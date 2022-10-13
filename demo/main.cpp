@@ -12,15 +12,44 @@ auto fun(double x) {
     return x * x - 5;
 }
 
-int main() {
+template<typename S>
+void print(S solver, std::pair<double, double> b) {
 
-    using namespace numerix::roots;
+    auto bounds = b;
+    solver.init(bounds);
 
-    //auto solver = bisection([](double x) {return x * x - 5;});
-    auto solver = dnewton(fun);
-    auto guess = 10.0;
+    std::cout << "----------------------------------------------------------------------------------\n";
+    std::cout << fmt::format("{:>10} | {:>15} | {:>15} | {:>15} | {:>15} ", "Iter", "Upper", "Lower", "Root", "Error") << std::endl;
+    std::cout << "----------------------------------------------------------------------------------\n";
+
+    for (int i = 0; i <= 100; ++i) {
+
+        std::cout << fmt::format("{:10} | {:15.10f} | {:15.10f} | {:15.10f} | {:15.10f} "
+                                 , i
+                                 , bounds.first
+                                 , bounds.second
+                                 , (bounds.first + bounds.second) / 2.0
+                                 , abs(solver.evaluate((bounds.first + bounds.second) / 2.0))) << std::endl;
+
+        if (abs(solver.evaluate((bounds.first + bounds.second) / 2.0)) < 1.0E-15) break;
+
+        solver.iterate();
+        bounds = solver.result();
+
+    }
+
+    std::cout << std::fixed << std::setprecision(20 )<< "CONVERGED! Root found at: " << (bounds.first + bounds.second) / 2.0 << "\n";
+    std::cout << "----------------------------------------------------------------------------------\n\n";
+
+}
+
+template<typename S>
+void print(S solver, double g) {
+
+    auto guess = g;
     solver.init(guess);
 
+    std::cout << "------------------------------------------------------------------\n";
     std::cout << fmt::format("{:>10} | {:>25} | {:>25} ", "Iter", "Root", "Error") << std::endl;
     std::cout << "------------------------------------------------------------------\n";
 
@@ -36,19 +65,25 @@ int main() {
         guess = solver.result();
     }
 
-    std::cout << "------------------------------------------------------------------\n";
+    std::cout << std::fixed << std::setprecision(20 )<< "CONVERGED! Root found at: " << guess << "\n";
+    std::cout << "------------------------------------------------------------------\n\n";
+}
 
-    auto result1 = fsolve(ridders(fun), std::make_pair(0.0, 2.5), 1.0E-15);
-    std::cout << std::setprecision(20) << result1 << std::endl;
+int main() {
 
-    auto result2 = fsolve(bisection(fun), std::make_pair(0.0, 2.5), 1.0E-15);
-    std::cout << std::setprecision(20) << result2 << std::endl;
+    using namespace numerix::roots;
 
-    auto result3 = fdfsolve(dnewton(fun), 3.0, 1.0E-15);
-    std::cout << std::setprecision(20) << result3 << std::endl;
+    std::cout << "RIDDERS:" << std::endl;
+    print(ridders(fun), std::make_pair(0.0, 2.5));
 
-    auto result4 = fdfsolve(newton(fun, [](double x){return 2 * x;}), 3.0, 1.0E-15);
-    std::cout << std::setprecision(20) << result4 << std::endl;
+    std::cout << "BISECTION:" << std::endl;
+    print(bisection(fun), std::make_pair(0.0, 2.5));
+
+    std::cout << "DISCRETE NEWTON:" << std::endl;
+    print(dnewton(fun), 3.0);
+
+    std::cout << "NEWTON:" << std::endl;
+    print(newton(fun, [](double x){return 2 * x;}), 3.0);
 
     return 0;
 }
