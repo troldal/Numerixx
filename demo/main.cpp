@@ -58,7 +58,6 @@ void print(S solver, double g) {
 
         std::cout << fmt::format("{:10} | {:25.20f} | {:25.20f} ", i, guess, abs(solver.evaluate(guess))) << std::endl;
 
-
         if (abs(solver.evaluate(guess)) < 1.0E-15) break;
 
         solver.iterate();
