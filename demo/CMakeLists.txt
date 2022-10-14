@@ -13,10 +13,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 #=================================================================================================================
 # Define TEST target
 #=================================================================================================================
-add_executable(Demo1)
-target_sources(Demo1
+add_executable(DemoRoot)
+target_sources(DemoRoot
         PRIVATE
-        main.cpp
+        DemoRoot.cpp
         )
 
-target_link_libraries(Demo1 PRIVATE fmt numerix)
+target_link_libraries(DemoRoot PRIVATE fmt numerix)
+
+add_executable(DemoPoly)
+target_sources(DemoPoly
+        PRIVATE
+        DemoPoly.cpp
+        )
+
+target_link_libraries(DemoPoly PRIVATE fmt numerix)

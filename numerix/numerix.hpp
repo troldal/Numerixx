@@ -6,5 +6,7 @@
 #define NUMERIX_NUMERIX_HPP
 
 #include "roots/roots.hpp"
+#include "poly/polynomial.hpp"
+#include "polyroots/polyroots.hpp"
 
 #endif    // NUMERIX_NUMERIX_HPP

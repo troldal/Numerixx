@@ -8,9 +8,8 @@
 #include <fmt/format.h>
 #include <numerix.hpp>
 
-auto fun(double x) {
-    return x * x - 5;
-}
+
+auto fun = numerix::poly::polynomial({-5.0, 0.0, 1.0});
 
 template<typename S>
 void print(S solver, std::pair<double, double> b) {
@@ -82,7 +81,7 @@ int main() {
     print(dnewton(fun), 3.0);
 
     std::cout << "NEWTON:" << std::endl;
-    print(newton(fun, [](double x){return 2 * x;}), 3.0);
+    print(newton(fun, [&](double x){return fun.derivative(x);}), 1.25);
 
     return 0;
 }
