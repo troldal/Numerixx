@@ -42,7 +42,7 @@
 #include <algorithm>
 #include <tuple>
 
-#include "../differentiation.hpp"
+#include "calculus/derivatives.hpp"
 
 namespace numerix::roots
 {
@@ -119,7 +119,7 @@ namespace numerix::roots
      * @tparam Fn
      */
     template<typename Algo, typename Fn>
-    requires std::is_invocable_v<Fn, float>
+    requires std::is_invocable_v<Fn, double>
     class BracketingBase {
 
     private:
@@ -180,7 +180,7 @@ namespace numerix::roots
      * @brief
      */
     template<typename Fn>
-    requires std::is_invocable_v<Fn, float>
+    requires std::is_invocable_v<Fn, double>
     class ridders final : public BracketingBase<ridders<Fn>, Fn>
     {
         using Base = BracketingBase<ridders<Fn>, Fn>;
@@ -260,7 +260,7 @@ namespace numerix::roots
      * @tparam Fn
      */
     template<typename Fn>
-    requires std::is_invocable_v<Fn, float>
+    requires std::is_invocable_v<Fn, double>
     class bisection final : public BracketingBase<bisection<Fn>, Fn>
     {
         using Base = BracketingBase<bisection<Fn>, Fn>;
@@ -433,7 +433,7 @@ namespace numerix::roots
          * @brief
          * @param objective
          */
-        explicit dnewton(Fn objective) : Base(objective, [=](double x){return numeric::diff_central(objective, x);}){}
+        explicit dnewton(Fn objective) : Base(objective, [=](double x){return numerix::deriv::central(objective, x);}){}
 
         /**
          * @brief

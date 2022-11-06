@@ -28,3 +28,19 @@ target_sources(DemoPoly
         )
 
 target_link_libraries(DemoPoly PRIVATE fmt numerix)
+
+add_executable(DemoMatrix)
+target_sources(DemoMatrix
+        PRIVATE
+        DemoMatrix.cpp
+        )
+
+target_link_libraries(DemoMatrix PRIVATE numerix)
+
+add_executable(DemoDeriv)
+target_sources(DemoDeriv
+        PRIVATE
+        DemoDeriv.cpp
+        )
+
+target_link_libraries(DemoDeriv PRIVATE numerix)

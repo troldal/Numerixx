@@ -5,8 +5,10 @@
 #ifndef NUMERIX_NUMERIX_HPP
 #define NUMERIX_NUMERIX_HPP
 
-#include "roots/roots.hpp"
+#include "linalg/GaussJordan.h"
+#include "linalg/Matrix.hpp"
 #include "poly/polynomial.hpp"
 #include "polyroots/polyroots.hpp"
+#include "roots/roots.hpp"
 
 #endif    // NUMERIX_NUMERIX_HPP
