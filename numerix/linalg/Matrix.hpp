@@ -461,7 +461,7 @@ namespace numerix::linalg
         int m_rowCount; /**< */
         int m_colCount; /**< */
         //MatrixSlice m_slice; /**< */
-        Slice m_rowslice;
+        Slice m_rowSlice;
         Slice m_colSlice;
 
         /**
@@ -505,7 +505,10 @@ namespace numerix::linalg
         Matrix(int rows, int columns) : m_rowCount{rows},
                                         m_colCount{columns},
                                         m_data(rows * columns),
-                                        m_slice(0, {rows, columns}, {columns, 1}){}
+                                        //m_slice(0, {rows, columns}, {columns, 1})
+                                        m_rowSlice(0, rows, columns),
+                                        m_colSlice(0, columns, 1)
+        {}
 
         /**
          * @brief
@@ -543,7 +546,7 @@ namespace numerix::linalg
          * @return
          */
         auto operator[](const int i) {
-            return std::span (&m_data.data()[i * m_slice.colCount()], m_slice.colCount());
+            return std::span (&m_data.data()[i * m_colSlice.length()], m_colSlice.length());
         }
 
         /**
@@ -552,7 +555,7 @@ namespace numerix::linalg
          * @return
          */
         const auto operator[](int i) const {
-            return std::span (&m_data.data()[i * m_slice.colCount()], m_slice.colCount());
+            return std::span (&m_data.data()[i * m_colSlice.length()], m_colSlice.length());
         }
 
         /**
@@ -581,8 +584,8 @@ namespace numerix::linalg
         auto col(int i) const {
 
             std::vector<T> result;
-            for (int row = 0; row < m_slice.rowCount(); ++row)
-                result.push_back(m_data[row * m_slice.colCount() + i]);
+            for (int row = 0; row < m_rowSlice.length(); ++row)
+                result.push_back(m_data[row * m_colSlice.length() + i]);
 
             return result;
         }
@@ -609,7 +612,7 @@ namespace numerix::linalg
          * @return
          */
         Matrix& operator-=(const Matrix& other) {
-            assert(other.rowCount() == m_slice.rowCount() && other.colCount() == m_slice.colCount());
+            assert(other.rowCount() == m_rowSlice.length() && other.colCount() == m_colSlice.length());
             std::transform(other.m_data.begin(), other.m_data.end(), m_data.begin(), m_data.begin(), std::minus<T>());
             return *this;
         }
@@ -654,10 +657,10 @@ namespace numerix::linalg
         }
 
         Matrix& operator*=(const Matrix& other) {
-            assert(m_slice.colCount() == other.rowCount());
+            assert(m_colSlice.length() == other.rowCount());
             
             std::vector<T> result;
-            for (int r = 0; r < m_slice.rowCount(); ++r)
+            for (int r = 0; r < m_rowSlice.length(); ++r)
                 for (int c = 0; c < other.colCount(); ++c)
                     result.push_back(std::inner_product(row(r).begin(), row(r).end(), other.col(c).begin(), 0.0));
 
@@ -667,7 +670,7 @@ namespace numerix::linalg
         }
 
         void augment(Matrix<T>& mat) {
-            assert(mat.colCount() == 1 && mat.rowCount() == m_slice.rowCount());
+            assert(mat.colCount() == 1 && mat.rowCount() == m_rowSlice.length());
 
             //Matrix<T> result (rowCount(), colCount() + 1);
 
