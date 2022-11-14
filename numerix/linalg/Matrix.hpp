@@ -260,6 +260,7 @@ namespace numerix::linalg
 
         /**
          * @brief The CRTP base class for the Matrix and MatrixProxy classes.
+         * This class provides basic functionality common to both the Matrix and MatrixProxy classes.
          * @tparam DERIVED The derived class used for CRTP
          */
         template<typename DERIVED>
@@ -271,19 +272,24 @@ namespace numerix::linalg
             using value_type = typename MatrixTraits<DERIVED>::value_type;
 
             /**
-             * @brief
-             * @param row
-             * @param col
-             * @return
+             * @brief The index() function converts the row/column indeces to an index of the item in the raw array.
+             * @param row The row index of the element.
+             * @param col The column index of the element.
+             * @return The index of the element in the raw array.
              */
             size_t index(size_t row, size_t col) const {
                 const DERIVED& derived = static_cast<const DERIVED&>(*this);
-                if (row >= derived.m_slice.rowCount() || col >= derived.m_slice.colCount())
+                if (row >= derived.m_rowSlice.length() || col >= derived.m_colSlice.length())
                     throw std::out_of_range("Index out of bounds.");
 
-                return derived.m_slice(row, col);
+                return (derived.m_rowSlice.start() + row) * derived.m_rowSlice.stride() +
+                       (derived.m_colSlice.start() + col) * derived.m_colSlice.stride();
             }
 
+            /**
+             * @brief
+             * @return
+             */
             MatrixExtents extents() const {
                 const DERIVED& derived = static_cast<const DERIVED&>(*this);
                 return derived.extents();
@@ -292,10 +298,10 @@ namespace numerix::linalg
         public:
 
             /**
-             * @brief
-             * @param row
-             * @param col
-             * @return
+             * @brief Function call operator overload, for providing Fortran-like element access.
+             * @param row The row index.
+             * @param col The column index.
+             * @return A reference to the matrix element.
              */
             value_type& operator()(size_t row, size_t col) {
                 DERIVED& derived = static_cast<DERIVED&>(*this);
@@ -303,62 +309,95 @@ namespace numerix::linalg
             }
 
             /**
-             * @brief
-             * @param row
-             * @param col
-             * @return
+             * @brief Const function call operator overload, for providing Fortran-like element access.
+             * @param row The row index.
+             * @param col The column index.
+             * @return A const reference to the matrix element.
              */
-            value_type operator()(size_t row, size_t col) const {
+            const value_type& operator()(size_t row, size_t col) const {
                 const DERIVED& derived = static_cast<const DERIVED&>(*this);
-
                 return derived.m_data[index(row, col)];
             }
 
             /**
-             * @brief
-             * @param rowSlice
-             * @param colSlice
-             * @return
+             * @brief Function call operator overload, for getting a MatrixProxy object for a subset of the elements.
+             * @param rowSlice The Slice object defining the rows.
+             * @param colSlice The Slice object defining the columns.
+             * @return A MatrixProxy object with the subset of matrix elements.
              */
             auto operator()(const Slice& rowSlice, const Slice& colSlice) {
                 DERIVED& derived = static_cast<DERIVED&>(*this);
                 return derived.slice(rowSlice, colSlice);
             }
 
+            /**
+             * @brief Get the number of rows in the Matrix (or MatrixProxy) object.
+             * @return The number of rows.
+             */
             size_t rowCount() const {
                 const DERIVED& derived = static_cast<const DERIVED&>(*this);
-                return derived.m_slice.rowCount();
+                return derived.m_rowSlice.length();
             }
 
+            /**
+             * @brief Get the number of columns in the Matrix (or MatrixProxy) object.
+             * @return The number of columns.
+             */
             size_t colCount() const {
                 const DERIVED& derived = static_cast<const DERIVED&>(*this);
-                return derived.m_slice.colCount();
+                return derived.m_colSlice.length();
             }
 
+            /**
+             * @brief Determine if the Matrix (or MatrixProxy) object is square (i.e. rowCount == colCount).
+             * @return If yes, true. Otherwise false.
+             */
             bool isSquare() const {
                 return rowCount() == colCount();
             }
 
+            /**
+             * @brief Get a begin-iterator, i.e. an iterator pointing to the first (upper left) element.
+             * @return An iterator to the first element
+             */
             SliceIter<value_type> begin() {
                 DERIVED& derived = static_cast<DERIVED&>(*this);
                 return SliceIter<value_type>(derived.data(), derived.m_slice);
             }
 
+            /**
+             * @brief Get a const begin-iterator, i.e. an iterator pointing to the first (upper left) element.
+             * @return A const iterator to the first element
+             */
             SliceIterConst<value_type> begin() const {
                 const DERIVED& derived = static_cast<const DERIVED&>(*this);
                 return SliceIterConst<value_type>(derived.data(), derived.m_slice);
             }
 
+            /**
+             * @brief Get an end-iterator, i.e. an iterator pointing to one past the last (lower right) element.
+             * @return An iterator to one past the last element.
+             */
             SliceIter<value_type> end() {
                 DERIVED& derived = static_cast<DERIVED&>(*this);
                 return SliceIter<value_type>(derived.data(), derived.m_slice).end();
             }
 
+            /**
+             * @brief Get aconst end-iterator, i.e. an iterator pointing to one past the last (lower right) element.
+             * @return A const iterator to one past the last element.
+             */
             SliceIterConst<value_type> end() const {
                 const DERIVED& derived = static_cast<const DERIVED&>(*this);
                 return SliceIterConst<value_type>(derived.data(), derived.m_slice).end();
             }
 
+            /**
+             * @brief Matrix/Matrix add assignment operator. I.e. adds two Matrix of MatrixProxy objects, with the same size.
+             * @tparam T The type of matrix to be added, i.e. Matrix or MatrixProxy.
+             * @param other The Matrix of MatrixProxy to be added.
+             * @return A reference to the current object, after addition.
+             */
             template<typename T>
             requires (std::is_same_v<T, Matrix<value_type>> || std::is_same_v<T, MatrixProxy<value_type>>)
             DERIVED& operator+=(const T& other) {
@@ -368,101 +407,61 @@ namespace numerix::linalg
                 return derived;
             }
 
+            /**
+             * @brief Scalar add assignment operator. I.e. adds a scalar value to all elements of the Matrix.
+             * @tparam T The type of scalar to add. Can be any number type, except char and bool.
+             * @param value The scalar value.
+             * @return A reference to the current object, after addition.
+             */
             template<typename T>
-                requires std::is_arithmetic_v<T> && (!std::is_same_v<T, bool>) && (!std::is_same_v<T, char>)
+            requires std::is_arithmetic_v<T> && (!std::is_same_v<T, bool>) && (!std::is_same_v<T, char>)
             DERIVED& operator+=(T value) {
                 DERIVED& derived = static_cast<DERIVED&>(*this);
                 for (auto& item : derived) item += value;
                 return derived;
             }
-
         };
     }
 
     /**
-     * @brief
-     * @tparam T
+     * @brief The MatrixProxy class is a view into a subset of the elements of a Matrix. It derives from the MatrixBase class using CRTP.
+     * An object of the MatrixProxy class does not own the data; the data is owned by the corresponding Matrix object.
+     * @tparam T The type of the underlying matrix elements. Default is double, but can be any kind of floating point or integer number.
+     * @todo Consider putting in the impl namespace, as MatrixProxy objects should only be created from a Matrix object.
      */
     template<typename T>
-        requires std::is_arithmetic_v<T> && (!std::is_same_v<T, bool>) && (!std::is_same_v<T, char>)
+    requires std::is_arithmetic_v<T> && (!std::is_same_v<T, bool>) && (!std::is_same_v<T, char>)
     class MatrixProxy : public impl::MatrixBase<MatrixProxy<T>>
     {
         /*
-         * Friend declarations
+         * Friend declarations. Necessary for the base class to access elements of MatrixProxy using CRTP.
          */
         friend impl::MatrixBase<MatrixProxy<T>>;
 
+        /**
+         * @brief
+         * @return
+         */
         MatrixExtents extents() const {
-            return m_extents;
+            return MatrixExtents(m_rowSlice.length(), m_colSlice.length());
         }
 
     public:
 
+        /**
+         * Alias declatations. To be consistant with standard library containers.
+         */
         using value_type = T;
 
-        MatrixProxy(const MatrixExtents& extents, const MatrixSlice& slice, T* data) : m_extents(extents),
-                                                                                       m_slice(slice),
-                                                                                       m_data(data) {}
-
-        auto slice(const Slice& rowSlice, const Slice& colSlice) {
-
-            //if (rowSlice.start() + rowSlice.stride() * (rowSlice.length() - 1) >= m_slice.rowCount())
-            //    throw std::out_of_range("Row index out of bounds.");
-
-            //if (colSlice.start() + colSlice.stride() * (colSlice.length() - 1) >= m_slice.colCount())
-            //    throw std::out_of_range("Column index out of bounds.");
-
-            auto delta = MatrixExtents(extents().rowCount() - m_slice.rowCount(), extents().colCount() - m_slice.colCount());
-            auto rSlice = Slice(rowSlice.start() + delta.rowCount(), rowSlice.length(), rowSlice.stride() + delta.rowCount());
-            auto cSlice = Slice(colSlice.start() + delta.colCount(), colSlice.length(), colSlice.stride());
-
-
-            auto start = rSlice.start() * m_slice.colCount() + cSlice.start();
-            auto slice = MatrixSlice(start, {rSlice.length(), cSlice.length()}, {rSlice.stride() * m_slice.colCount(), cSlice.stride()});
-
-            return MatrixProxy(m_extents, slice, data());
-        }
-
-    private:
-
-        T* data() {
-            return m_data;
-        }
-
-        const T* data() const {
-            return m_data;
-        }
-
-        Slice m_rowSlice;
-        Slice m_colSlice;
-        //MatrixSlice m_slice;
-        T* m_data;
-        //MatrixExtents m_extents;
-    };
-
-
-
-
-    /**
-     * @brief
-     * @tparam T
-     */
-    template<typename T>
-        requires std::is_arithmetic_v<T> && (!std::is_same_v<T, bool>) && (!std::is_same_v<T, char>)
-    class Matrix : public impl::MatrixBase<Matrix<T>>
-    {
-        /*
-         * Friend declarations
+        /**
+         * @brief
+         * @param rowSlice
+         * @param colSlice
+         * @param data
          */
-        friend impl::MatrixBase<Matrix<T>>;
-
-    private:
-        std::vector<T> m_data; /**< */
-        int m_rowCount; /**< */
-        int m_colCount; /**< */
-        //MatrixSlice m_slice; /**< */
-        Slice m_rowSlice;
-        Slice m_colSlice;
+        MatrixProxy(const Slice& rowSlice, const Slice& colSlice, T* data) : m_rowSlice(rowSlice),
+                                                                                       m_colSlice(colSlice),
+                                                                                       m_data(data) {}
 
         /**
          * @brief
@@ -472,71 +471,148 @@ namespace numerix::linalg
          */
         auto slice(const Slice& rowSlice, const Slice& colSlice) {
 
+            //if (rowSlice.start() + rowSlice.stride() * (rowSlice.length() - 1) >= m_slice.rowCount())
+            //    throw std::out_of_range("Row index out of bounds.");
+
+            //if (colSlice.start() + colSlice.stride() * (colSlice.length() - 1) >= m_slice.colCount())
+            //    throw std::out_of_range("Column index out of bounds.");
+
+            auto delta = MatrixExtents(extents().rowCount() - m_rowSlice.length(), extents().colCount() - m_colSlice.length());
+            auto rSlice = Slice(rowSlice.start() + delta.rowCount(), rowSlice.length(), rowSlice.stride() + delta.rowCount());
+            auto cSlice = Slice(colSlice.start() + delta.colCount(), colSlice.length(), colSlice.stride());
+
+
+            auto start = rSlice.start() * m_colSlice.length() + cSlice.start();
+            auto slice = MatrixSlice(start, {rSlice.length(), cSlice.length()}, {rSlice.stride() * m_colSlice.length(), cSlice.stride()});
+
+            return MatrixProxy(rowSlice, colSlice, data());
+        }
+
+    private:
+
+        /**
+         * @brief
+         * @return
+         */
+        T* data() {
+            return m_data;
+        }
+
+        /**
+         * @brief
+         * @return
+         */
+        const T* data() const {
+            return m_data;
+        }
+
+        Slice m_rowSlice; /**< */
+        Slice m_colSlice; /**< */
+        //MatrixSlice m_slice; /**< */
+        T* m_data; /**< */
+        //MatrixExtents m_extents; /**< */
+    };
+
+
+    /**
+     * @brief The Matrix class is the main abstraction for matrices. It derives from the MatrixBase class using CRTP.
+     * The Matrix class owns the underlying data, unlike the MatrixProxy class which simply is a view into a Matrix object.
+     * @tparam T The type of the underlying matrix elements. Default is double, but can be any kind of floating point or integer number.
+     */
+    template<typename T = double>
+        requires std::is_arithmetic_v<T> && (!std::is_same_v<T, bool>) && (!std::is_same_v<T, char>)
+    class Matrix : public impl::MatrixBase<Matrix<T>>
+    {
+        /**
+         * Friend declarations. Necessary for the base class to access elements of Matrix using CRTP.
+         */
+        friend impl::MatrixBase<Matrix<T>>;
+
+    private:
+        // TODO: Consider using an Extents class, rather than row and col count.
+        std::vector<T> m_data; /**< The underlying array of matrix elements. */
+        int m_rowCount; /**< The number of rows in the matrix. */
+        int m_colCount; /**< The number of columns in the matrix. */
+        Slice m_rowSlice; /**< The Slice describing the rows. Required to provide a common interface with MatrixProxy. */
+        Slice m_colSlice; /**< The Slice describing the columns. Required to provide a common interface with MatrixProxy. */
+
+        /**
+         * @brief Create a MatrixProxy object, based on the input row and column slices.
+         * @param rowSlice The Slice object describing the row elements.
+         * @param colSlice The Slice object describing the column elements.
+         * @return A MatrixProxy object for the subset of Matrix elements included in the slices.
+         */
+        auto slice(const Slice& rowSlice, const Slice& colSlice) {
+
 //            if (rowSlice.start() + rowSlice.stride() * (rowSlice.length() - 1) >= m_slice.rowCount())
-            if (rowSlice.length() > m_slice.rowCount())
+            if (rowSlice.length() > m_rowSlice.length())
                 throw std::out_of_range("Row index out of bounds.");
 
 //            if (colSlice.start() + colSlice.stride() * (colSlice.length() - 1) >= m_slice.colCount())
-            if (colSlice.length() > m_slice.colCount())
+            if (colSlice.length() > m_colSlice.length())
                 throw std::out_of_range("Column index out of bounds.");
 
-            auto start = rowSlice.start() * m_slice.colCount() + colSlice.start();
-            auto slice = MatrixSlice(start, {rowSlice.length(), colSlice.length()}, {rowSlice.stride() * m_slice.colCount(), colSlice.stride()});
+            auto start = rowSlice.start() * m_colSlice.length() + colSlice.start();
+            auto slice = MatrixSlice(start, {rowSlice.length(), colSlice.length()}, {rowSlice.stride() * m_colSlice.length(), colSlice.stride()});
 
-            return MatrixProxy(extents(), slice, data());
+            return MatrixProxy(rowSlice, colSlice, data());
         }
 
+        /**
+         * @brief Get a MatrixExtents object describing the extents of the Matrix object,
+         * @return The MatrixExtents object.
+         */
         MatrixExtents extents() const {
-            return MatrixExtents(m_slice.rowCount(), m_slice.colCount());
+            return MatrixExtents(m_rowSlice.length(), m_colSlice.length());
         }
 
     public:
 
-        /*
-         * Alias declatations
+        /**
+         * Alias declatations. To be consistant with standard library containers.
          */
         using value_type = T;
 
         /**
-         * @brief
-         * @param rows
-         * @param columns
+         * @brief Constructor taking the number of rows and columns.
+         * @param rows Number of rows.
+         * @param cols Number of cols.
          */
-        Matrix(int rows, int columns) : m_rowCount{rows},
-                                        m_colCount{columns},
-                                        m_data(rows * columns),
-                                        //m_slice(0, {rows, columns}, {columns, 1})
-                                        m_rowSlice(0, rows, columns),
-                                        m_colSlice(0, columns, 1)
+        Matrix(int rows, int cols) : m_rowCount{rows},
+                                        m_colCount{cols},
+                                        m_data(rows * cols),
+                                        m_rowSlice(0, rows, cols),
+                                        m_colSlice(0, cols, 1)
         {}
 
         /**
-         * @brief
-         * @param other
+         * @brief Copy constructor.
+         * @param other Object to be copied.
          */
         Matrix(const Matrix& other) = default;
 
         /**
-         * @brief
-         * @param other
+         * @brief Move constructor.
+         * @param other Object to be moved.
          */
         Matrix(Matrix&& other) noexcept = default;
 
         /**
-         * @brief
+         * @brief Destructor.
          */
         ~Matrix() = default;
 
         /**
-         * @brief
-         * @return
+         * @brief Copy assignment operator.
+         * @param other Object to be copied.
+         * @return The copied-to object.
          */
-        Matrix& operator=(const Matrix&) = default;
+        Matrix& operator=(const Matrix& other) = default;
 
         /**
-         * @brief
-         * @param other
-         * @return
+         * @brief Move assignment operator.
+         * @param other Object to be moved.
+         * @return The moved-to object.
          */
         Matrix& operator=(Matrix&& other) noexcept = default;
 
@@ -544,6 +620,7 @@ namespace numerix::linalg
          * @brief
          * @param i
          * @return
+         * @todo Needs new implementation.
          */
         auto operator[](const int i) {
             return std::span (&m_data.data()[i * m_colSlice.length()], m_colSlice.length());
@@ -553,6 +630,7 @@ namespace numerix::linalg
          * @brief
          * @param i
          * @return
+         * @todo Needs new implementation.
          */
         const auto operator[](int i) const {
             return std::span (&m_data.data()[i * m_colSlice.length()], m_colSlice.length());
@@ -562,6 +640,7 @@ namespace numerix::linalg
          * @brief
          * @param i
          * @return
+         * @todo Needs new implementation.
          */
         const auto row(int i) const {
             return (*this)[i];
@@ -571,6 +650,7 @@ namespace numerix::linalg
          * @brief
          * @param i
          * @return
+         * @todo Needs new implementation.
          */
         auto row(int i) {
             return (*this)[i];
@@ -580,6 +660,7 @@ namespace numerix::linalg
          * @brief
          * @param i
          * @return
+         * @todo Needs new implementation.
          */
         auto col(int i) const {
 
@@ -591,25 +672,25 @@ namespace numerix::linalg
         }
 
         /**
-         * @brief
-         * @return
+         * @brief Access the raw array of Matrix elements.
+         * @return A pointer to the first element.
          */
         T* data() {
             return m_data.data();
         }
 
         /**
-         * @brief
-         * @return
+         * @brief Access the raw array of Matrix elements.
+         * @return A const pointer to the first element.
          */
         const T* data() const {
             return m_data.data();
         }
 
         /**
-         * @brief
-         * @param other
-         * @return
+         * @brief Subtract two Matrix'es, element by element.
+         * @param other The Matrix to subtract.
+         * @return The Matrix after subtraction.
          */
         Matrix& operator-=(const Matrix& other) {
             assert(other.rowCount() == m_rowSlice.length() && other.colCount() == m_colSlice.length());
@@ -618,10 +699,10 @@ namespace numerix::linalg
         }
 
         /**
-         * @brief
-         * @tparam U
-         * @param value
-         * @return
+         * @brief Subtract a scalar from a Matrix.
+         * @tparam U The type of the scalar to subtract.
+         * @param value The value to subtract.
+         * @return The Matrix after subtraction.
          */
         template<typename U>
         requires std::is_arithmetic_v<T> && (!std::is_same_v<T, bool>) && (!std::is_same_v<T, char>)
@@ -631,7 +712,7 @@ namespace numerix::linalg
         }
 
         /**
-         * @brief
+         * @brief 
          * @tparam U
          * @param value
          * @return
