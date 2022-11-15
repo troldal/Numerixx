@@ -459,9 +459,9 @@ namespace numerix::linalg
          * @param colSlice
          * @param data
          */
-        MatrixProxy(const Slice& rowSlice, const Slice& colSlice, T* data) : m_rowSlice(rowSlice),
+        MatrixProxy(const Slice& rowSlice, const Slice& colSlice, Matrix<T>* matrix) : m_rowSlice(rowSlice),
                                                                                        m_colSlice(colSlice),
-                                                                                       m_data(data) {}
+                                                                                       m_matrix(matrix) {}
 
         /**
          * @brief
@@ -476,6 +476,8 @@ namespace numerix::linalg
 
             //if (colSlice.start() + colSlice.stride() * (colSlice.length() - 1) >= m_slice.colCount())
             //    throw std::out_of_range("Column index out of bounds.");
+
+
 
             auto delta = MatrixExtents(extents().rowCount() - m_rowSlice.length(), extents().colCount() - m_colSlice.length());
             auto rSlice = Slice(rowSlice.start() + delta.rowCount(), rowSlice.length(), rowSlice.stride() + delta.rowCount());
@@ -495,7 +497,7 @@ namespace numerix::linalg
          * @return
          */
         T* data() {
-            return m_data;
+            return m_parent;
         }
 
         /**
@@ -509,8 +511,9 @@ namespace numerix::linalg
         Slice m_rowSlice; /**< */
         Slice m_colSlice; /**< */
         //MatrixSlice m_slice; /**< */
-        T* m_data; /**< */
+//        T* m_data; /**< */
         //MatrixExtents m_extents; /**< */
+        Matrix<T>* m_matrix;
     };
 
 
@@ -523,14 +526,22 @@ namespace numerix::linalg
         requires std::is_arithmetic_v<T> && (!std::is_same_v<T, bool>) && (!std::is_same_v<T, char>)
     class Matrix : public impl::MatrixBase<Matrix<T>>
     {
+    private:
+
         /**
          * Friend declarations. Necessary for the base class to access elements of Matrix using CRTP.
          */
         friend impl::MatrixBase<Matrix<T>>;
+        friend MatrixProxy<T>;
 
-    private:
+        /**
+         * Private alias declatations.
+         */
+        using parent = impl::MatrixBase<Matrix<T>>;
+
         // TODO: Consider using an Extents class, rather than row and col count.
         std::vector<T> m_data; /**< The underlying array of matrix elements. */
+        // TODO: Delete m_rowCount and m_colCount from the internal datastructure.
         int m_rowCount; /**< The number of rows in the matrix. */
         int m_colCount; /**< The number of columns in the matrix. */
         Slice m_rowSlice; /**< The Slice describing the rows. Required to provide a common interface with MatrixProxy. */
@@ -562,14 +573,14 @@ namespace numerix::linalg
          * @brief Get a MatrixExtents object describing the extents of the Matrix object,
          * @return The MatrixExtents object.
          */
-        MatrixExtents extents() const {
-            return MatrixExtents(m_rowSlice.length(), m_colSlice.length());
-        }
+//        MatrixExtents extents() const {
+//            return MatrixExtents(m_rowSlice.length(), m_colSlice.length());
+//        }
 
     public:
 
         /**
-         * Alias declatations. To be consistant with standard library containers.
+         * Public alias declatations. To be consistant with standard library containers.
          */
         using value_type = T;
 
@@ -615,6 +626,14 @@ namespace numerix::linalg
          * @return The moved-to object.
          */
         Matrix& operator=(Matrix&& other) noexcept = default;
+
+        /**
+         * @brief
+         * @return
+         */
+        auto dimensions() const {
+            return std::make_pair(parent::rowCount(), parent::colCount());
+        }
 
         /**
          * @brief
@@ -712,7 +731,7 @@ namespace numerix::linalg
         }
 
         /**
-         * @brief 
+         * @brief
          * @tparam U
          * @param value
          * @return
@@ -737,6 +756,11 @@ namespace numerix::linalg
             return *this;
         }
 
+        /**
+         * @brief
+         * @param other
+         * @return
+         */
         Matrix& operator*=(const Matrix& other) {
             assert(m_colSlice.length() == other.rowCount());
             
