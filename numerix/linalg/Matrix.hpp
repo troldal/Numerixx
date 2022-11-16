@@ -223,6 +223,15 @@ namespace numerix::linalg
 
     public:
 
+        /*
+         * Alias declarations.
+         */
+        using iterator_category = std::forward_iterator_tag;
+        using value_type        = T;
+        using difference_type   = size_t;
+        using pointer           = T*;
+        using reference         = T&;
+
         /**
          * @brief
          * @param data
@@ -270,6 +279,14 @@ namespace numerix::linalg
 
         /**
          * @brief
+         * @return
+         */
+        T* operator->() {
+            return &m_data[m_slice(m_current)];
+        }
+
+        /**
+         * @brief
          * @param other
          * @return
          */
@@ -308,6 +325,15 @@ namespace numerix::linalg
         size_t m_current; /**< */
 
     public:
+
+        /*
+         * Alias declarations.
+         */
+        using iterator_category = std::forward_iterator_tag;
+        using value_type        = T;
+        using difference_type   = size_t;
+        using pointer           = T*;
+        using reference         = T&;
 
         /**
          * @brief
@@ -352,6 +378,14 @@ namespace numerix::linalg
          */
         const T& operator*() const {
             return m_data[m_slice(m_current)];
+        }
+
+        /**
+         * @brief
+         * @return
+         */
+        const T* operator->() {
+            return &m_data[m_slice(m_current)];
         }
 
         /**
@@ -429,8 +463,8 @@ namespace numerix::linalg
                 if (row >= derived.m_rowSlice.length() || col >= derived.m_colSlice.length())
                     throw std::out_of_range("Index out of bounds.");
 
-                return (derived.m_rowSlice.start() + row) * derived.m_rowSlice.stride() +
-                       (derived.m_colSlice.start() + col) * derived.m_colSlice.stride();
+                size_t start = derived.m_rowSlice.start() * derived.dimensions().second + derived.m_colSlice.start();
+                return start + row * derived.m_rowSlice.stride() + col * derived.m_colSlice.stride();
             }
 
         public:
@@ -599,9 +633,12 @@ namespace numerix::linalg
          */
         auto slice(const Slice& rowSlice, const Slice& colSlice); // NOTE: Implementation can be found after the MatrixProxy class.
 
-
+        /**
+         * @brief
+         * @return
+         */
         auto gslice() const {
-            auto start = m_rowSlice.start() * m_rowSlice.stride() + m_colSlice.start();
+            auto start = m_rowSlice.start() * dimensions().first + m_colSlice.start();
             return MatrixSlice(start, {m_rowSlice.length(), m_colSlice.length()}, {m_rowSlice.stride(), m_colSlice.stride()});
         }
 
@@ -840,7 +877,7 @@ namespace numerix::linalg
          * @return
          */
         auto gslice() const {
-            auto start = m_rowSlice.start() * m_rowSlice.stride() + m_colSlice.start();
+            auto start = m_rowSlice.start() * m_matrix->dimensions().first + m_colSlice.start();
             return MatrixSlice(start, {m_rowSlice.length(), m_colSlice.length()}, {m_rowSlice.stride(), m_colSlice.stride()});
         }
 
@@ -874,17 +911,20 @@ namespace numerix::linalg
 
             //if (colSlice.start() + colSlice.stride() * (colSlice.length() - 1) >= m_slice.colCount())
             //    throw std::out_of_range("Column index out of bounds.");
+            auto _1 = m_rowSlice.stride();
+            auto _2 = m_rowSlice.start();
+            auto rSlice = Slice(rowSlice.start() * (m_rowSlice.stride()/dimensions().second) + m_rowSlice.start(), rowSlice.length(), rowSlice.stride() * m_rowSlice.stride());
+            auto cSlice = Slice(colSlice.start() * m_colSlice.stride() + m_colSlice.start(), colSlice.length(), colSlice.stride() * m_colSlice.stride());
 
-            auto mDims = m_matrix->dimensions();
-            auto rDelta = mDims.first - m_rowSlice.length();
-            auto cDelta = mDims.second - m_colSlice.length();
-            auto rSlice = Slice(rowSlice.start() + rDelta, rowSlice.length(), rowSlice.stride() + rDelta);
-            auto cSlice = Slice(colSlice.start() + cDelta, colSlice.length(), colSlice.stride());
+            return MatrixProxy(rSlice, cSlice, m_matrix);
+        }
 
-            auto start = rSlice.start() * m_colSlice.length() + cSlice.start();
-            auto slice = MatrixSlice(start, {rSlice.length(), cSlice.length()}, {rSlice.stride() * m_colSlice.length(), cSlice.stride()});
-
-            return MatrixProxy(rowSlice, colSlice, m_matrix);
+        /**
+         * @brief
+         * @return
+         */
+        auto dimensions() const {
+            return m_matrix->dimensions();
         }
 
     private:
@@ -907,14 +947,11 @@ namespace numerix::linalg
 
         Slice m_rowSlice; /**< */
         Slice m_colSlice; /**< */
-        //MatrixSlice m_slice; /**< */
-//        T* m_data; /**< */
-        //MatrixExtents m_extents; /**< */
-        Matrix<T>* m_matrix;
+        Matrix<T>* m_matrix; /**< */
     };
 
     template<typename T>
-        requires std::is_arithmetic_v<T> && (!std::is_same_v<T, bool>) && (!std::is_same_v<T, char>)
+    requires std::is_arithmetic_v<T> && (!std::is_same_v<T, bool>) && (!std::is_same_v<T, char>)
     auto Matrix<T>::slice(const Slice& rowSlice, const Slice& colSlice)
     {
 
@@ -926,10 +963,9 @@ namespace numerix::linalg
         if (colSlice.length() > m_colSlice.length())
             throw std::out_of_range("Column index out of bounds.");
 
-        auto start = rowSlice.start() * m_colSlice.length() + colSlice.start();
-        auto slice = MatrixSlice(start, {rowSlice.length(), colSlice.length()}, {rowSlice.stride() * m_colSlice.length(), colSlice.stride()});
+        auto rSlice = Slice(rowSlice.start(), rowSlice.length(), rowSlice.stride() * m_rowSlice.stride());
 
-        return MatrixProxy(rowSlice, colSlice, this);
+        return MatrixProxy(rSlice, colSlice, this);
     }
 
     namespace impl {
@@ -1100,6 +1136,12 @@ namespace numerix::linalg
         return result;
     }
 
+    /**
+     * @brief
+     * @tparam T
+     * @param mat
+     * @return
+     */
     template<typename T>
     inline Matrix<T> transpose(const Matrix<T>& mat) {
         Matrix<T> result(mat.colCount(), mat.rowCount());

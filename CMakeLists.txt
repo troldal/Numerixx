@@ -16,4 +16,5 @@ target_include_directories(numerix SYSTEM INTERFACE $<BUILD_INTERFACE:${CMAKE_CU
 #add_subdirectory(numerix)
 add_subdirectory(fmt)
 add_subdirectory(demo)
+add_subdirectory(test)
 
