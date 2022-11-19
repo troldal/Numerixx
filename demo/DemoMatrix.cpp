@@ -33,36 +33,39 @@ int main()
 
     std::cout << m1 <<std::endl;
 
-    auto item = std::find(m1.begin(), m1.end(), 16);
+    std::copy(m1.row(3).begin(), m1.row(3).end(), m1.row(0).begin());
+    std::cout << m1 <<std::endl;
 
-    auto m2 = m1({0,1,1}, {0,4,1});
+
+    auto m2 = m1({1,2,1}, {1,2,1});
     std::cout << m2 <<std::endl;
 
-    auto m3 = m1({0,4,1}, {0,1,1});
-    std::cout << m3 <<std::endl;
+    auto m3 = numerix::linalg::transpose(m2);
+    std::cout << m3 << std::endl;
 
-    auto m4 = m1({1,3,1}, {1,3,1});
-    std::cout << m4 <<std::endl;
+    numerix::linalg::Matrix<int> x1(2, 2);
+    x1[0][0] = 1;
+    x1[0][1] = 2;
+    x1[1][0] = 3;
+    x1[1][1] = 4;
 
-    auto m5 = m4({0,2,2}, {0,2,2});
-    std::cout << m5 <<std::endl;
-    for (auto elem : m5) std::cout << elem << std::endl;
+    numerix::linalg::Matrix<int> x2(2, 2);
+    x2[0][0] = 1;
+    x2[0][1] = 2;
+    x2[1][0] = 3;
+    x2[1][1] = 4;
 
-    auto m6 = m5({0,2,1}, {0,1,1});
-    std::cout << m6 <<std::endl;
-    for (auto& elem : m6) std::cout << elem << std::endl;
+    std::cout << x1 << std::endl;
+    std::cout << x2 << std::endl;
 
-    auto m7 = m5({0,2,1}, {1,1,1});
-    std::cout << m7 <<std::endl;
-    for (auto& elem : m7) std::cout << elem << std::endl;
+    auto x3 = x1 * x2;
+    std::cout << x3 << std::endl;
 
-    auto m8 = m5({0,1,1}, {0,2,1});
-    std::cout << m8 <<std::endl;
-    for (auto& elem : m8) std::cout << elem << std::endl;
 
-    auto m9 = m5({1,1,1}, {0,2,1});
-    std::cout << m9 <<std::endl;
-    for (auto& elem : m9) std::cout << elem << std::endl;
+    std::cout << m1 <<std::endl;
+    for (size_t i = 0; i < m1.rowCount(); ++i)
+        std::cout << m1.row(i).slice({0,1,1},{i ,m1.rowCount() - i,1});
+
 }
 
 //int main() {
