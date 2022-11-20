@@ -9,8 +9,14 @@
 
 namespace numerix::linalg {
 
-    template<typename T>
-    Matrix<T> GaussJordan(Matrix<T> mat, Matrix<T> vec) {
+    template<typename T1, typename T2>
+    requires is_matrix<T1> && is_matrix<T2>
+    Matrix<std::common_type<typename T1::value_type, typename T2::value_type>> GaussJordan(T1 mat, T2 vec) {
+
+        using result_t = std::common_type<typename T1::value_type, typename T2::value_type>;
+
+
+
 
         mat.augment(vec);
 
@@ -37,7 +43,7 @@ namespace numerix::linalg {
             ++k;
         }
 
-        Matrix<T> result(mat.rowCount(), 1);
+        result_t result(mat.rowCount(), 1);
 
         for (int i = 0; i < mat.rowCount(); ++i)
             result[i][0] = mat[i][mat.colCount() - 1];

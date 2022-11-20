@@ -7,9 +7,59 @@
 #include <linalg/GaussJordan.h>
 #include <linalg/Matrix.hpp>
 
+//int main() {
+//
+//    using numerix::linalg::Matrix;
+//
+//        Matrix<double> m1(4,4);
+//
+//        m1[0][0] = 0.18;
+//        m1[0][1] = 0.60;
+//        m1[0][2] = 0.57;
+//        m1[0][3] = 0.96;
+//
+//        m1[1][0] = 0.41;
+//        m1[1][1] = 0.24;
+//        m1[1][2] = 0.99;
+//        m1[1][3] = 0.58;
+//
+//        m1[2][0] = 0.14;
+//        m1[2][1] = 0.30;
+//        m1[2][2] = 0.97;
+//        m1[2][3] = 0.66;
+//
+//        m1[3][0] = 0.51;
+//        m1[3][1] = 0.13;
+//        m1[3][2] = 0.19;
+//        m1[3][3] = 0.85;
+//
+//        Matrix<double> m2(4,1);
+//        m2[0][0] = 1.0;
+//        m2[1][0] = 2.0;
+//        m2[2][0] = 3.0;
+//        m2[3][0] = 4.0;
+//
+//        std::cout << m2 << std::endl;
+//
+//        auto m3 = m1 * m2;
+//        std::cout << m3 << std::endl;
+//
+//        //m2.print();
+//
+//        auto m3 = numerix::linalg::GaussJordan(m1, m2);
+//        m3.print();
+//
+//        auto m4 = m1 * m3;
+//        m4.print();
+//
+//}
+
+
 int main()
 {
-    numerix::linalg::Matrix<int> m1(4, 4);
+    using namespace numerix::linalg;
+
+    Matrix<int> m1(4, 4);
 
     m1[0][0] = 1;
     m1[0][1] = 2;
@@ -40,16 +90,16 @@ int main()
     auto m2 = m1({1,2,1}, {1,2,1});
     std::cout << m2 <<std::endl;
 
-    auto m3 = numerix::linalg::transpose(m2);
+    auto m3 = transpose(m2);
     std::cout << m3 << std::endl;
 
-    numerix::linalg::Matrix<int> x1(2, 2);
+    Matrix<int> x1(2, 2);
     x1[0][0] = 1;
     x1[0][1] = 2;
     x1[1][0] = 3;
     x1[1][1] = 4;
 
-    numerix::linalg::Matrix<int> x2(2, 2);
+    Matrix<int> x2(2, 2);
     x2[0][0] = 1;
     x2[0][1] = 2;
     x2[1][0] = 3;
@@ -65,6 +115,13 @@ int main()
     std::cout << m1 <<std::endl;
     for (size_t i = 0; i < m1.rowCount(); ++i)
         std::cout << m1.row(i).slice({0,1,1},{i ,m1.rowCount() - i,1});
+
+
+    //auto x4 = x1({0,2,1},{0,2,1});
+    //for(auto& c : x4.cols()) std::cout << c << std::endl;
+
+    //for(auto iter = x4.cols()->begin(); iter != x4.cols()->end(); ++iter)
+    //    std::cout << *iter << std::endl;
 
 }
 
