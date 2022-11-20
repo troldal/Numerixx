@@ -377,6 +377,13 @@ namespace numerix::linalg
     template<typename T>
     using MatrixColIterConst = MatrixColIterConcept<T, true>;
 
+}
+
+// ============================================================================
+// MatrixBase Class: DECLARATION
+// ============================================================================
+namespace numerix::linalg
+{
     namespace impl
     {
 
@@ -399,15 +406,7 @@ namespace numerix::linalg
              * @param col The column index of the element.
              * @return The index of the element in the raw array.
              */
-            size_t index(size_t row, size_t col) const
-            {
-                const DERIVED& derived = static_cast<const DERIVED&>(*this);
-                if (row >= derived.m_rowSlice.length() || col >= derived.m_colSlice.length())
-                    throw std::out_of_range("Index out of bounds.");
-
-                size_t start = derived.m_rowSlice.start() * derived.extents().second + derived.m_colSlice.start();
-                return start + row * derived.m_rowSlice.stride() + col * derived.m_colSlice.stride();
-            }
+            size_t index(size_t row, size_t col) const;
 
         public:
             /**
@@ -417,11 +416,7 @@ namespace numerix::linalg
              * @return A reference to the matrix element.
              */
             value_type& operator()(size_t row, size_t col)
-                requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>)
-            {
-                DERIVED& derived = static_cast<DERIVED&>(*this);
-                return derived.data()[index(row, col)];
-            }
+                requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>);
 
             /**
              * @brief Const function call operator overload, for providing Fortran-like element access.
@@ -429,11 +424,8 @@ namespace numerix::linalg
              * @param col The column index.
              * @return A const reference to the matrix element.
              */
-            const value_type& operator()(size_t row, size_t col) const
-            {
-                const DERIVED& derived = static_cast<const DERIVED&>(*this);
-                return derived.data()[index(row, col)];
-            }
+            const value_type& operator()(size_t row, size_t col) const;
+
 
             /**
              * @brief Function call operator overload, for getting a MatrixProxy object for a subset of the elements.
@@ -442,11 +434,7 @@ namespace numerix::linalg
              * @return A MatrixProxy object with the subset of matrix elements.
              */
             auto operator()(const Slice& rowSlice, const Slice& colSlice)
-                requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>)
-            {
-                DERIVED& derived = static_cast<DERIVED&>(*this);
-                return derived.slice(rowSlice, colSlice);
-            }
+                requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>);
 
             /**
              * @brief
@@ -454,99 +442,63 @@ namespace numerix::linalg
              * @param colSlice
              * @return
              */
-            auto operator()(const Slice& rowSlice, const Slice& colSlice) const
-            {
-                const DERIVED& derived = static_cast<const DERIVED&>(*this);
-                return derived.slice(rowSlice, colSlice);
-            }
+            auto operator()(const Slice& rowSlice, const Slice& colSlice) const;
 
             /**
              * @brief Get the number of rows in the Matrix (or MatrixProxy) object.
              * @return The number of rows.
              */
-            size_t rowCount() const
-            {
-                const DERIVED& derived = static_cast<const DERIVED&>(*this);
-                return derived.m_rowSlice.length();
-            }
+            size_t rowCount() const;
 
             /**
              * @brief Get the number of columns in the Matrix (or MatrixProxy) object.
              * @return The number of columns.
              */
-            size_t colCount() const
-            {
-                const DERIVED& derived = static_cast<const DERIVED&>(*this);
-                return derived.m_colSlice.length();
-            }
+            size_t colCount() const;
 
             /**
              * @brief Determine if the Matrix (or MatrixProxy) object is square (i.e. rowCount == colCount).
              * @return If yes, true. Otherwise false.
              */
-            bool isSquare() const { return rowCount() == colCount(); }
+            bool isSquare() const;
 
             /**
              * @brief Get a begin-iterator, i.e. an iterator pointing to the first (upper left) element.
              * @return An iterator to the first element
              */
             MatrixIter<value_type> begin()
-                requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>)
-            {
-                DERIVED& derived = static_cast<DERIVED&>(*this);
-                return MatrixIter<value_type>(derived.data(), derived.gslice());
-            }
+                requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>);
 
             /**
              * @brief Get a const begin-iterator, i.e. an iterator pointing to the first (upper left) element.
              * @return A const iterator to the first element
              */
-            MatrixIterConst<value_type> begin() const
-            {
-                const DERIVED& derived = static_cast<const DERIVED&>(*this);
-                return MatrixIterConst<value_type>(derived.data(), derived.gslice());
-            }
+            MatrixIterConst<value_type> begin() const;
 
             /**
              * @brief
              * @return
              */
-            MatrixIterConst<value_type> cbegin() const
-            {
-                const DERIVED& derived = static_cast<const DERIVED&>(*this);
-                return MatrixIterConst<value_type>(derived.data(), derived.gslice());
-            }
+            MatrixIterConst<value_type> cbegin() const;
 
             /**
              * @brief Get an end-iterator, i.e. an iterator pointing to one past the last (lower right) element.
              * @return An iterator to one past the last element.
              */
             MatrixIter<value_type> end()
-                requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>)
-            {
-                DERIVED& derived = static_cast<DERIVED&>(*this);
-                return MatrixIter<value_type>(derived.data(), derived.gslice()).end();
-            }
+                requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>);
 
             /**
              * @brief Get a const end-iterator, i.e. an iterator pointing to one past the last (lower right) element.
              * @return A const iterator to one past the last element.
              */
-            MatrixIterConst<value_type> end() const
-            {
-                const DERIVED& derived = static_cast<const DERIVED&>(*this);
-                return MatrixIterConst<value_type>(derived.data(), derived.gslice()).end();
-            }
+            MatrixIterConst<value_type> end() const;
 
             /**
              * @brief Get a const end-iterator, i.e. an iterator pointing to one past the last (lower right) element.
              * @return A const iterator to one past the last element.
              */
-            MatrixIterConst<value_type> cend() const
-            {
-                const DERIVED& derived = static_cast<const DERIVED&>(*this);
-                return MatrixIterConst<value_type>(derived.data(), derived.gslice()).end();
-            }
+            MatrixIterConst<value_type> cend() const;
 
             /**
              * @brief
@@ -554,17 +506,15 @@ namespace numerix::linalg
              * @return
              */
             auto row(size_t index)
-                requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>)
-            {
-                return (*this)({ index, 1, 1 }, { 0, colCount(), 1 });
-            }
+                requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>);
+
 
             /**
              * @brief
              * @param index
              * @return
              */
-            auto row(size_t index) const { return (*this)({ index, 1, 1 }, { 0, colCount(), 1 }); }
+            auto row(size_t index) const;
 
             /**
              * @brief
@@ -572,127 +522,72 @@ namespace numerix::linalg
              * @return
              */
             auto col(size_t index)
-                requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>)
-            {
-                return (*this)({ 0, rowCount(), 1 }, { index, 1, 1 });
-            }
+                requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>);
 
             /**
              * @brief
              * @param index
              * @return
              */
-            auto col(size_t index) const { return (*this)({ 0, rowCount(), 1 }, { index, 1, 1 }); }
+            auto col(size_t index) const;
 
             /**
              * @brief
-             * @tparam T
              * @param other
              * @return
              */
-            template<typename T>
-                requires is_matrix<T>
-            DERIVED& operator=(const T& other)
-            {
-                // assert(other.rowCount() == rowCount() && other.colCount() == colCount());
-                DERIVED& derived = static_cast<DERIVED&>(*this);
-                std::copy(other.begin(), other.end(), derived.begin());
-                return derived;
-            }
-
-            /**
-             * @brief Matrix/Matrix add assignment operator. I.e. adds two Matrix of MatrixProxy objects, with the same size.
-             * @tparam T The type of matrix to be added, i.e. Matrix or MatrixProxy.
-             * @param other The Matrix of MatrixProxy to be added.
-             * @return A reference to the current object, after addition.
-             */
-            template<typename T>
-                requires is_matrix<T>
-            DERIVED& operator+=(const T& other)
-            {
-                assert(other.rowCount() == rowCount() && other.colCount() == colCount());
-                DERIVED& derived = static_cast<DERIVED&>(*this);
-                std::transform(other.begin(), other.end(), derived.begin(), derived.begin(), std::plus<value_type>());
-                return derived;
-            }
-
-            /**
-             * @brief Scalar add assignment operator. I.e. adds a scalar value to all elements of the Matrix.
-             * @tparam T The type of scalar to add. Can be any number type, except char and bool.
-             * @param value The scalar value.
-             * @return A reference to the current object, after addition.
-             */
-            template<typename T>
-                requires is_number<T>
-            DERIVED& operator+=(T value)
-            {
-                DERIVED& derived = static_cast<DERIVED&>(*this);
-                derived          = derived + static_cast<value_type>(value);
-                return derived;
-            }
+            DERIVED& operator=(const is_matrix auto& other);
 
             /**
              * @brief
-             * @tparam T
              * @param other
              * @return
              */
-            template<typename T>
-                requires is_matrix<T>
-            DERIVED& operator-=(const T& other)
-            {
-                assert(other.rowCount() == rowCount() && other.colCount() == colCount());
-                DERIVED& derived = static_cast<DERIVED&>(*this);
-                std::transform(other.begin(), other.end(), derived.begin(), derived.begin(), std::minus<value_type>());
-                return derived;
-            }
+            DERIVED& operator+=(const is_matrix auto& other);
 
             /**
              * @brief
-             * @tparam T
              * @param value
              * @return
              */
-            template<typename T>
-                requires is_number<T>
-            DERIVED& operator-=(T value)
-            {
-                DERIVED& derived = static_cast<DERIVED&>(*this);
-                derived          = derived - static_cast<value_type>(value);
-                return derived;
-            }
+            DERIVED& operator+=(is_number auto value);
 
             /**
              * @brief
-             * @tparam T
-             * @param value
+             * @param other
              * @return
              */
-            template<typename T>
-                requires is_number<T>
-            DERIVED& operator/=(T value)
-            {
-                DERIVED& derived = static_cast<DERIVED&>(*this);
-                derived          = derived / static_cast<value_type>(value);
-                return derived;
-            }
+            DERIVED& operator-=(const is_matrix auto& other);
 
             /**
              * @brief
-             * @tparam T
              * @param value
              * @return
              */
-            template<typename T>
-                requires is_number<T>
-            DERIVED& operator*=(T value)
-            {
-                DERIVED& derived = static_cast<DERIVED&>(*this);
-                derived          = derived * static_cast<value_type>(value);
-                return derived;
-            }
+            DERIVED& operator-=(is_number auto value);
+
+            /**
+             * @brief
+             * @param value
+             * @return
+             */
+            DERIVED& operator/=(is_number auto value);
+
+            /**
+             * @brief
+             * @param value
+             * @return
+             */
+            DERIVED& operator*=(is_number auto value);
         };
     }    // namespace impl
+
+} // namespace numerix::linalg
+
+// ============================================================================
+// Matrix Class: DECLARATION
+// ============================================================================
+namespace numerix::linalg {
 
     /**
      * @brief The Matrix class is the main abstraction for matrices. It derives from the MatrixBase class using CRTP.
@@ -703,7 +598,6 @@ namespace numerix::linalg
         requires is_number<T>
     class Matrix : public impl::MatrixBase<Matrix<T>>
     {
-    private:
         /**
          * Friend declarations. Necessary for the base class to access elements of Matrix using CRTP.
          */
@@ -716,6 +610,7 @@ namespace numerix::linalg
          */
         using parent = impl::MatrixBase<Matrix<T>>;
 
+    private:
         std::vector<T> m_data;     /**< The underlying array of matrix elements. */
         Slice          m_rowSlice; /**< The Slice describing the rows. Required to provide a common interface with MatrixProxy. */
         Slice          m_colSlice; /**< The Slice describing the columns. Required to provide a common interface with MatrixProxy. */
@@ -726,7 +621,7 @@ namespace numerix::linalg
          * @param colSlice The Slice object describing the column elements.
          * @return A MatrixProxy object for the subset of Matrix elements included in the slices.
          */
-        auto slice(const Slice& rowSlice, const Slice& colSlice);    // NOTE: Implementation can be found after the MatrixProxy class.
+        auto slice(const Slice& rowSlice, const Slice& colSlice);
 
         /**
          * @brief
@@ -821,6 +716,13 @@ namespace numerix::linalg
         const T* data() const;
     };
 
+} // namespace numerix::linalg
+
+// ============================================================================
+// MatrixViewConcept Class: DECLARATION
+// ============================================================================
+namespace numerix::linalg {
+
     /**
      * @brief The MatrixViewConcept class is a genereic implementation of a view into a subset of the elements of a Matrix.
      * Similar to the Matrix class, it derives from the MatrixBase class using CRTP. Specializations of this class are the
@@ -834,7 +736,6 @@ namespace numerix::linalg
         requires is_number<T>
     class MatrixViewConcept : public impl::MatrixBase<MatrixViewConcept<T, IsConst>>
     {
-    private:
         /*
          * Friend declarations. Necessary for the base class to access elements of MatrixProxy using CRTP.
          */
@@ -845,6 +746,41 @@ namespace numerix::linalg
          */
         using parent   = impl::MatrixBase<MatrixViewConcept<T, IsConst>>;
         using matrix_t = std::conditional_t<IsConst, const Matrix<T>, Matrix<T>>;
+
+    private:
+
+        Slice     m_rowSlice; /**< */
+        Slice     m_colSlice; /**< */
+        matrix_t* m_matrix;   /**< */
+
+        /**
+         * @brief
+         * @return
+         */
+        T* data()
+            requires(!std::is_const_v<T>);
+
+        /**
+         * @brief
+         * @return
+         */
+        const T* data() const;
+
+        /**
+         * @brief
+         * @param rowSlice
+         * @param colSlice
+         * @return
+         */
+        auto slice(const Slice& rowSlice, const Slice& colSlice);
+
+        /**
+         * @brief
+         * @param rowSlice
+         * @param colSlice
+         * @return
+         */
+        auto slice(const Slice& rowSlice, const Slice& colSlice) const;
 
         /**
          * @brief
@@ -903,48 +839,280 @@ namespace numerix::linalg
 
         /**
          * @brief
-         * @param rowSlice
-         * @param colSlice
-         * @return
-         */
-        auto slice(const Slice& rowSlice, const Slice& colSlice);
-
-        /**
-         * @brief
-         * @param rowSlice
-         * @param colSlice
-         * @return
-         */
-        auto slice(const Slice& rowSlice, const Slice& colSlice) const;
-
-
-        /**
-         * @brief
          * @return
          */
         auto extents() const;
 
         // auto cols() { return MatrixColIter<decltype(*this)>(*this); }
 
-    private:
-        /**
-         * @brief
-         * @return
-         */
-        T* data()
-            requires(!std::is_const_v<T>);
-
-        /**
-         * @brief
-         * @return
-         */
-        const T* data() const;
-
-        Slice     m_rowSlice; /**< */
-        Slice     m_colSlice; /**< */
-        matrix_t* m_matrix;   /**< */
     };
 }    // namespace numerix::linalg
+
+// ============================================================================
+// MatrixBase Class: DECLARATION
+// ============================================================================
+namespace numerix::linalg {
+
+    namespace impl
+    {
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        size_t MatrixBase<DERIVED>::index(size_t row, size_t col) const
+        {
+            const DERIVED& derived = static_cast<const DERIVED&>(*this);
+            if (row >= derived.m_rowSlice.length() || col >= derived.m_colSlice.length())
+                throw std::out_of_range("Index out of bounds.");
+
+            size_t start = derived.m_rowSlice.start() * derived.extents().second + derived.m_colSlice.start();
+            return start + row * derived.m_rowSlice.stride() + col * derived.m_colSlice.stride();
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        typename MatrixTraits<DERIVED>::value_type& MatrixBase<DERIVED>::operator()(size_t row, size_t col)
+            requires(!std::same_as<DERIVED, MatrixViewConst<typename MatrixTraits<DERIVED>::value_type>>)
+        {
+            DERIVED& derived = static_cast<DERIVED&>(*this);
+            return derived.data()[index(row, col)];
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        const typename MatrixTraits<DERIVED>::value_type& MatrixBase<DERIVED>::operator()(size_t row, size_t col) const
+        {
+            const DERIVED& derived = static_cast<const DERIVED&>(*this);
+            return derived.data()[index(row, col)];
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        auto MatrixBase<DERIVED>::operator()(const Slice& rowSlice, const Slice& colSlice)
+            requires(!std::same_as<DERIVED, MatrixViewConst<typename MatrixTraits<DERIVED>::value_type>>)
+        {
+            DERIVED& derived = static_cast<DERIVED&>(*this);
+            return derived.slice(rowSlice, colSlice);
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        auto MatrixBase<DERIVED>::operator()(const Slice& rowSlice, const Slice& colSlice) const
+        {
+            const DERIVED& derived = static_cast<const DERIVED&>(*this);
+            return derived.slice(rowSlice, colSlice);
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        size_t MatrixBase<DERIVED>::rowCount() const
+        {
+            const DERIVED& derived = static_cast<const DERIVED&>(*this);
+            return derived.m_rowSlice.length();
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        size_t MatrixBase<DERIVED>::colCount() const
+        {
+            const DERIVED& derived = static_cast<const DERIVED&>(*this);
+            return derived.m_colSlice.length();
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        bool MatrixBase<DERIVED>::isSquare() const { return rowCount() == colCount(); }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        MatrixIter<typename MatrixTraits<DERIVED>::value_type> MatrixBase<DERIVED>::begin()
+            requires(!std::same_as<DERIVED, MatrixViewConst<typename MatrixTraits<DERIVED>::value_type>>)
+        {
+            DERIVED& derived = static_cast<DERIVED&>(*this);
+            return MatrixIter<value_type>(derived.data(), derived.gslice());
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        MatrixIterConst<typename MatrixTraits<DERIVED>::value_type> MatrixBase<DERIVED>::begin() const
+        {
+            const DERIVED& derived = static_cast<const DERIVED&>(*this);
+            return MatrixIterConst<value_type>(derived.data(), derived.gslice());
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        MatrixIterConst<typename MatrixTraits<DERIVED>::value_type> MatrixBase<DERIVED>::cbegin() const
+        {
+            const DERIVED& derived = static_cast<const DERIVED&>(*this);
+            return MatrixIterConst<value_type>(derived.data(), derived.gslice());
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        MatrixIter<typename MatrixTraits<DERIVED>::value_type> MatrixBase<DERIVED>::end()
+            requires(!std::same_as<DERIVED, MatrixViewConst<typename MatrixTraits<DERIVED>::value_type>>)
+        {
+            DERIVED& derived = static_cast<DERIVED&>(*this);
+            return MatrixIter<value_type>(derived.data(), derived.gslice()).end();
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        MatrixIterConst<typename MatrixTraits<DERIVED>::value_type> MatrixBase<DERIVED>::end() const
+        {
+            const DERIVED& derived = static_cast<const DERIVED&>(*this);
+            return MatrixIterConst<value_type>(derived.data(), derived.gslice()).end();
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        MatrixIterConst<typename MatrixTraits<DERIVED>::value_type> MatrixBase<DERIVED>::cend() const
+        {
+            const DERIVED& derived = static_cast<const DERIVED&>(*this);
+            return MatrixIterConst<value_type>(derived.data(), derived.gslice()).end();
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        auto MatrixBase<DERIVED>::row(size_t index)
+            requires(!std::same_as<DERIVED, MatrixViewConst<typename MatrixTraits<DERIVED>::value_type>>)
+        {
+            return (*this)({ index, 1, 1 }, { 0, colCount(), 1 });
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        auto MatrixBase<DERIVED>::row(size_t index) const { return (*this)({ index, 1, 1 }, { 0, colCount(), 1 }); }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        auto MatrixBase<DERIVED>::col(size_t index)
+            requires(!std::same_as<DERIVED, MatrixViewConst<typename MatrixTraits<DERIVED>::value_type>>)
+        {
+            return (*this)({ 0, rowCount(), 1 }, { index, 1, 1 });
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        auto MatrixBase<DERIVED>::col(size_t index) const { return (*this)({ 0, rowCount(), 1 }, { index, 1, 1 }); }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        DERIVED& MatrixBase<DERIVED>::operator=(const is_matrix auto& other)
+        {
+            // assert(other.rowCount() == rowCount() && other.colCount() == colCount());
+            DERIVED& derived = static_cast<DERIVED&>(*this);
+            std::copy(other.begin(), other.end(), derived.begin());
+            return derived;
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        DERIVED& MatrixBase<DERIVED>::operator+=(const is_matrix auto& other)
+        {
+            assert(other.rowCount() == rowCount() && other.colCount() == colCount());
+            DERIVED& derived = static_cast<DERIVED&>(*this);
+            std::transform(other.begin(), other.end(), derived.begin(), derived.begin(), std::plus<value_type>());
+            return derived;
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        DERIVED& MatrixBase<DERIVED>::operator+=(is_number auto value)
+        {
+            DERIVED& derived = static_cast<DERIVED&>(*this);
+            derived          = derived + static_cast<value_type>(value);
+            return derived;
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        DERIVED& MatrixBase<DERIVED>::operator-=(const is_matrix auto& other)
+        {
+            assert(other.rowCount() == rowCount() && other.colCount() == colCount());
+            DERIVED& derived = static_cast<DERIVED&>(*this);
+            std::transform(other.begin(), other.end(), derived.begin(), derived.begin(), std::minus<value_type>());
+            return derived;
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        DERIVED& MatrixBase<DERIVED>::operator-=(is_number auto value)
+        {
+            DERIVED& derived = static_cast<DERIVED&>(*this);
+            derived          = derived - static_cast<value_type>(value);
+            return derived;
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        DERIVED& MatrixBase<DERIVED>::operator/=(is_number auto value)
+        {
+            DERIVED& derived = static_cast<DERIVED&>(*this);
+            derived          = derived / static_cast<value_type>(value);
+            return derived;
+        }
+
+        /**
+         * @details
+         */
+        template<typename DERIVED>
+        DERIVED& MatrixBase<DERIVED>::operator*=(is_number auto value)
+        {
+            DERIVED& derived = static_cast<DERIVED&>(*this);
+            derived          = derived * static_cast<value_type>(value);
+            return derived;
+        }
+    }
+} // namespace numerix::linalg
 
 // ============================================================================
 // Matrix Class: IMPLEMENTATION
@@ -1062,10 +1230,10 @@ namespace numerix::linalg
      */
     template<typename T, bool IsConst>
         requires is_number<T>
-    auto MatrixViewConcept<T, IsConst>::gslice() const
+    T* MatrixViewConcept<T, IsConst>::data()
+        requires(!std::is_const_v<T>)
     {
-        auto start = m_rowSlice.start() * m_matrix->extents().first + m_colSlice.start();
-        return GSlice(start, { m_rowSlice.length(), m_colSlice.length() }, { m_rowSlice.stride(), m_colSlice.stride() });
+        return m_matrix->data();
     }
 
     /**
@@ -1073,6 +1241,16 @@ namespace numerix::linalg
      */
     template<typename T, bool IsConst>
         requires is_number<T>
+    const T* MatrixViewConcept<T, IsConst>::data() const
+    {
+        return m_matrix->data();
+    }
+
+    /**
+     * @details
+     */
+    template<typename T, bool IsConst>
+    requires is_number<T>
     auto MatrixViewConcept<T, IsConst>::slice(const Slice& rowSlice, const Slice& colSlice)
     {
         // if (rowSlice.start() + rowSlice.stride() * (rowSlice.length() - 1) >= m_slice.rowCount())
@@ -1094,7 +1272,7 @@ namespace numerix::linalg
      * @details
      */
     template<typename T, bool IsConst>
-        requires is_number<T>
+    requires is_number<T>
     auto MatrixViewConcept<T, IsConst>::slice(const Slice& rowSlice, const Slice& colSlice) const
     {
         // if (rowSlice.start() + rowSlice.stride() * (rowSlice.length() - 1) >= m_slice.rowCount())
@@ -1117,28 +1295,18 @@ namespace numerix::linalg
      */
     template<typename T, bool IsConst>
         requires is_number<T>
+    auto MatrixViewConcept<T, IsConst>::gslice() const
+    {
+        auto start = m_rowSlice.start() * m_matrix->extents().first + m_colSlice.start();
+        return GSlice(start, { m_rowSlice.length(), m_colSlice.length() }, { m_rowSlice.stride(), m_colSlice.stride() });
+    }
+
+    /**
+     * @details
+     */
+    template<typename T, bool IsConst>
+        requires is_number<T>
     auto MatrixViewConcept<T, IsConst>::extents() const { return m_matrix->extents(); }
-
-    /**
-     * @details
-     */
-    template<typename T, bool IsConst>
-        requires is_number<T>
-    T* MatrixViewConcept<T, IsConst>::data()
-        requires(!std::is_const_v<T>)
-    {
-        return m_matrix->data();
-    }
-
-    /**
-     * @details
-     */
-    template<typename T, bool IsConst>
-        requires is_number<T>
-    const T* MatrixViewConcept<T, IsConst>::data() const
-    {
-        return m_matrix->data();
-    }
 
 }    // namespace numerix::linalg
 

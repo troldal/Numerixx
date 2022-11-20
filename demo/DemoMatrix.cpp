@@ -114,7 +114,7 @@ int main()
 
     std::cout << m1 <<std::endl;
     for (size_t i = 0; i < m1.rowCount(); ++i)
-        std::cout << m1.row(i).slice({0,1,1},{i ,m1.rowCount() - i,1});
+        std::cout << m1.row(i)({0,1,1},{i ,m1.rowCount() - i,1});
 
 
     //auto x4 = x1({0,2,1},{0,2,1});
