@@ -61,67 +61,33 @@ int main()
 
     Matrix<int> m1(4, 4);
 
-    m1[0][0] = 1;
-    m1[0][1] = 2;
-    m1[0][2] = 3;
-    m1[0][3] = 4;
+    m1(0,0) = 1;
+    m1(0,1) = 2;
+    m1(0,2) = 3;
+    m1(0,3) = 4;
 
-    m1[1][0] = 5;
-    m1[1][1] = 6;
-    m1[1][2] = 7;
-    m1[1][3] = 8;
+    m1(1,0) = 5;
+    m1(1,1) = 6;
+    m1(1,2) = 7;
+    m1(1,3) = 8;
 
-    m1[2][0] = 9;
-    m1[2][1] = 10;
-    m1[2][2] = 11;
-    m1[2][3] = 12;
+    m1(2,0) = 9;
+    m1(2,1) = 10;
+    m1(2,2) = 11;
+    m1(2,3) = 12;
 
-    m1[3][0] = 13;
-    m1[3][1] = 14;
-    m1[3][2] = 15;
-    m1[3][3] = 16;
+    m1(3,0) = 13;
+    m1(3,1) = 14;
+    m1(3,2) = 15;
+    m1(3,3) = 16;
 
-    std::cout << m1 <<std::endl;
-
-    std::copy(m1.row(3).begin(), m1.row(3).end(), m1.row(0).begin());
-    std::cout << m1 <<std::endl;
-
-
-    auto m2 = m1({1,2,1}, {1,2,1});
+    const auto m2 = m1;
     std::cout << m2 <<std::endl;
 
-    auto m3 = transpose(m2);
-    std::cout << m3 << std::endl;
+    for (auto& row : m2.rows()) std::cout << row << std::endl;
 
-    Matrix<int> x1(2, 2);
-    x1[0][0] = 1;
-    x1[0][1] = 2;
-    x1[1][0] = 3;
-    x1[1][1] = 4;
+    //std::cout << m1.cols()[0].size() << std::endl;
 
-    Matrix<int> x2(2, 2);
-    x2[0][0] = 1;
-    x2[0][1] = 2;
-    x2[1][0] = 3;
-    x2[1][1] = 4;
-
-    std::cout << x1 << std::endl;
-    std::cout << x2 << std::endl;
-
-    auto x3 = x1 * x2;
-    std::cout << x3 << std::endl;
-
-
-    std::cout << m1 <<std::endl;
-    for (size_t i = 0; i < m1.rowCount(); ++i)
-        std::cout << m1.row(i)({0,1,1},{i ,m1.rowCount() - i,1});
-
-
-    //auto x4 = x1({0,2,1},{0,2,1});
-    //for(auto& c : x4.cols()) std::cout << c << std::endl;
-
-    //for(auto iter = x4.cols()->begin(); iter != x4.cols()->end(); ++iter)
-    //    std::cout << *iter << std::endl;
 
 }
 
