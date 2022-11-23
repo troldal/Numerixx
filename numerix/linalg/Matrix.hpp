@@ -36,6 +36,7 @@
 #include <exception>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <numeric>
 #include <span>
 #include <vector>
@@ -58,13 +59,13 @@ namespace numerix::linalg
         /**
          * @brief
          */
-        Slice() : m_start(0), m_length(-1), m_stride(1) {}
+        Slice() : m_start(0), m_length(0), m_stride(1) {}
 
         /**
          * @brief
          * @param start
          */
-        explicit Slice(size_t start) : m_start(start), m_length(-1), m_stride(1) {}
+        explicit Slice(size_t start) : m_start(start), m_length(0), m_stride(1) {}
 
         /**
          * @brief
@@ -655,22 +656,6 @@ namespace numerix::linalg {
         Slice          m_colSlice; /**< The Slice describing the columns. Required to provide a common interface with MatrixProxy. */
 
         /**
-         * @brief Create a MatrixProxy object, based on the input row and column slices.
-         * @param rowSlice The Slice object describing the row elements.
-         * @param colSlice The Slice object describing the column elements.
-         * @return A MatrixProxy object for the subset of Matrix elements included in the slices.
-         */
-        auto slice(const Slice& rowSlice, const Slice& colSlice);
-
-        /**
-         * @brief
-         * @param rowSlice
-         * @param colSlice
-         * @return
-         */
-        auto slice(const Slice& rowSlice, const Slice& colSlice) const;
-
-        /**
          * @brief
          * @return
          */
@@ -789,22 +774,6 @@ namespace numerix::linalg {
          * @return
          */
         const T* data() const;
-
-        /**
-         * @brief
-         * @param rowSlice
-         * @param colSlice
-         * @return
-         */
-        auto slice(const Slice& rowSlice, const Slice& colSlice);
-
-        /**
-         * @brief
-         * @param rowSlice
-         * @param colSlice
-         * @return
-         */
-        auto slice(const Slice& rowSlice, const Slice& colSlice) const;
 
         /**
          * @brief
@@ -1011,7 +980,46 @@ namespace numerix::linalg {
             requires(!std::same_as<DERIVED, MatrixViewConst<typename MatrixTraits<DERIVED>::value_type>>)
         {
             DERIVED& derived = static_cast<DERIVED&>(*this);
-            return derived.slice(rowSlice, colSlice);
+
+            auto rSlice = Slice(rowSlice.start(), (rowSlice.length() == 0 ? rowCount() - rowSlice.start() : rowSlice.length()), rowSlice.stride());
+            auto cSlice = Slice(colSlice.start(), (colSlice.length() == 0 ? colCount() - colSlice.start() : colSlice.length()), colSlice.stride());
+
+            if (rSlice.length() * rSlice.stride() + rSlice.start() - rSlice.stride() > rowCount() - 1)
+                throw std::out_of_range("Row slice out of bounds.");
+            if (cSlice.length() * cSlice.stride() + cSlice.start() - cSlice.stride() > colCount() - 1)
+                throw std::out_of_range("Column slice out of bounds.");
+
+            if constexpr (std::same_as<DERIVED, Matrix<typename MatrixTraits<DERIVED>::value_type>> && (!std::is_const_v<DERIVED>)) {
+                auto rSlice = Slice(rowSlice.start(), rowSlice.length(), rowSlice.stride() * derived.m_rowSlice.stride());
+                return MatrixView<typename MatrixTraits<DERIVED>::value_type>(rSlice, colSlice, static_cast<DERIVED*>(this));
+            }
+
+            if constexpr (std::same_as<DERIVED, Matrix<typename MatrixTraits<DERIVED>::value_type>> && (std::is_const_v<DERIVED>)) {
+                auto rSlice = Slice(rowSlice.start(), rowSlice.length(), rowSlice.stride() * derived.m_rowSlice.stride());
+                return MatrixViewConst<typename MatrixTraits<DERIVED>::value_type>(rSlice, colSlice, static_cast<DERIVED*>(this));
+            }
+
+            if constexpr (std::same_as<DERIVED, MatrixView<typename MatrixTraits<DERIVED>::value_type>>) {
+                auto rSlice = Slice(rowSlice.start() * (derived.m_rowSlice.stride() / derived.extents().second) + derived.m_rowSlice.start(),
+                                    rowSlice.length(),
+                                    rowSlice.stride() * derived.m_rowSlice.stride());
+                auto cSlice = Slice(colSlice.start() * derived.m_colSlice.stride() + derived.m_colSlice.start(),
+                                    colSlice.length(),
+                                    colSlice.stride() * derived.m_colSlice.stride());
+
+                return MatrixViewConcept<typename MatrixTraits<DERIVED>::value_type, false>(rSlice, cSlice, derived.m_matrix);
+            }
+
+            if constexpr (std::same_as<DERIVED, MatrixViewConst<typename MatrixTraits<DERIVED>::value_type>>) {
+                auto rSlice = Slice(rowSlice.start() * (derived.m_rowSlice.stride() / derived.extents().second) + derived.m_rowSlice.start(),
+                                    rowSlice.length(),
+                                    rowSlice.stride() * derived.m_rowSlice.stride());
+                auto cSlice = Slice(colSlice.start() * derived.m_colSlice.stride() + derived.m_colSlice.start(),
+                                    colSlice.length(),
+                                    colSlice.stride() * derived.m_colSlice.stride());
+
+                return MatrixViewConcept<typename MatrixTraits<DERIVED>::value_type, true>(rSlice, cSlice, derived.m_matrix);
+            }
         }
 
         /**
@@ -1021,7 +1029,31 @@ namespace numerix::linalg {
         auto MatrixBase<DERIVED>::operator()(const Slice& rowSlice, const Slice& colSlice) const
         {
             const DERIVED& derived = static_cast<const DERIVED&>(*this);
-            return derived.slice(rowSlice, colSlice);
+
+            auto rSlice = Slice(rowSlice.start(), (rowSlice.length() == 0 ? rowCount() - rowSlice.start() : rowSlice.length()), rowSlice.stride());
+            auto cSlice = Slice(colSlice.start(), (colSlice.length() == 0 ? colCount() - colSlice.start() : colSlice.length()), colSlice.stride());
+
+            if (rSlice.length() * rSlice.stride() + rSlice.start() - rSlice.stride() > rowCount() - 1)
+                throw std::out_of_range("Row slice out of bounds.");
+            if (cSlice.length() * cSlice.stride() + cSlice.start() - cSlice.stride() > colCount() - 1)
+                throw std::out_of_range("Column slice out of bounds.");
+
+            if constexpr (std::same_as<DERIVED, Matrix<typename MatrixTraits<DERIVED>::value_type>> && (std::is_const_v<DERIVED>)) {
+                auto rSlice = Slice(rowSlice.start(), rowSlice.length(), rowSlice.stride() * derived.m_rowSlice.stride());
+                return MatrixViewConst<typename MatrixTraits<DERIVED>::value_type>(rSlice, colSlice, static_cast<DERIVED*>(this));
+            }
+
+            if constexpr (std::same_as<DERIVED, MatrixViewConst<typename MatrixTraits<DERIVED>::value_type>> ||
+                          std::same_as<DERIVED, MatrixView<typename MatrixTraits<DERIVED>::value_type>>) {
+                auto rSlice = Slice(rowSlice.start() * (derived.m_rowSlice.stride() / derived.extents().second) + derived.m_rowSlice.start(),
+                                    rowSlice.length(),
+                                    rowSlice.stride() * derived.m_rowSlice.stride());
+                auto cSlice = Slice(colSlice.start() * derived.m_colSlice.stride() + derived.m_colSlice.start(),
+                                    colSlice.length(),
+                                    colSlice.stride() * derived.m_colSlice.stride());
+
+                return MatrixViewConcept<typename MatrixTraits<DERIVED>::value_type, true>(rSlice, cSlice, derived.m_matrix);
+            }
         }
 
         /**
@@ -1174,6 +1206,9 @@ namespace numerix::linalg {
             return MatrixColsConst<decltype(view)>(view);
         }
 
+        /**
+         * @details
+         */
         template<typename DERIVED>
         auto MatrixBase<DERIVED>::rows()
             requires(!std::same_as<DERIVED, MatrixViewConst<typename MatrixTraits<DERIVED>::value_type>>)
@@ -1181,6 +1216,10 @@ namespace numerix::linalg {
             auto view = (*this)({ 0, rowCount(), 1 }, { 0, colCount(), 1 });
             return MatrixRows<decltype(view)>(view);
         }
+
+        /**
+         * @details
+         */
         template<typename DERIVED>
         auto MatrixBase<DERIVED>::rows() const
         {
@@ -1275,43 +1314,6 @@ namespace numerix::linalg {
 // ============================================================================
 namespace numerix::linalg
 {
-
-    /**
-     * @details
-     */
-    template<typename T>
-        requires is_number<T>
-    auto Matrix<T>::slice(const Slice& rowSlice, const Slice& colSlice)
-    {
-        //            if (rowSlice.start() + rowSlice.stride() * (rowSlice.length() - 1) >= m_slice.rowCount())
-        if (rowSlice.length() > m_rowSlice.length()) throw std::out_of_range("Row index out of bounds.");
-
-        //            if (colSlice.start() + colSlice.stride() * (colSlice.length() - 1) >= m_slice.colCount())
-        if (colSlice.length() > m_colSlice.length()) throw std::out_of_range("Column index out of bounds.");
-
-        auto rSlice = Slice(rowSlice.start(), rowSlice.length(), rowSlice.stride() * m_rowSlice.stride());
-
-        return MatrixView<T>(rSlice, colSlice, this);
-    }
-
-    /**
-     * @details
-     */
-    template<typename T>
-        requires is_number<T>
-    auto Matrix<T>::slice(const Slice& rowSlice, const Slice& colSlice) const
-    {
-        //            if (rowSlice.start() + rowSlice.stride() * (rowSlice.length() - 1) >= m_slice.rowCount())
-        if (rowSlice.length() > m_rowSlice.length()) throw std::out_of_range("Row index out of bounds.");
-
-        //            if (colSlice.start() + colSlice.stride() * (colSlice.length() - 1) >= m_slice.colCount())
-        if (colSlice.length() > m_colSlice.length()) throw std::out_of_range("Column index out of bounds.");
-
-        auto rSlice = Slice(rowSlice.start(), rowSlice.length(), rowSlice.stride() * m_rowSlice.stride());
-
-        return MatrixViewConst<T>(rSlice, colSlice, this);
-    }
-
     /**
      * @details
      */
@@ -1380,50 +1382,6 @@ namespace numerix::linalg
     const T* MatrixViewConcept<T, IsConst>::data() const
     {
         return m_matrix->data();
-    }
-
-    /**
-     * @details
-     */
-    template<typename T, bool IsConst>
-    requires is_number<T>
-    auto MatrixViewConcept<T, IsConst>::slice(const Slice& rowSlice, const Slice& colSlice)
-    {
-        // if (rowSlice.start() + rowSlice.stride() * (rowSlice.length() - 1) >= m_slice.rowCount())
-        //     throw std::out_of_range("Row index out of bounds.");
-
-        // if (colSlice.start() + colSlice.stride() * (colSlice.length() - 1) >= m_slice.colCount())
-        //     throw std::out_of_range("Column index out of bounds.");
-        auto rSlice = Slice(rowSlice.start() * (m_rowSlice.stride() / extents().second) + m_rowSlice.start(),
-                            rowSlice.length(),
-                            rowSlice.stride() * m_rowSlice.stride());
-        auto cSlice = Slice(colSlice.start() * m_colSlice.stride() + m_colSlice.start(),
-                            colSlice.length(),
-                            colSlice.stride() * m_colSlice.stride());
-
-        return MatrixViewConcept(rSlice, cSlice, m_matrix);
-    }
-
-    /**
-     * @details
-     */
-    template<typename T, bool IsConst>
-    requires is_number<T>
-    auto MatrixViewConcept<T, IsConst>::slice(const Slice& rowSlice, const Slice& colSlice) const
-    {
-        // if (rowSlice.start() + rowSlice.stride() * (rowSlice.length() - 1) >= m_slice.rowCount())
-        //     throw std::out_of_range("Row index out of bounds.");
-
-        // if (colSlice.start() + colSlice.stride() * (colSlice.length() - 1) >= m_slice.colCount())
-        //     throw std::out_of_range("Column index out of bounds.");
-        auto rSlice = Slice(rowSlice.start() * (m_rowSlice.stride() / extents().second) + m_rowSlice.start(),
-                            rowSlice.length(),
-                            rowSlice.stride() * m_rowSlice.stride());
-        auto cSlice = Slice(colSlice.start() * m_colSlice.stride() + m_colSlice.start(),
-                            colSlice.length(),
-                            colSlice.stride() * m_colSlice.stride());
-
-        return MatrixViewConcept<T, true>(rSlice, cSlice, m_matrix);
     }
 
     /**
@@ -1520,7 +1478,21 @@ namespace numerix::linalg
          * @param index
          * @return
          */
+        auto operator()(size_t index) const { return m_matrix.col(index); }
+
+        /**
+         * @brief
+         * @param index
+         * @return
+         */
         auto operator[](size_t index) { return m_matrix.col(index); }
+
+        /**
+         * @brief
+         * @param index
+         * @return
+         */
+        auto operator[](size_t index) const { return m_matrix.col(index); }
 
         /**
          * @brief
@@ -1571,6 +1543,14 @@ namespace numerix::linalg
          * @return
          */
         auto cend() const { return MatrixColIterConst<typename std::remove_cvref_t<decltype(*this)>>(*this, size()); }
+
+        auto front() { return (*this)[0]; }
+
+        auto front() const { return (*this)[0]; }
+
+        auto back() { return (*this)[m_matrix.colCount() - 1]; }
+
+        auto back() const { return (*this)[m_matrix.colCount() - 1]; }
     };
 
 
@@ -1642,7 +1622,21 @@ namespace numerix::linalg
          * @param index
          * @return
          */
+        auto operator()(size_t index) const { return m_matrix.row(index); }
+
+        /**
+         * @brief
+         * @param index
+         * @return
+         */
         auto operator[](size_t index) { return m_matrix.row(index); }
+
+        /**
+         * @brief
+         * @param index
+         * @return
+         */
+        auto operator[](size_t index) const { return m_matrix.row(index); }
 
         /**
          * @brief
@@ -1693,6 +1687,31 @@ namespace numerix::linalg
          * @return
          */
         auto cend() const { return MatrixRowIterConst<typename std::remove_cvref_t<decltype(*this)>>(*this, size()); }
+
+        /**
+         * @brief
+         * @return
+         */
+        auto front() { return (*this)[0]; }
+
+        /**
+         * @brief
+         * @return
+         */
+        auto front() const { return (*this)[0]; }
+
+        /**
+         * @brief
+         * @return
+         */
+        auto back() { return (*this)[m_matrix.rowCount() - 1]; }
+
+        /**
+         * @brief
+         * @return
+         */
+        auto back() const { return (*this)[m_matrix.rowCount() - 1]; }
+
     };
 
 }
@@ -1720,7 +1739,7 @@ namespace numerix::linalg {
 
         cols_t m_columns;  /**< A pointer to the matrix element array. */
         size_t m_current; /**< The current index. */
-        col_t  m_curcol; /**< */
+        std::unique_ptr<col_t> m_curcol = nullptr; /**< */
 
     public:
         /*
@@ -1738,7 +1757,7 @@ namespace numerix::linalg {
          * @param slice
          * @param pos
          */
-        MatrixColIterConcept(cols_t data, size_t pos = 0) : m_columns(data), m_current(pos), m_curcol(m_columns[m_current]) {
+        MatrixColIterConcept(cols_t data, size_t pos = 0) : m_columns(data), m_current(pos) {
 
         }
 
@@ -1774,8 +1793,8 @@ namespace numerix::linalg {
          * @return
          */
         col_t& operator*() {
-            m_curcol = m_columns(m_current);
-            return m_curcol;
+            m_curcol = std::make_unique<col_t>(m_columns(m_current));
+            return *m_curcol;
         }
 
         /**
@@ -1783,8 +1802,8 @@ namespace numerix::linalg {
          * @return
          */
         col_t* operator->() {
-            m_curcol = m_columns(m_current);
-            return &m_curcol;
+            m_curcol = std::make_unique<col_t>(m_columns(m_current));
+            return m_curcol.get();
         }
 
         /**
@@ -1827,7 +1846,7 @@ namespace numerix::linalg {
 
         rows_t m_rows;  /**< A pointer to the matrix element array. */
         size_t m_current; /**< The current index. */
-        row_t  m_currow; /**< */
+        std::unique_ptr<row_t> m_currow = nullptr; /**< */
 
     public:
         /*
@@ -1845,7 +1864,7 @@ namespace numerix::linalg {
          * @param slice
          * @param pos
          */
-        MatrixRowIterConcept(rows_t data, size_t pos = 0) : m_rows(data), m_current(pos), m_currow(m_rows[m_current]) {}
+        MatrixRowIterConcept(rows_t data, size_t pos = 0) : m_rows(data), m_current(pos){}
 
         /**
          * @brief
@@ -1879,8 +1898,8 @@ namespace numerix::linalg {
          * @return
          */
         row_t& operator*() {
-            m_currow = m_rows(m_current);
-            return m_currow;
+            m_currow = std::make_unique<row_t>(m_rows(m_current));
+            return *m_currow;
         }
 
         /**
@@ -1888,8 +1907,8 @@ namespace numerix::linalg {
          * @return
          */
         row_t* operator->() {
-            m_currow = m_rows(m_current);
-            return &m_currow;
+            m_currow = std::make_unique<row_t>(m_rows(m_current));
+            return m_currow.get();
         }
 
         /**

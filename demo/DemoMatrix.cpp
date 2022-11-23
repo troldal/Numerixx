@@ -81,7 +81,7 @@ int main()
     m1(3,2) = 15;
     m1(3,3) = 16;
 
-    const auto m2 = m1;
+    const auto m2 = m1(Slice(1,3,1),Slice(1,3,1));
     std::cout << m2 <<std::endl;
 
     for (auto& row : m2.rows()) std::cout << row << std::endl;
