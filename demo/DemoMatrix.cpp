@@ -7,89 +7,104 @@
 #include <linalg/GaussJordan.h>
 #include <linalg/Matrix.hpp>
 
-//int main() {
-//
-//    using numerix::linalg::Matrix;
-//
-//        Matrix<double> m1(4,4);
-//
-//        m1[0][0] = 0.18;
-//        m1[0][1] = 0.60;
-//        m1[0][2] = 0.57;
-//        m1[0][3] = 0.96;
-//
-//        m1[1][0] = 0.41;
-//        m1[1][1] = 0.24;
-//        m1[1][2] = 0.99;
-//        m1[1][3] = 0.58;
-//
-//        m1[2][0] = 0.14;
-//        m1[2][1] = 0.30;
-//        m1[2][2] = 0.97;
-//        m1[2][3] = 0.66;
-//
-//        m1[3][0] = 0.51;
-//        m1[3][1] = 0.13;
-//        m1[3][2] = 0.19;
-//        m1[3][3] = 0.85;
-//
-//        Matrix<double> m2(4,1);
-//        m2[0][0] = 1.0;
-//        m2[1][0] = 2.0;
-//        m2[2][0] = 3.0;
-//        m2[3][0] = 4.0;
-//
-//        std::cout << m2 << std::endl;
-//
-//        auto m3 = m1 * m2;
-//        std::cout << m3 << std::endl;
-//
-//        //m2.print();
-//
-//        auto m3 = numerix::linalg::GaussJordan(m1, m2);
-//        m3.print();
-//
-//        auto m4 = m1 * m3;
-//        m4.print();
-//
-//}
+int main() {
 
-
-int main()
-{
+    using numerix::linalg::Matrix;
     using namespace numerix::linalg;
 
-    Matrix<int> m1(4, 4);
+        Matrix<double> m1(4,4);
 
-    m1(0,0) = 1;
-    m1(0,1) = 2;
-    m1(0,2) = 3;
-    m1(0,3) = 4;
+        m1(0,0) = 0.18;
+        m1(0,1) = 0.60;
+        m1(0,2) = 0.57;
+        m1(0,3) = 0.96;
 
-    m1(1,0) = 5;
-    m1(1,1) = 6;
-    m1(1,2) = 7;
-    m1(1,3) = 8;
+        m1(1,0) = 0.41;
+        m1(1,1) = 0.24;
+        m1(1,2) = 0.99;
+        m1(1,3) = 0.58;
 
-    m1(2,0) = 9;
-    m1(2,1) = 10;
-    m1(2,2) = 11;
-    m1(2,3) = 12;
+        m1(2,0) = 0.14;
+        m1(2,1) = 0.30;
+        m1(2,2) = 0.97;
+        m1(2,3) = 0.66;
 
-    m1(3,0) = 13;
-    m1(3,1) = 14;
-    m1(3,2) = 15;
-    m1(3,3) = 16;
+        m1(3,0) = 0.51;
+        m1(3,1) = 0.13;
+        m1(3,2) = 0.19;
+        m1(3,3) = 0.85;
 
-    const auto m2 = m1(Slice(1,3,1),Slice(1,3,1));
-    std::cout << m2 <<std::endl;
+        Matrix<double> m2(4,1);
+        m2(0,0) = 1.0;
+        m2(1,0) = 2.0;
+        m2(2,0) = 3.0;
+        m2(3,0) = 4.0;
 
-    for (auto& row : m2.rows()) std::cout << row << std::endl;
+        std::cout << m1 << std::endl;
+        std::cout << m2 << std::endl;
 
-    //std::cout << m1.cols()[0].size() << std::endl;
+        //auto m3 = m1 * m2;
+        //std::cout << m3 << std::endl;
 
+
+        auto [m4, v4] = GaussJordan(m1, m2);
+        std::cout << m4 << std::endl;
+        std::cout << v4 << std::endl;
+
+        auto res = m1 * m4;
+        std::cout << res << std::endl;
+
+        auto check = m1 * v4;
+        std::cout << check << std::endl;
+
+        //auto m4 = m1 * m3;
+        //m4.print();
 
 }
+
+
+//int main()
+//{
+//    using namespace numerix::linalg;
+//
+//    Matrix<int> m1(4, 4);
+//
+//    m1(0,0) = 1;
+//    m1(0,1) = 2;
+//    m1(0,2) = 3;
+//    m1(0,3) = 4;
+//
+//    m1(1,0) = 5;
+//    m1(1,1) = 6;
+//    m1(1,2) = 7;
+//    m1(1,3) = 8;
+//
+//    m1(2,0) = 9;
+//    m1(2,1) = 10;
+//    m1(2,2) = 11;
+//    m1(2,3) = 12;
+//
+//    m1(3,0) = 13;
+//    m1(3,1) = 14;
+//    m1(3,2) = 15;
+//    m1(3,3) = 16;
+//
+//    auto m2 = m1(Slice(0,2,1),Slice(0,2,1));
+//    auto m3 = m1(Slice(2,2,1),Slice(2,2,1));
+//
+//    std::cout << m1 << std::endl;
+//    std::cout << m2 << std::endl;
+//    std::cout << m3 << std::endl;
+//
+//    std::vector<int> val {99, 98, 97, 96};
+//
+//    m2.elems() = val;
+//    std::cout << m1 << std::endl;
+//
+//    val = static_cast<decltype(val)>(m1.elems());
+//    for (auto& v : val) std::cout << v << std::endl;
+//
+//}
 
 //int main() {
 //

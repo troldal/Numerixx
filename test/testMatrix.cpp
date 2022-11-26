@@ -33,6 +33,9 @@ TEST_CASE("Matrix Tests", "[linalg]") {
     m1(3,2) = 15;
     m1(3,3) = 16;
 
+    /*
+     * Test that access to the individual matrix elements works as intended.
+     */
     SECTION("Read individual Matrix items") {
 
         auto m2 = m1;
@@ -55,6 +58,9 @@ TEST_CASE("Matrix Tests", "[linalg]") {
         REQUIRE(m2(3,3) == 16);
     }
 
+    /*
+     * Test that overwriting of individual matrix elements works as intended.
+     */
     SECTION("Write individual Matrix items") {
 
         auto m2 = m1;
@@ -108,15 +114,29 @@ TEST_CASE("Matrix Tests", "[linalg]") {
         REQUIRE(m2(3,3) == 1016);
     }
 
+    /*
+     * Iterate over each element of a Matrix object, using iterators.
+     */
     SECTION("Read access to Matrix via iterator") {
-        auto vec = std::vector<int> {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16};
-        REQUIRE(std::equal(m1.begin(), m1.end(), vec.begin()));
 
+        // ===== Make a const copy of the m1 Matrix object, to ensure an immutable object.
+        // ===== Create a std::vector with the same values as in the Matrix object, and check that they are identical.
+        auto vec = std::vector<int> {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16};
+        const auto m2 = m1;
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec.begin()));
+
+        // ===== Reverse the vector, and check that the sequence is no longer the same as the Matrix object.
         std::reverse(vec.begin(), vec.end());
-        REQUIRE_FALSE(std::equal(m1.begin(), m1.end(), vec.begin()));
+        REQUIRE_FALSE(std::equal(m2.begin(), m2.end(), vec.begin()));
     }
 
+    /*
+     * Iterate over each element of the Matrix object and alter the value.
+     */
     SECTION("Write access to Matrix via iterators") {
+
+        // ===== Make a mutable copy of the m1 Matrix.
+        
         auto m2 = m1;
         auto vec = std::vector<int> {101,102,103,104,105,106,107,108,109,1010,1011,1012,1013,1014,1015,1016};
         std::copy(vec.begin(), vec.end(), m2.begin());
@@ -336,7 +356,7 @@ TEST_CASE("Matrix Tests", "[linalg]") {
 
     SECTION("Read access to MatrixProxy (sub-Matrix column) via iterators") {
         auto m2 = m1;
-        auto m3 = m2({1,2,1}, {1,2,1});
+        auto m3 = m2({1,3,1}, {1,3,1});
 
         auto m4 = m3({0,3,1}, {0,1,1});
         auto vec = std::vector<int> {6,10,14};
@@ -362,7 +382,7 @@ TEST_CASE("Matrix Tests", "[linalg]") {
 
     SECTION("Write access to MatrixProxy (sub-Matrix column) via iterators") {
         auto m2 = m1;
-        auto m3 = m2({1,2,1}, {1,2,1});
+        auto m3 = m2({1,3,1}, {1,3,1});
 
         auto m4 = m3({0,3,1}, {0,1,1});
         auto vec = std::vector<int> {106,1010,1014};
@@ -449,7 +469,7 @@ TEST_CASE("Matrix Tests", "[linalg]") {
 
     SECTION("Read access to MatrixProxy (sub-Matrix row) via iterators") {
         auto m2 = m1;
-        auto m3 = m2({1,2,1}, {1,2,1});
+        auto m3 = m2({1,3,1}, {1,3,1});
 
         auto m4 = m3({0,1,1}, {0,3,1});
         auto vec = std::vector<int> {6,7,8};
@@ -475,7 +495,7 @@ TEST_CASE("Matrix Tests", "[linalg]") {
 
     SECTION("Write access to MatrixProxy (sub-Matrix row) via iterators") {
         auto m2 = m1;
-        auto m3 = m2({1,2,1}, {1,2,1});
+        auto m3 = m2({1,3,1}, {1,3,1});
 
         auto m4 = m3({0,1,1}, {0,3,1});
         auto vec = std::vector<int> {106,107,108};
