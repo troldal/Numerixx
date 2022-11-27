@@ -42,7 +42,7 @@ namespace numerix::linalg
      * @tparam IsConst
      */
     template<typename T, bool IsConst>
-        requires std::same_as<T, MatrixView<typename T::value_type>> || std::same_as<T, MatrixViewConst<typename T::value_type>>
+        requires std::same_as<T, MatrixView<typename impl::MatrixTraits<T>::value_type>> || std::same_as<T, MatrixViewConst<typename impl::MatrixTraits<T>::value_type>>
     class MatrixElementsConcept
     {
     private:
@@ -58,7 +58,8 @@ namespace numerix::linalg
         friend class impl::MatrixBase<Matrix<typename matrix_t::value_type>>;
         friend class impl::MatrixBase<MatrixViewConcept<typename matrix_t::value_type, false>>;
         friend class impl::MatrixBase<MatrixViewConcept<typename matrix_t::value_type, true>>;
-        friend void ::swap(MatrixElementsConcept lhs, MatrixElementsConcept rhs);
+        friend void swap(MatrixElementsConcept lhs, MatrixElementsConcept rhs);
+
 
         /**
          * @brief
@@ -134,6 +135,38 @@ namespace numerix::linalg
         /**
          * @brief
          * @tparam C
+         * @param other
+         * @return
+         */
+        template<typename C>
+            requires is_matrix<typename C::value_type>
+        MatrixElementsConcept& operator+=(const C& other)
+        {
+            std::transform(other.begin(), other.end(), begin(), begin(), std::plus<value_type>());
+            return *this;
+        }
+
+        /**
+         * @brief
+         * @tparam C
+         * @param other
+         * @return
+         */
+        template<typename C>
+            requires is_matrix<typename C::value_type>
+        MatrixElementsConcept& operator-=(const C& other)
+        {
+            std::transform(other.begin(), other.end(), begin(), begin(), [&](auto a, auto b){ return b -= a; });
+            return *this;
+        }
+
+
+
+
+
+        /**
+         * @brief
+         * @tparam C
          * @return
          */
         template<typename C>
@@ -165,7 +198,7 @@ namespace numerix::linalg
          * @brief
          * @return
          */
-        auto cbegin() const { return m_matrix.begin(); }
+        auto cbegin() const { return m_matrix.cbegin(); }
 
         /**
          * @brief
@@ -187,7 +220,15 @@ namespace numerix::linalg
          * @brief
          * @return
          */
-        auto cend() const { return m_matrix.end(); }
+        auto cend() const { return m_matrix.cend(); }
+
+        auto rowCount() const {
+            return m_matrix.rowCount();
+        }
+
+        auto colCount() const {
+            return m_matrix.colCount();
+        }
 
         /**
          * @brief
@@ -199,7 +240,39 @@ namespace numerix::linalg
             *this                                           = other;
             other                                           = temp;
         }
+
+        template<typename U, typename V>
+            requires is_matrix<typename U::value_type> && is_matrix<typename V::value_type>
+        static auto multiply(const U& a, const V& b)
+        {
+            using result_t = Matrix<typename std::common_type_t<typename U::value_type::value_type, typename V::value_type::value_type>>;
+
+            result_t result { a.rowCount(), b.colCount() };
+            for (int i = 0; i < result.rowCount(); ++i)
+                for (int j = 0; j < result.colCount(); ++j)
+                    result(i, j) =
+                        std::inner_product(a.m_matrix.row(i).elems().begin(), a.m_matrix.row(i).elems().end(), b.m_matrix.col(j).elems().begin(), static_cast<typename result_t::value_type>(0.0));
+
+            return result;
+        }
+
     };
+
+
+    /**
+     * @brief Compute the result of Matrix-Matrix multiplication.
+     * @tparam T The type of the first Matrix (Matrix or MatrixProxy)
+     * @tparam U The type of the second Matrix (Matrix or MatrixProxy)
+     * @param a The first Matrix
+     * @param b The second Matrix
+     * @return A Metrix object with the result of the Matrix multiplication
+     */
+    template<typename T, typename U>
+        requires is_matrix<typename T::value_type> && is_matrix<typename U::value_type>
+    inline auto operator*(const T& a, const U& b)
+    {
+        return T::multiply(a, b);
+    }
 
 }    // namespace numerix::linalg
 

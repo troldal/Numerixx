@@ -5,7 +5,7 @@
 #ifndef NUMERIX_NUMERIX_HPP
 #define NUMERIX_NUMERIX_HPP
 
-#include "linalg/GaussJordan.h"
+#include "linalg/FactorizeGJ.h"
 #include "linalg/Matrix.hpp"
 #include "poly/polynomial.hpp"
 #include "polyroots/polyroots.hpp"

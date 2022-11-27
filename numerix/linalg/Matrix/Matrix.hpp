@@ -67,7 +67,10 @@ namespace numerix::linalg
          * @brief
          * @return
          */
-        auto gslice() const;
+        auto gslice() const    {
+            auto start = m_rowSlice.start() * extents().first + m_colSlice.start();
+            return GSlice(start, { m_rowSlice.length(), m_colSlice.length() }, { m_rowSlice.stride(), m_colSlice.stride() });
+        }
 
     public:
         /**
@@ -117,62 +120,29 @@ namespace numerix::linalg
          * @brief
          * @return
          */
-        auto extents() const;
+        auto extents() const
+        {
+            return std::make_pair(parent::rowCount(), parent::colCount());
+        }
 
         /**
          * @brief Access the raw array of Matrix elements.
          * @return A pointer to the first element.
          */
-        T* data();
+        T* data()
+        {
+            return m_data.data();
+        }
 
         /**
          * @brief Access the raw array of Matrix elements.
          * @return A const pointer to the first element.
          */
-        const T* data() const;
+        const T* data() const
+        {
+            return m_data.data();
+        }
     };
-
-    /**
-     * @details
-     */
-    template<typename T>
-        requires is_number<T>
-    auto Matrix<T>::gslice() const
-    {
-        auto start = m_rowSlice.start() * extents().first + m_colSlice.start();
-        return GSlice(start, { m_rowSlice.length(), m_colSlice.length() }, { m_rowSlice.stride(), m_colSlice.stride() });
-    }
-
-    /**
-     * @details
-     */
-    template<typename T>
-        requires is_number<T>
-    auto Matrix<T>::extents() const
-    {
-        return std::make_pair(parent::rowCount(), parent::colCount());
-    }
-
-    /**
-     * @details
-     */
-    template<typename T>
-        requires is_number<T>
-    T* Matrix<T>::data()
-    {
-        return m_data.data();
-    }
-
-    /**
-     * @details
-     */
-    template<typename T>
-        requires is_number<T>
-    const T* Matrix<T>::data() const
-    {
-        return m_data.data();
-    }
-
 
 }    // namespace numerix::linalg
 

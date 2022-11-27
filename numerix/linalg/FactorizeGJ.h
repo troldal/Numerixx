@@ -2,8 +2,8 @@
 // Created by Kenneth Balslev on 19/10/2022.
 //
 
-#ifndef NUMERIX_GAUSSJORDAN_H
-#define NUMERIX_GAUSSJORDAN_H
+#ifndef NUMERIX_FACTORIZEGJ_H
+#define NUMERIX_FACTORIZEGJ_H
 
 #include "Matrix.hpp"
 
@@ -19,7 +19,7 @@ namespace numerix::linalg {
      */
     template<typename T1, typename T2>
     requires is_matrix<T1> && is_matrix<T2>
-    std::pair<T1, T2> GaussJordan(T1 coefficients, T2 results) {
+    std::pair<T1, T2> FactorizeGJ(T1 coefficients, T2 results) {
 
         // ===== Check that the dimensions of the input matrix and vector match.
         if (coefficients.colCount() != results.rowCount() || results.colCount() != 1)
@@ -99,4 +99,4 @@ namespace numerix::linalg {
 }
 
 
-#endif    // NUMERIX_GAUSSJORDAN_H
+#endif    // NUMERIX_FACTORIZEGJ_H

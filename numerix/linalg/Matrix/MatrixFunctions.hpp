@@ -110,7 +110,7 @@ namespace numerix::linalg
     {
         Matrix<typename std::common_type<typename T::value_type, typename U::value_type>::type> result(a.rowCount(), a.colCount());
         result.elems() = a;
-        result -= b;
+        result.elems() -= b.elems();
         return result;
     }
 
@@ -135,28 +135,7 @@ namespace numerix::linalg
         return result;
     }
 
-    /**
-     * @brief Compute the result of Matrix-Matrix multiplication.
-     * @tparam T The type of the first Matrix (Matrix or MatrixProxy)
-     * @tparam U The type of the second Matrix (Matrix or MatrixProxy)
-     * @param a The first Matrix
-     * @param b The second Matrix
-     * @return A Metrix object with the result of the Matrix multiplication
-     */
-    template<typename T, typename U>
-        requires is_matrix<T> && is_matrix<U>
-    inline Matrix<typename std::common_type_t<typename T::value_type, typename U::value_type>> operator*(const T& a, const U& b)
-    {
-        using result_t = Matrix<typename std::common_type_t<typename T::value_type, typename U::value_type>>;
 
-        result_t result { a.rowCount(), b.colCount() };
-        for (int i = 0; i < result.rowCount(); ++i)
-            for (int j = 0; j < result.colCount(); ++j)
-                result(i, j) =
-                    std::inner_product(a.row(i).begin(), a.row(i).end(), b.col(j).begin(), static_cast<typename result_t::value_type>(0.0));
-
-        return result;
-    }
 
     /**
      * @brief
@@ -168,12 +147,12 @@ namespace numerix::linalg
      */
     template<typename T, typename U>
         requires is_matrix<T> && is_number<U>
-    inline Matrix<typename std::common_type<typename T::value_type, U>::type> operator*(const T& a, U b)
+    inline auto operator*(const T& a, U b)
     {
         using result_t = Matrix<typename std::common_type<typename T::value_type, U>::type>;
 
         result_t result { a.rowCount(), a.colCount() };
-        std::transform(a.begin(), a.end(), result.begin(), [&](const auto& v) {
+        std::transform(a.elems().begin(), a.elems().end(), result.elems().begin(), [&](const auto& v) {
             return static_cast<typename result_t::value_type>(v) * b;
         });
         return result;
@@ -189,7 +168,7 @@ namespace numerix::linalg
      */
     template<typename T, typename U>
         requires is_matrix<U> && is_number<T>
-    inline Matrix<typename std::common_type<typename U::value_type, T>::type> operator*(const T a, U& b)
+    inline auto operator*(const T a, U& b)
     {
         using result_t = Matrix<typename std::common_type<typename U::value_type, T>::type>;
 
@@ -210,12 +189,12 @@ namespace numerix::linalg
      */
     template<typename T, typename U>
         requires is_matrix<T> && is_number<U>
-    inline Matrix<typename std::common_type<typename T::value_type, U>::type> operator/(const T& a, U b)
+    inline auto operator/(const T& a, U b)
     {
         using result_t = Matrix<typename std::common_type<typename T::value_type, U>::type>;
 
         result_t result { a.rowCount(), a.colCount() };
-        std::transform(a.begin(), a.end(), result.begin(), [&](const auto& v) {
+        std::transform(a.elems().begin(), a.elems().end(), result.elems().begin(), [&](const auto& v) {
             return static_cast<typename result_t::value_type>(v) / b;
         });
         return result;
@@ -240,11 +219,11 @@ namespace numerix::linalg
 }    // namespace numerix::linalg
 
 template<typename T>
-    requires std::same_as<T, numerix::linalg::MatrixElements<typename numerix::linalg::impl::MatrixTraits<T>::value_type>>
+    requires std::same_as<T, numerix::linalg::MatrixElements<typename numerix::linalg::impl::MatrixTraits<T>::value_type>> ||
+             std::same_as<T, numerix::linalg::MatrixElementsConst<typename numerix::linalg::impl::MatrixTraits<T>::value_type>>
 inline void swap(T lhs, T rhs)
 {
     lhs.swap(rhs);
-
 }
 
 

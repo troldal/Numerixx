@@ -31,11 +31,15 @@
 #ifndef NUMERIX_MATRIXCOMMON_H
 #define NUMERIX_MATRIXCOMMON_H
 
-#include <iostream>
 #include <cassert>
+#include <cstddef>
+#include <initializer_list>
 #include <iomanip>
+#include <iostream>
 #include <memory>
 #include <numeric>
+#include <stdexcept>
+#include <vector>
 
 namespace numerix::linalg
 {
@@ -172,7 +176,7 @@ namespace numerix::linalg
      *
      */
     template<typename T, bool IsConst>
-        requires std::same_as<T, MatrixView<typename T::value_type>> || std::same_as<T, MatrixViewConst<typename T::value_type>>
+        requires std::same_as<T, MatrixView<typename impl::MatrixTraits<T>::value_type>> || std::same_as<T, MatrixViewConst<typename impl::MatrixTraits<T>::value_type>>
     class MatrixElementsConcept;
 
     /**
@@ -195,6 +199,13 @@ namespace numerix::linalg
         {
             using value_type = T;
         };
+
+        template<typename T>
+        struct MatrixTraits<MatrixElementsConst<T>>
+        {
+            using value_type = T;
+        };
+
 
     }    // namespace impl
 
@@ -241,7 +252,8 @@ namespace numerix::linalg
 }
 
 template<typename T>
-    requires std::same_as<T, numerix::linalg::MatrixElements<typename numerix::linalg::impl::MatrixTraits<T>::value_type>>
+    requires std::same_as<T, numerix::linalg::MatrixElements<typename numerix::linalg::impl::MatrixTraits<T>::value_type>> ||
+             std::same_as<T, numerix::linalg::MatrixElementsConst<typename numerix::linalg::impl::MatrixTraits<T>::value_type>>
 inline void swap(T lhs, T rhs);
 
 #endif    // NUMERIX_MATRIXCOMMON_H

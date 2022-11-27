@@ -2,9 +2,9 @@
 // Created by Kenneth Balslev on 16/10/2022.
 //
 
-#include <iostream>
 #include <algorithm>
-#include <linalg/GaussJordan.h>
+#include <iostream>
+#include <linalg/FactorizeGJ.h>
 #include <linalg/Matrix.hpp>
 
 int main() {
@@ -47,14 +47,14 @@ int main() {
         //std::cout << m3 << std::endl;
 
 
-        auto [m4, v4] = GaussJordan(m1, m2);
+        auto [m4, v4] = FactorizeGJ(m1, m2);
         std::cout << m4 << std::endl;
         std::cout << v4 << std::endl;
 
-        auto res = m1 * m4;
+        auto res = m1.elems() * m4.elems();
         std::cout << res << std::endl;
 
-        auto check = m1 * v4;
+        auto check = m1.elems() * v4.elems();
         std::cout << check << std::endl;
 
         //auto m4 = m1 * m3;
@@ -150,7 +150,7 @@ int main() {
 ////
 ////    //m2.print();
 ////
-////    auto m3 = numerix::linalg::GaussJordan(m1, m2);
+////    auto m3 = numerix::linalg::FactorizeGJ(m1, m2);
 ////    m3.print();
 ////
 ////    auto m4 = m1 * m3;

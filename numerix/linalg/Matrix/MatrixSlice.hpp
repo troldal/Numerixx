@@ -31,10 +31,7 @@
 #ifndef NUMERIX_MATRIXSLICE_HPP
 #define NUMERIX_MATRIXSLICE_HPP
 
-#include <cstddef>
-#include <initializer_list>
-#include <stdexcept>
-#include <vector>
+#include "MatrixCommon.h"
 
 namespace numerix::linalg
 {

@@ -31,7 +31,6 @@
 #ifndef NUMERIX_MATRIXELEMENTITER_HPP
 #define NUMERIX_MATRIXELEMENTITER_HPP
 
-#include <cstddef>
 #include "MatrixCommon.h"
 #include "MatrixSlice.hpp"
 

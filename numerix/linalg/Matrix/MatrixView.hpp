@@ -53,6 +53,7 @@ namespace numerix::linalg
          * Friend declarations. Necessary for the base class to access elements of MatrixProxy using CRTP.
          */
         friend impl::MatrixBase<MatrixViewConcept<T, IsConst>>;
+        friend impl::MatrixBase<Matrix<T>>;
 
         /**
          * Private alias declatations.
@@ -70,23 +71,31 @@ namespace numerix::linalg
          * @return
          */
         T* data()
-            requires(!std::is_const_v<T>);
+            requires(!std::is_const_v<T>)
+        {
+            return m_matrix->data();
+        }
 
         /**
          * @brief
          * @return
          */
-        const T* data() const;
+        const T* data() const
+        {
+            return m_matrix->data();
+        }
 
         /**
          * @brief
          * @return
          */
-        auto gslice() const;
+        auto gslice() const
+        {
+            auto start = m_rowSlice.start() * m_matrix->extents().first + m_colSlice.start();
+            return GSlice(start, { m_rowSlice.length(), m_colSlice.length() }, { m_rowSlice.stride(), m_colSlice.stride() });
+        }
 
     public:
-        using value_type = T;
-
         /**
          * @brief
          * @param rowSlice
@@ -98,6 +107,10 @@ namespace numerix::linalg
               m_colSlice(colSlice),
               m_matrix(matrix)
         {}
+
+    public:
+
+        using value_type = T;
 
         /**
          * @brief
@@ -134,51 +147,11 @@ namespace numerix::linalg
          * @brief
          * @return
          */
-        auto extents() const;
+        auto extents() const
+        {
+            return m_matrix->extents();
+        }
     };
-
-    /**
-     * @details
-     */
-    template<typename T, bool IsConst>
-        requires is_number<T>
-    T* MatrixViewConcept<T, IsConst>::data()
-        requires(!std::is_const_v<T>)
-    {
-        return m_matrix->data();
-    }
-
-    /**
-     * @details
-     */
-    template<typename T, bool IsConst>
-        requires is_number<T>
-    const T* MatrixViewConcept<T, IsConst>::data() const
-    {
-        return m_matrix->data();
-    }
-
-    /**
-     * @details
-     */
-    template<typename T, bool IsConst>
-        requires is_number<T>
-    auto MatrixViewConcept<T, IsConst>::gslice() const
-    {
-        auto start = m_rowSlice.start() * m_matrix->extents().first + m_colSlice.start();
-        return GSlice(start, { m_rowSlice.length(), m_colSlice.length() }, { m_rowSlice.stride(), m_colSlice.stride() });
-    }
-
-    /**
-     * @details
-     */
-    template<typename T, bool IsConst>
-        requires is_number<T>
-    auto MatrixViewConcept<T, IsConst>::extents() const
-    {
-        return m_matrix->extents();
-    }
-
 }    // namespace numerix::linalg
 
 
