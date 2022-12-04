@@ -41,20 +41,38 @@ namespace numerix::linalg
      * @tparam T
      * @tparam IsConst
      */
-    template<typename T, bool IsConst>
-        requires std::same_as<T, MatrixRows<typename T::matrix_type>> || std::same_as<T, MatrixRowsConst<typename T::matrix_type>>
+    template<typename ROWCOLL, bool IsConst>
+        requires std::same_as<ROWCOLL, MatrixRows<typename ROWCOLL::matrix_type>> ||
+                 std::same_as<ROWCOLL, MatrixRowsConst<typename ROWCOLL::matrix_type>>
     class MatrixRowIterConcept
     {
+
+        friend MatrixRows<typename ROWCOLL::matrix_type>;
+        friend MatrixRowsConst<typename ROWCOLL::matrix_type>;
+
         /*
          *
          */
-        using rows_t = std::conditional_t<IsConst, MatrixRowsConst<typename T::matrix_type>, MatrixRows<typename T::matrix_type>>;
-        using row_t  = std::
-            conditional_t<IsConst, MatrixViewConst<typename T::matrix_type::value_type>, MatrixView<typename T::matrix_type::value_type>>;
+        using rows_t = std::conditional_t<IsConst,
+                                          MatrixRowsConst<typename ROWCOLL::matrix_type>,
+                                              MatrixRows<typename ROWCOLL::matrix_type>>;
+        using row_t  =
+            std::conditional_t<IsConst,
+                               MatrixViewConst<typename ROWCOLL::matrix_type::value_type>,
+                                   MatrixView<typename ROWCOLL::matrix_type::value_type>>;
 
         rows_t                 m_rows;             /**< A pointer to the matrix element array. */
         size_t                 m_current;          /**< The current index. */
         std::unique_ptr<row_t> m_currow = nullptr; /**< */
+
+        /**
+         * @brief
+         * @param data
+         * @param slice
+         * @param pos
+         */
+        MatrixRowIterConcept(rows_t data, size_t pos = 0) : m_rows(data), m_current(pos) {}
+
 
     public:
         /*
@@ -66,13 +84,6 @@ namespace numerix::linalg
         using pointer           = row_t*;
         using reference         = row_t&;
 
-        /**
-         * @brief
-         * @param data
-         * @param slice
-         * @param pos
-         */
-        MatrixRowIterConcept(rows_t data, size_t pos = 0) : m_rows(data), m_current(pos) {}
 
         /**
          * @brief

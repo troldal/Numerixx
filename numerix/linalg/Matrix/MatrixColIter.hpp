@@ -41,20 +41,37 @@ namespace numerix::linalg
      * @tparam T
      * @tparam IsConst
      */
-    template<typename T, bool IsConst>
-        requires std::same_as<T, MatrixCols<typename T::matrix_type>> || std::same_as<T, MatrixColsConst<typename T::matrix_type>>
+    template<typename COLCOLL, bool IsConst>
+        requires std::same_as<COLCOLL, MatrixCols<typename COLCOLL::matrix_type>> ||
+                 std::same_as<COLCOLL, MatrixColsConst<typename COLCOLL::matrix_type>>
     class MatrixColIterConcept
     {
+
+        friend MatrixCols<typename COLCOLL::matrix_type>;
+        friend MatrixColsConst<typename COLCOLL::matrix_type>;
+
         /*
          *
          */
-        using cols_t = std::conditional_t<IsConst, MatrixColsConst<typename T::matrix_type>, MatrixCols<typename T::matrix_type>>;
+        using cols_t = std::conditional_t<IsConst,
+                                          MatrixColsConst<typename COLCOLL::matrix_type>,
+                                              MatrixCols<typename COLCOLL::matrix_type>>;
         using col_t  = std::
-            conditional_t<IsConst, MatrixViewConst<typename T::matrix_type::value_type>, MatrixView<typename T::matrix_type::value_type>>;
+            conditional_t<IsConst,
+                          MatrixViewConst<typename COLCOLL::matrix_type::value_type>,
+                              MatrixView<typename COLCOLL::matrix_type::value_type>>;
 
         cols_t                 m_columns;          /**< A pointer to the matrix element array. */
         size_t                 m_current;          /**< The current index. */
         std::unique_ptr<col_t> m_curcol = nullptr; /**< */
+
+        /**
+         * @brief
+         * @param data
+         * @param slice
+         * @param pos
+         */
+        MatrixColIterConcept(cols_t data, size_t pos = 0) : m_columns(data), m_current(pos) {}
 
     public:
         /*
@@ -65,14 +82,6 @@ namespace numerix::linalg
         using difference_type   = size_t;
         using pointer           = col_t*;
         using reference         = col_t&;
-
-        /**
-         * @brief
-         * @param data
-         * @param slice
-         * @param pos
-         */
-        MatrixColIterConcept(cols_t data, size_t pos = 0) : m_columns(data), m_current(pos) {}
 
         /**
          * @brief

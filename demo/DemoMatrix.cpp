@@ -57,7 +57,7 @@ int main() {
         auto check = m1 * v4;
         std::cout << check << std::endl;
 
-        for (auto& row : m1.rows()) std::cout << row << std::endl;
+        for (auto& col : m1.cols()) std::cout << col << std::endl;
 
 }
 
