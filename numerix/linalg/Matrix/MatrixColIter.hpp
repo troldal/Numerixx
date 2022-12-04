@@ -42,15 +42,15 @@ namespace numerix::linalg
      * @tparam IsConst
      */
     template<typename T, bool IsConst>
-        requires std::same_as<T, MatrixCols<typename T::value_type>> || std::same_as<T, MatrixColsConst<typename T::value_type>>
+        requires std::same_as<T, MatrixCols<typename T::matrix_type>> || std::same_as<T, MatrixColsConst<typename T::matrix_type>>
     class MatrixColIterConcept
     {
         /*
          *
          */
-        using cols_t = std::conditional_t<IsConst, MatrixColsConst<typename T::value_type>, MatrixCols<typename T::value_type>>;
+        using cols_t = std::conditional_t<IsConst, MatrixColsConst<typename T::matrix_type>, MatrixCols<typename T::matrix_type>>;
         using col_t  = std::
-            conditional_t<IsConst, MatrixViewConst<typename T::value_type::value_type>, MatrixView<typename T::value_type::value_type>>;
+            conditional_t<IsConst, MatrixViewConst<typename T::matrix_type::value_type>, MatrixView<typename T::matrix_type::value_type>>;
 
         cols_t                 m_columns;          /**< A pointer to the matrix element array. */
         size_t                 m_current;          /**< The current index. */

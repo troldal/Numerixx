@@ -44,8 +44,9 @@
 namespace numerix::linalg
 {
 
-    /*
-     *
+    /**
+     * @brief Concept defining an integral or floating-point number to be used in the Matrix classes
+     * @tparam T
      */
     template<typename T>
     concept is_number = (std::integral<T> || std::floating_point<T>) && (!std::same_as<T, bool>) && (!std::same_as<T, char>);
@@ -66,34 +67,32 @@ namespace numerix::linalg
     class MatrixViewConcept;
 
     /**
-     * @brief Declaration of the spcialization of the (mutable) MatrixView class, based on the MatrixViewConcept class.
+     * @brief Declaration of the specialization of the (mutable) MatrixView class, based on the MatrixViewConcept class.
      */
     template<typename T>
     using MatrixView = MatrixViewConcept<T, false>;
 
     /**
-     * @brief Declaration of the spcialization of the (const) MatrixViewConst class, based on the MatrixViewConcept class.
+     * @brief Declaration of the specialization of the (const) MatrixViewConst class, based on the MatrixViewConcept class.
      */
     template<typename T>
     using MatrixViewConst = MatrixViewConcept<T, true>;
 
 
-    /**
-     * @brief
-     * @tparam T
-     * @tparam IsConst
+    /*
+     * Forward declaration of the MatrixElementIterConcept class.
      */
     template<typename T, bool IsConst>
     class MatrixElementIterConcept;
 
     /**
-     * @brief
+     * @brief Declaration of the specialization of the (mutable) MatrixElementIter class, based on the MatrixElementIterConcept class.
      */
     template<typename T>
     using MatrixElementIter = MatrixElementIterConcept<T, false>;
 
     /**
-     * @brief
+     * @brief Declaration of the specialization of the (const) MatrixElementIterConst class, based on the MatrixElementIterConcept class.
      */
     template<typename T>
     using MatrixElementIterConst = MatrixElementIterConcept<T, true>;
@@ -114,18 +113,27 @@ namespace numerix::linalg
         template<typename T>
         struct MatrixTraits;
 
+        /*
+         * Specialization of the MatrixTraits class for Matrix<T>
+         */
         template<typename T>
         struct MatrixTraits<Matrix<T>>
         {
             using value_type = T;
         };
 
+        /*
+         * Specialization of the MatrixTraits class for MatrixView<T>
+         */
         template<typename T>
         struct MatrixTraits<MatrixView<T>>
         {
             using value_type = T;
         };
 
+        /*
+         * Specialization of the MatrixTraits class for MatrixViewConst<T>
+         */
         template<typename T>
         struct MatrixTraits<MatrixViewConst<T>>
         {
@@ -135,125 +143,85 @@ namespace numerix::linalg
     }    // namespace impl
 
     /*
-     *
+     * Forward declaration of the MatrixColsConcept class.
      */
     template<typename T, bool IsConst>
         requires std::same_as<T, MatrixView<typename T::value_type>> || std::same_as<T, MatrixViewConst<typename T::value_type>>
     class MatrixColsConcept;
 
     /**
-     * @brief
+     * @brief Declaration of the specialization of the (mutable) MatrixCols class, based on the MatrixColsConcept class.
      */
     template<typename T>
     using MatrixCols = MatrixColsConcept<T, false>;
 
     /**
-     * @brief
+     * @brief Declaration of the specialization of the (const) MatrixColsConst class, based on the MatrixColsConcept class.
      */
     template<typename T>
     using MatrixColsConst = MatrixColsConcept<T, true>;
 
     /*
-     *
+     * Forward declaration of the MatrixColsConcept class.
      */
     template<typename T, bool IsConst>
         requires std::same_as<T, MatrixView<typename T::value_type>> || std::same_as<T, MatrixViewConst<typename T::value_type>>
     class MatrixRowsConcept;
 
     /**
-     * @brief
+     * @brief Declaration of the specialization of the (mutable) MatrixRows class, based on the MatrixRowsConcept class.
      */
     template<typename T>
     using MatrixRows = MatrixRowsConcept<T, false>;
 
     /**
-     * @brief
+     * @brief Declaration of the specialization of the (const) MatrixRowsConst class, based on the MatrixRowsConcept class.
      */
     template<typename T>
     using MatrixRowsConst = MatrixRowsConcept<T, true>;
 
     /*
-     *
+     * Forward declaration of the MatrixColIterConcept class.
      */
     template<typename T, bool IsConst>
-        requires std::same_as<T, MatrixView<typename impl::MatrixTraits<T>::value_type>> || std::same_as<T, MatrixViewConst<typename impl::MatrixTraits<T>::value_type>>
-    class MatrixElementsConcept;
-
-    /**
-     * @brief
-     */
-    template<typename T>
-    using MatrixElements = MatrixElementsConcept<T, false>;
-
-    /**
-     * @brief
-     */
-    template<typename T>
-    using MatrixElementsConst = MatrixElementsConcept<T, true>;
-
-    namespace impl
-    {
-
-        template<typename T>
-        struct MatrixTraits<MatrixElements<T>>
-        {
-            using value_type = T;
-        };
-
-        template<typename T>
-        struct MatrixTraits<MatrixElementsConst<T>>
-        {
-            using value_type = T;
-        };
-
-
-    }    // namespace impl
-
-    /*
-     *
-     */
-    template<typename T, bool IsConst>
-        requires std::same_as<T, MatrixCols<typename T::value_type>> || std::same_as<T, MatrixColsConst<typename T::value_type>>
+        requires std::same_as<T, MatrixCols<typename T::matrix_type>> || std::same_as<T, MatrixColsConst<typename T::matrix_type>>
     class MatrixColIterConcept;
 
     /**
-     * @brief
+     * @brief Declaration of the specialization of the (mutable) MatrixColIter class, based on the MatrixColIterConcept class.
      */
     template<typename T>
     using MatrixColIter = MatrixColIterConcept<T, false>;
 
     /**
-     * @brief
+     * @brief Declaration of the specialization of the (const) MatrixColIterConst class, based on the MatrixColIterConcept class.
      */
     template<typename T>
     using MatrixColIterConst = MatrixColIterConcept<T, true>;
 
     /*
-     *
+     * Forward declaration of the MatrixRowIterConcept class.
      */
     template<typename T, bool IsConst>
-        requires std::same_as<T, MatrixRows<typename T::value_type>> || std::same_as<T, MatrixRowsConst<typename T::value_type>>
+        requires std::same_as<T, MatrixRows<typename T::matrix_type>> || std::same_as<T, MatrixRowsConst<typename T::matrix_type>>
     class MatrixRowIterConcept;
 
     /**
-     * @brief
+     * @brief Declaration of the specialization of the (mutable) MatrixRowIter class, based on the MatrixRowIterConcept class.
      */
     template<typename T>
     using MatrixRowIter = MatrixRowIterConcept<T, false>;
 
     /**
-     * @brief
+     * @brief Declaration of the specialization of the (const) MatrixRowIterConst class, based on the MatrixRowIterConcept class.
      */
     template<typename T>
     using MatrixRowIterConst = MatrixRowIterConcept<T, true>;
-
-
-
 }
 
-template<typename T>
-    requires std::same_as<T, numerix::linalg::MatrixElements<typename numerix::linalg::impl::MatrixTraits<T>::value_type>> ||
-             std::same_as<T, numerix::linalg::MatrixElementsConst<typename numerix::linalg::impl::MatrixTraits<T>::value_type>>
-inline void swap(T lhs, T rhs);
+//template<typename T>
+//    requires std::same_as<T, numerix::linalg::MatrixElements<typename numerix::linalg::impl::MatrixTraits<T>::value_type>> ||
+//             std::same_as<T, numerix::linalg::MatrixElementsConst<typename numerix::linalg::impl::MatrixTraits<T>::value_type>>
+//inline void swap(T lhs, T rhs);
 
 #endif    // NUMERIX_MATRIXCOMMON_H

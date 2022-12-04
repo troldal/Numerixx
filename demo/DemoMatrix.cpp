@@ -12,7 +12,7 @@ int main() {
     using numerix::linalg::Matrix;
     using namespace numerix::linalg;
 
-        Matrix<double> m1(4,4);
+        Matrix m1(4,4);
 
         m1(0,0) = 0.18;
         m1(0,1) = 0.60;
@@ -34,7 +34,7 @@ int main() {
         m1(3,2) = 0.19;
         m1(3,3) = 0.85;
 
-        Matrix<double> m2(4,1);
+        Matrix m2(4,1);
         m2(0,0) = 1.0;
         m2(1,0) = 2.0;
         m2(2,0) = 3.0;
@@ -56,6 +56,8 @@ int main() {
 
         auto check = m1 * v4;
         std::cout << check << std::endl;
+
+        for (auto& row : m1.rows()) std::cout << row << std::endl;
 
 }
 

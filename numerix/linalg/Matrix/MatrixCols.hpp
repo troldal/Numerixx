@@ -37,148 +37,202 @@ namespace numerix::linalg
 {
 
     /**
-     * @brief
-     * @tparam T
-     * @tparam IsConst
+     * @brief Collection of the columns of a Matrix or MatrixView object. This can be used to iterate through all columns of a Matrix.
+     * @tparam MATRIX The type of the Matrix object
+     * @tparam IsConst Flag indicating if the object should be treated as const (non-mutable)
      */
-    template<typename T, bool IsConst>
-        requires std::same_as<T, MatrixView<typename T::value_type>> || std::same_as<T, MatrixViewConst<typename T::value_type>>
+    template<typename MATRIX, bool IsConst>
+        requires std::same_as<MATRIX, MatrixView<typename MATRIX::value_type>> ||
+                 std::same_as<MATRIX, MatrixViewConst<typename MATRIX::value_type>>
     class MatrixColsConcept
     {
         /*
-         *
+         * Friend declarations. Required to allow use of private constructor.
          */
-        using matrix_t = std::conditional_t<IsConst,
-                                            MatrixViewConst<typename std::remove_reference_t<T>::value_type>,
-                                            MatrixView<typename std::remove_reference_t<T>::value_type>>;
-
-        matrix_t m_matrix; /**< A MatrixView object containing the columns. */
-
-    public:
-        /*
-         *
-         */
-        using value_type = matrix_t;
+        friend impl::MatrixBase<Matrix<typename MATRIX::value_type>>;
+        friend impl::MatrixBase<MatrixView<typename MATRIX::value_type>>;
+        friend impl::MatrixBase<MatrixViewConst<typename MATRIX::value_type>>;
 
         /**
-         * @brief
-         * @param data
+         * Private alias declatations.
+         */
+        using matrix_t = std::conditional_t<IsConst,
+                                            MatrixViewConst<typename std::remove_cvref_t<MATRIX>::value_type>,
+                                            MatrixView<typename std::remove_cvref_t<MATRIX>::value_type>>;
+
+    private:
+        matrix_t m_matrix; /**< A MatrixView object containing the columns. */
+
+        /**
+         * @brief Constructor taking a MatrixView as an argument.
+         * @param data The MatrixView representing the collection of columns.
+         * @note Constructor is private to avoid manual creation by client.
          */
         explicit MatrixColsConcept(matrix_t data) : m_matrix(data) {}
 
+    public:
         /**
-         * @brief
-         * @param other
+         * Public alias declatations. To be consistant with standard library containers.
+         */
+        using matrix_type = matrix_t;
+        using value_type  = typename matrix_t::value_type;
+
+        /**
+         * @brief Copy constructor.
+         * @param other Object to be copied.
          */
         MatrixColsConcept(const MatrixColsConcept& other) = default;
 
         /**
-         * @brief
-         * @param other
+         * @brief Move constructor.
+         * @param other Object to be moved.
          */
         MatrixColsConcept(MatrixColsConcept&& other) noexcept = default;
 
         /**
-         * @brief
-         * @param other
-         * @return
+         * @brief Destructor.
+         */
+        ~MatrixColsConcept() = default;
+
+        /**
+         * @brief Copy assignment operator.
+         * @param other Object to be copied.
+         * @return The copied-to object.
          */
         MatrixColsConcept& operator=(const MatrixColsConcept& other) = default;
 
         /**
-         * @brief
-         * @param other
-         * @return
+         * @brief Move assignment operator.
+         * @param other Object to be moved.
+         * @return The moved-to object.
          */
         MatrixColsConcept& operator=(MatrixColsConcept&& other) noexcept = default;
 
         /**
-         * @brief
-         * @param index
-         * @return
+         * @brief Function call operator, taking the index of the column to return, as an argument.
+         * @param index The index of the column to return.
+         * @return The column at the given index.
+         * @note This version is disabled for non-mutable objects.
          */
-        auto operator()(size_t index) { return m_matrix.col(index); }
+        auto operator()(size_t index)
+            requires(!std::same_as<MATRIX, MatrixViewConst<typename MATRIX::value_type>>)
+        {
+            return m_matrix.col(index);
+        }
 
         /**
-         * @brief
-         * @param index
-         * @return
+         * @brief Function call operator, taking the index of the column to return, as an argument.
+         * @param index The index of the column to return.
+         * @return The column at the given index.
          */
         auto operator()(size_t index) const { return m_matrix.col(index); }
 
         /**
-         * @brief
-         * @param index
-         * @return
+         * @brief Subscript operator, taking the index of the column to return, as an argument.
+         * @param index The index of the column to return.
+         * @return The column at the given index.
+         * @note This version is disabled for non-mutable objects.
          */
-        auto operator[](size_t index) { return m_matrix.col(index); }
+        auto operator[](size_t index)
+            requires(!std::same_as<MATRIX, MatrixViewConst<typename MATRIX::value_type>>)
+        {
+            return m_matrix.col(index);
+        }
 
         /**
-         * @brief
-         * @param index
-         * @return
+         * @brief Subscript operator, taking the index of the column to return, as an argument.
+         * @param index The index of the column to return.
+         * @return The column at the given index.
          */
         auto operator[](size_t index) const { return m_matrix.col(index); }
 
         /**
-         * @brief
-         * @return
+         * @brief Get the size, i.e. the count of columns.
+         * @return The column count.
          */
         size_t size() const { return m_matrix.colCount(); }
 
         /**
-         * @brief
-         * @return
+         * @brief Get an iterator to the first column in the collection.
+         * @return An iterator to the first column.
+         * @note This version is disabled for non-mutable objects.
          */
         auto begin()
-            requires(!std::same_as<T, MatrixViewConst<typename T::value_type>>)
+            requires(!std::same_as<MATRIX, MatrixViewConst<typename MATRIX::value_type>>)
         {
             return MatrixColIter<typename std::remove_reference_t<decltype(*this)>>(*this, 0);
         }
 
         /**
-         * @brief
-         * @return
+         * @brief Get a const iterator to the first column in the collection.
+         * @return A const iterator to the first column.
          */
         auto begin() const { return MatrixColIterConst<typename std::remove_cvref_t<decltype(*this)>>(*this, 0); }
 
         /**
-         * @brief
-         * @return
+         * @brief Get a const iterator to the first column in the collection.
+         * @return A const iterator to the first column.
          */
         auto cbegin() const { return MatrixColIterConst<typename std::remove_cvref_t<decltype(*this)>>(*this, 0); }
 
         /**
-         * @brief
-         * @return
+         * @brief Get an iterator to one past the last column in the collection.
+         * @return An iterator to one past the last column.
+         * @note This version is disabled for non-mutable objects.
          */
         auto end()
-            requires(!std::same_as<T, MatrixViewConst<typename T::value_type>>)
+            requires(!std::same_as<MATRIX, MatrixViewConst<typename MATRIX::value_type>>)
         {
             return MatrixColIter<typename std::remove_reference_t<decltype(*this)>>(*this, size());
         }
 
         /**
-         * @brief
-         * @return
+         * @brief Get a const iterator to one past the last column in the collection.
+         * @return A const iterator to one past the last column.
          */
         auto end() const { return MatrixColIterConst<typename std::remove_cvref_t<decltype(*this)>>(*this, size()); }
 
         /**
-         * @brief
-         * @return
+         * @brief Get a const iterator to one past the last column in the collection.
+         * @return A const iterator to one past the last column.
          */
         auto cend() const { return MatrixColIterConst<typename std::remove_cvref_t<decltype(*this)>>(*this, size()); }
 
-        auto front() { return (*this)[0]; }
+        /**
+         * @brief Get the first column in the collection.
+         * @return The first column.
+         * @note This version is disabled for non-mutable objects.
+         */
+        auto front()
+            requires(!std::same_as<MATRIX, MatrixViewConst<typename MATRIX::value_type>>)
+        {
+            return (*this)[0];
+        }
 
+        /**
+         * @brief Get the first column in the collection.
+         * @return The first column.
+         */
         auto front() const { return (*this)[0]; }
 
-        auto back() { return (*this)[m_matrix.colCount() - 1]; }
+        /**
+         * @brief Get the last column in the collection.
+         * @return The last column.
+         * @note This version is disabled for non-mutable objects.
+         */
+        auto back()
+            requires(!std::same_as<MATRIX, MatrixViewConst<typename MATRIX::value_type>>)
+        {
+            return (*this)[m_matrix.colCount() - 1];
+        }
 
+        /**
+         * @brief Get the last column in the collection.
+         * @return The last column.
+         */
         auto back() const { return (*this)[m_matrix.colCount() - 1]; }
     };
 
-}
+}    // namespace numerix::linalg
 
 #endif    // NUMERIX_MATRIXCOLS_HPP

@@ -47,7 +47,17 @@ namespace numerix::linalg::impl
     template<typename DERIVED>
     class MatrixBase
     {
+
+        friend Matrix<typename MatrixTraits<DERIVED>::value_type>;
+        friend MatrixView<typename MatrixTraits<DERIVED>::value_type>;
+        friend MatrixViewConst<typename MatrixTraits<DERIVED>::value_type>;
+
     private:
+
+        // ========================================================================================
+        // Private member functions
+        // ========================================================================================
+
         /**
          * @brief The index() function converts the row/column indeces to an index of the item in the raw array.
          * @param row The row index of the element.
@@ -105,6 +115,12 @@ namespace numerix::linalg::impl
             return std::pair<Slice, Slice>(rSlice, cSlice);
         }
 
+        /**
+         * @brief Default constructor
+         * @note Constructor made private to avoid non-matrix classes to use it as a base.
+         */
+        MatrixBase() = default;
+
     public:
 
         /**
@@ -114,14 +130,8 @@ namespace numerix::linalg::impl
 
 
         // ========================================================================================
-        // Special Member Functions (i.e. default constructors and assignment operators)
+        // Special Member Functions (i.e. copy constructors and assignment operators)
         // ========================================================================================
-
-        /**
-         * @brief Default constructor
-         * @todo Can this be made private, in order to prevent others to use it?
-         */
-        MatrixBase() = default;
 
         /**
          * @brief Copy constructor.
@@ -381,6 +391,7 @@ namespace numerix::linalg::impl
          */
         auto col(size_t index) const { return (*this)({ 0, rowCount(), 1 }, { index, 1, 1 }); }
 
+
         // ========================================================================================
         // Meta data
         // ========================================================================================
@@ -440,9 +451,9 @@ namespace numerix::linalg::impl
         }
 
         /**
-         * @brief
-         * @param value
-         * @return
+         * @brief Add-assign a scalar value to each matrix element.
+         * @param value The scalar value to add.
+         * @return A reference to the object.
          */
         DERIVED& operator+=(is_number auto value)
         {
@@ -452,9 +463,21 @@ namespace numerix::linalg::impl
         }
 
         /**
-         * @brief
-         * @param value
-         * @return
+         * @brief Add-assign the elements of a matrix to the elements of the current object.
+         * @param mat The matrix object with the elements to add.
+         * @return A reference to the object.
+         */
+        DERIVED& operator+=(is_matrix auto mat)
+        {
+            DERIVED& derived = static_cast<DERIVED&>(*this);
+            derived          = (derived + mat);
+            return derived;
+        }
+
+        /**
+         * @brief Subtract-assign a scalar value from each matrix element.
+         * @param value The scalar value to subtract.
+         * @return A reference to the object.
          */
         DERIVED& operator-=(is_number auto value)
         {
@@ -464,9 +487,21 @@ namespace numerix::linalg::impl
         }
 
         /**
-         * @brief
-         * @param value
-         * @return
+         * @brief Subtract-assign the elements of a matrix from the elements of the current object.
+         * @param mat The matrix object with the elements to subtract.
+         * @return A reference to the object.
+         */
+        DERIVED& operator-=(is_matrix auto mat)
+        {
+            DERIVED& derived = static_cast<DERIVED&>(*this);
+            derived          = (derived - mat);
+            return derived;
+        }
+
+        /**
+         * @brief Divide-assign each matrix element with a scalar value.
+         * @param value The scalar value to divide by.
+         * @return A reference to the object.
          */
         DERIVED& operator/=(is_number auto value)
         {
@@ -476,9 +511,9 @@ namespace numerix::linalg::impl
         }
 
         /**
-         * @brief
-         * @param value
-         * @return
+         * @brief Multiply-assign each matrix element by a scalar value.
+         * @param value The scalar value to multiply by.
+         * @return A reference to the object.
          */
         DERIVED& operator*=(is_number auto value)
         {
@@ -493,9 +528,9 @@ namespace numerix::linalg::impl
         // ========================================================================================
 
         /**
-         * @brief
-         * @param extents
-         * @return
+         * @brief Create an identity Matrix object (with ones (1) down the diagonal).
+         * @param extents The extents of the identity matrix (number of rows and columns must be identical).
+         * @return A Matrix object representing the identity matrix.
          */
         static Matrix<typename MatrixTraits<DERIVED>::value_type> CreateIdentityMatrix(size_t extents)
         {
