@@ -37,7 +37,6 @@
 #include "Matrix/MatrixCols.hpp"
 #include "Matrix/MatrixCommon.h"
 #include "Matrix/MatrixElementIter.hpp"
-#include "Matrix/MatrixElements.hpp"
 #include "Matrix/MatrixFunctions.hpp"
 #include "Matrix/MatrixRowIter.hpp"
 #include "Matrix/MatrixRows.hpp"

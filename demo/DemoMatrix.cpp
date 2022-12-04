@@ -51,14 +51,11 @@ int main() {
         std::cout << m4 << std::endl;
         std::cout << v4 << std::endl;
 
-        auto res = m1.elems() * m4.elems();
+        auto res = m1 * m4;
         std::cout << res << std::endl;
 
-        auto check = m1.elems() * v4.elems();
+        auto check = m1 * v4;
         std::cout << check << std::endl;
-
-        //auto m4 = m1 * m3;
-        //m4.print();
 
 }
 

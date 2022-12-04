@@ -37,12 +37,12 @@ namespace numerix::linalg
 {
 
     /**
-     * @brief The MatrixViewConcept class is a genereic implementation of a view into a subset of the elements of a Matrix.
+     * @brief The MatrixViewConcept class is a generic implementation of a view into a subset of the elements of a Matrix.
      * Similar to the Matrix class, it derives from the MatrixBase class using CRTP. Specializations of this class are the
      * MatrixView and MatrixViewConst classes, for mutable and const views, respectively.
      * An object of the MatrixProxy class does not own the data; the data is owned by the corresponding Matrix object.
      * @tparam T The type of the underlying matrix elements. Default is double, but can be any kind of floating point or integer number.
-     * @tparam IsConst
+     * @tparam IsConst A flag indicating if the object should be treated as const (i.e. non-mutable, similar to a const_iterator).
      * @todo Consider putting in the impl namespace, as MatrixProxy objects should only be created from a Matrix object.
      */
     template<typename T, bool IsConst>
@@ -62,28 +62,32 @@ namespace numerix::linalg
         using matrix_t = std::conditional_t<IsConst, const Matrix<T>, Matrix<T>>;
 
     private:
-        Slice     m_rowSlice; /**< */
-        Slice     m_colSlice; /**< */
-        matrix_t* m_matrix;   /**< */
+        matrix_t* m_matrix;   /**< A raw pointer (i.e. non-owning) to the underlying Matrix object. */
+        Slice     m_rowSlice; /**< The Slice describing the rows. */
+        Slice     m_colSlice; /**< The Slice describing the columns. */
 
         /**
-         * @brief
-         * @return
+         * @brief Access the raw array of Matrix elements.
+         * @return A pointer to the first element.
+         * @note Unlike in the Matrix class, this is a private member. The reason is that it provides access to
+         * the entire array of matrix elements, not only the ones visible in the view. Direct access by clients
+         * would result in unexpected behaviour.
+         * @note The non-const version is only available for mutable types.
          */
         T* data()
-            requires(!std::is_const_v<T>)
+            requires(!IsConst) && (!std::is_const_v<T>)
         {
             return m_matrix->data();
         }
 
         /**
-         * @brief
-         * @return
+         * @brief Access the raw array of Matrix elements.
+         * @return A pointer to the first element.
+         * @note Unlike in the Matrix class, this is a private member. The reason is that it provides access to
+         * the entire array of matrix elements, not only the ones visible in the view. Direct access by clients
+         * would result in unexpected behaviour.
          */
-        const T* data() const
-        {
-            return m_matrix->data();
-        }
+        const T* data() const { return m_matrix->data(); }
 
         /**
          * @brief
@@ -95,64 +99,65 @@ namespace numerix::linalg
             return GSlice(start, { m_rowSlice.length(), m_colSlice.length() }, { m_rowSlice.stride(), m_colSlice.stride() });
         }
 
-    public:
         /**
-         * @brief
-         * @param rowSlice
-         * @param colSlice
-         * @param data
+         * @brief Get the extents in each of the dimensions (rows and columns), of the parent Matrix.
+         * @return A std::pair with the row and column extents.
          */
-        MatrixViewConcept(const Slice& rowSlice, const Slice& colSlice, matrix_t* matrix)
+        auto extents() const { return m_matrix->extents(); }
+
+        /**
+         * @brief Constructor taking row/column slices and the parent Matrix object as arguments.
+         * @param rowSlice Slice object representing the rows.
+         * @param colSlice Slice object representing the columns.
+         * @param mat The parent Matrix object
+         * @note This constructor is private, as clients should not be allowed to create MatrixViews directly.
+         */
+        MatrixViewConcept(const Slice& rowSlice, const Slice& colSlice, matrix_t* mat)
             : m_rowSlice(rowSlice),
               m_colSlice(colSlice),
-              m_matrix(matrix)
+              m_matrix(mat)
         {}
 
     public:
 
+        /**
+         * Public alias declatations. To be consistant with standard library containers, and to provide access to
+         * non-standard assignment operator.
+         */
         using value_type = T;
+        using parent::operator=;
 
         /**
-         * @brief
-         * @param other
+         * @brief Copy constructor.
+         * @param other Object to be copied.
          */
         MatrixViewConcept(const MatrixViewConcept& other) = default;
 
         /**
-         * @brief
-         * @param other
+         * @brief Move constructor.
+         * @param other Object to be moved.
          */
         MatrixViewConcept(MatrixViewConcept&& other) noexcept = default;
 
         /**
-         * @brief
+         * @brief Destructor.
          */
         ~MatrixViewConcept() = default;
 
         /**
-         * @brief
-         * @param other
-         * @return
+         * @brief Copy assignment operator.
+         * @param other Object to be copied.
+         * @return The copied-to object.
          */
         MatrixViewConcept& operator=(const MatrixViewConcept& other) = default;
 
         /**
-         * @brief
-         * @param other
-         * @return
+         * @brief Move assignment operator.
+         * @param other Object to be moved.
+         * @return The moved-to object.
          */
         MatrixViewConcept& operator=(MatrixViewConcept&& other) noexcept = default;
-
-        /**
-         * @brief
-         * @return
-         */
-        auto extents() const
-        {
-            return m_matrix->extents();
-        }
     };
 }    // namespace numerix::linalg
-
 
 #endif    // NUMERIX_MATRIXVIEW_HPP

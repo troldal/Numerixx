@@ -39,7 +39,7 @@ namespace numerix::linalg
 
     /**
      * @brief The Matrix class is the main abstraction for matrices. It derives from the MatrixBase class using CRTP.
-     * The Matrix class owns the underlying data, unlike the MatrixProxy class which simply is a view into a Matrix object.
+     * The Matrix class owns the underlying data, unlike the MatrixView class which simply is a view into a Matrix object.
      * @tparam T The type of the underlying matrix elements. Default is double, but can be any kind of floating point or integer number.
      */
     template<typename T = double>
@@ -60,8 +60,8 @@ namespace numerix::linalg
 
     private:
         std::vector<T> m_data;     /**< The underlying array of matrix elements. */
-        Slice          m_rowSlice; /**< The Slice describing the rows. Required to provide a common interface with MatrixProxy. */
-        Slice          m_colSlice; /**< The Slice describing the columns. Required to provide a common interface with MatrixProxy. */
+        Slice          m_rowSlice; /**< The Slice describing the rows. Required to provide a common interface with MatrixView. */
+        Slice          m_colSlice; /**< The Slice describing the columns. Required to provide a common interface with MatrixView. */
 
         /**
          * @brief
@@ -72,18 +72,33 @@ namespace numerix::linalg
             return GSlice(start, { m_rowSlice.length(), m_colSlice.length() }, { m_rowSlice.stride(), m_colSlice.stride() });
         }
 
-    public:
         /**
-         * Public alias declatations. To be consistant with standard library containers.
+         * @brief Get the extents in each of the dimensions (rows and columns)
+         * @return A std::pair with the row and column extents.
+         */
+        auto extents() const
+        {
+            return std::make_pair(parent::rowCount(), parent::colCount());
+        }
+
+    public:
+
+        /**
+         * Public alias declatations. To be consistant with standard library containers, and to provide access to
+         * non-standard assignment operator.
          */
         using value_type = T;
+        using parent::operator=;
 
         /**
          * @brief Constructor taking the number of rows and columns.
          * @param rows Number of rows.
          * @param cols Number of cols.
          */
-        Matrix(int rows, int cols) : m_data(rows * cols), m_rowSlice(0, rows, cols), m_colSlice(0, cols, 1) {}
+        Matrix(int rows, int cols) : m_data(rows * cols), m_rowSlice(0, rows, cols), m_colSlice(0, cols, 1) {
+            if (rows <= 0) throw std::invalid_argument("Invalid Matrix Extents: A Matrix object must have at least one row.");
+            if (cols <= 0) throw std::invalid_argument("Invalid Matrix Extents: A Matrix object must have at least one column.");
+        }
 
         /**
          * @brief Copy constructor.
@@ -117,15 +132,6 @@ namespace numerix::linalg
         Matrix& operator=(Matrix&& other) noexcept = default;
 
         /**
-         * @brief
-         * @return
-         */
-        auto extents() const
-        {
-            return std::make_pair(parent::rowCount(), parent::colCount());
-        }
-
-        /**
          * @brief Access the raw array of Matrix elements.
          * @return A pointer to the first element.
          */
@@ -142,6 +148,7 @@ namespace numerix::linalg
         {
             return m_data.data();
         }
+
     };
 
 }    // namespace numerix::linalg

@@ -63,8 +63,8 @@ namespace numerix::linalg {
                 // ===== Multiply the i'th row by the element below the pivot, and subtract from the j'th row,
                 // ===== for both the coefficient and identity matrices.
                 // ===== Do the same to the j'th element of the results vector.
-                row2.elems() = row2 - row * elem;
-                inv2.elems() = inv2 - inv * elem;
+                row2 = row2 - row * elem;
+                inv2 = inv2 - inv * elem;
                 results(j,0) = results(j,0) - results(i, 0) * elem;
             }
         }
@@ -88,8 +88,8 @@ namespace numerix::linalg {
                 // ===== Multiply the i'th row by the element above the pivot, and subtract from the j'th row,
                 // ===== for both the coefficient and identity matrices.
                 // ===== Do the same to the j'th element of the results vector.
-                row2.elems() = row2 - row * elem;
-                inv2.elems() = inv2 - inv * elem;
+                row2 = row2 - row * elem;
+                inv2 = inv2 - inv * elem;
                 results(j,0) = results(j,0) - results(i, 0) * elem;
             }
         }

@@ -69,10 +69,13 @@ namespace numerix::linalg
      */
     template<typename T, typename U>
         requires is_matrix<T> && is_matrix<U>
-    inline Matrix<typename std::common_type<typename T::value_type, typename U::value_type>::type> operator+(const T& a, const U& b)
+    inline auto operator+(const T& mat1, const U& mat2)
     {
-        auto result = a;
-        result += b;
+        using value_t = std::common_type_t<typename T::value_type, typename U::value_type>;
+        using result_t = Matrix<value_t>;
+
+        result_t result {mat1.rowCount(), mat1.colCount()};
+        std::transform(mat1.begin(), mat1.end(), mat2.begin(), result.begin(), std::plus());
         return result;
     }
 
@@ -86,13 +89,14 @@ namespace numerix::linalg
      */
     template<typename T, typename U>
         requires is_matrix<T> && is_number<U>
-    inline Matrix<typename std::common_type<typename T::value_type, U>::type> operator+(const T& a, U b)
+    inline auto operator+(const T& mat, U scalar)
     {
-        using result_t = Matrix<typename std::common_type<typename T::value_type, U>::type>;
+        using value_t = std::common_type_t<typename T::value_type, U>;
+        using result_t = Matrix<value_t>;
 
-        result_t result { a.rowCount(), a.colCount() };
-        std::transform(a.begin(), a.end(), result.begin(), [&](const auto& v) {
-            return static_cast<typename result_t::value_type>(v) + b;
+        result_t result { mat.rowCount(), mat.colCount() };
+        std::transform(mat.begin(), mat.end(), result.begin(), [&](const auto& v) {
+            return static_cast<result_t>(v) + scalar;
         });
         return result;
     }
@@ -106,11 +110,16 @@ namespace numerix::linalg
      */
     template<typename T, typename U>
         requires is_matrix<T> && is_matrix<U>
-    inline Matrix<typename std::common_type<typename T::value_type, typename U::value_type>::type> operator-(const T& a, const U& b)
+    inline auto operator-(const T& mat1, const U& mat2)
     {
-        Matrix<typename std::common_type<typename T::value_type, typename U::value_type>::type> result(a.rowCount(), a.colCount());
-        result.elems() = a;
-        result.elems() -= b.elems();
+        using value_t = std::common_type_t<typename T::value_type, typename U::value_type>;
+        using result_t = Matrix<value_t>;
+
+        result_t result { mat1.rowCount(), mat1.colCount() };
+        std::transform(mat1.begin(), mat1.end(), mat2.begin(), result.begin(), [&](const auto& a, const auto& b) {
+            return static_cast<value_t>(a) - static_cast<value_t>(b);
+        });
+
         return result;
     }
 
@@ -124,18 +133,18 @@ namespace numerix::linalg
      */
     template<typename T, typename U>
         requires is_matrix<T> && is_number<U>
-    inline Matrix<typename std::common_type<typename T::value_type, U>::type> operator-(const T& a, U b)
+    inline auto operator-(const T& mat, U scalar)
     {
-        using result_t = Matrix<typename std::common_type<typename T::value_type, U>::type>;
+        using value_t = std::common_type_t<typename T::value_type, U>;
+        using result_t = Matrix<value_t>;
 
-        result_t result { a.rowCount(), a.colCount() };
-        std::transform(a.begin(), a.end(), result.begin(), [&](const auto& v) {
-            return static_cast<typename result_t::value_type>(v) - b;
+        result_t result { mat.rowCount(), mat.colCount() };
+        std::transform(mat.begin(), mat.end(), result.begin(), [&](const auto& v) {
+            return static_cast<result_t>(v) - scalar;
         });
+
         return result;
     }
-
-
 
     /**
      * @brief
@@ -147,14 +156,16 @@ namespace numerix::linalg
      */
     template<typename T, typename U>
         requires is_matrix<T> && is_number<U>
-    inline auto operator*(const T& a, U b)
+    inline auto operator*(const T& mat, U scalar)
     {
-        using result_t = Matrix<typename std::common_type<typename T::value_type, U>::type>;
+        using value_t = std::common_type_t<typename T::value_type, U>;
+        using result_t = Matrix<value_t>;
 
-        result_t result { a.rowCount(), a.colCount() };
-        std::transform(a.elems().begin(), a.elems().end(), result.elems().begin(), [&](const auto& v) {
-            return static_cast<typename result_t::value_type>(v) * b;
+        result_t result { mat.rowCount(), mat.colCount() };
+        std::transform(mat.begin(), mat.end(), result.begin(), [&](const auto& v) {
+            return static_cast<typename result_t::value_type>(v) * scalar;
         });
+
         return result;
     }
 
@@ -168,14 +179,32 @@ namespace numerix::linalg
      */
     template<typename T, typename U>
         requires is_matrix<U> && is_number<T>
-    inline auto operator*(const T a, U& b)
+    inline auto operator*(const T scalar, U& mat)
     {
-        using result_t = Matrix<typename std::common_type<typename U::value_type, T>::type>;
+        return (mat * scalar);
+    }
 
-        result_t result { b.rowCount(), b.colCount() };
-        std::transform(b.begin(), b.end(), result.begin(), [&](const auto& v) {
-            return static_cast<typename result_t::value_type>(v) * a;
-        });
+    /**
+     * @brief
+     * @tparam T
+     * @tparam U
+     * @param a
+     * @param b
+     * @return
+     */
+    template<typename T, typename U>
+        requires is_matrix<U> && is_matrix<T>
+    inline auto operator*(const T& mat1, const U& mat2)
+    {
+        using value_t = std::common_type_t<typename T::value_type, typename U::value_type>;
+        using result_t = Matrix<value_t>;
+
+        result_t result { mat1.rowCount(), mat2.colCount() };
+        for (int i = 0; i < result.rowCount(); ++i)
+            for (int j = 0; j < result.colCount(); ++j)
+                result(i, j) =
+                    std::inner_product(mat1.row(i).begin(), mat1.row(i).end(), mat2.col(j).begin(), static_cast<value_t>(0.0));
+
         return result;
     }
 
@@ -189,14 +218,16 @@ namespace numerix::linalg
      */
     template<typename T, typename U>
         requires is_matrix<T> && is_number<U>
-    inline auto operator/(const T& a, U b)
+    inline auto operator/(const T& mat, U scalar)
     {
-        using result_t = Matrix<typename std::common_type<typename T::value_type, U>::type>;
+        using value_t = std::common_type_t<typename T::value_type, U>;
+        using result_t = Matrix<value_t>;
 
-        result_t result { a.rowCount(), a.colCount() };
-        std::transform(a.elems().begin(), a.elems().end(), result.elems().begin(), [&](const auto& v) {
-            return static_cast<typename result_t::value_type>(v) / b;
+        result_t result { mat.rowCount(), mat.colCount() };
+        std::transform(mat.begin(), mat.end(), result.begin(), [&](const auto& v) {
+            return static_cast<value_t>(v) / scalar;
         });
+
         return result;
     }
 
@@ -211,8 +242,16 @@ namespace numerix::linalg
         requires is_matrix<T>
     inline Matrix<typename T::value_type> transpose(const T& mat)
     {
-        Matrix<typename T::value_type> result(mat.colCount(), mat.rowCount());
-        for (int i = 0; i < mat.rowCount(); ++i) std::copy(mat.row(i).begin(), mat.row(i).end(), result.col(i).begin());
+        using value_t = typename T::value_type;
+        using result_t = Matrix<value_t>;
+
+        result_t result(mat.colCount(), mat.rowCount());
+        for (int i = 0; i < result.rowCount(); ++i) {
+            if (result.colCount() == 1) // TODO: Not sure why this requires special treatment. See if there's a better way.
+                result.row(i)(0,0) = mat.col(i)(0,0);
+            std::copy(mat.col(i).begin(), mat.col(i).end(), result.row(i).begin());
+        }
+
         return result;
     }
 

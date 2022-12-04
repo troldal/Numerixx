@@ -123,11 +123,11 @@ TEST_CASE("Matrix Tests", "[linalg]") {
         // ===== Create a std::vector with the same values as in the Matrix object, and check that they are identical.
         auto vec = std::vector<int> {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16};
         const auto m2 = m1;
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec.begin()));
 
         // ===== Reverse the vector, and check that the sequence is no longer the same as the Matrix object.
         std::reverse(vec.begin(), vec.end());
-        REQUIRE_FALSE(std::equal(m2.elems().begin(), m2.elems().end(), vec.begin()));
+        REQUIRE_FALSE(std::equal(m2.begin(), m2.end(), vec.begin()));
     }
 
     /*
@@ -139,8 +139,8 @@ TEST_CASE("Matrix Tests", "[linalg]") {
         
         auto m2 = m1;
         auto vec = std::vector<int> {101,102,103,104,105,106,107,108,109,1010,1011,1012,1013,1014,1015,1016};
-        std::copy(vec.begin(), vec.end(), m2.elems().begin());
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec.begin()));
+        std::copy(vec.begin(), vec.end(), m2.begin());
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec.begin()));
     }
 
     SECTION("Read individual MatrixProxy (column) items") {
@@ -170,28 +170,28 @@ TEST_CASE("Matrix Tests", "[linalg]") {
         REQUIRE(m3(3,0) == 1013);
 
         auto vec = std::vector<int> {101,2,3,4,105,6,7,8,109,10,11,12,1013,14,15,16};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec.begin()));
     }
 
     SECTION("Read access to MatrixProxy (column) via iterators") {
         auto m2 = m1;
         auto m3 = m2({0,4,1}, {0,1,1});
         auto vec = std::vector<int> {1,5,9,13};
-        REQUIRE(std::equal(m3.elems().begin(), m3.elems().end(), vec.begin()));
+        REQUIRE(std::equal(m3.begin(), m3.end(), vec.begin()));
 
         std::reverse(vec.begin(), vec.end());
-        REQUIRE_FALSE(std::equal(m3.elems().begin(), m3.elems().end(), vec.begin()));
+        REQUIRE_FALSE(std::equal(m3.begin(), m3.end(), vec.begin()));
     }
 
     SECTION("Write access to MatrixProxy (column) via iterators") {
         auto m2 = m1;
         auto m3 = m2({0,4,1}, {0,1,1});
         auto vec = std::vector<int> {101,105,109,1013};
-        std::copy(vec.begin(), vec.end(), m3.elems().begin());
-        REQUIRE(std::equal(m3.elems().begin(), m3.elems().end(), vec.begin()));
+        std::copy(vec.begin(), vec.end(), m3.begin());
+        REQUIRE(std::equal(m3.begin(), m3.end(), vec.begin()));
 
         auto vec2 = std::vector<int> {101,2,3,4,105,6,7,8,109,10,11,12,1013,14,15,16};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec2.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec2.begin()));
     }
 
     SECTION("Read individual MatrixProxy (row) items") {
@@ -221,28 +221,28 @@ TEST_CASE("Matrix Tests", "[linalg]") {
         REQUIRE(m3(0,3) == 104);
 
         auto vec = std::vector<int> {101,102,103,104,5,6,7,8,9,10,11,12,13,14,15,16};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec.begin()));
     }
 
     SECTION("Read access to MatrixProxy (row) via iterators") {
         auto m2 = m1;
         auto m3 = m2({0,1,1}, {0,4,1});
         auto vec = std::vector<int> {1,2,3,4};
-        REQUIRE(std::equal(m3.elems().begin(), m3.elems().end(), vec.begin()));
+        REQUIRE(std::equal(m3.begin(), m3.end(), vec.begin()));
 
         std::reverse(vec.begin(), vec.end());
-        REQUIRE_FALSE(std::equal(m3.elems().begin(), m3.elems().end(), vec.begin()));
+        REQUIRE_FALSE(std::equal(m3.begin(), m3.end(), vec.begin()));
     }
 
     SECTION("Write access to MatrixProxy (column) via iterators") {
         auto m2 = m1;
         auto m3 = m2({0,1,1}, {0,4,1});
         auto vec = std::vector<int> {101,102,103,104};
-        std::copy(vec.begin(), vec.end(), m3.elems().begin());
-        REQUIRE(std::equal(m3.elems().begin(), m3.elems().end(), vec.begin()));
+        std::copy(vec.begin(), vec.end(), m3.begin());
+        REQUIRE(std::equal(m3.begin(), m3.end(), vec.begin()));
 
         auto vec2 = std::vector<int> {101,102,103,104,5,6,7,8,9,10,11,12,13,14,15,16};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec2.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec2.begin()));
     }
 
     SECTION("Read individual MatrixProxy (sub-Matrix) items") {
@@ -272,28 +272,28 @@ TEST_CASE("Matrix Tests", "[linalg]") {
         REQUIRE(m3(1,1) == 1011);
 
         auto vec = std::vector<int> {1,2,3,4,5,106,107,8,9,1010,1011,12,13,14,15,16};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec.begin()));
     }
 
     SECTION("Read access to MatrixProxy (sub-Matrix) via iterators") {
         auto m2 = m1;
         auto m3 = m2({1,2,1}, {1,2,1});
         auto vec = std::vector<int> {6,7,10,11};
-        REQUIRE(std::equal(m3.elems().begin(), m3.elems().end(), vec.begin()));
+        REQUIRE(std::equal(m3.begin(), m3.end(), vec.begin()));
 
         std::reverse(vec.begin(), vec.end());
-        REQUIRE_FALSE(std::equal(m3.elems().begin(), m3.elems().end(), vec.begin()));
+        REQUIRE_FALSE(std::equal(m3.begin(), m3.end(), vec.begin()));
     }
 
     SECTION("Write access to MatrixProxy (sub-Matrix) via iterators") {
         auto m2 = m1;
         auto m3 = m2({1,2,1}, {1,2,1});
         auto vec = std::vector<int> {106,107,1010,1011};
-        std::copy(vec.begin(), vec.end(), m3.elems().begin());
-        REQUIRE(std::equal(m3.elems().begin(), m3.elems().end(), vec.begin()));
+        std::copy(vec.begin(), vec.end(), m3.begin());
+        REQUIRE(std::equal(m3.begin(), m3.end(), vec.begin()));
 
         auto vec2 = std::vector<int> {1,2,3,4,5,106,107,8,9,1010,1011,12,13,14,15,16};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec2.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec2.begin()));
     }
 
     SECTION("Read individual MatrixProxy (sub-Matrix column) items") {
@@ -329,7 +329,7 @@ TEST_CASE("Matrix Tests", "[linalg]") {
         REQUIRE(m4(1,0) == 1010);
         REQUIRE(m4(2,0) == 1014);
         auto vec = std::vector<int> {1,2,3,4,5,106,7,8,9,1010,11,12,13,1014,15,16};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec.begin()));
 
         m4 = m3({0,3,1}, {1,1,1});
         m4(0,0) = 107;
@@ -340,7 +340,7 @@ TEST_CASE("Matrix Tests", "[linalg]") {
         REQUIRE(m4(1,0) == 1011);
         REQUIRE(m4(2,0) == 1015);
         auto vec2 = std::vector<int> {1,2,3,4,5,106,107,8,9,1010,1011,12,13,1014,1015,16};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec2.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec2.begin()));
 
         m4 = m3({0,3,1}, {2,1,1});
         m4(0,0) = 108;
@@ -351,7 +351,7 @@ TEST_CASE("Matrix Tests", "[linalg]") {
         REQUIRE(m4(1,0) == 1012);
         REQUIRE(m4(2,0) == 1016);
         auto vec3 = std::vector<int> {1,2,3,4,5,106,107,108,9,1010,1011,1012,13,1014,1015,1016};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec3.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec3.begin()));
     }
 
     SECTION("Read access to MatrixProxy (sub-Matrix column) via iterators") {
@@ -360,24 +360,24 @@ TEST_CASE("Matrix Tests", "[linalg]") {
 
         auto m4 = m3({0,3,1}, {0,1,1});
         auto vec = std::vector<int> {6,10,14};
-        REQUIRE(std::equal(m4.elems().begin(), m4.elems().end(), vec.begin()));
+        REQUIRE(std::equal(m4.begin(), m4.end(), vec.begin()));
 
         std::reverse(vec.begin(), vec.end());
-        REQUIRE_FALSE(std::equal(m4.elems().begin(), m4.elems().end(), vec.begin()));
+        REQUIRE_FALSE(std::equal(m4.begin(), m4.end(), vec.begin()));
 
         m4 = m3({0,3,1}, {1,1,1});
         auto vec2 = std::vector<int> {7,11,15};
-        REQUIRE(std::equal(m4.elems().begin(), m4.elems().end(), vec2.begin()));
+        REQUIRE(std::equal(m4.begin(), m4.end(), vec2.begin()));
 
         std::reverse(vec2.begin(), vec2.end());
-        REQUIRE_FALSE(std::equal(m4.elems().begin(), m4.elems().end(), vec2.begin()));
+        REQUIRE_FALSE(std::equal(m4.begin(), m4.end(), vec2.begin()));
 
         m4 = m3({0,3,1}, {2,1,1});
         auto vec3 = std::vector<int> {8,12,16};
-        REQUIRE(std::equal(m4.elems().begin(), m4.elems().end(), vec3.begin()));
+        REQUIRE(std::equal(m4.begin(), m4.end(), vec3.begin()));
 
         std::reverse(vec3.begin(), vec3.end());
-        REQUIRE_FALSE(std::equal(m4.elems().begin(), m4.elems().end(), vec3.begin()));
+        REQUIRE_FALSE(std::equal(m4.begin(), m4.end(), vec3.begin()));
     }
 
     SECTION("Write access to MatrixProxy (sub-Matrix column) via iterators") {
@@ -386,27 +386,27 @@ TEST_CASE("Matrix Tests", "[linalg]") {
 
         auto m4 = m3({0,3,1}, {0,1,1});
         auto vec = std::vector<int> {106,1010,1014};
-        std::copy(vec.begin(), vec.end(), m4.elems().begin());
-        REQUIRE(std::equal(m4.elems().begin(), m4.elems().end(), vec.begin()));
+        std::copy(vec.begin(), vec.end(), m4.begin());
+        REQUIRE(std::equal(m4.begin(), m4.end(), vec.begin()));
 
         auto vec2 = std::vector<int> {1,2,3,4,5,106,7,8,9,1010,11,12,13,1014,15,16};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec2.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec2.begin()));
 
         m4 = m3({0,3,1}, {1,1,1});
         auto vec3 = std::vector<int> {107,1011,1015};
-        std::copy(vec3.begin(), vec3.end(), m4.elems().begin());
-        REQUIRE(std::equal(m4.elems().begin(), m4.elems().end(), vec3.begin()));
+        std::copy(vec3.begin(), vec3.end(), m4.begin());
+        REQUIRE(std::equal(m4.begin(), m4.end(), vec3.begin()));
 
         auto vec4 = std::vector<int> {1,2,3,4,5,106,107,8,9,1010,1011,12,13,1014,1015,16};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec4.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec4.begin()));
 
         m4 = m3({0,3,1}, {2,1,1});
         auto vec5 = std::vector<int> {108,1012,1016};
-        std::copy(vec5.begin(), vec5.end(), m4.elems().begin());
-        REQUIRE(std::equal(m4.elems().begin(), m4.elems().end(), vec5.begin()));
+        std::copy(vec5.begin(), vec5.end(), m4.begin());
+        REQUIRE(std::equal(m4.begin(), m4.end(), vec5.begin()));
 
         auto vec6 = std::vector<int> {1,2,3,4,5,106,107,108,9,1010,1011,1012,13,1014,1015,1016};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec6.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec6.begin()));
     }
 
     SECTION("Read individual MatrixProxy (sub-Matrix row) items") {
@@ -442,7 +442,7 @@ TEST_CASE("Matrix Tests", "[linalg]") {
         REQUIRE(m4(0,1) == 107);
         REQUIRE(m4(0,2) == 108);
         auto vec = std::vector<int> {1,2,3,4,5,106,107,108,9,10,11,12,13,14,15,16};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec.begin()));
 
         m4 = m3({1,1,1}, {0,3,1});
         m4(0,0) = 1010;
@@ -453,7 +453,7 @@ TEST_CASE("Matrix Tests", "[linalg]") {
         REQUIRE(m4(0,1) == 1011);
         REQUIRE(m4(0,2) == 1012);
         auto vec2 = std::vector<int> {1,2,3,4,5,106,107,108,9,1010,1011,1012,13,14,15,16};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec2.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec2.begin()));
 
         m4 = m3({2,1,1}, {0,3,1});
         m4(0,0) = 1014;
@@ -464,7 +464,7 @@ TEST_CASE("Matrix Tests", "[linalg]") {
         REQUIRE(m4(0,1) == 1015);
         REQUIRE(m4(0,2) == 1016);
         auto vec3 = std::vector<int> {1,2,3,4,5,106,107,108,9,1010,1011,1012,13,1014,1015,1016};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec3.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec3.begin()));
     }
 
     SECTION("Read access to MatrixProxy (sub-Matrix row) via iterators") {
@@ -473,24 +473,24 @@ TEST_CASE("Matrix Tests", "[linalg]") {
 
         auto m4 = m3({0,1,1}, {0,3,1});
         auto vec = std::vector<int> {6,7,8};
-        REQUIRE(std::equal(m4.elems().begin(), m4.elems().end(), vec.begin()));
+        REQUIRE(std::equal(m4.begin(), m4.end(), vec.begin()));
 
         std::reverse(vec.begin(), vec.end());
-        REQUIRE_FALSE(std::equal(m4.elems().begin(), m4.elems().end(), vec.begin()));
+        REQUIRE_FALSE(std::equal(m4.begin(), m4.end(), vec.begin()));
 
         m4 = m3({1,1,1}, {0,3,1});
         auto vec2 = std::vector<int> {10,11,12};
-        REQUIRE(std::equal(m4.elems().begin(), m4.elems().end(), vec2.begin()));
+        REQUIRE(std::equal(m4.begin(), m4.end(), vec2.begin()));
 
         std::reverse(vec2.begin(), vec2.end());
-        REQUIRE_FALSE(std::equal(m4.elems().begin(), m4.elems().end(), vec2.begin()));
+        REQUIRE_FALSE(std::equal(m4.begin(), m4.end(), vec2.begin()));
 
         m4 = m3({2,1,1}, {0,3,1});
         auto vec3 = std::vector<int> {14,15,16};
-        REQUIRE(std::equal(m4.elems().begin(), m4.elems().end(), vec3.begin()));
+        REQUIRE(std::equal(m4.begin(), m4.end(), vec3.begin()));
 
         std::reverse(vec3.begin(), vec3.end());
-        REQUIRE_FALSE(std::equal(m4.elems().begin(), m4.elems().end(), vec3.begin()));
+        REQUIRE_FALSE(std::equal(m4.begin(), m4.end(), vec3.begin()));
     }
 
     SECTION("Write access to MatrixProxy (sub-Matrix row) via iterators") {
@@ -499,27 +499,27 @@ TEST_CASE("Matrix Tests", "[linalg]") {
 
         auto m4 = m3({0,1,1}, {0,3,1});
         auto vec = std::vector<int> {106,107,108};
-        std::copy(vec.begin(), vec.end(), m4.elems().begin());
-        REQUIRE(std::equal(m4.elems().begin(), m4.elems().end(), vec.begin()));
+        std::copy(vec.begin(), vec.end(), m4.begin());
+        REQUIRE(std::equal(m4.begin(), m4.end(), vec.begin()));
 
         auto vec2 = std::vector<int> {1,2,3,4,5,106,107,108,9,10,11,12,13,14,15,16};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec2.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec2.begin()));
 
         m4 = m3({1,1,1}, {0,3,1});
         auto vec3 = std::vector<int> {1010,1011,1012};
-        std::copy(vec3.begin(), vec3.end(), m4.elems().begin());
-        REQUIRE(std::equal(m4.elems().begin(), m4.elems().end(), vec3.begin()));
+        std::copy(vec3.begin(), vec3.end(), m4.begin());
+        REQUIRE(std::equal(m4.begin(), m4.end(), vec3.begin()));
 
         auto vec4 = std::vector<int> {1,2,3,4,5,106,107,108,9,1010,1011,1012,13,14,15,16};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec4.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec4.begin()));
 
         m4 = m3({2,1,1}, {0,3,1});
         auto vec5 = std::vector<int> {1014,1015,1016};
-        std::copy(vec5.begin(), vec5.end(), m4.elems().begin());
-        REQUIRE(std::equal(m4.elems().begin(), m4.elems().end(), vec5.begin()));
+        std::copy(vec5.begin(), vec5.end(), m4.begin());
+        REQUIRE(std::equal(m4.begin(), m4.end(), vec5.begin()));
 
         auto vec6 = std::vector<int> {1,2,3,4,5,106,107,108,9,1010,1011,1012,13,1014,1015,1016};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec6.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec6.begin()));
     }
 
     SECTION("Read individual MatrixProxy (sub-sub-Matrix) items") {
@@ -554,7 +554,7 @@ TEST_CASE("Matrix Tests", "[linalg]") {
         REQUIRE(m4(1,0) == 1015);
         REQUIRE(m4(1,1) == 1016);
         auto vec = std::vector<int> {1,2,3,4,5,6,7,8,9,10,1011,1012,13,14,1015,1016};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec.begin()));
 
         m4 = m3({0,2,2}, {0,2,2});
         m4(0,0) = 106;
@@ -567,7 +567,7 @@ TEST_CASE("Matrix Tests", "[linalg]") {
         REQUIRE(m4(1,0) == 1014);
         REQUIRE(m4(1,1) == 1016);
         auto vec2 = std::vector<int> {1,2,3,4,5,106,7,108,9,10,1011,1012,13,1014,1015,1016};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec2.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec2.begin()));
     }
 
     SECTION("Read access to MatrixProxy (sub-sub-Matrix) via iterators") {
@@ -576,17 +576,17 @@ TEST_CASE("Matrix Tests", "[linalg]") {
 
         auto m4 = m3({1,2,1}, {1,2,1});
         auto vec = std::vector<int> {11,12,15,16};
-        REQUIRE(std::equal(m4.elems().begin(), m4.elems().end(), vec.begin()));
+        REQUIRE(std::equal(m4.begin(), m4.end(), vec.begin()));
 
         std::reverse(vec.begin(), vec.end());
-        REQUIRE_FALSE(std::equal(m4.elems().begin(), m4.elems().end(), vec.begin()));
+        REQUIRE_FALSE(std::equal(m4.begin(), m4.end(), vec.begin()));
 
         m4 = m3({0,2,2}, {0,2,2});
         auto vec2 = std::vector<int> {6,8,14,16};
-        REQUIRE(std::equal(m4.elems().begin(), m4.elems().end(), vec2.begin()));
+        REQUIRE(std::equal(m4.begin(), m4.end(), vec2.begin()));
 
         std::reverse(vec2.begin(), vec2.end());
-        REQUIRE_FALSE(std::equal(m4.elems().begin(), m4.elems().end(), vec2.begin()));
+        REQUIRE_FALSE(std::equal(m4.begin(), m4.end(), vec2.begin()));
     }
 
     SECTION("Write access to MatrixProxy (sub-sub-Matrix) via iterators") {
@@ -595,19 +595,18 @@ TEST_CASE("Matrix Tests", "[linalg]") {
 
         auto m4 = m3({1,2,1}, {1,2,1});
         auto vec = std::vector<int> {1011,1012,1015,1016};
-        std::copy(vec.begin(), vec.end(), m4.elems().begin());
-        REQUIRE(std::equal(m4.elems().begin(), m4.elems().end(), vec.begin()));
+        std::copy(vec.begin(), vec.end(), m4.begin());
+        REQUIRE(std::equal(m4.begin(), m4.end(), vec.begin()));
 
         auto vec2 = std::vector<int> {1,2,3,4,5,6,7,8,9,10,1011,1012,13,14,1015,1016};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec2.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec2.begin()));
 
         m4 = m3({0,2,2}, {0,2,2});
         auto vec3 = std::vector<int> {106,108,1014, 1016};
-        std::copy(vec3.begin(), vec3.end(), m4.elems().begin());
-        REQUIRE(std::equal(m4.elems().begin(), m4.elems().end(), vec3.begin()));
+        std::copy(vec3.begin(), vec3.end(), m4.begin());
+        REQUIRE(std::equal(m4.begin(), m4.end(), vec3.begin()));
 
         auto vec4 = std::vector<int> {1,2,3,4,5,106,7,108,9,10,1011,1012,13,1014,1015,1016};
-        REQUIRE(std::equal(m2.elems().begin(), m2.elems().end(), vec4.begin()));
+        REQUIRE(std::equal(m2.begin(), m2.end(), vec4.begin()));
     }
-
 }
