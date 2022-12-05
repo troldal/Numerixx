@@ -44,39 +44,51 @@ namespace numerix::linalg
     template<typename T, bool IsConst>
     class MatrixElemIterConcept
     {
+        /*
+         * Friend declarations. Required to allow use of private constructor.
+         */
+        friend impl::MatrixBase<Matrix<T>>;
+        friend impl::MatrixBase<MatrixView<T>>;
+        friend impl::MatrixBase<MatrixViewConst<T>>;
+
+        /**
+         * Private alias declatations.
+         */
         using iter_t = std::conditional_t<IsConst, const T, T>;
 
+    private:
         iter_t* m_data;    /**< A pointer to the matrix element array. */
         GSlice  m_slice;   /**< The generalized slice for the data array. */
         size_t  m_current; /**< The current index. */
 
+        /**
+         * @brief Constructor taking a raw array of elements, a gslice, and the starting position (default 0) as arguments.
+         * @param data The raw array of elements (pointer to the first element).
+         * @param slice The generalized slice, describing the subset of elements to iterate over.
+         * @param pos The starting position (default 0)
+         * @note The constructor is private to prevent direct usage by clients.
+         */
+        MatrixElemIterConcept(iter_t* data, GSlice slice, size_t pos = 0) : m_data(data), m_slice(slice), m_current(pos) {}
+
+        /**
+         * @brief Get a copy of the end iterator
+         * @return The end iterator (one past the last element).
+         */
+        MatrixElemIterConcept end() const { return { m_data, m_slice, m_slice.size() }; }
+
     public:
         /*
-         * Alias declarations.
+         * Alias declarations. Required to conform to the interface of standard iterators.
          */
         using iterator_category = std::forward_iterator_tag;
         using value_type        = iter_t;
         using difference_type   = size_t;
         using pointer           = iter_t*;
         using reference         = iter_t&;
-
+        
         /**
-         * @brief
-         * @param data
-         * @param slice
-         * @param pos
-         */
-        MatrixElemIterConcept(iter_t* data, GSlice slice, size_t pos = 0) : m_data(data), m_slice(slice), m_current(pos) {}
-
-        /**
-         * @brief
-         * @return
-         */
-        MatrixElemIterConcept end() const { return { m_data, m_slice, m_slice.size() }; }
-
-        /**
-         * @brief
-         * @return
+         * @brief Increment operator. Moves the iterator one step forward.
+         * @return A reference to the incremented iterator.
          */
         MatrixElemIterConcept& operator++()
         {
@@ -85,8 +97,8 @@ namespace numerix::linalg
         }
 
         /**
-         * @brief
-         * @return
+         * @brief Post-increment operator. Moves the iterator one step forward.
+         * @return The iterator prior to incrementing it.
          */
         MatrixElemIterConcept operator++(int)
         {
@@ -96,35 +108,35 @@ namespace numerix::linalg
         }
 
         /**
-         * @brief
-         * @return
+         * @brief Indirection operator.
+         * @return A reference to the pointed-to object.
          */
         iter_t& operator*() { return m_data[m_slice(m_current)]; }
 
         /**
-         * @brief
-         * @return
+         * @brief Arrow operator.
+         * @return A pointer to the pointed-to object.
          */
         iter_t* operator->() { return &m_data[m_slice(m_current)]; }
 
         /**
-         * @brief
-         * @param other
-         * @return
+         * @brief Equality operator. Check if the argument is equal to the iterator (i.e. the position is the same).
+         * @param other The iterator to compare to.
+         * @return If they are equal, true; otherwise false.
          */
         bool operator==(const MatrixElemIterConcept& other) const { return m_current == other.m_current; }
 
         /**
-         * @brief
-         * @param other
-         * @return
+         * @brief Inequality operator. Check if the argument is not equal to the iterator (i.e. the position is the not same).
+         * @param other The iterator to compare to.
+         * @return If they are not equal, true; otherwise false.
          */
         bool operator!=(const MatrixElemIterConcept& other) const { return !(*this == other); }
 
         /**
-         * @brief
-         * @param other
-         * @return
+         * @brief Less-than operator. Check if the argument is less than the iterator (i.e. the position is lower than for the iterator).
+         * @param other The iterator to compare to.
+         * @return If the argument is less than the current, true; otherwise false.
          */
         bool operator<(const MatrixElemIterConcept& other) const { return m_current < other.m_current; }
     };
