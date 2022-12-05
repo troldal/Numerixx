@@ -31,8 +31,8 @@
 #ifndef NUMERIX_MATRIX_IMPL_HPP
 #define NUMERIX_MATRIX_IMPL_HPP
 
-#include "MatrixCommon.h"
 #include "MatrixBase.hpp"
+#include "MatrixCommon.hpp"
 
 namespace numerix::linalg
 {
@@ -67,7 +67,8 @@ namespace numerix::linalg
          * @brief
          * @return
          */
-        auto gslice() const    {
+        auto gslice() const
+        {
             auto start = m_rowSlice.start() * extents().first + m_colSlice.start();
             return GSlice(start, { m_rowSlice.length(), m_colSlice.length() }, { m_rowSlice.stride(), m_colSlice.stride() });
         }
@@ -76,13 +77,9 @@ namespace numerix::linalg
          * @brief Get the extents in each of the dimensions (rows and columns)
          * @return A std::pair with the row and column extents.
          */
-        auto extents() const
-        {
-            return std::make_pair(parent::rowCount(), parent::colCount());
-        }
+        auto extents() const { return std::make_pair(parent::rowCount(), parent::colCount()); }
 
     public:
-
         /**
          * Public alias declatations. To be consistant with standard library containers, and to provide access to
          * non-standard assignment operator.
@@ -95,7 +92,8 @@ namespace numerix::linalg
          * @param rows Number of rows.
          * @param cols Number of cols.
          */
-        Matrix(int rows, int cols) : m_data(rows * cols), m_rowSlice(0, rows, cols), m_colSlice(0, cols, 1) {
+        Matrix(int rows, int cols) : m_data(rows * cols), m_rowSlice(0, rows, cols), m_colSlice(0, cols, 1)
+        {
             if (rows <= 0) throw std::invalid_argument("Invalid Matrix Extents: A Matrix object must have at least one row.");
             if (cols <= 0) throw std::invalid_argument("Invalid Matrix Extents: A Matrix object must have at least one column.");
         }
@@ -135,23 +133,15 @@ namespace numerix::linalg
          * @brief Access the raw array of Matrix elements.
          * @return A pointer to the first element.
          */
-        T* data()
-        {
-            return m_data.data();
-        }
+        T* data() { return m_data.data(); }
 
         /**
          * @brief Access the raw array of Matrix elements.
          * @return A const pointer to the first element.
          */
-        const T* data() const
-        {
-            return m_data.data();
-        }
-
+        const T* data() const { return m_data.data(); }
     };
 
 }    // namespace numerix::linalg
-
 
 #endif    // NUMERIX_MATRIX_HPP

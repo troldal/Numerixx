@@ -4,7 +4,7 @@
 
 #include <algorithm>
 #include <iostream>
-#include <linalg/FactorizeGJ.h>
+#include <linalg/FactorizeGJ.hpp>
 #include <linalg/Matrix.hpp>
 
 int main() {

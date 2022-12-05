@@ -28,12 +28,11 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef NUMERIX_MATRIXELEMENTITER_HPP
-#define NUMERIX_MATRIXELEMENTITER_HPP
+#ifndef NUMERIX_MATRIXELEMITER_HPP
+#define NUMERIX_MATRIXELEMITER_HPP
 
-#include "MatrixCommon.h"
+#include "MatrixCommon.hpp"
 #include "MatrixSlice.hpp"
-
 
 namespace numerix::linalg
 {
@@ -43,7 +42,7 @@ namespace numerix::linalg
      * @tparam IsConst
      */
     template<typename T, bool IsConst>
-    class MatrixElementIterConcept
+    class MatrixElemIterConcept
     {
         using iter_t = std::conditional_t<IsConst, const T, T>;
 
@@ -67,19 +66,19 @@ namespace numerix::linalg
          * @param slice
          * @param pos
          */
-        MatrixElementIterConcept(iter_t* data, GSlice slice, size_t pos = 0) : m_data(data), m_slice(slice), m_current(pos) {}
+        MatrixElemIterConcept(iter_t* data, GSlice slice, size_t pos = 0) : m_data(data), m_slice(slice), m_current(pos) {}
 
         /**
          * @brief
          * @return
          */
-        MatrixElementIterConcept end() const { return { m_data, m_slice, m_slice.size() }; }
+        MatrixElemIterConcept end() const { return { m_data, m_slice, m_slice.size() }; }
 
         /**
          * @brief
          * @return
          */
-        MatrixElementIterConcept& operator++()
+        MatrixElemIterConcept& operator++()
         {
             ++m_current;
             return *this;
@@ -89,9 +88,9 @@ namespace numerix::linalg
          * @brief
          * @return
          */
-        MatrixElementIterConcept operator++(int)
+        MatrixElemIterConcept operator++(int)
         {
-            MatrixElementIterConcept slice = *this;
+            MatrixElemIterConcept slice = *this;
             ++m_current;
             return slice;
         }
@@ -113,23 +112,23 @@ namespace numerix::linalg
          * @param other
          * @return
          */
-        bool operator==(const MatrixElementIterConcept& other) const { return m_current == other.m_current; }
+        bool operator==(const MatrixElemIterConcept& other) const { return m_current == other.m_current; }
 
         /**
          * @brief
          * @param other
          * @return
          */
-        bool operator!=(const MatrixElementIterConcept& other) const { return !(*this == other); }
+        bool operator!=(const MatrixElemIterConcept& other) const { return !(*this == other); }
 
         /**
          * @brief
          * @param other
          * @return
          */
-        bool operator<(const MatrixElementIterConcept& other) const { return m_current < other.m_current; }
+        bool operator<(const MatrixElemIterConcept& other) const { return m_current < other.m_current; }
     };
 
-}
+}    // namespace numerix::linalg
 
-#endif    // NUMERIX_MATRIXELEMENTITER_HPP
+#endif    // NUMERIX_MATRIXELEMITER_HPP

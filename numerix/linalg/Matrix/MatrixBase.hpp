@@ -33,7 +33,7 @@
 
 #include <cstddef>
 
-#include "MatrixCommon.h"
+#include "MatrixCommon.hpp"
 #include "MatrixSlice.hpp"
 
 namespace numerix::linalg::impl
@@ -47,13 +47,11 @@ namespace numerix::linalg::impl
     template<typename DERIVED>
     class MatrixBase
     {
-
         friend Matrix<typename MatrixTraits<DERIVED>::value_type>;
         friend MatrixView<typename MatrixTraits<DERIVED>::value_type>;
         friend MatrixViewConst<typename MatrixTraits<DERIVED>::value_type>;
 
     private:
-
         // ========================================================================================
         // Private member functions
         // ========================================================================================
@@ -122,12 +120,10 @@ namespace numerix::linalg::impl
         MatrixBase() = default;
 
     public:
-
         /**
          * Public alias declatations. To be consistant with standard library containers.
          */
         using value_type = typename MatrixTraits<DERIVED>::value_type;
-
 
         // ========================================================================================
         // Special Member Functions (i.e. copy constructors and assignment operators)
@@ -164,7 +160,6 @@ namespace numerix::linalg::impl
          */
         MatrixBase& operator=(MatrixBase&& other) noexcept = default;
 
-
         // ========================================================================================
         // Iterator access (i.e. begin/end iterators) and row/column ranges
         // ========================================================================================
@@ -174,31 +169,31 @@ namespace numerix::linalg::impl
          * @return An iterator to the first element
          * @note This function will be disabled for const objects.
          */
-        MatrixElementIter<typename MatrixTraits<DERIVED>::value_type> begin()
+        MatrixElemIter<typename MatrixTraits<DERIVED>::value_type> begin()
             requires(!std::same_as<DERIVED, MatrixViewConst<typename MatrixTraits<DERIVED>::value_type>>) && (!std::is_const_v<DERIVED>)
         {
             DERIVED& derived = static_cast<DERIVED&>(*this);
-            return MatrixElementIter<value_type>(derived.data(), derived.gslice());
+            return MatrixElemIter<value_type>(derived.data(), derived.gslice());
         }
 
         /**
          * @brief Get a const begin-iterator, i.e. an iterator pointing to the first (upper left) element.
          * @return A const iterator to the first element
          */
-        MatrixElementIterConst<typename MatrixTraits<DERIVED>::value_type> begin() const
+        MatrixElemIterConst<typename MatrixTraits<DERIVED>::value_type> begin() const
         {
             const DERIVED& derived = static_cast<const DERIVED&>(*this);
-            return MatrixElementIterConst<value_type>(derived.data(), derived.gslice());
+            return MatrixElemIterConst<value_type>(derived.data(), derived.gslice());
         }
 
         /**
          * @brief Get a const begin-iterator, i.e. an iterator pointing to the first (upper left) element.
          * @return A const iterator to the first element
          */
-        MatrixElementIterConst<typename MatrixTraits<DERIVED>::value_type> cbegin() const
+        MatrixElemIterConst<typename MatrixTraits<DERIVED>::value_type> cbegin() const
         {
             const DERIVED& derived = static_cast<const DERIVED&>(*this);
-            return MatrixElementIterConst<value_type>(derived.data(), derived.gslice());
+            return MatrixElemIterConst<value_type>(derived.data(), derived.gslice());
         }
 
         /**
@@ -206,31 +201,31 @@ namespace numerix::linalg::impl
          * @return An iterator to one past the last element.
          * @note This function will be disabled for const objects.
          */
-        MatrixElementIter<typename MatrixTraits<DERIVED>::value_type> end()
+        MatrixElemIter<typename MatrixTraits<DERIVED>::value_type> end()
             requires(!std::same_as<DERIVED, MatrixViewConst<typename MatrixTraits<DERIVED>::value_type>>) && (!std::is_const_v<DERIVED>)
         {
             DERIVED& derived = static_cast<DERIVED&>(*this);
-            return MatrixElementIter<value_type>(derived.data(), derived.gslice()).end();
+            return MatrixElemIter<value_type>(derived.data(), derived.gslice()).end();
         }
 
         /**
          * @brief Get a const end-iterator, i.e. an iterator pointing to one past the last (lower right) element.
          * @return A const iterator to one past the last element.
          */
-        MatrixElementIterConst<typename MatrixTraits<DERIVED>::value_type> end() const
+        MatrixElemIterConst<typename MatrixTraits<DERIVED>::value_type> end() const
         {
             const DERIVED& derived = static_cast<const DERIVED&>(*this);
-            return MatrixElementIterConst<value_type>(derived.data(), derived.gslice()).end();
+            return MatrixElemIterConst<value_type>(derived.data(), derived.gslice()).end();
         }
 
         /**
          * @brief Get a const end-iterator, i.e. an iterator pointing to one past the last (lower right) element.
          * @return A const iterator to one past the last element.
          */
-        MatrixElementIterConst<typename MatrixTraits<DERIVED>::value_type> cend() const
+        MatrixElemIterConst<typename MatrixTraits<DERIVED>::value_type> cend() const
         {
             const DERIVED& derived = static_cast<const DERIVED&>(*this);
-            return MatrixElementIterConst<value_type>(derived.data(), derived.gslice()).end();
+            return MatrixElemIterConst<value_type>(derived.data(), derived.gslice()).end();
         }
 
         /**
@@ -276,7 +271,6 @@ namespace numerix::linalg::impl
             auto view = (*this)({ 0, rowCount(), 1 }, { 0, colCount(), 1 });
             return MatrixRowsConst<decltype(view)>(view);
         }
-
 
         // ========================================================================================
         // View and direct element access
@@ -391,7 +385,6 @@ namespace numerix::linalg::impl
          */
         auto col(size_t index) const { return (*this)({ 0, rowCount(), 1 }, { index, 1, 1 }); }
 
-
         // ========================================================================================
         // Meta data
         // ========================================================================================
@@ -427,7 +420,6 @@ namespace numerix::linalg::impl
          * @return If yes, true. Otherwise false.
          */
         bool isSquare() const { return rowCount() == colCount(); }
-
 
         // ========================================================================================
         // Arithmetic and non-standard assignment operators.
@@ -521,7 +513,6 @@ namespace numerix::linalg::impl
             derived          = derived * static_cast<value_type>(value);
             return derived;
         }
-
 
         // ========================================================================================
         // Static Member Functions

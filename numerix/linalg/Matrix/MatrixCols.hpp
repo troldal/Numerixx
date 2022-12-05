@@ -31,7 +31,7 @@
 #ifndef NUMERIX_MATRIXCOLS_HPP
 #define NUMERIX_MATRIXCOLS_HPP
 
-#include "MatrixCommon.h"
+#include "MatrixCommon.hpp"
 
 namespace numerix::linalg
 {

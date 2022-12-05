@@ -31,7 +31,7 @@
 #ifndef NUMERIX_MATRIXROWITER_HPP
 #define NUMERIX_MATRIXROWITER_HPP
 
-#include "MatrixCommon.h"
+#include "MatrixCommon.hpp"
 
 namespace numerix::linalg
 {

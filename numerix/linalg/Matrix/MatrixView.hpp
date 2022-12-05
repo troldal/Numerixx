@@ -31,7 +31,7 @@
 #ifndef NUMERIX_MATRIXVIEW_HPP
 #define NUMERIX_MATRIXVIEW_HPP
 
-#include "MatrixCommon.h"
+#include "MatrixCommon.hpp"
 
 namespace numerix::linalg
 {
@@ -119,7 +119,6 @@ namespace numerix::linalg
         {}
 
     public:
-
         /**
          * Public alias declatations. To be consistant with standard library containers, and to provide access to
          * non-standard assignment operator.

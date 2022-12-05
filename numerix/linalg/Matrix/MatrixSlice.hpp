@@ -31,7 +31,7 @@
 #ifndef NUMERIX_MATRIXSLICE_HPP
 #define NUMERIX_MATRIXSLICE_HPP
 
-#include "MatrixCommon.h"
+#include "MatrixCommon.hpp"
 
 namespace numerix::linalg
 {
@@ -193,6 +193,6 @@ namespace numerix::linalg
         std::vector<size_t> m_strides; /**< */
     };
 
-}
+}    // namespace numerix::linalg
 
 #endif    // NUMERIX_MATRIXSLICE_HPP

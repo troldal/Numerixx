@@ -31,7 +31,7 @@
 #ifndef NUMERIX_MATRIXROWS_HPP
 #define NUMERIX_MATRIXROWS_HPP
 
-#include "MatrixCommon.h"
+#include "MatrixCommon.hpp"
 
 namespace numerix::linalg
 {
