@@ -37,42 +37,41 @@ namespace numerix::linalg
 {
 
     /**
-     * @brief
-     * @tparam T
-     * @param out
-     * @param mat
-     * @return
+     * @brief Stream output operator.
+     * @param out The output stream.
+     * @param mat The matrix to output to stream.
+     * @return A reference to the output stream.
      */
-    template<typename T>
-        requires std::is_same_v<T, Matrix<typename T::value_type>> || std::is_same_v<T, MatrixView<typename T::value_type>> ||
-                 std::is_same_v<T, MatrixViewConst<typename T::value_type>>
-    std::ostream& operator<<(std::ostream& out, const T& mat)
+    std::ostream& operator<<(std::ostream& out, const is_matrix auto& mat)
     {
         auto printRow = [&](int row) {
             std::cout << "{ ";
             std::cout << std::fixed << std::setw(2);
             for (auto col = 0; col < mat.colCount(); ++col) std::cout << mat(row, col) << " ";
-            std::cout << "}\n";
+            std::cout << "}";
         };
 
-        for (int i = 0; i < mat.rowCount(); ++i) printRow(i);
+        for (int i = 0; i < mat.rowCount(); ++i) {
+            printRow(i);
+            if (i < mat.rowCount() - 1) std::cout << "\n";
+        }
 
         return out;
     }
 
     /**
-     * @brief
-     * @tparam T
-     * @param a
-     * @param b
-     * @return
+     * @brief Matrix addition operator. Adds the elements of two (identically sized) matrices.
+     * @param mat1 Matrix 1
+     * @param mat2 Matrix 2
+     * @return A new matrix with the added numbers.
      */
-    template<typename T, typename U>
-        requires is_matrix<T> && is_matrix<U>
-    inline auto operator+(const T& mat1, const U& mat2)
+    inline auto operator+(const is_matrix auto& mat1, const is_matrix auto& mat2)
     {
-        using value_t  = std::common_type_t<typename T::value_type, typename U::value_type>;
+        using value_t  = std::common_type_t<typename std::remove_cvref_t<decltype(mat1)>::value_type, typename std::remove_cvref_t<decltype(mat2)>::value_type>;
         using result_t = Matrix<value_t>;
+
+        if (mat1.rowCount() != mat2.rowCount()) throw std::invalid_argument("Matrix Addition Error: Row count must be identical.");
+        if (mat1.colCount() != mat2.colCount()) throw std::invalid_argument("Matrix Addition Error: Column count must be identical.");
 
         result_t result { mat1.rowCount(), mat1.colCount() };
         std::transform(mat1.begin(), mat1.end(), mat2.begin(), result.begin(), std::plus());
@@ -80,18 +79,14 @@ namespace numerix::linalg
     }
 
     /**
-     * @brief
-     * @tparam T
-     * @tparam U
-     * @param a
-     * @param b
-     * @return
+     * @brief Add a scalar to each element of a matrix.
+     * @param mat The Matrix object.
+     * @param scalar The scalar to add to each element.
+     * @return A new Matrix object with the new values.
      */
-    template<typename T, typename U>
-        requires is_matrix<T> && is_number<U>
-    inline auto operator+(const T& mat, U scalar)
+    inline auto operator+(const is_matrix auto& mat, is_number auto scalar)
     {
-        using value_t  = std::common_type_t<typename T::value_type, U>;
+        using value_t  = std::common_type_t<typename std::remove_cvref_t<decltype(mat)>::value_type, std::remove_cvref_t<decltype(scalar)>>;
         using result_t = Matrix<value_t>;
 
         result_t result { mat.rowCount(), mat.colCount() };
@@ -100,18 +95,18 @@ namespace numerix::linalg
     }
 
     /**
-     * @brief
-     * @tparam T
-     * @param a
-     * @param b
-     * @return
+     * @brief Matrix subtraction operator. Subtracts the elements of two (identically sized) matrices.
+     * @param mat1 Matrix 1
+     * @param mat2 Matrix 2
+     * @return A new matrix with the subtracted numbers.
      */
-    template<typename T, typename U>
-        requires is_matrix<T> && is_matrix<U>
-    inline auto operator-(const T& mat1, const U& mat2)
+    inline auto operator-(const is_matrix auto& mat1, const is_matrix auto& mat2)
     {
-        using value_t  = std::common_type_t<typename T::value_type, typename U::value_type>;
+        using value_t  = std::common_type_t<typename std::remove_cvref_t<decltype(mat1)>::value_type, typename std::remove_cvref_t<decltype(mat2)>::value_type>;
         using result_t = Matrix<value_t>;
+
+        if (mat1.rowCount() != mat2.rowCount()) throw std::invalid_argument("Matrix Subtraction Error: Row count must be identical.");
+        if (mat1.colCount() != mat2.colCount()) throw std::invalid_argument("Matrix Subtraction Error: Column count must be identical.");
 
         result_t result { mat1.rowCount(), mat1.colCount() };
         std::transform(mat1.begin(), mat1.end(), mat2.begin(), result.begin(), [&](const auto& a, const auto& b) {
@@ -122,18 +117,14 @@ namespace numerix::linalg
     }
 
     /**
-     * @brief
-     * @tparam T
-     * @tparam U
-     * @param a
-     * @param b
-     * @return
+     * @brief Subtract a scalar from each element of a matrix.
+     * @param mat The Matrix object.
+     * @param scalar The scalar to subtract from each element.
+     * @return A new Matrix object with the new values.
      */
-    template<typename T, typename U>
-        requires is_matrix<T> && is_number<U>
-    inline auto operator-(const T& mat, U scalar)
+    inline auto operator-(const is_matrix auto& mat, is_number auto scalar)
     {
-        using value_t  = std::common_type_t<typename T::value_type, U>;
+        using value_t  = std::common_type_t<typename std::remove_cvref_t<decltype(mat)>::value_type, std::remove_cvref_t<decltype(scalar)>>;
         using result_t = Matrix<value_t>;
 
         result_t result { mat.rowCount(), mat.colCount() };
@@ -143,18 +134,36 @@ namespace numerix::linalg
     }
 
     /**
-     * @brief
-     * @tparam T
-     * @tparam U
-     * @param a
-     * @param b
-     * @return
+     * @brief Matrix multiplication operator. Multiplies two matrices. The number of columns of the first Matrix must be equal to the
+     * number of rows of the second Matrix.
+     * @param mat1 Matrix 1
+     * @param mat2 Matrix 2
+     * @return A new matrix with the result of multiplication.
      */
-    template<typename T, typename U>
-        requires is_matrix<T> && is_number<U>
-    inline auto operator*(const T& mat, U scalar)
+    inline auto operator*(const is_matrix auto& mat1, const is_matrix auto& mat2)
     {
-        using value_t  = std::common_type_t<typename T::value_type, U>;
+        using value_t  = std::common_type_t<typename std::remove_cvref_t<decltype(mat1)>::value_type, typename std::remove_cvref_t<decltype(mat2)>::value_type>;
+        using result_t = Matrix<value_t>;
+
+        if (mat1.colCount() != mat2.rowCount()) throw std::invalid_argument("Matrix Multiplication Error: Matrix 1 row count must be equal to Matrix 2 column count.");
+
+        result_t result { mat1.rowCount(), mat2.colCount() };
+        for (int i = 0; i < result.rowCount(); ++i)
+            for (int j = 0; j < result.colCount(); ++j)
+                result(i, j) = std::inner_product(mat1.row(i).begin(), mat1.row(i).end(), mat2.col(j).begin(), static_cast<value_t>(0.0));
+
+        return result;
+    }
+
+    /**
+     * @brief Multiply each element of a Matrix by a scalar.
+     * @param mat The Matrix object.
+     * @param scalar The scalar to multiply by.
+     * @return A new Matrix object with the new values.
+     */
+    inline auto operator*(const is_matrix auto& mat, is_number auto scalar)
+    {
+        using value_t  = std::common_type_t<typename std::remove_cvref_t<decltype(mat)>::value_type, std::remove_cvref_t<decltype(scalar)>>;
         using result_t = Matrix<value_t>;
 
         result_t result { mat.rowCount(), mat.colCount() };
@@ -166,56 +175,25 @@ namespace numerix::linalg
     }
 
     /**
-     * @brief
-     * @tparam T
-     * @tparam U
-     * @param a
-     * @param b
-     * @return
+     * @brief Multiply each element of a Matrix by a scalar.
+     * @param mat The Matrix object.
+     * @param scalar The scalar to multiply by.
+     * @return A new Matrix object with the new values.
      */
-    template<typename T, typename U>
-        requires is_matrix<U> && is_number<T>
-    inline auto operator*(const T scalar, U& mat)
+    inline auto operator*(const is_number auto scalar, const is_matrix auto& mat)
     {
         return (mat * scalar);
     }
 
     /**
-     * @brief
-     * @tparam T
-     * @tparam U
-     * @param a
-     * @param b
-     * @return
+     * @brief Divide each element of a Matrix by a scalar.
+     * @param mat The Matrix object.
+     * @param scalar The scalar to divide by.
+     * @return A new Matrix object with the new values.
      */
-    template<typename T, typename U>
-        requires is_matrix<U> && is_matrix<T>
-    inline auto operator*(const T& mat1, const U& mat2)
+    inline auto operator/(const is_matrix auto& mat, is_number auto scalar)
     {
-        using value_t  = std::common_type_t<typename T::value_type, typename U::value_type>;
-        using result_t = Matrix<value_t>;
-
-        result_t result { mat1.rowCount(), mat2.colCount() };
-        for (int i = 0; i < result.rowCount(); ++i)
-            for (int j = 0; j < result.colCount(); ++j)
-                result(i, j) = std::inner_product(mat1.row(i).begin(), mat1.row(i).end(), mat2.col(j).begin(), static_cast<value_t>(0.0));
-
-        return result;
-    }
-
-    /**
-     * @brief
-     * @tparam T
-     * @tparam U
-     * @param a
-     * @param b
-     * @return
-     */
-    template<typename T, typename U>
-        requires is_matrix<T> && is_number<U>
-    inline auto operator/(const T& mat, U scalar)
-    {
-        using value_t  = std::common_type_t<typename T::value_type, U>;
+        using value_t  = std::common_type_t<typename std::remove_cvref_t<decltype(mat)>::value_type, std::remove_cvref_t<decltype(scalar)>>;
         using result_t = Matrix<value_t>;
 
         result_t result { mat.rowCount(), mat.colCount() };
@@ -226,16 +204,13 @@ namespace numerix::linalg
 
     /**
      * @brief Compute the transpose of the input Matrix (or MatrixProxy.
-     * @tparam T The type of the input Matrix. Must be of Matrix or MatrixProxy types.
      * @param mat The input Matrix
      * @return A new Matrix object, with the transpose of the input.
      * @note This function does not modify the input. It merely produces a new Matrix object with the transpose.
      */
-    template<typename T>
-        requires is_matrix<T>
-    inline Matrix<typename T::value_type> transpose(const T& mat)
+    inline auto transpose(const is_matrix auto& mat)
     {
-        using value_t  = typename T::value_type;
+        using value_t  = typename std::remove_cvref_t<decltype(mat)>::value_type;
         using result_t = Matrix<value_t>;
 
         result_t result(mat.colCount(), mat.rowCount());
