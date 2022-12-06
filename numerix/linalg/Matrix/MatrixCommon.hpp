@@ -217,9 +217,4 @@ namespace numerix::linalg
     using MatrixRowIterConst = MatrixRowIterConcept<T, true>;
 }    // namespace numerix::linalg
 
-// template<typename T>
-//     requires std::same_as<T, numerix::linalg::MatrixElements<typename numerix::linalg::impl::MatrixTraits<T>::value_type>> ||
-//              std::same_as<T, numerix::linalg::MatrixElementsConst<typename numerix::linalg::impl::MatrixTraits<T>::value_type>>
-// inline void swap(T lhs, T rhs);
-
 #endif    // NUMERIX_MATRIXCOMMON_HPP

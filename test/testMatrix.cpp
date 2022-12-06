@@ -7,7 +7,61 @@
 
 #include <algorithm>
 
-TEST_CASE("Matrix Tests", "[linalg]") {
+TEST_CASE("Matrix Creation and Copying", "[linalg]") {
+    using namespace numerix::linalg;
+
+    SECTION("Matrix Creation") {
+        REQUIRE_THROWS(Matrix(1,0));
+        REQUIRE_THROWS(Matrix(0,1));
+        REQUIRE_THROWS(Matrix(0,0));
+        REQUIRE_THROWS(Matrix(-1,-1));
+        REQUIRE_NOTHROW(Matrix(1,1));
+    }
+
+    SECTION("Matrix Copying and Moving") {
+
+        auto m1 = Matrix<int>(2,2);
+        m1(0,0) = 1;
+        m1(0,1) = 2;
+        m1(1,0) = 3;
+        m1(1,1) = 4;
+
+        auto m2 = m1;
+        REQUIRE(m2(0,0) == m1(0,0));
+        REQUIRE(m2(0,1) == m1(0,1));
+        REQUIRE(m2(1,0) == m1(1,0));
+        REQUIRE(m2(1,1) == m1(1,1));
+        REQUIRE_FALSE(m2(0,0) == m1(1,1));
+
+        auto m3 = Matrix<int>(2,2);
+        m3 = m1;
+        REQUIRE(m3(0,0) == m1(0,0));
+        REQUIRE(m3(0,1) == m1(0,1));
+        REQUIRE(m3(1,0) == m1(1,0));
+        REQUIRE(m3(1,1) == m1(1,1));
+        REQUIRE_FALSE(m3(0,0) == m1(1,1));
+
+        auto m4 = std::move(m1);
+        REQUIRE(m4(0,0) == m2(0,0));
+        REQUIRE(m4(0,1) == m2(0,1));
+        REQUIRE(m4(1,0) == m2(1,0));
+        REQUIRE(m4(1,1) == m2(1,1));
+        REQUIRE_FALSE(m4(0,0) == m2(1,1));
+
+        auto m5 = Matrix<int>(2,2);
+        m5 = std::move(m2);
+        REQUIRE(m5(0,0) == m3(0,0));
+        REQUIRE(m5(0,1) == m3(0,1));
+        REQUIRE(m5(1,0) == m3(1,0));
+        REQUIRE(m5(1,1) == m3(1,1));
+        REQUIRE_FALSE(m5(0,0) == m3(1,1));
+
+    }
+
+}
+
+
+TEST_CASE("Matrix Element Access", "[linalg]") {
 
     using namespace numerix::linalg;
 

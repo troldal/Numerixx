@@ -225,12 +225,4 @@ namespace numerix::linalg
 
 }    // namespace numerix::linalg
 
-// template<typename T>
-//     requires std::same_as<T, numerix::linalg::MatrixElements<typename numerix::linalg::impl::MatrixTraits<T>::value_type>> ||
-//              std::same_as<T, numerix::linalg::MatrixElementsConst<typename numerix::linalg::impl::MatrixTraits<T>::value_type>>
-// inline void swap(T lhs, T rhs)
-//{
-//     lhs.swap(rhs);
-// }
-
 #endif    // NUMERIX_MATRIXFUNCTIONS_HPP

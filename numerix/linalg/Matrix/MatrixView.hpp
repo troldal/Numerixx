@@ -96,7 +96,7 @@ namespace numerix::linalg
         auto gslice() const
         {
             auto start = m_rowSlice.start() * m_matrix->extents().first + m_colSlice.start();
-            return GSlice(start, { m_rowSlice.length(), m_colSlice.length() }, { m_rowSlice.stride(), m_colSlice.stride() });
+            return impl::GSlice(start, { m_rowSlice.length(), m_colSlice.length() }, { m_rowSlice.stride(), m_colSlice.stride() });
         }
 
         /**

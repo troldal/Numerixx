@@ -65,7 +65,8 @@ namespace numerix::linalg::impl
         size_t index(size_t row, size_t col) const
         {
             const DERIVED& derived = static_cast<const DERIVED&>(*this);
-            if (row >= derived.m_rowSlice.length() || col >= derived.m_colSlice.length()) throw std::out_of_range("Index out of bounds.");
+            if (row >= derived.m_rowSlice.length()) throw std::out_of_range("Bounds Error: Row index out of bounds.");
+            if (col >= derived.m_colSlice.length()) throw std::out_of_range("Bounds Error: Column index out of bounds.");
 
             size_t start = derived.m_rowSlice.start() * derived.extents().second + derived.m_colSlice.start();
             return start + row * derived.m_rowSlice.stride() + col * derived.m_colSlice.stride();
@@ -89,9 +90,9 @@ namespace numerix::linalg::impl
 
             // ===== Check that the slices are inside the bounds of the matrix object.
             if (rSlice.length() * rSlice.stride() + rSlice.start() - rSlice.stride() > rowCount() - 1)
-                throw std::out_of_range("Row slice out of bounds.");
+                throw std::out_of_range("Slice Error: Row slice out of bounds.");
             if (cSlice.length() * cSlice.stride() + cSlice.start() - cSlice.stride() > colCount() - 1)
-                throw std::out_of_range("Column slice out of bounds.");
+                throw std::out_of_range("SliceError: Column slice out of bounds.");
 
             // ===== If the DERIVED type is a Matrix, modify the row slice accordingly.
             if constexpr (std::same_as<DERIVED, Matrix<typename MatrixTraits<DERIVED>::value_type>>) {
@@ -281,6 +282,7 @@ namespace numerix::linalg::impl
          * @param row The row index.
          * @param col The column index.
          * @return A reference to the matrix element.
+         * @note Bounds-checking is done in the index function.
          */
         value_type& operator()(size_t row, size_t col)
             requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>) && (!std::is_const_v<DERIVED>)
@@ -294,6 +296,7 @@ namespace numerix::linalg::impl
          * @param row The row index.
          * @param col The column index.
          * @return A const reference to the matrix element.
+         * @note Bounds-checking is done in the index function.
          */
         const value_type& operator()(size_t row, size_t col) const
         {
@@ -306,6 +309,7 @@ namespace numerix::linalg::impl
          * @param rowSlice The Slice object defining the rows.
          * @param colSlice The Slice object defining the columns.
          * @return A MatrixView object with the subset of matrix elements.
+         * @note Bounds-checking is done in the checkSliceBounds function.
          */
         auto operator()(const Slice& rowSlice, const Slice& colSlice)
             requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>) && (!std::is_const_v<DERIVED>)
@@ -329,6 +333,7 @@ namespace numerix::linalg::impl
          * @param rowSlice The Slice object defining the rows.
          * @param colSlice The Slice object defining the columns.
          * @return A MatrixView object with the subset of matrix elements.
+         * Bounds-checking is done in the checkSliceBounds function.
          */
         auto operator()(const Slice& rowSlice, const Slice& colSlice) const
         {
@@ -356,6 +361,7 @@ namespace numerix::linalg::impl
         auto row(size_t index)
             requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>) && (!std::is_const_v<DERIVED>)
         {
+            if (index >= rowCount() - 1) throw std::out_of_range("Bounds Error: Row index out of bounds.");
             return (*this)({ index, 1, 1 }, { 0, colCount(), 1 });
         }
 
@@ -364,7 +370,11 @@ namespace numerix::linalg::impl
          * @param index The index of the row to get.
          * @return A MatrixViewConst object representing the row.
          */
-        auto row(size_t index) const { return (*this)({ index, 1, 1 }, { 0, colCount(), 1 }); }
+        auto row(size_t index) const
+        {
+            if (index >= rowCount() - 1) throw std::out_of_range("Bounds Error: Row index out of bounds.");
+            return (*this)({ index, 1, 1 }, { 0, colCount(), 1 });
+        }
 
         /**
          * @brief Get the column at the given index.
@@ -375,6 +385,7 @@ namespace numerix::linalg::impl
         auto col(size_t index)
             requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>) && (!std::is_const_v<DERIVED>)
         {
+            if (index >= colCount() - 1) throw std::out_of_range("Bounds Error: Column index out of bounds.");
             return (*this)({ 0, rowCount(), 1 }, { index, 1, 1 });
         }
 
@@ -383,7 +394,11 @@ namespace numerix::linalg::impl
          * @param index The index of the column to get.
          * @return A MatrixViewConst object representing the column.
          */
-        auto col(size_t index) const { return (*this)({ 0, rowCount(), 1 }, { index, 1, 1 }); }
+        auto col(size_t index) const
+        {
+            if (index >= colCount() - 1) throw std::out_of_range("Bounds Error: Column index out of bounds.");
+            return (*this)({ 0, rowCount(), 1 }, { index, 1, 1 });
+        }
 
         // ========================================================================================
         // Meta data

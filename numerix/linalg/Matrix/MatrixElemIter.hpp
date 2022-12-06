@@ -58,7 +58,7 @@ namespace numerix::linalg
 
     private:
         iter_t* m_data;    /**< A pointer to the matrix element array. */
-        GSlice  m_slice;   /**< The generalized slice for the data array. */
+        impl::GSlice  m_slice;   /**< The generalized slice for the data array. */
         size_t  m_current; /**< The current index. */
 
         /**
@@ -68,7 +68,7 @@ namespace numerix::linalg
          * @param pos The starting position (default 0)
          * @note The constructor is private to prevent direct usage by clients.
          */
-        MatrixElemIterConcept(iter_t* data, GSlice slice, size_t pos = 0) : m_data(data), m_slice(slice), m_current(pos) {}
+        MatrixElemIterConcept(iter_t* data, impl::GSlice slice, size_t pos = 0) : m_data(data), m_slice(slice), m_current(pos) {}
 
         /**
          * @brief Get a copy of the end iterator
