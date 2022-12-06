@@ -11,16 +11,14 @@ namespace numerix::linalg
 {
 
     /**
-     * @brief
-     * @tparam T1
-     * @tparam T2
-     * @param coefficients
-     * @param results
-     * @return
+     * @brief Gauss-Jordan elimination with back-substitution. This function determines the inverse of the
+     * coefficient matrix, while also determining the solution vector.
+     * @param coefficients The Matrix of coefficients.
+     * @param results The vector of results (the b in Ax=b). The contents of the results vector is replaced by the
+     * solution vector.
+     * @return A std::pair holding the inverse to the coefficient matrix, and the solution vector.
      */
-    template<typename T1, typename T2>
-        requires is_matrix<T1> && is_matrix<T2>
-    std::pair<T1, T2> FactorizeGJ(T1 coefficients, T2 results)
+    auto FactorizeGJ(is_matrix auto coefficients, is_matrix auto results)
     {
         // ===== Check that the dimensions of the input matrix and vector match.
         if (coefficients.colCount() != results.rowCount() || results.colCount() != 1)
@@ -30,7 +28,7 @@ namespace numerix::linalg
         if (!coefficients.isSquare()) throw std::logic_error("Gauss Jordan error: The coefficient matrix must be square.");
 
         // ===== Create the identity matrix, which will be modified and become the inverse of the coefficient matrix.
-        T1 inverse = T1::CreateIdentityMatrix(coefficients.colCount());
+        auto inverse = std::remove_cvref_t<decltype(coefficients)>::CreateIdentityMatrix(coefficients.colCount());
 
         // ===== Elimination
         // TODO: Implement pivoting.
@@ -90,7 +88,7 @@ namespace numerix::linalg
             }
         }
 
-        return { inverse, results };
+        return std::make_pair( inverse, results );
     }
 }    // namespace numerix::linalg
 

@@ -361,7 +361,8 @@ namespace numerix::linalg::impl
         auto row(size_t index)
             requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>) && (!std::is_const_v<DERIVED>)
         {
-            if (index >= rowCount() - 1) throw std::out_of_range("Bounds Error: Row index out of bounds.");
+            auto a = rowCount();
+            if (index >= rowCount()) throw std::out_of_range("Bounds Error: Row index out of bounds.");
             return (*this)({ index, 1, 1 }, { 0, colCount(), 1 });
         }
 
@@ -372,7 +373,7 @@ namespace numerix::linalg::impl
          */
         auto row(size_t index) const
         {
-            if (index >= rowCount() - 1) throw std::out_of_range("Bounds Error: Row index out of bounds.");
+            if (index >= rowCount()) throw std::out_of_range("Bounds Error: Row index out of bounds.");
             return (*this)({ index, 1, 1 }, { 0, colCount(), 1 });
         }
 
@@ -385,7 +386,7 @@ namespace numerix::linalg::impl
         auto col(size_t index)
             requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>) && (!std::is_const_v<DERIVED>)
         {
-            if (index >= colCount() - 1) throw std::out_of_range("Bounds Error: Column index out of bounds.");
+            if (index >= colCount()) throw std::out_of_range("Bounds Error: Column index out of bounds.");
             return (*this)({ 0, rowCount(), 1 }, { index, 1, 1 });
         }
 
@@ -396,7 +397,7 @@ namespace numerix::linalg::impl
          */
         auto col(size_t index) const
         {
-            if (index >= colCount() - 1) throw std::out_of_range("Bounds Error: Column index out of bounds.");
+            if (index >= colCount()) throw std::out_of_range("Bounds Error: Column index out of bounds.");
             return (*this)({ 0, rowCount(), 1 }, { index, 1, 1 });
         }
 

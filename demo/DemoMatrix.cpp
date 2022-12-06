@@ -40,37 +40,21 @@ int main() {
         m2(2,0) = 3.0;
         m2(3,0) = 4.0;
 
-        //std::cout << m1 << std::endl;
-        //std::cout << m2 << std::endl;
-
-        auto x1 = m1({0,4},{0,4});
-        auto x2 = m2({0,4},{0,1});
-
-        std::cout << x1 << std::endl;
-        std::cout << x2 << std::endl;
-
-        std::swap(x1, x2);
-
-        std::cout << x1 << std::endl;
-        std::cout << x2 << std::endl;
+        std::cout << m1 << std::endl;
+        std::cout << m2 << std::endl;
 
         //auto m3 = m1 * m2;
         //std::cout << m3 << std::endl;
 
+        auto [m4, v4] = FactorizeGJ(m1, m2);
+        std::cout << m4 << std::endl;
+        std::cout << v4 << std::endl;
 
-//        auto [m4, v4] = FactorizeGJ(m1, m2);
-//        std::cout << m4 << std::endl;
-//        std::cout << v4 << std::endl;
-//
-//        auto res = m1 * m4;
-//        std::cout << res << std::endl;
-//
-//        auto check = m1 * v4;
-//        std::cout << check << std::endl;
-//
-//        for (auto& col : m1.cols()) std::cout << col << std::endl;
+        auto res = m1 * m4;
+        std::cout << res << std::endl;
 
-
+        auto check = m1 * v4;
+        std::cout << check << std::endl;
 
 }
 

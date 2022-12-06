@@ -14,7 +14,6 @@ add_library(numerix INTERFACE IMPORTED)
 target_include_directories(numerix SYSTEM INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/numerix>)
 
 #add_subdirectory(numerix)
-add_subdirectory(fmt)
 add_subdirectory(demo)
 add_subdirectory(test)
 
