@@ -7,7 +7,7 @@
 
 #include "linalg/FactorizeGJ.hpp"
 #include "linalg/Matrix.hpp"
-#include "poly/polynomial.hpp"
+#include "poly/Polynomial.hpp"
 #include "polyroots/polyroots.hpp"
 #include "roots/roots.hpp"
 

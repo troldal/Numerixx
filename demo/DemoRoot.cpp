@@ -9,7 +9,7 @@
 #include <numerix.hpp>
 
 
-auto fun = numerix::poly::polynomial({-5.0, 0.0, 1.0});
+auto fun = numerix::poly::Polynomial({-5.0, 0.0, 1.0});
 
 template<typename S>
 void print(S solver, std::pair<double, double> b) {
