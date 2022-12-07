@@ -58,7 +58,7 @@ namespace numerix::poly
         /**
          * @brief Constructor taking a container of coefficients as an argument.
          * @param coefficients The container of coefficients. The value type must be of floating-point type, and must
-         * support iterators.
+         * support iterators. The coefficients must be in order of increasing power, starting with the constant (power of zero).
          */
         template<typename CONTAINER>
         explicit Polynomial(CONTAINER coefficients) : m_coefficients { coefficients.begin(), coefficients.end() }
@@ -66,7 +66,8 @@ namespace numerix::poly
 
         /**
          * @brief Constructor taking an std::initializer_list with the polynomial coefficients as an argument.
-         * @param coefficients The list of coefficients of the polynomial.
+         * @param coefficients The list of coefficients of the polynomial.The coefficients must be in order of increasing power,
+         * starting with the constant (power of zero).
          */
         Polynomial(std::initializer_list<T> coefficients) : m_coefficients { coefficients } {}
 

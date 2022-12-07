@@ -34,59 +34,63 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
-#include <vector>
 #include <numbers>
+#include <vector>
 
-namespace numerix::polyroots {
+namespace numerix::polyroots
+{
 
     /**
-     * @brief
-     * @tparam Poly
-     * @param poly
-     * @return
+     * @brief Compute the real roots of a quadratic polynomial.
+     * @tparam POLYTYPE The type of the polynomial (must be poly::Polynomial, with value_type = floating point).
+     * @param poly The Polynomial object.
+     * @return The roots of the polynomial.
      */
-    template<typename Poly>
-    requires std::is_floating_point_v<typename Poly::value_type>
-    inline auto quadratic(Poly poly) {
+    template<typename POLYTYPE>
+        requires std::is_floating_point_v<typename POLYTYPE::value_type> &&
+                 std::same_as<POLYTYPE, poly::Polynomial<typename POLYTYPE::value_type>>
+    inline auto quadratic(POLYTYPE poly)
+    {
+        using result_vector = std::vector<typename POLYTYPE::value_type>;
+        auto& coeff         = poly.coefficients();
 
-        using result_vector = std::vector<typename Poly::value_type>;
+        // ===== Check that the polynomial is quadratic.
+        if (coeff.size() != 3) throw std::invalid_argument("Polynomial Error: Polynomial is not quadratic.");
 
-        auto& coeff = poly.coefficients();
-        assert(coeff.size() == 3);
-
+        // ===== Compute the discriminant. If it is negative, there are no real roots.
         auto sq_num = coeff[1] * coeff[1] - 4 * coeff[2] * coeff[0];
         if (sq_num < 0.0) return result_vector {};
 
-        auto roots = result_vector {(-coeff[1] + std::sqrt(sq_num)) / (2 * coeff[2]), (-coeff[1] - std::sqrt(sq_num)) / (2 * coeff[2])};
+        // ===== Compute the roots, sort them lowest to highest, and return them.
+        auto roots = result_vector { (-coeff[1] + std::sqrt(sq_num)) / (2 * coeff[2]), (-coeff[1] - std::sqrt(sq_num)) / (2 * coeff[2]) };
         std::sort(roots.begin(), roots.end());
         return roots;
     }
 
     /**
-     * @brief
-     * @tparam Poly
-     * @param poly
-     * @return
+     * @brief Compute the real roots of a cubic polynomial.
+     * @tparam POLYTYPE The type of the polynomial (must be poly::Polynomial, with value_type = floating point).
+     * @param poly The Polynomial object.
+     * @return The roots of the polynomial.
      */
-    template<typename Poly>
-    requires std::is_floating_point_v<typename Poly::value_type>
-    inline auto cubic(Poly poly) {
-
+    template<typename POLYTYPE>
+        requires std::is_floating_point_v<typename POLYTYPE::value_type> &&
+                 std::same_as<POLYTYPE, poly::Polynomial<typename POLYTYPE::value_type>>
+    inline auto cubic(POLYTYPE poly)
+    {
         using std::acos;
-        using std::cbrt;
         using std::cbrt;
         using std::cos;
         using std::sqrt;
         using namespace std::numbers;
 
-        using result_vector = std::vector<typename Poly::value_type>;
-        using value_type = typename Poly::value_type;
+        using result_vector = std::vector<typename POLYTYPE::value_type>;
+        using value_type    = typename POLYTYPE::value_type;
 
         auto coeff = poly.coefficients();
-        assert(coeff.size() == 4);
+        if (coeff.size() != 4) throw std::invalid_argument("Polynomial Error: Polynomial is not cubic.");
 
-        std::transform(coeff.cbegin(), coeff.cend(), coeff.begin(), [&coeff](value_type elem){
-            return elem / coeff.back(); });
+        std::transform(coeff.cbegin(), coeff.cend(), coeff.begin(), [&coeff](value_type elem) { return elem / coeff.back(); });
 
         auto& a_0 = coeff[0];
         auto& a_1 = coeff[1];
@@ -102,7 +106,9 @@ namespace numerix::polyroots {
             auto m     = 2 * sqrt(-p / 3);
             auto theta = acos(3 * q / (p * m)) / 3.0;
 
-            result_vector roots { m * cos(theta) - a_2 / 3, m * cos(theta + 2 * pi_v<value_type> / 3) - a_2 / 3, m * cos(theta + 4 * pi_v<value_type> / 3) - a_2 / 3 };
+            result_vector roots { m * cos(theta) - a_2 / 3,
+                                  m * cos(theta + 2 * pi_v<value_type> / 3) - a_2 / 3,
+                                  m * cos(theta + 4 * pi_v<value_type> / 3) - a_2 / 3 };
             std::sort(roots.begin(), roots.end());
 
             return roots;
@@ -115,6 +121,6 @@ namespace numerix::polyroots {
         return result_vector { P + Q - a_2 / 3.0 };
     }
 
-}
+}    // namespace numerix::polyroots
 
 #endif    // NUMERIX_POLYROOTS_HPP

@@ -10,6 +10,7 @@
 
 int main() {
 
+    // ===== Set up a polynomial function of f(x) = -5 + x^2
     auto fun = numerix::poly::Polynomial({-5.0, 0.0, 1.0});
 
 //    std::vector<double> c {-5, 0, 1};
