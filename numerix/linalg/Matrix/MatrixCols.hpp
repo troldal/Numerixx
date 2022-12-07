@@ -150,7 +150,7 @@ namespace numerix::linalg
          * @brief Get the size, i.e. the count of columns.
          * @return The column count.
          */
-        size_t size() const { return m_matrix.colCount(); }
+        [[nodiscard]] int size() const { return m_matrix.colCount(); }
 
         /**
          * @brief Get an iterator to the first column in the collection.

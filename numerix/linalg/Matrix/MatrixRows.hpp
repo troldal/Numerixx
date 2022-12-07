@@ -150,7 +150,7 @@ namespace numerix::linalg
          * @brief Get the size, i.e. the count of rows.
          * @return The row count.
          */
-        size_t size() const { return m_matrix.rowCount(); }
+        [[nodiscard]] int size() const { return m_matrix.rowCount(); }
 
         /**
          * @brief Get an iterator to the first row in the collection.

@@ -80,19 +80,19 @@ namespace numerix::linalg
          * @brief Get the start index of the Slice object.
          * @return The start index.
          */
-        auto start() const { return m_start; }
+        [[nodiscard]] auto start() const { return m_start; }
 
         /**
          * @brief Get the length of the Slice object.
          * @return The length.
          */
-        auto length() const { return m_length; }
+        [[nodiscard]] auto length() const { return m_length; }
 
         /**
          * @brief Get the stride of the Slice object.
          * @return The stride.
          */
-        auto stride() const { return m_stride; }
+        [[nodiscard]] auto stride() const { return m_stride; }
 
     private:
         int m_start;  /**< Index of the start element. */
@@ -176,25 +176,25 @@ namespace numerix::linalg
              * @brief Get the number of rows in the slice.
              * @return The number of rows.
              */
-            int rowCount() const { return m_extents.front(); }
+            [[nodiscard]] int rowCount() const { return m_extents.front(); }
 
             /**
              * @brief Get the number of columns in the slice.
              * @return The number of columns.
              */
-            int colCount() const { return m_extents.back(); }
+            [[nodiscard]] int colCount() const { return m_extents.back(); }
 
             /**
              * @brief Get the size (number of elements) of the slice.
              * @return The number of elements.
              */
-            int size() const { return m_size; }
+            [[nodiscard]] int size() const { return m_size; }
 
             /**
              * @brief Get the index of the starting element.
              * @return Index of the start element.
              */
-            auto start() const { return m_start; }
+            [[nodiscard]] auto start() const { return m_start; }
 
         private:
             int              m_size;    /**< The size of the slice. */

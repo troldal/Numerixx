@@ -62,13 +62,13 @@ namespace numerix::linalg::impl
          * @param col The column index of the element.
          * @return The index of the element in the raw array.
          */
-        size_t index(size_t row, size_t col) const
+        [[nodiscard]] int index(int row, int col) const
         {
-            const DERIVED& derived = static_cast<const DERIVED&>(*this);
+            const auto& derived = static_cast<const DERIVED&>(*this);
             if (row >= derived.m_rowSlice.length()) throw std::out_of_range("Bounds Error: Row index out of bounds.");
             if (col >= derived.m_colSlice.length()) throw std::out_of_range("Bounds Error: Column index out of bounds.");
 
-            size_t start = derived.m_rowSlice.start() * derived.extents().second + derived.m_colSlice.start();
+            int start = derived.m_rowSlice.start() * derived.extents().second + derived.m_colSlice.start();
             return start + row * derived.m_rowSlice.stride() + col * derived.m_colSlice.stride();
         }
 
@@ -78,9 +78,9 @@ namespace numerix::linalg::impl
          * @param colSlice The Slice object representing the columns.
          * @return New, bounds checked slices for rows and columns.
          */
-        std::pair<Slice, Slice> checkSliceBounds(Slice rowSlice, Slice colSlice) const
+        [[nodiscard]] std::pair<Slice, Slice> checkSliceBounds(Slice rowSlice, Slice colSlice) const
         {
-            const DERIVED& derived = static_cast<const DERIVED&>(*this);
+            const auto& derived = static_cast<const DERIVED&>(*this);
 
             // ===== If the length() member is zero, replace it with the distance to the last element.
             auto rSlice =
@@ -111,7 +111,7 @@ namespace numerix::linalg::impl
                                cSlice.stride() * derived.m_colSlice.stride());
             }
 
-            return std::pair<Slice, Slice>(rSlice, cSlice);
+            return {rSlice, cSlice};
         }
 
         /**
@@ -173,7 +173,7 @@ namespace numerix::linalg::impl
         MatrixElemIter<typename MatrixTraits<DERIVED>::value_type> begin()
             requires(!std::same_as<DERIVED, MatrixViewConst<typename MatrixTraits<DERIVED>::value_type>>) && (!std::is_const_v<DERIVED>)
         {
-            DERIVED& derived = static_cast<DERIVED&>(*this);
+            auto& derived = static_cast<DERIVED&>(*this);
             return MatrixElemIter<value_type>(derived.data(), derived.gslice());
         }
 
@@ -183,7 +183,7 @@ namespace numerix::linalg::impl
          */
         MatrixElemIterConst<typename MatrixTraits<DERIVED>::value_type> begin() const
         {
-            const DERIVED& derived = static_cast<const DERIVED&>(*this);
+            const auto& derived = static_cast<const DERIVED&>(*this);
             return MatrixElemIterConst<value_type>(derived.data(), derived.gslice());
         }
 
@@ -193,7 +193,7 @@ namespace numerix::linalg::impl
          */
         MatrixElemIterConst<typename MatrixTraits<DERIVED>::value_type> cbegin() const
         {
-            const DERIVED& derived = static_cast<const DERIVED&>(*this);
+            const auto& derived = static_cast<const DERIVED&>(*this);
             return MatrixElemIterConst<value_type>(derived.data(), derived.gslice());
         }
 
@@ -205,7 +205,7 @@ namespace numerix::linalg::impl
         MatrixElemIter<typename MatrixTraits<DERIVED>::value_type> end()
             requires(!std::same_as<DERIVED, MatrixViewConst<typename MatrixTraits<DERIVED>::value_type>>) && (!std::is_const_v<DERIVED>)
         {
-            DERIVED& derived = static_cast<DERIVED&>(*this);
+            auto& derived = static_cast<DERIVED&>(*this);
             return MatrixElemIter<value_type>(derived.data(), derived.gslice()).end();
         }
 
@@ -215,7 +215,7 @@ namespace numerix::linalg::impl
          */
         MatrixElemIterConst<typename MatrixTraits<DERIVED>::value_type> end() const
         {
-            const DERIVED& derived = static_cast<const DERIVED&>(*this);
+            const auto& derived = static_cast<const DERIVED&>(*this);
             return MatrixElemIterConst<value_type>(derived.data(), derived.gslice()).end();
         }
 
@@ -225,7 +225,7 @@ namespace numerix::linalg::impl
          */
         MatrixElemIterConst<typename MatrixTraits<DERIVED>::value_type> cend() const
         {
-            const DERIVED& derived = static_cast<const DERIVED&>(*this);
+            const auto& derived = static_cast<const DERIVED&>(*this);
             return MatrixElemIterConst<value_type>(derived.data(), derived.gslice()).end();
         }
 
@@ -284,10 +284,10 @@ namespace numerix::linalg::impl
          * @return A reference to the matrix element.
          * @note Bounds-checking is done in the index function.
          */
-        value_type& operator()(size_t row, size_t col)
+        value_type& operator()(int row, int col)
             requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>) && (!std::is_const_v<DERIVED>)
         {
-            DERIVED& derived = static_cast<DERIVED&>(*this);
+            auto& derived = static_cast<DERIVED&>(*this);
             return derived.data()[index(row, col)];
         }
 
@@ -298,9 +298,9 @@ namespace numerix::linalg::impl
          * @return A const reference to the matrix element.
          * @note Bounds-checking is done in the index function.
          */
-        const value_type& operator()(size_t row, size_t col) const
+        const value_type& operator()(int row, int col) const
         {
-            const DERIVED& derived = static_cast<const DERIVED&>(*this);
+            const auto& derived = static_cast<const DERIVED&>(*this);
             return derived.data()[index(row, col)];
         }
 
@@ -314,7 +314,7 @@ namespace numerix::linalg::impl
         auto operator()(const Slice& rowSlice, const Slice& colSlice)
             requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>) && (!std::is_const_v<DERIVED>)
         {
-            DERIVED& derived = static_cast<DERIVED&>(*this);
+            auto& derived = static_cast<DERIVED&>(*this);
 
             // ===== Check and modify the slices as required.
             auto [rSlice, cSlice] = checkSliceBounds(rowSlice, colSlice);
@@ -337,7 +337,7 @@ namespace numerix::linalg::impl
          */
         auto operator()(const Slice& rowSlice, const Slice& colSlice) const
         {
-            const DERIVED& derived = static_cast<const DERIVED&>(*this);
+            const auto& derived = static_cast<const DERIVED&>(*this);
 
             // ===== Check and modify the slices as required.
             auto [rSlice, cSlice] = checkSliceBounds(rowSlice, colSlice);
@@ -358,10 +358,9 @@ namespace numerix::linalg::impl
          * @return A MatrixView object representing the row.
          * @note This function will be disabled for const objects.
          */
-        auto row(size_t index)
+        auto row(int index)
             requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>) && (!std::is_const_v<DERIVED>)
         {
-            auto a = rowCount();
             if (index >= rowCount()) throw std::out_of_range("Bounds Error: Row index out of bounds.");
             return (*this)({ index, 1, 1 }, { 0, colCount(), 1 });
         }
@@ -371,7 +370,7 @@ namespace numerix::linalg::impl
          * @param index The index of the row to get.
          * @return A MatrixViewConst object representing the row.
          */
-        auto row(size_t index) const
+        auto row(int index) const
         {
             if (index >= rowCount()) throw std::out_of_range("Bounds Error: Row index out of bounds.");
             return (*this)({ index, 1, 1 }, { 0, colCount(), 1 });
@@ -383,7 +382,7 @@ namespace numerix::linalg::impl
          * @return A MatrixView object representing the column.
          * @note This function will be disabled for const objects.
          */
-        auto col(size_t index)
+        auto col(int index)
             requires(!std::same_as<DERIVED, MatrixViewConst<value_type>>) && (!std::is_const_v<DERIVED>)
         {
             if (index >= colCount()) throw std::out_of_range("Bounds Error: Column index out of bounds.");
@@ -395,7 +394,7 @@ namespace numerix::linalg::impl
          * @param index The index of the column to get.
          * @return A MatrixViewConst object representing the column.
          */
-        auto col(size_t index) const
+        auto col(int index) const
         {
             if (index >= colCount()) throw std::out_of_range("Bounds Error: Column index out of bounds.");
             return (*this)({ 0, rowCount(), 1 }, { index, 1, 1 });
@@ -409,9 +408,9 @@ namespace numerix::linalg::impl
          * @brief Get the number of rows in the Matrix (or MatrixProxy) object.
          * @return The number of rows.
          */
-        size_t rowCount() const
+        [[nodiscard]] int rowCount() const
         {
-            const DERIVED& derived = static_cast<const DERIVED&>(*this);
+            const auto& derived = static_cast<const DERIVED&>(*this);
             return derived.m_rowSlice.length();
         }
 
@@ -419,9 +418,9 @@ namespace numerix::linalg::impl
          * @brief Get the number of columns in the Matrix (or MatrixProxy) object.
          * @return The number of columns.
          */
-        size_t colCount() const
+        [[nodiscard]] int colCount() const
         {
-            const DERIVED& derived = static_cast<const DERIVED&>(*this);
+            const auto& derived = static_cast<const DERIVED&>(*this);
             return derived.m_colSlice.length();
         }
 
@@ -429,13 +428,13 @@ namespace numerix::linalg::impl
          * @brief Get the total number of elements of the Matrix or MatrixView object.
          * @return The number of elements.
          */
-        size_t size() const { return rowCount() * colCount(); }
+        [[nodiscard]] int size() const { return rowCount() * colCount(); }
 
         /**
          * @brief Determine if the Matrix (or MatrixView) object is square (i.e. rowCount == colCount).
          * @return If yes, true. Otherwise false.
          */
-        bool isSquare() const { return rowCount() == colCount(); }
+        [[nodiscard]] bool isSquare() const { return rowCount() == colCount(); }
 
         // ========================================================================================
         // Arithmetic and non-standard assignment operators.
@@ -450,10 +449,10 @@ namespace numerix::linalg::impl
          */
         template<typename U>
             requires is_matrix<U> && (!std::is_same_v<U, DERIVED>)
-        DERIVED& operator=(const U& other)
+        DERIVED& operator=(const U& other) // NOLINT
         {
             // assert(other.rowCount() == rowCount() && other.colCount() == colCount());
-            DERIVED& derived = static_cast<DERIVED&>(*this);
+            auto& derived = static_cast<DERIVED&>(*this);
             std::copy(other.begin(), other.end(), derived.begin());
             return derived;
         }
@@ -465,7 +464,7 @@ namespace numerix::linalg::impl
          */
         DERIVED& operator+=(is_number auto value)
         {
-            DERIVED& derived = static_cast<DERIVED&>(*this);
+            auto& derived = static_cast<DERIVED&>(*this);
             derived          = (derived + static_cast<value_type>(value));
             return derived;
         }
@@ -477,7 +476,7 @@ namespace numerix::linalg::impl
          */
         DERIVED& operator+=(is_matrix auto mat)
         {
-            DERIVED& derived = static_cast<DERIVED&>(*this);
+            auto& derived = static_cast<DERIVED&>(*this);
             derived          = (derived + mat);
             return derived;
         }
@@ -489,7 +488,7 @@ namespace numerix::linalg::impl
          */
         DERIVED& operator-=(is_number auto value)
         {
-            DERIVED& derived = static_cast<DERIVED&>(*this);
+            auto& derived = static_cast<DERIVED&>(*this);
             derived          = (derived - static_cast<value_type>(value));
             return derived;
         }
@@ -501,7 +500,7 @@ namespace numerix::linalg::impl
          */
         DERIVED& operator-=(is_matrix auto mat)
         {
-            DERIVED& derived = static_cast<DERIVED&>(*this);
+            auto& derived = static_cast<DERIVED&>(*this);
             derived          = (derived - mat);
             return derived;
         }
@@ -513,7 +512,7 @@ namespace numerix::linalg::impl
          */
         DERIVED& operator/=(is_number auto value)
         {
-            DERIVED& derived = static_cast<DERIVED&>(*this);
+            auto& derived = static_cast<DERIVED&>(*this);
             derived          = (derived / static_cast<value_type>(value));
             return derived;
         }
@@ -525,7 +524,7 @@ namespace numerix::linalg::impl
          */
         DERIVED& operator*=(is_number auto value)
         {
-            DERIVED& derived = static_cast<DERIVED&>(*this);
+            auto& derived = static_cast<DERIVED&>(*this);
             derived          = derived * static_cast<value_type>(value);
             return derived;
         }
@@ -539,7 +538,7 @@ namespace numerix::linalg::impl
          * @param extents The extents of the identity matrix (number of rows and columns must be identical).
          * @return A Matrix object representing the identity matrix.
          */
-        static Matrix<typename MatrixTraits<DERIVED>::value_type> CreateIdentityMatrix(size_t extents)
+        static Matrix<typename MatrixTraits<DERIVED>::value_type> CreateIdentityMatrix(int extents)
         {
             using value_t = typename MatrixTraits<DERIVED>::value_type;
 

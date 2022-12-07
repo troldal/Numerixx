@@ -1,6 +1,32 @@
-//
-// Created by Kenneth Balslev on 19/10/2022.
-//
+/*
+    888b      88  88        88  88b           d88  88888888888  88888888ba   88  8b        d8
+    8888b     88  88        88  888b         d888  88           88      "8b  88   Y8,    ,8P
+    88 `8b    88  88        88  88`8b       d8'88  88           88      ,8P  88    `8b  d8'
+    88  `8b   88  88        88  88 `8b     d8' 88  88aaaaa      88aaaaaa8P'  88      Y88P
+    88   `8b  88  88        88  88  `8b   d8'  88  88"""""      88""""88'    88      d88b
+    88    `8b 88  88        88  88   `8b d8'   88  88           88    `8b    88    ,8P  Y8,
+    88     `8888  Y8a.    .a8P  88    `888'    88  88           88     `8b   88   d8'    `8b
+    88      `888   `"Y8888Y"'   88     `8'     88  88888888888  88      `8b  88  8P        Y8
+
+    Copyright © 2022 Kenneth Troldal Balslev
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the “Software”), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is furnished
+    to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+    INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+    PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+    OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
 
 #ifndef NUMERIX_FACTORIZEGJ_HPP
 #define NUMERIX_FACTORIZEGJ_HPP
@@ -33,7 +59,7 @@ namespace numerix::linalg
         // ===== Elimination
         // TODO: Implement pivoting.
         // TODO: Implement scaling.
-        for (size_t i = 0; i < coefficients.rowCount(); ++i) {
+        for (int i = 0; i < coefficients.rowCount(); ++i) {
             // ===== Select the i'th row of the coefficient and identity matrices.
             // ===== The pivot element is the i'th element of the i'th row of the coefficient matrix
             auto row   = coefficients.row(i);
@@ -49,7 +75,7 @@ namespace numerix::linalg
 
             // ===== For each of the rows below the i'th row, subtract the right amount of the i'th row
             // ===== to set set all elements below the pivot element to zero.
-            for (size_t j = i + 1; j < coefficients.rowCount(); ++j) {
+            for (int j = i + 1; j < coefficients.rowCount(); ++j) {
                 // ===== Select the j'th row (below the i'th row) of the coefficient and identity matrices.
                 // ===== Select the element below the pivot element in the coefficient matrix.
                 auto row2 = coefficients.row(j);
@@ -66,13 +92,13 @@ namespace numerix::linalg
         }
 
         // =====Back-substitution
-        for (int64_t i = coefficients.rowCount() - 1; i >= 0; --i) {
+        for (int i = coefficients.rowCount() - 1; i >= 0; --i) {
             // ===== Select the i'th row (starting from the bottom) of the coefficient and identity matrices.
             auto row = coefficients.row(i);
             auto inv = inverse.row(i);
 
             // ===== For each of the rows above the i'th row, subtract the right amount of the i'th row
-            for (int64_t j = i - 1; j >= 0; --j) {
+            for (int j = i - 1; j >= 0; --j) {
                 // ===== Select the j'th row (above the i'th row) of the coefficient and identity matrices.
                 // ===== Select the element above the pivot element in the coefficient matrix.
                 auto row2 = coefficients.row(j);

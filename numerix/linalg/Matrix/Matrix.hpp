@@ -92,7 +92,7 @@ namespace numerix::linalg
          * @param rows Number of rows.
          * @param cols Number of cols.
          */
-        Matrix(int rows, int cols) : m_data(rows * cols), m_rowSlice(0, rows, cols), m_colSlice(0, cols, 1)
+        Matrix(int rows, int cols) : m_data(static_cast<size_t>(rows * cols)), m_rowSlice(0, rows, cols), m_colSlice(0, cols, 1)
         {
             if (rows <= 0) throw std::invalid_argument("Invalid Matrix Extents: A Matrix object must have at least one row.");
             if (cols <= 0) throw std::invalid_argument("Invalid Matrix Extents: A Matrix object must have at least one column.");
@@ -144,4 +144,4 @@ namespace numerix::linalg
 
 }    // namespace numerix::linalg
 
-#endif    // NUMERIX_MATRIX_HPP
+#endif    // NUMERIX_MATRIX_IMPL_HPP

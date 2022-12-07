@@ -31,6 +31,7 @@
 #ifndef NUMERIX_MATRIXCOMMON_HPP
 #define NUMERIX_MATRIXCOMMON_HPP
 
+#include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <initializer_list>

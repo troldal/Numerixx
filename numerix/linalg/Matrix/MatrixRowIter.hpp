@@ -76,7 +76,7 @@ namespace numerix::linalg
          * @param pos The starting position (default 0).
          * @note The constructor is private to avoid direct usage by clients.
          */
-        MatrixRowIterConcept(rows_t data, size_t pos = 0) : m_rows(data), m_current(pos) {}
+        explicit MatrixRowIterConcept(rows_t data, size_t pos = 0) : m_rows(data), m_current(pos) {}
 
     public:
         /*
@@ -103,7 +103,7 @@ namespace numerix::linalg
          * @brief Post-increment operator. Moves the iterator one step forward.
          * @return The iterator prior to incrementing it.
          */
-        MatrixRowIterConcept operator++(int)
+        MatrixRowIterConcept operator++(int) // NOLINT
         {
             MatrixColIterConcept slice = *this;
             ++m_current;
@@ -142,7 +142,7 @@ namespace numerix::linalg
          * @param other The iterator to compare to.
          * @return If they are not equal, true; otherwise false.
          */
-        bool operator!=(const MatrixRowIterConcept& other) const { return !(*this == other); }
+        bool operator!=(const MatrixRowIterConcept& other) const { return !(*this == other); } // NOLINT
 
         /**
          * @brief Less-than operator. Check if the argument is less than the iterator (i.e. the position is lower than for the iterator).

@@ -113,9 +113,10 @@ namespace numerix::linalg
          * @note This constructor is private, as clients should not be allowed to create MatrixViews directly.
          */
         MatrixViewConcept(const Slice& rowSlice, const Slice& colSlice, matrix_t* mat)
-            : m_rowSlice(rowSlice),
-              m_colSlice(colSlice),
-              m_matrix(mat)
+            : m_matrix(mat),
+              m_rowSlice(rowSlice),
+              m_colSlice(colSlice)
+
         {}
 
     public:
