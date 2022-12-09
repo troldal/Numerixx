@@ -60,7 +60,7 @@ namespace numerix::deriv
          * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the convenience functions.
          */
         template<typename Fn>
-            requires std::is_invocable_v<Fn, double>
+            requires std::invocable<Fn, double>
         inline auto central3PointOrder1(Fn function, decltype(function(0.0)) val, decltype(function(0.0)) stepsize)
             -> decltype(function(0.0))
         {
@@ -78,7 +78,7 @@ namespace numerix::deriv
          * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the convenience functions.
          */
         template<typename Fn>
-            requires std::is_invocable_v<Fn, double>
+            requires std::invocable<Fn, double>
         inline auto central5PointOrder1(Fn function, decltype(function(0.0)) val, decltype(function(0.0)) stepsize)
             -> decltype(function(0.0))
         {
@@ -98,7 +98,7 @@ namespace numerix::deriv
          * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the convenience functions.
          */
         template<typename Fn>
-            requires std::is_invocable_v<Fn, double>
+            requires std::invocable<Fn, double>
         inline auto central3PointOrder2(Fn function, decltype(function(0.0)) val, decltype(function(0.0)) stepsize)
             -> decltype(function(0.0))
         {
@@ -116,7 +116,7 @@ namespace numerix::deriv
          * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the convenience functions.
          */
         template<typename Fn>
-            requires std::is_invocable_v<Fn, double>
+            requires std::invocable<Fn, double>
         inline auto central5PointOrder2(Fn function, decltype(function(0.0)) val, decltype(function(0.0)) stepsize)
             -> decltype(function(0.0))
         {
@@ -140,7 +140,7 @@ namespace numerix::deriv
          * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the convenience functions.
          */
         template<typename Fn>
-            requires std::is_invocable_v<Fn, double>
+            requires std::invocable<Fn, double>
         inline auto forward2PointOrder1(Fn function, decltype(function(0.0)) val, decltype(function(0.0)) stepsize)
             -> decltype(function(0.0))
         {
@@ -158,7 +158,7 @@ namespace numerix::deriv
          * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the convenience functions.
          */
         template<typename Fn>
-            requires std::is_invocable_v<Fn, double>
+            requires std::invocable<Fn, double>
         inline auto forward3PointOrder1(Fn function, decltype(function(0.0)) val, decltype(function(0.0)) stepsize)
             -> decltype(function(0.0))
         {
@@ -176,7 +176,7 @@ namespace numerix::deriv
          * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the convenience functions.
          */
         template<typename Fn>
-            requires std::is_invocable_v<Fn, double>
+            requires std::invocable<Fn, double>
         inline auto forward3PointOrder2(Fn function, decltype(function(0.0)) val, decltype(function(0.0)) stepsize)
             -> decltype(function(0.0))
         {
@@ -194,7 +194,7 @@ namespace numerix::deriv
          * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the convenience functions.
          */
         template<typename Fn>
-            requires std::is_invocable_v<Fn, double>
+            requires std::invocable<Fn, double>
         inline auto forward4PointOrder2(Fn function, decltype(function(0.0)) val, decltype(function(0.0)) stepsize)
             -> decltype(function(0.0))
         {
@@ -217,7 +217,7 @@ namespace numerix::deriv
          * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the convenience functions.
          */
         template<typename Fn>
-            requires std::is_invocable_v<Fn, double>
+            requires std::invocable<Fn, double>
         inline auto backward2PointOrder1(Fn function, decltype(function(0.0)) val, decltype(function(0.0)) stepsize)
             -> decltype(function(0.0))
         {
@@ -253,7 +253,7 @@ namespace numerix::deriv
          * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the convenience functions.
          */
         template<typename Fn>
-            requires std::is_invocable_v<Fn, double>
+            requires std::invocable<Fn, double>
         inline auto backward3PointOrder2(Fn function, decltype(function(0.0)) val, decltype(function(0.0)) stepsize)
             -> decltype(function(0.0))
         {
@@ -271,7 +271,7 @@ namespace numerix::deriv
          * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the convenience functions.
          */
         template<typename Fn>
-            requires std::is_invocable_v<Fn, double>
+            requires std::invocable<Fn, double>
         inline auto backward4PointOrder2(Fn function, decltype(function(0.0)) val, decltype(function(0.0)) stepsize)
             -> decltype(function(0.0))
         {
@@ -292,7 +292,7 @@ namespace numerix::deriv
          * @return
          */
         template<typename Fn>
-            requires std::is_invocable_v<Fn, double>
+            requires std::invocable<Fn, double>
         inline auto derivOrder1(Fn function, decltype(function(0.0)) val, decltype(function(0.0)) stepsize) -> decltype(function(0.0))
         {
             using RT = decltype(function(0.0));
@@ -326,7 +326,7 @@ namespace numerix::deriv
          * @return
          */
         template<typename Fn>
-            requires std::is_invocable_v<Fn, double>
+            requires std::invocable<Fn, double>
         inline auto derivOrder2(Fn function, decltype(function(0.0)) val, decltype(function(0.0)) stepsize) -> decltype(function(0.0))
         {
             using RT = decltype(function(0.0));
@@ -357,7 +357,7 @@ namespace numerix::deriv
      * @tparam Fn
      */
     template<typename Fn>
-        requires std::is_invocable_v<Fn, double>
+        requires std::invocable<Fn, double>
     class Derivative final
     {
         Fn m_func;
@@ -402,7 +402,7 @@ namespace numerix::deriv
      * @return
      */
     template<typename Fn>
-        requires std::is_invocable_v<Fn, double>
+        requires std::invocable<Fn, double>
     inline auto central(Fn function, decltype(function(0.0)) val, int order = 1) -> decltype(function(0.0))
     {
         assert(order >= 1 && order <= 2);
@@ -436,7 +436,7 @@ namespace numerix::deriv
      * @return
      */
     template<typename Fn>
-        requires std::is_invocable_v<Fn, double>
+        requires std::invocable<Fn, double>
     inline auto forward(Fn function, decltype(function(0.0)) val, int order = 1) -> decltype(function(0.0))
     {
         assert(order >= 1 && order <= 2);
@@ -470,7 +470,7 @@ namespace numerix::deriv
      * @return
      */
     template<typename Fn>
-        requires std::is_invocable_v<Fn, double>
+        requires std::invocable<Fn, double>
     inline auto backward(Fn function, decltype(function(0.0)) val, int order = 1) -> decltype(function(0.0))
     {
         assert(order >= 1 && order <= 2);

@@ -72,16 +72,21 @@ int main() {
     using namespace numerix::roots;
 
     std::cout << "RIDDERS:" << std::endl;
-    print(ridders(fun), std::make_pair(0.0, 2.5));
+    print(Ridders(fun), std::make_pair(0.0, 2.5));
 
     std::cout << "BISECTION:" << std::endl;
-    print(bisection(fun), std::make_pair(0.0, 2.5));
+    print(Bisection(fun), std::make_pair(0.0, 2.5));
 
     std::cout << "DISCRETE NEWTON:" << std::endl;
-    print(dnewton(fun), 3.0);
+    print(DNewton(fun), 3.0);
 
     std::cout << "NEWTON:" << std::endl;
-    print(newton(fun, [&](double x){return fun.derivative(x);}), 1.25);
+    print(Newton(fun, [&](double x){return fun.derivative(x);}), 1.25);
+
+    std::cout << "Ridders:         " << fsolve(Ridders(fun), {0.0, 2.5}, 1.0E-15) << std::endl;
+    std::cout << "Bisection:       " << fsolve(Bisection(fun), {0.0, 2.5}, 1.0E-15) << std::endl;
+    std::cout << "Discrete Newton: " << fdfsolve(DNewton(fun), 1.25, 1.0E-15) << std::endl;
+    std::cout << "Newton:          " << fdfsolve(Newton(fun, [&](double x){return fun.derivative(x);}), 1.25, 1.0E-15) << std::endl;
 
     return 0;
 }

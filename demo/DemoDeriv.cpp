@@ -2,7 +2,7 @@
 // Created by Troldal on 14/10/2022.
 //
 
-#include <calculus/derivatives.hpp>
+#include <calculus/Derivatives.hpp>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
