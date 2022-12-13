@@ -8,7 +8,9 @@
 #include "linalg/FactorizeGJ.hpp"
 #include "linalg/Matrix.hpp"
 #include "poly/Polynomial.hpp"
-#include "polyroots/polyroots.hpp"
-#include "roots/roots.hpp"
+#include "polyroots/Polyroots.hpp"
+#include "roots/Roots.hpp"
+#include "calculus/Jacobian.hpp"
+#include "multiroots/Multiroots.hpp"
 
 #endif    // NUMERIX_NUMERIX_HPP

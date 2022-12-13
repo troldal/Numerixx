@@ -7,7 +7,7 @@
 #include <iomanip>
 #include <iostream>
 #include <poly/Polynomial.hpp>
-#include <polyroots/polyroots.hpp>
+#include <polyroots/Polyroots.hpp>
 
 int main() {
 

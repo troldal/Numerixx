@@ -448,13 +448,44 @@ namespace numerix::linalg::impl
          * @todo What should happen when the extents do not match?
          */
         template<typename U>
-            requires is_matrix<U> && (!std::is_same_v<U, DERIVED>)
+            requires is_matrix<U> && (!std::same_as<U, DERIVED>)
         DERIVED& operator=(const U& other) // NOLINT
         {
             // assert(other.rowCount() == rowCount() && other.colCount() == colCount());
             auto& derived = static_cast<DERIVED&>(*this);
             std::copy(other.begin(), other.end(), derived.begin());
             return derived;
+        }
+
+        /**
+         * @brief
+         * @tparam U
+         * @param other
+         * @return
+         */
+        template<typename U>
+            requires (!is_matrix<U>) && std::convertible_to<typename U::value_type, typename MatrixTraits<DERIVED>::value_type>
+        DERIVED& operator=(const U& other) // NOLINT
+        {
+            auto& derived = static_cast<DERIVED&>(*this);
+            if (derived.size() != other.size()) throw std::invalid_argument("Matrix Container Assignment: size mismatch.");
+            std::copy(other.begin(),other.end(), derived.begin());
+            return derived;
+        }
+
+        /**
+         * @brief
+         * @tparam U
+         * @return
+         * @todo Check that the container is valid (i.e. supports forward iterators)
+         */
+        template<typename U>
+        requires std::convertible_to<typename MatrixTraits<DERIVED>::value_type, typename U::value_type>
+        operator U() const {
+            auto& derived = static_cast<const DERIVED&>(*this);
+            U result(derived.size());
+            std::copy(derived.begin(), derived.end(), result.begin());
+            return result;
         }
 
         /**

@@ -46,6 +46,14 @@ target_sources(DemoDeriv
 
 target_link_libraries(DemoDeriv PRIVATE numerix)
 
+add_executable(DemoMultiroot)
+target_sources(DemoMultiroot
+        PRIVATE
+        DemoMultiroot.cpp
+        )
+
+target_link_libraries(DemoMultiroot PRIVATE numerix)
+
 #=======================================================================================================================
 # COMPILER FLAGS
 #   Set compiler debug flags for GCC, Clang and MSVC.
