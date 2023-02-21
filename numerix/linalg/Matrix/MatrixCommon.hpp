@@ -41,6 +41,7 @@
 #include <numeric>
 #include <stdexcept>
 #include <vector>
+#include <iterator>
 
 namespace numerix::linalg
 {

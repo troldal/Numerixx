@@ -99,6 +99,21 @@ namespace numerix::linalg
         }
 
         /**
+         * @brief
+         * @tparam TIter
+         * @param first
+         * @param last
+         */
+        template<typename TIter>
+            requires std::convertible_to<typename std::iterator_traits<TIter>::value_type, T>
+        Matrix(TIter first, TIter last) : m_data(static_cast<size_t>(std::distance(first, last))),
+                                          m_rowSlice(0, m_data.size(), 1),
+                                          m_colSlice(0, 1, 1)
+        {
+            m_data = std::vector(first, last);
+        }
+
+        /**
          * @brief Copy constructor.
          * @param other Object to be copied.
          */
@@ -129,6 +144,11 @@ namespace numerix::linalg
          */
         Matrix& operator=(Matrix&& other) noexcept = default;
 
+
+//        void resize(int rows, int cols) {
+//
+//        }
+
         /**
          * @brief Access the raw array of Matrix elements.
          * @return A pointer to the first element.
@@ -140,6 +160,12 @@ namespace numerix::linalg
          * @return A const pointer to the first element.
          */
         const T* data() const { return m_data.data(); }
+
+        /**
+         * @brief
+         * @param new_cap
+         */
+        //void reserve(size_t new_cap) { m_data.reserve(new_cap); }
     };
 
 }    // namespace numerix::linalg

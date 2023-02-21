@@ -31,6 +31,9 @@
 #ifndef NUMERIX_ROOTBRACKETING_HPP
 #define NUMERIX_ROOTBRACKETING_HPP
 
+#include <expected.hpp>
+
+#include "RootError.hpp"
 #include "calculus/Derivatives.hpp"
 
 namespace numerix::roots
@@ -41,10 +44,10 @@ namespace numerix::roots
     // ========================================================================
 
     /**
-     * @brief
+     * @brief HOLD
      * @param objective
      * @param lower
-     * @param upper
+     * @param upper 
      * @return
      */
     inline std::pair<double, double>
@@ -110,8 +113,10 @@ namespace numerix::roots
         };
 
         /**
-         * @brief The BracketingBase class is a CRTP base class for bracketing solvers.
-         * @tparam SOLVER The type of the (derived) solver class.
+         * @brief The BracketingBase class serves as a base class for all bracketing solvers.
+         * It functions as the CRTP base class for concrete bracketing solvers, and it therefore
+         * does not contain any virtual functions.
+         * @tparam SOLVER The type of the (derived) solver class, e.g. Bisection or Ridders.
          */
         template<typename SOLVER>
             requires std::invocable<typename BracketingTraits<SOLVER>::function_type, double>
@@ -126,8 +131,8 @@ namespace numerix::roots
             using function_type = typename BracketingTraits<SOLVER>::function_type;
             function_type m_func {}; /**< The function object to find the root for. */
 
-            using RT = decltype(m_func(0.0));
-            std::pair<RT, RT> m_bounds; /**< The bounds around the root. */
+            using return_type = decltype(m_func(0.0));
+            std::pair<return_type, return_type> m_bounds; /**< Holds the current bounds around the root. */
 
             /**
              * @brief Constructor, taking a function object as an argument.
@@ -136,12 +141,24 @@ namespace numerix::roots
              */
             explicit BracketingBase(function_type objective) : m_func { objective } {}
 
+            /**
+             * @brief
+             * @param bounds
+             */
+            void setBounds(std::pair<return_type, return_type> bounds) { m_bounds = bounds; }
+
         public:
             /**
-             * @brief Initialize the solver by setting the initial bounds around the root.
-             * @tparam T1 The type of the first bracket.
-             * @tparam T2 The type of the second bracket.
-             * @param bounds A std::pair with the bounds.
+             * @brief The \ref init function initialises the solver by setting the initial bounds around the root.
+             * At the point of initialisation, the solver has already been constructed and provided with the
+             * function to solve. The purpose of the initialisation is only to set the initial bounds.
+             * @tparam T1 The value type of the lower bound. Must be a floating point type, convertible to the
+             * parameter type of the function to solve.
+             * @tparam T2 The value type of the upper bound. Must be a floating point type, convertible to the
+             * parameter type of the function to solve.
+             * @param bounds A std::pair holding the initial bounds around the root. The root must be contained
+             * inside these bounds.
+             * @warning If the solver is used without initialising, the behaviour is undefined.
              */
             template<typename T1, typename T2>
                 requires std::is_floating_point_v<T1> && std::is_floating_point_v<T2>
@@ -151,10 +168,13 @@ namespace numerix::roots
             }
 
             /**
-             * @brief Evaluate the function object at a given point.
-             * @tparam T The type of the argument (must be floating point type)
+             * @brief The \ref evaluate function evaluates the function to solve, at a given point. This is
+             * done simply by passing the given argument to the function object to solve.
+             * @tparam T The value type of the argument. Must be a floating point type, convertible to the parameter
+             * type of the function to solve.
              * @param value The value at which to evaluate the function.
-             * @return The result of the evaluation.
+             * @return The result of the evaluation. The return type will be the same as the return type of the
+             * given function object.
              */
             template<typename T>
                 requires std::is_floating_point_v<T>
@@ -164,10 +184,12 @@ namespace numerix::roots
             }
 
             /**
-             * @brief Get the current bounds around the root.
-             * @return A const reference to the bounds pair.
+             * @brief The result function returns the current bounds around the root. Every time an iteration
+             * is executed, the bounds will narrow
+             * @return A const reference to the current bounds. The bounds is returned as std::pair.
+             * The value type of the bounds are the same as the return type of the function object.
              */
-            const auto& result() const { return m_bounds; }
+            const auto& bounds() const { return m_bounds; }
         };
     }    // namespace impl
 
@@ -203,14 +225,15 @@ namespace numerix::roots
          */
         void iterate()
         {
-            using RT = decltype(Base::evaluate(Base::m_bounds.first));
+            const auto& bounds = Base::bounds();
+            using RT = decltype(Base::evaluate(bounds.first));
 
             using std::abs;
             using std::pow;
             using std::sqrt;
 
-            RT& x_lo = Base::m_bounds.first;
-            RT& x_hi = Base::m_bounds.second;
+            const RT& x_lo = bounds.first;
+            const RT& x_hi = bounds.second;
             RT  f_lo = Base::evaluate(x_lo);
             RT  f_hi = Base::evaluate(x_hi);
 
@@ -228,29 +251,29 @@ namespace numerix::roots
             f_new    = Base::evaluate(x_new);
 
             // ===== If x_new is NaN (i.e. the expression in the sqrt is negative), then return the input bounds.
-            if (std::isnan(x_new)) Base::m_bounds = std::make_pair(x_lo, x_hi);
+//            if (std::isnan(x_new)) Base::setBounds({x_lo, x_hi});
 
             // ===== General case: The root is between x_mid and x_new
             if (f_mid * f_new < 0.0) {
                 if (x_mid < x_new)
-                    Base::m_bounds = std::make_pair(x_mid, x_new);
+                    Base::setBounds({x_mid, x_new});
                 else
-                    Base::m_bounds = std::make_pair(x_new, x_mid);
+                    Base::setBounds({x_new, x_mid});
             }
 
             // ===== Degenerate cases: The root is between x_new and either x_lo or x_hi
             if (f_hi * f_new < 0.0) {
                 if (x_hi < x_new)
-                    Base::m_bounds = std::make_pair(x_hi, x_new);
+                    Base::setBounds({x_hi, x_new});
                 else
-                    Base::m_bounds = std::make_pair(x_new, x_hi);
+                    Base::setBounds({x_new, x_hi});
             }
 
             else {
                 if (x_lo < x_new)
-                    Base::m_bounds = std::make_pair(x_lo, x_new);
+                    Base::setBounds({x_lo, x_new});
                 else
-                    Base::m_bounds = std::make_pair(x_new, x_lo);
+                    Base::setBounds({x_new, x_lo});
             }
         }
     };
@@ -287,38 +310,44 @@ namespace numerix::roots
          */
         void iterate()
         {
-            using RT = decltype(Base::evaluate(Base::m_bounds.first));
+            const auto& bounds = Base::bounds();
+            using RT = decltype(Base::evaluate(bounds.first));
 
-            RT root = (Base::m_bounds.first + Base::m_bounds.second) / 2.0;
+            RT root = (bounds.first + bounds.second) / 2.0;
 
-            if (Base::evaluate(Base::m_bounds.first) * Base::evaluate(root) < 0.0)
-                Base::m_bounds = std::pair<RT, RT>(Base::m_bounds.first, root);
+            if (Base::evaluate(bounds.first) * Base::evaluate(root) < 0.0)
+                Base::setBounds({bounds.first, root});
             else
-                Base::m_bounds = std::pair<RT, RT>(root, Base::m_bounds.second);
+                Base::setBounds({root, bounds.second});
         }
     };
 
     /**
-     * @brief Convenience function for running a bracketing solver (i.e. without derivative), in one go.
-     * @tparam S The type of the solver.
-     * @param solver The solver object.
+     * @brief The fsolve function is a convenience function for running a bracketing solver (i.e. without derivative), without
+     * dealing with low level details. If fine grained control is needed, such as advanced search stopping criteria or running each
+     * iteration manually, please see the documentation for the solver classes.
+     * @tparam SOLVER The type of the solver. This could be the Bisection or the Ridders solvers, but any solver with the correct interface can be used.
+     * @param solver The actual solver object.
      * @param bounds The initial bounds around the root. A root must exist between the brackets.
      * @param eps The max. allowed error.
      * @param maxiter The max. number of allowed iterations.
      * @return The root estimate (mid-point between brackets).
+     * @note The function returns only a single estimate of the root, i.e. the mid-point between the brackets after the final iteration.
+     * If the actual brackets are needed, please use the solver object directly.
      */
-    template<typename S>
-    inline auto fsolve(S solver, std::pair<double, double> bounds, double eps = 1.0E-6, int maxiter = 100)
+    template<typename SOLVER >
+    inline auto fsolve(SOLVER solver, std::pair<double, double> bounds, double eps = 1.0E-6, int maxiter = 100)
     {
         using RT = decltype(solver.evaluate(0.0));
+        const auto& curBounds = solver.bounds();
 
         solver.init(bounds);
         RT result;
 
         int iter = 1;
         while (true) {
-            result = (solver.result().first + solver.result().second) / 2.0;
-            if (abs(solver.result().first - solver.result().second) < eps || abs(solver.evaluate(result)) < eps) break;
+            result = (curBounds.first + curBounds.second) / 2.0;
+            if (abs(curBounds.first - curBounds.second) < eps || abs(solver.evaluate(result)) < eps) break;
             solver.iterate();
 
             ++iter;

@@ -31,33 +31,36 @@
 #ifndef NUMERIX_MULTIROOTS_HPP
 #define NUMERIX_MULTIROOTS_HPP
 
-#include "../linalg/Matrix.hpp"
-#include "../linalg/FactorizeGJ.hpp"
 #include "../calculus/Jacobian.hpp"
+#include "../linalg/FactorizeGJ.hpp"
+#include "../linalg/Matrix.hpp"
+#include "MultiFunction.hpp"
 #include <functional>
 
 namespace numerix::multiroots
 {
-    template<typename FUNCARR>
-        requires std::same_as<typename FUNCARR::value_type, std::function<typename FUNCARR::value_type::result_type(std::vector<typename FUNCARR::value_type::result_type>)> >
+    template< typename TMultiFunc >
+    // requires std::same_as<typename FUNCARR::value_type, std::function<typename FUNCARR::value_type::result_type(std::vector<typename
+    // FUNCARR::value_type::result_type>)> >
     class DMultiNewton;
 
     /*
-         * Forward declaration of the PolishingTraits class.
+     * Forward declaration of the PolishingTraits class.
      */
-    template<typename FUNCARR>
-    struct MultirootsTraits;
+    template< typename SOLVER >
+    struct MultirootsSolverTraits;
 
     /*
-         * Specialization of the PolishingTraits class for Newton<FN, DFN>
+     * Specialization of the PolishingTraits class for Newton<FN, DFN>
      */
-    template<typename FUNCARR>
-    struct MultirootsTraits<DMultiNewton<FUNCARR>>
+    template< typename TMultiFunc >
+    struct MultirootsSolverTraits< DMultiNewton< TMultiFunc > >
     {
-        using function_type = typename FUNCARR::value_type;
-        using result_type = typename function_type::result_type;
+        using function_array = typename TMultiFunc::function_array;
+        using function_type = typename TMultiFunc::function_type;
+        using return_type   = typename TMultiFunc::return_type;
+        using argument_type = typename TMultiFunc::argument_type;
     };
-
 
     // ========================================================================
     // MULTIROOT-FINDING WITH DERIVATIVES
@@ -73,16 +76,15 @@ namespace numerix::multiroots
          */
         friend SOLVER;
 
-    private:
-        using function_type = typename MultirootsTraits<SOLVER>::function_type;//std::function< double(std::vector< double >) >;
-        using result_type = typename MultirootsTraits<SOLVER>::result_type;
+    public:
+        using function_array = typename MultirootsSolverTraits< SOLVER >::function_array;
+        using function_type = typename MultirootsSolverTraits< SOLVER >::function_type;
+        using return_type   = typename MultirootsSolverTraits< SOLVER >::return_type;
+        using argument_type = typename MultirootsSolverTraits< SOLVER >::argument_type;
 
-        std::vector< function_type > m_functions {}; /**< The function object to find the root for. */
+        MultiFunction< function_array > m_functions {}; /**< The function object to find the root for. */
 
-        // using deriv_type = typename impl::PolishingTraits<SOLVER>::deriv_type;
-        // deriv_type m_deriv {}; /**< The function object for the derivative. */
-
-        using RT = numerix::linalg::Matrix< result_type >;
+        using RT = numerix::linalg::Matrix< return_type >;
         RT m_guess; /**< The current root estimate. */
 
     public:
@@ -92,28 +94,32 @@ namespace numerix::multiroots
          * @param derivative The function object for the derivative
          * @note Constructor is private to avoid direct usage by clients.
          */
-        explicit MultirootBase(const std::vector< function_type >& functions) : m_functions { functions },
-                                                                                m_guess(functions.size(), 1) {}
+        explicit MultirootBase(const MultiFunction< function_array >& functions) : m_functions { functions }, m_guess(functions.size(), 1) {}
 
     public:
-
         /**
          * @brief
          * @tparam ARR
          * @param guess
          */
-        template<typename ARR>
-            requires std::convertible_to<typename ARR::value_type, result_type>
-        void init(const ARR& guess) { m_guess = guess; }
+        template< typename ARR >
+            requires std::convertible_to< typename ARR::value_type, return_type >
+        void init(const ARR& guess)
+        {
+            m_guess = guess;
+        }
 
         /**
          * @brief
          * @tparam T
          * @param guess
          */
-        template<typename T>
-            requires std::convertible_to<T, result_type>
-        void init(std::initializer_list<T> guess) { m_guess = guess; }
+        template< typename T >
+            requires std::convertible_to< T, return_type >
+        void init(std::initializer_list< T > guess)
+        {
+            m_guess = guess;
+        }
 
         /**
          * @brief
@@ -121,23 +127,24 @@ namespace numerix::multiroots
          * @param values
          * @return
          */
-        template<typename ARR>
-            requires std::convertible_to<typename ARR::value_type, result_type>
-        auto evaluate(const ARR& values) {
+        template< typename ARR >
+            requires std::convertible_to< typename ARR::value_type, return_type >
+        auto evaluate(const ARR& values)
+        {
 
-            using numerix::linalg::Matrix;
-
-            std::vector< result_type > vals = values;
-
-            std::vector< result_type > result;
-            result.reserve(m_functions.size());
-            for (auto& f : m_functions) result.emplace_back(f(vals));
-
-            Matrix< result_type > res(result.size(), 1);
-            res = result;
-
-            return res;
-
+            return m_functions(values);
+//            using numerix::linalg::Matrix;
+//
+//            std::vector< return_type > vals = values;
+//
+//            std::vector< return_type > result;
+//            result.reserve(m_functions.size());
+//            for (auto& f : m_functions) result.emplace_back(f(vals));
+//
+//            Matrix< return_type > res(result.size(), 1);
+//            res = result;
+//
+//            return res;
         }
 
         /**
@@ -164,43 +171,45 @@ namespace numerix::multiroots
      * @brief
      * @tparam FUNCARR
      */
-    template<typename FUNCARR>
-        requires std::same_as<typename FUNCARR::value_type, std::function<typename FUNCARR::value_type::result_type(std::vector<typename FUNCARR::value_type::result_type>)> >
-    class DMultiNewton final : public MultirootBase< DMultiNewton<FUNCARR> >
+    template< typename TMultiFunc >
+    // requires std::same_as<typename FUNCARR::value_type, std::function<typename FUNCARR::value_type::result_type(std::vector<typename
+    // FUNCARR::value_type::result_type>)> >
+    class DMultiNewton final : public MultirootBase< DMultiNewton< TMultiFunc > >
     {
         /*
          * Private alias declarations.
          */
-        using Base = MultirootBase< DMultiNewton<FUNCARR> >;
+        using Base = MultirootBase< DMultiNewton< TMultiFunc > >;
 
     public:
         /*
          * Public alias declarations.
          */
-        using function_type = typename FUNCARR::value_type;
-        using result_type = typename function_type::result_type;
+        using function_type = typename TMultiFunc::function_type;
+        using return_type   = typename TMultiFunc::return_type;
+        using argument_type = typename TMultiFunc::argument_type;
 
         /**
          * @brief Constructor, taking the function object as an argument.
          * @param objective The function object for which to find the root.
          */
-        explicit DMultiNewton(const FUNCARR& functions) : Base(std::vector(functions.begin(), functions.end())) {}
+        explicit DMultiNewton(const TMultiFunc& funcArray) : Base(funcArray) {}
 
         /**
          * @brief Perform one iteration. This is the main algorithm of the DMultiNewton method.
          */
         void iterate()
         {
-            using numerix::linalg::Matrix;
             using numerix::deriv::computeJacobian;
             using numerix::linalg::FactorizeGJ;
+            using numerix::linalg::Matrix;
 
             // ===== Create vector of function evaluations, using vector of guesses
-            Matrix< result_type >functionEvals(Base::m_functions.size(), 1);
+            Matrix< return_type > functionEvals(Base::m_functions.size(), 1);
             functionEvals = Base::evaluate(Base::m_guess) * (-1);
 
             // ===== Solve the linear system using the jacobian matrix, and estimate new guesses
-            auto jacobian = computeJacobian(Base::m_functions, Base::m_guess);
+            auto jacobian = computeJacobian(Base::m_functions.functionArray(), Base::m_guess);
             auto [inv, x] = FactorizeGJ(jacobian, functionEvals);
             Base::m_guess += x;
         }

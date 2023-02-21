@@ -11,26 +11,38 @@
 
 int main() {
 
-    auto func1 = [](std::vector< double> coeffs) {
+    using namespace numerix::multiroots;
+    using numerix::linalg::Matrix;
+
+    using function_type = std::function< double(Matrix< double>)>;
+
+    function_type func1 = [](const Matrix< double>& coeffs) {
         return coeffs[1] * coeffs[1] * (1.0 - coeffs[0]) - coeffs[0] * coeffs[0] * coeffs[0];
     };
 
-    auto func2 = [](std::vector< double> coeffs) {
+    function_type func2 = [](const Matrix< double>& coeffs) {
         return coeffs[0] * coeffs[0] + coeffs[1] * coeffs[1] - 1.0;
     };
 
-    using function_type = std::function< double(std::vector< double>)>;
-    std::list<function_type > fns;
-    fns.emplace_back(func1);
-    fns.emplace_back(func2);
 
-    auto solver = numerix::multiroots::DMultiNewton(fns);
-    solver.init({1.0, 1.0});
+//    auto solver = numerix::multiroots::DMultiNewton(fns);
+//    solver.init({2.0, 2.0});
+//
+//    for (int i = 0; i < 10; ++i)
+//        solver.iterate();
+//
+//    auto res = solver.result();
+//    for(auto r : res) std::cout << r << std::endl;
 
-    for (int i = 0; i < 10; ++i)
-        solver.iterate();
+    MultiFunction f({ func1, func2 });
+    auto tmp = f({2.0, 2.0});
+    std::cout << tmp << std::endl;
 
-    auto res = solver.result();
-    for(auto r : res) std::cout << r << std::endl;
-
+//    auto solver = numerix::multiroots::DMultiNewton(f);
+//    solver.init({2.0, 2.0});
+//
+//    for (int i = 0; i < 10; ++i) solver.iterate();
+//
+//    auto res = solver.result();
+//    for (auto r : res) std::cout << r << std::endl;
 }

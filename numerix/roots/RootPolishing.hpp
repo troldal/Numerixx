@@ -251,16 +251,18 @@ namespace numerix::roots
     };
 
     /**
-     * @brief Convenience function for running a polishing solver (i.e. with derivative), in one go.
-     * @tparam S The type of the solver.
-     * @param solver The solver object.
-     * @param guess The initial guess of the root.
+     * @brief The fdfsolve function is a convenience function for running a polishing solver (i.e. with derivative), without
+     * dealing with low level details. If fine grained control is needed, such as advanced search stopping criteria or running each
+     * iteration manually, please see the documentation for the solver classes.
+     * @tparam SOLVER The type of the solver. This could be the Newton or DNewton solvers, but any solver with the correct interface can be used.
+     * @param solver The actual solver object.
+     * @param guess The initial guess of the root. The guess must be reasonably close to the actual root.
      * @param eps The max. allowed error.
      * @param maxiter The max. number of allowed iterations.
      * @return The root estimate.
      */
-    template<typename S>
-    inline auto fdfsolve(S solver, double guess, double eps = 1.0E-6, int maxiter = 100)
+    template<typename SOLVER >
+    inline auto fdfsolve(SOLVER solver, double guess, double eps = 1.0E-6, int maxiter = 100)
     {
         using RT = decltype(solver.evaluate(0.0));
 

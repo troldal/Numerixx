@@ -353,6 +353,26 @@ namespace numerix::linalg::impl
         }
 
         /**
+         * @brief
+         * @param index
+         * @return
+         */
+        auto operator[](int index) const {
+            const auto& derived = static_cast<const DERIVED&>(*this);
+            return derived.data()[derived.gslice()(index)];
+        }
+
+        /**
+         * @brief
+         * @param index
+         * @return
+         */
+        auto& operator[](int index) {
+            auto& derived = static_cast<DERIVED&>(*this);
+            return derived.data()[derived.gslice()(index)];
+        }
+
+        /**
          * @brief Get the row at the given index.
          * @param index The index of the row to get.
          * @return A MatrixView object representing the row.
@@ -482,7 +502,7 @@ namespace numerix::linalg::impl
         template<typename U>
         requires std::convertible_to<typename MatrixTraits<DERIVED>::value_type, typename U::value_type>
         operator U() const {
-            auto& derived = static_cast<const DERIVED&>(*this);
+            const auto& derived = static_cast<const DERIVED&>(*this);
             U result(derived.size());
             std::copy(derived.begin(), derived.end(), result.begin());
             return result;

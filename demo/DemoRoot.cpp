@@ -33,7 +33,7 @@ void print(S solver, std::pair<double, double> b) {
         if (abs(solver.evaluate((bounds.first + bounds.second) / 2.0)) < 1.0E-15) break;
 
         solver.iterate();
-        bounds = solver.result();
+        bounds = solver.bounds();
 
     }
 
@@ -69,13 +69,18 @@ void print(S solver, double g) {
 
 int main() {
 
-    using namespace numerix::roots;
+    using numerix::roots::fsolve;
+    using numerix::roots::fdfsolve;
+    using numerix::roots::Ridders;
+    using numerix::roots::Bisection;
+    using numerix::roots::Newton;
+    using numerix::roots::DNewton;
 
     std::cout << "RIDDERS:" << std::endl;
-    print(Ridders(fun), std::make_pair(0.0, 2.5));
+    print(Ridders(fun), {0.0, 2.5});
 
     std::cout << "BISECTION:" << std::endl;
-    print(Bisection(fun), std::make_pair(0.0, 2.5));
+    print(Bisection(fun), {0.0, 2.5});
 
     std::cout << "DISCRETE NEWTON:" << std::endl;
     print(DNewton(fun), 3.0);
@@ -87,6 +92,10 @@ int main() {
     std::cout << "Bisection:       " << fsolve(Bisection(fun), {0.0, 2.5}, 1.0E-15) << std::endl;
     std::cout << "Discrete Newton: " << fdfsolve(DNewton(fun), 1.25, 1.0E-15) << std::endl;
     std::cout << "Newton:          " << fdfsolve(Newton(fun, [&](double x){return fun.derivative(x);}), 1.25, 1.0E-15) << std::endl;
+
+    std::cout << "Bisection2:      " << fsolve(Bisection([](double x){return x*x - 5;}), {0.0, 2.5}) << std::endl;
+    std::cout << "Discrete Newton2:" << fdfsolve(DNewton([](double x){return x*x - 5;}), 1.25) << std::endl;
+    std::cout << "Newton2:         " << fdfsolve(Newton([](double x){return x*x - 5;}, [](double x){return 2*x;}), 1.25) << std::endl;
 
     return 0;
 }

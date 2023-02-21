@@ -52,7 +52,7 @@ namespace Catch {
                     auto&& Timing = measure_one<Clock>(fun, iters, is_callable<Fun(Chronometer)>());
 
                     if (Timing.elapsed >= how_long) {
-                        return { Timing.elapsed, CATCH_MOVE(Timing.result), iters };
+                        return { Timing.elapsed, CATCH_MOVE(Timing.bounds ), iters };
                     }
                     iters *= 2;
                 }

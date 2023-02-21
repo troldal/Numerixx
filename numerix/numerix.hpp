@@ -12,5 +12,6 @@
 #include "roots/Roots.hpp"
 #include "calculus/Jacobian.hpp"
 #include "multiroots/Multiroots.hpp"
+#include "multiroots/MultiFunction.hpp"
 
 #endif    // NUMERIX_NUMERIX_HPP
