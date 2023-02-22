@@ -29,16 +29,16 @@ The following example shows how to find the root of the function :math:`f(x) = x
 
 .. code-block:: c++
 
-    using numerix::roots::fsolve;
-    using numerix::roots::Bisection;
+    using nxx::roots::fsolve;
+    using nxx::roots::Bisection;
     auto result = fsolve(Bisection([](double x){return x * x - 5;}), {0.0, 2.5});
 
 Similarly, the same function can be solved using Newton's method (with the derivative being :math:`f'(x) = 2x`)
 
 .. code-block:: c++
 
-    using numerix::roots::fdfsolve;
-    using numerix::roots::Newton;
+    using nxx::roots::fdfsolve;
+    using nxx::roots::Newton;
     auto result = fdfsolve(Newton([](double x){return x * x - 5;}, [](double x){return 2 * x;}), 1.25);
 
 As can be seen from the previous examples, the root-finding solvers can be invoked in a single line of code, which makes it very easy to use.
@@ -48,10 +48,10 @@ In addition to the solver object, the :code:`fsolve` function also needs the ini
 The documentation for the :code:`fsolve` and :code:`fdfsolve` functions are shown below:
 
 .. doxygenfunction:: fsolve
-   :project: numerix
+   :project: nxx
 
 .. doxygenfunction:: fdfsolve
-   :project: numerix
+   :project: nxx
 
 Root-Finding Methods
 ====================
@@ -72,7 +72,7 @@ The bisection method is a simple algorithm for finding a root of a one-dimension
 
 This method is considered to be inefficient as it typically requires more iterations compared to more advanced methods (e.g. Ridder's method). However, due to the simple nature of the method, each iteration takes much less computational effort and the overall performance is therefore often quite good.
 
-.. doxygenclass:: numerix::roots::Bisection
+.. doxygenclass:: nxx::roots::Bisection
    :members:
 
 Ridders' method
@@ -80,7 +80,7 @@ Ridders' method
 
 Ridders' method is a root-finding algorithm for one-dimensional functions that uses an iterative process to refine the location of the root. It works by fitting a parabola through three points and using the vertex of the parabola as the next estimate for the root. This estimate is then refined by applying a scaling factor to the distance between the estimates to reduce the error. The method is efficient and can converge faster than the bisection method, but it requires the function to be twice differentiable and have a continuous second derivative.
 
-.. doxygenclass:: numerix::roots::Ridders
+.. doxygenclass:: nxx::roots::Ridders
    :members:
 
 Polishing Methods
@@ -93,7 +93,7 @@ Newton's method
 
 Newton's method is a popular root-finding algorithm for one-dimensional functions. It works by making a linear approximation of the function at the current estimate of the root and finding the point where this approximation crosses the x-axis. This point becomes the next estimate for the root, and the process is repeated until convergence is achieved. Newton's method is generally faster than the bisection and Ridders' methods, but it requires the function to be differentiable and the derivative to be non-zero at the estimate. Additionally, the method may fail to converge or converge to a local minimum instead of a root.
 
-.. doxygenclass:: numerix::roots::Newton
+.. doxygenclass:: nxx::roots::Newton
    :members:
 
 Discrete Newton's method
@@ -101,7 +101,7 @@ Discrete Newton's method
 
 Discrete Newton's method is a variant of Newton's method that is used for finding roots of discrete functions or numerical data. Instead of computing the derivative of the function at each estimate, the discrete derivative is computed using the available data points. This method approximates the second derivative using the difference between the first derivatives at adjacent points, and then iteratively refines the estimate of the root using a similar approach as Newton's method. Discrete Newton's method can be an effective way to find roots of numerical data, but it may be less stable than Newton's method when used on analytic functions.
 
-.. doxygenclass:: numerix::roots::DNewton
+.. doxygenclass:: nxx::roots::DNewton
    :members:
 
 Design and Implementation Details
@@ -118,7 +118,7 @@ BracketingBase
 
 The BracketingBase class (located in the :file:`root::impl` namespace) look as follows:
 
-.. doxygenclass:: numerix::roots::impl::BracketingBase
+.. doxygenclass:: nxx::roots::impl::BracketingBase
     :members: m_func, m_bounds, init, evaluate, result
 
 PolishingBase
@@ -126,7 +126,7 @@ PolishingBase
 
 Similarly, the PolishingBase class (located in the :file:`root::impl` namespace) look as follows:
 
-.. doxygenclass:: numerix::roots::impl::PolishingBase
+.. doxygenclass:: nxx::roots::impl::PolishingBase
     :members: m_func, m_deriv, m_guess, init, evaluate, derivative, result
 
 Creating Concrete Root-Finding Solvers

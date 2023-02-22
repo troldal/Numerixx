@@ -11,7 +11,7 @@
 
 int main() {
 
-    using namespace numerix;
+    using namespace nxx;
 
     //numerix::poly::polynomial p({1.2, -0.25, -0.5, -0.15, -0.1});
     poly::Polynomial p({0.0, 0.0, 0.0, 0.0, 1.0});

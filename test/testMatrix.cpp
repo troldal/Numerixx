@@ -8,7 +8,7 @@
 #include <algorithm>
 
 TEST_CASE("Matrix Creation and Copying", "[linalg]") {
-    using namespace numerix::linalg;
+    using namespace nxx::linalg;
 
     SECTION("Matrix Creation") {
         REQUIRE_THROWS(Matrix(1,0));
@@ -63,7 +63,7 @@ TEST_CASE("Matrix Creation and Copying", "[linalg]") {
 
 TEST_CASE("Matrix Element Access", "[linalg]") {
 
-    using namespace numerix::linalg;
+    using namespace nxx::linalg;
 
     Matrix<int> m1(4, 4);
 

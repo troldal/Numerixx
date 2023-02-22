@@ -9,8 +9,8 @@
 
 int main() {
 
-    using numerix::linalg::Matrix;
-    using namespace numerix::linalg;
+    using nxx::linalg::Matrix;
+    using namespace nxx::linalg;
 
         Matrix m1(4,4);
 

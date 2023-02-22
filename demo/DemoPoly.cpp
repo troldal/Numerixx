@@ -10,8 +10,8 @@
 
 int main() {
 
-    using namespace numerix::poly;
-    using namespace numerix::polyroots;
+    using namespace nxx::poly;
+    using namespace nxx::polyroots;
 
     std::cout << "Solving f(x) = -5 + x^2\n";
     auto fun1 = Polynomial({-5.0, 0.0, 1.0});

@@ -2,14 +2,12 @@
 // Created by Troldal on 06/10/2022.
 //
 
-
-#include <iostream>
-#include <iomanip>
 #include <fmt/format.h>
-#include <numerix.hpp>
+#include <iomanip>
+#include <iostream>
+#include <numerixx.hpp>
 
-
-auto fun = numerix::poly::Polynomial({-5.0, 0.0, 1.0});
+auto fun = nxx::poly::Polynomial({-5.0, 0.0, 1.0});
 
 template<typename S>
 void print(S solver, std::pair<double, double> b) {
@@ -68,13 +66,10 @@ void print(S solver, double g) {
 }
 
 int main() {
-
-    using numerix::roots::fsolve;
-    using numerix::roots::fdfsolve;
-    using numerix::roots::Ridders;
-    using numerix::roots::Bisection;
-    using numerix::roots::Newton;
-    using numerix::roots::DNewton;
+    using nxx::roots::Ridders;
+    using nxx::roots::Bisection;
+    using nxx::roots::DNewton;
+    using nxx::roots::Newton;
 
     std::cout << "RIDDERS:" << std::endl;
     print(Ridders(fun), {0.0, 2.5});

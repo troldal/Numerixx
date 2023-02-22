@@ -2,7 +2,7 @@
 # Preamble
 #==================================================================================================================
 cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
-project(Numerix.Samples)
+project(numerixx.samples)
 
 #==============================================================================
 # Set compiler settings
@@ -20,7 +20,7 @@ target_sources(DemoRoot
         DemoRoot.cpp
         )
 
-target_link_libraries(DemoRoot PRIVATE fmt numerix)
+target_link_libraries(DemoRoot PRIVATE fmt numerixx)
 
 add_executable(DemoPoly)
 target_sources(DemoPoly
@@ -28,7 +28,7 @@ target_sources(DemoPoly
         DemoPoly.cpp
         )
 
-target_link_libraries(DemoPoly PRIVATE fmt numerix)
+target_link_libraries(DemoPoly PRIVATE fmt numerixx)
 
 add_executable(DemoMatrix)
 target_sources(DemoMatrix
@@ -44,7 +44,7 @@ target_sources(DemoDeriv
         DemoDeriv.cpp
         )
 
-target_link_libraries(DemoDeriv PRIVATE numerix)
+target_link_libraries(DemoDeriv PRIVATE numerixx)
 
 add_executable(DemoMultiroot)
 target_sources(DemoMultiroot
@@ -52,7 +52,7 @@ target_sources(DemoMultiroot
         DemoMultiroot.cpp
         )
 
-target_link_libraries(DemoMultiroot PRIVATE numerix)
+target_link_libraries(DemoMultiroot PRIVATE numerixx)
 
 #=======================================================================================================================
 # COMPILER FLAGS

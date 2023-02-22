@@ -2,17 +2,16 @@
 // Created by Kenneth Balslev on 09/12/2022.
 //
 
-#include <numerix.hpp>
-#include <vector>
 #include <deque>
-#include <list>
 #include <iostream>
-
+#include <list>
+#include <numerixx.hpp>
+#include <vector>
 
 int main() {
 
-    using namespace numerix::multiroots;
-    using numerix::linalg::Matrix;
+    using namespace nxx::multiroots;
+    using nxx::linalg::Matrix;
 
     using function_type = std::function< double(Matrix< double>)>;
 
