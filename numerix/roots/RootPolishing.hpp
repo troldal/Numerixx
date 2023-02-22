@@ -96,23 +96,23 @@ namespace numerix::roots
 
         /**
          * @brief The PolishingBase class is a CRTP base class for polishing solvers (i.e. with derivatives)
-         * @tparam SOLVER The type of the (derived) solver class.
+         * @tparam POLICY The type of the (derived) solver class.
          */
-        template<typename SOLVER>
-            requires std::invocable<typename impl::PolishingTraits<SOLVER>::function_type, double> &&
-                     std::invocable<typename impl::PolishingTraits<SOLVER>::deriv_type, double>
+        template<typename POLICY>
+            requires std::invocable<typename impl::PolishingTraits<POLICY>::function_type, double> &&
+                     std::invocable<typename impl::PolishingTraits<POLICY>::deriv_type, double>
         class PolishingBase
         {
             /*
              * Friend declarations.
              */
-            friend SOLVER;
+            friend POLICY;
 
         private:
-            using function_type = typename impl::PolishingTraits<SOLVER>::function_type;
+            using function_type = typename impl::PolishingTraits<POLICY>::function_type;
             function_type m_func {}; /**< The function object to find the root for. */
 
-            using deriv_type = typename impl::PolishingTraits<SOLVER>::deriv_type;
+            using deriv_type = typename impl::PolishingTraits<POLICY>::deriv_type;
             deriv_type m_deriv {}; /**< The function object for the derivative. */
 
             using RT = decltype(m_func(0.0));

@@ -53,6 +53,57 @@ The documentation for the :code:`fsolve` and :code:`fdfsolve` functions are show
 .. doxygenfunction:: fdfsolve
    :project: numerix
 
+Root-Finding Methods
+====================
+
+A number of algorithms are implemented for both the bracketing methods and polishing methods. They are all template classes, but the template parameters are automatically deduced by providing the constructor with a callable object as an argument for the function to find the root for. For the polishing methods, a callable object for the derivative is also required.
+
+The methods are described in the following.
+
+Bracketing methods
+------------------
+
+Bracketing methods are one-dimensional root-finding algorithms that work by first identifying an interval, or bracket, containing the root. They start with two points in the interval and iteratively narrow it down until the root is isolated within a desired tolerance. These methods are guaranteed to converge to a root as long as the function is continuous and changes sign within the interval.
+
+Bisection
+^^^^^^^^^
+
+The bisection method is a simple algorithm for finding a root of a one-dimensional function. It works by repeatedly dividing an interval in half and determining which half contains a root, until the root is found to within a desired level of accuracy. The method is guaranteed to converge to a root as long as the function is continuous and changes sign on the interval.
+
+This method is considered to be inefficient as it typically requires more iterations compared to more advanced methods (e.g. Ridder's method). However, due to the simple nature of the method, each iteration takes much less computational effort and the overall performance is therefore often quite good.
+
+.. doxygenclass:: numerix::roots::Bisection
+   :members:
+
+Ridders' method
+^^^^^^^^^^^^^^^
+
+Ridders' method is a root-finding algorithm for one-dimensional functions that uses an iterative process to refine the location of the root. It works by fitting a parabola through three points and using the vertex of the parabola as the next estimate for the root. This estimate is then refined by applying a scaling factor to the distance between the estimates to reduce the error. The method is efficient and can converge faster than the bisection method, but it requires the function to be twice differentiable and have a continuous second derivative.
+
+.. doxygenclass:: numerix::roots::Ridders
+   :members:
+
+Polishing Methods
+-----------------
+
+Polishing methods typically start with an initial guess and iteratively improve it by evaluating the function and its derivative at the guess point. By using this information, the algorithms can better estimate the location of the root and converge more quickly than non-derivative methods. These methods can be very effective, but they may be sensitive to the choice of initial guess and can converge slowly or not at all in some cases.
+
+Newton's method
+^^^^^^^^^^^^^^^
+
+Newton's method is a popular root-finding algorithm for one-dimensional functions. It works by making a linear approximation of the function at the current estimate of the root and finding the point where this approximation crosses the x-axis. This point becomes the next estimate for the root, and the process is repeated until convergence is achieved. Newton's method is generally faster than the bisection and Ridders' methods, but it requires the function to be differentiable and the derivative to be non-zero at the estimate. Additionally, the method may fail to converge or converge to a local minimum instead of a root.
+
+.. doxygenclass:: numerix::roots::Newton
+   :members:
+
+Discrete Newton's method
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Discrete Newton's method is a variant of Newton's method that is used for finding roots of discrete functions or numerical data. Instead of computing the derivative of the function at each estimate, the discrete derivative is computed using the available data points. This method approximates the second derivative using the difference between the first derivatives at adjacent points, and then iteratively refines the estimate of the root using a similar approach as Newton's method. Discrete Newton's method can be an effective way to find roots of numerical data, but it may be less stable than Newton's method when used on analytic functions.
+
+.. doxygenclass:: numerix::roots::DNewton
+   :members:
+
 Design and Implementation Details
 =================================
 
@@ -83,48 +134,6 @@ Creating Concrete Root-Finding Solvers
 
 Blah
 
-Bracketing Methods
-==================
 
-Bracketing methods are one-dimensional root-finding algorithms that work by first identifying an interval, or bracket, containing the root. They start with two points in the interval and iteratively narrow it down until the root is isolated within a desired tolerance. These methods are guaranteed to converge to a root as long as the function is continuous and changes sign within the interval.
-
-
-
-Bisection method
-----------------
-
-The bisection method is a simple algorithm for finding a root of a one-dimensional function. It works by repeatedly dividing an interval in half and determining which half contains a root, until the root is found to within a desired level of accuracy. The method is guaranteed to converge to a root as long as the function is continuous and changes sign on the interval.
-
-This method is considered to be inefficient as it typically requires more iterations compared to more advanced methods (e.g. Ridder's method). However, due to the simple nature of the method, each iteration takes much less computational effort and the overall performance is therefore often satisfactory.
-
-.. doxygenclass:: numerix::roots::Bisection
-   :members:
-
-Ridders' method
----------------
-
-Ridders' method is a root-finding algorithm for one-dimensional functions that uses an iterative process to refine the location of the root. It works by fitting a parabola through three points and using the vertex of the parabola as the next estimate for the root. This estimate is then refined by applying a scaling factor to the distance between the estimates to reduce the error. The method is efficient and can converge faster than the bisection method, but it requires the function to be twice differentiable and have a continuous second derivative.
-
-.. doxygenclass:: numerix::roots::Ridders
-   :members:
-
-Polishing Methods
-=================
-
-Newton's method
----------------
-
-Newton's method is a popular root-finding algorithm for one-dimensional functions. It works by making a linear approximation of the function at the current estimate of the root and finding the point where this approximation crosses the x-axis. This point becomes the next estimate for the root, and the process is repeated until convergence is achieved. Newton's method is generally faster than the bisection and Ridders' methods, but it requires the function to be differentiable and the derivative to be non-zero at the estimate. Additionally, the method may fail to converge or converge to a local minimum instead of a root.
-
-.. doxygenclass:: numerix::roots::Newton
-   :members:
-
-Discrete Newton's method
-------------------------
-
-Discrete Newton's method is a variant of Newton's method that is used for finding roots of discrete functions or numerical data. Instead of computing the derivative of the function at each estimate, the discrete derivative is computed using the available data points. This method approximates the second derivative using the difference between the first derivatives at adjacent points, and then iteratively refines the estimate of the root using a similar approach as Newton's method. Discrete Newton's method can be an effective way to find roots of numerical data, but it may be less stable than Newton's method when used on analytic functions.
-
-.. doxygenclass:: numerix::roots::DNewton
-   :members:
 
 .. [1] Vandevoorde, D., Josuttis, N., Gregor, D. (2018). C++ Templates - The Complete Guide

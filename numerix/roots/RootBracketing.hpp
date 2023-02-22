@@ -116,19 +116,19 @@ namespace numerix::roots
          * @brief The BracketingBase class serves as a base class for all bracketing solvers.
          * It functions as the CRTP base class for concrete bracketing solvers, and it therefore
          * does not contain any virtual functions.
-         * @tparam SOLVER The type of the (derived) solver class, e.g. Bisection or Ridders.
+         * @tparam POLICY The type of the (derived) solver class, e.g. Bisection or Ridders.
          */
-        template<typename SOLVER>
-            requires std::invocable<typename BracketingTraits<SOLVER>::function_type, double>
+        template<typename POLICY>
+            requires std::invocable<typename BracketingTraits<POLICY>::function_type, double>
         class BracketingBase
         {
             /*
              * Friend declarations.
              */
-            friend SOLVER;
+            friend POLICY;
 
         private:
-            using function_type = typename BracketingTraits<SOLVER>::function_type;
+            using function_type = typename BracketingTraits<POLICY>::function_type;
             function_type m_func {}; /**< The function object to find the root for. */
 
             using return_type = decltype(m_func(0.0));

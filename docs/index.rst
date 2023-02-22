@@ -10,7 +10,7 @@ Welcome to Numerix's documentation!
    :maxdepth: 1
    :caption: Contents:
 
-   roots
+   docRoots
 
 :ref:`genindex`
 
