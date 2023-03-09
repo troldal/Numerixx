@@ -83,14 +83,44 @@ int main() {
     std::cout << "NEWTON:" << std::endl;
     print(Newton(fun, [&](double x){return fun.derivative(x);}), 1.25);
 
-    std::cout << "Ridders:         " << fsolve(Ridders(fun), {0.0, 2.5}, 1.0E-15) << std::endl;
-    std::cout << "Bisection:       " << fsolve(Bisection(fun), {0.0, 2.5}, 1.0E-15) << std::endl;
+    auto s1 = fsolve(Ridders(fun), {0.0, 2.5}, 1.0E-15);
+    std::cout << "Ridders:         " << (s1 ? *s1 : 0) << std::endl;
+    std::cout << "Bisection:       " << *fsolve(Bisection(fun), {0.0, 2.5}, 1.0E-15) << std::endl;
     std::cout << "Discrete Newton: " << fdfsolve(DNewton(fun), 1.25, 1.0E-15) << std::endl;
     std::cout << "Newton:          " << fdfsolve(Newton(fun, [&](double x){return fun.derivative(x);}), 1.25, 1.0E-15) << std::endl;
 
-    std::cout << "Bisection2:      " << fsolve(Bisection([](double x){return x*x - 5;}), {0.0, 2.5}) << std::endl;
-    std::cout << "Discrete Newton2:" << fdfsolve(DNewton([](double x){return x*x - 5;}), 1.25) << std::endl;
-    std::cout << "Newton2:         " << fdfsolve(Newton([](double x){return x*x - 5;}, [](double x){return 2*x;}), 1.25) << std::endl;
+    std::vector<std::function<double(double)>> functions {
+        [](double x){return std::sin(x) - x/2.0;},
+        [](double x){return std::exp(x) - 3*x;},
+        [](double x){return std::tan(x) - x;},
+        [](double x){return std::log(x) + x;},
+        [](double x){return std::cos(x) - std::pow(x,3);},
+        [](double x){return std::sqrt(x) - std::cos(x);},
+        [](double x){return std::pow(x, 1.0/3) + std::pow(x, 1.0/5) - 1;},
+    };
+
+    std::vector<std::function<double(double)>> derivatives {
+        [](double x){return std::cos(x) - 0.5;},
+        [](double x){return std::exp(x) - 3;},
+        [](double x){return std::pow(1.0/ std::cos(x), 2) - 1;},
+        [](double x){return 1.0/x + 1;},
+        [](double x){return -std::sin(x) - 3 * std::pow(x,2);},
+        [](double x){return 1.0/(2*std::sqrt(x)) + std::sin(x);},
+        [](double x){return 1.0/(3*std::pow(x, 2.0/3)) + 1.0/(5*std::pow(x, 4.0/5));},
+    };
+
+    std::vector<std::pair<double, double>> brackets {
+        {1.0, 3.0},
+        {0.0, 1.0},
+        {4.0, 4.5},
+        {0.5, 1.0},
+        {0.5, 1.5},
+        {0.0, 1.0},
+        {0.0, 0.2}
+    };
+
+    for (auto i = 0; i <= 6; ++i)
+        std::cout << fdfsolve(Newton(functions[i], derivatives[i]), (brackets[i].second + brackets[i].second)/2.0, 1.0E-15) << std::endl;
 
     return 0;
 }

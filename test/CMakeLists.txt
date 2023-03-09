@@ -2,7 +2,7 @@
 # Preamble
 #=======================================================================================================================
 cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
-project(Numerix.Tests)
+project(Numerixx.Tests)
 
 #=======================================================================================================================
 # Set up Catch2 library
@@ -12,25 +12,28 @@ add_subdirectory(Catch2)
 #=======================================================================================================================
 # Define TEST target
 #=======================================================================================================================
-add_executable(NumerixTests EXCLUDE_FROM_ALL "")
-target_sources(NumerixTests
+add_executable(NumerixxTests EXCLUDE_FROM_ALL "")
+target_sources(NumerixxTests
         PRIVATE
+        testDerivatives.cpp
         testMatrix.cpp
+        testRootBracketing.cpp
+        testRootPolishing.cpp
         )
 
-target_link_libraries(NumerixTests
+target_link_libraries(NumerixxTests
         PRIVATE
-        numerix
+        numerixx
         Catch2WithMain
         )
 
-list(APPEND NUMERIX_TEST_DEBUG_FLAGS_GNU
+list(APPEND NUMERIXX_TEST_DEBUG_FLAGS_GNU
         "-Wmisleading-indentation"
         "-Wduplicated-cond"
         "-Wduplicated-branches"
         "-Wlogical-op"
         "-Wnull-dereference")
-list(APPEND NUMERIX_TEST_DEBUG_FLAGS_GNUCLANG
+list(APPEND NUMERIXX_TEST_DEBUG_FLAGS_GNUCLANG
         "-Wall"
         "-Wextra"
         "-Wshadow"
@@ -45,7 +48,7 @@ list(APPEND NUMERIX_TEST_DEBUG_FLAGS_GNUCLANG
         "-Wformat=2"
         "-Weffc++"
         "-Wno-unknown-pragmas")
-list(APPEND NUMERIX_TEST_DEBUG_FLAGS_MSVC
+list(APPEND NUMERIXX_TEST_DEBUG_FLAGS_MSVC
         "/permissive"
         "/W4"
         "/w14242"
@@ -69,20 +72,20 @@ list(APPEND NUMERIX_TEST_DEBUG_FLAGS_MSVC
         "/w14928"
         "/wd4251"
         "/wd4275")
-list(APPEND NUMERIX_TEST_RELEASE_FLAGS_MSVC
+list(APPEND NUMERIXX_TEST_RELEASE_FLAGS_MSVC
         "/wd4251"
         "/wd4275")
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-    target_compile_options(NumerixTests PRIVATE $<$<CONFIG:Debug>:${NUMERIX_TEST_DEBUG_FLAGS_GNU}>)
+    target_compile_options(NumerixxTests PRIVATE $<$<CONFIG:Debug>:${NUMERIXX_TEST_DEBUG_FLAGS_GNU}>)
 
 elseif (("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR
 ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang") OR
 ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU"))
-    target_compile_options(NumerixTests PRIVATE $<$<CONFIG:Debug>:${NUMERIX_TEST_DEBUG_FLAGS_GNUCLANG}>)
+    target_compile_options(NumerixxTests PRIVATE $<$<CONFIG:Debug>:${NUMERIXX_TEST_DEBUG_FLAGS_GNUCLANG}>)
 
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     string(REGEX REPLACE "/W[3|4]" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-    target_compile_options(NumerixTests PRIVATE $<$<CONFIG:Debug>:${NUMERIX_TEST_DEBUG_FLAGS_MSVC}>)
-    target_compile_options(NumerixTests PRIVATE $<$<CONFIG:Release>:${NUMERIX_TEST_RELEASE_FLAGS_MSVC}>)
+    target_compile_options(NumerixxTests PRIVATE $<$<CONFIG:Debug>:${NUMERIXX_TEST_DEBUG_FLAGS_MSVC}>)
+    target_compile_options(NumerixxTests PRIVATE $<$<CONFIG:Release>:${NUMERIXX_TEST_RELEASE_FLAGS_MSVC}>)
 endif ()

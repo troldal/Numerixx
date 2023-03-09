@@ -48,10 +48,10 @@ In addition to the solver object, the :code:`fsolve` function also needs the ini
 The documentation for the :code:`fsolve` and :code:`fdfsolve` functions are shown below:
 
 .. doxygenfunction:: fsolve
-   :project: nxx
+   :project: Numerixx
 
 .. doxygenfunction:: fdfsolve
-   :project: nxx
+   :project: Numerixx
 
 Root-Finding Methods
 ====================
@@ -97,7 +97,7 @@ Newton's method is a popular root-finding algorithm for one-dimensional function
    :members:
 
 Discrete Newton's method
-^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 Discrete Newton's method is a variant of Newton's method that is used for finding roots of discrete functions or numerical data. Instead of computing the derivative of the function at each estimate, the discrete derivative is computed using the available data points. This method approximates the second derivative using the difference between the first derivatives at adjacent points, and then iteratively refines the estimate of the root using a similar approach as Newton's method. Discrete Newton's method can be an effective way to find roots of numerical data, but it may be less stable than Newton's method when used on analytic functions.
 

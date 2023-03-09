@@ -1,12 +1,12 @@
 /*
-    888b      88  88        88  88b           d88  88888888888  88888888ba   88  8b        d8
-    8888b     88  88        88  888b         d888  88           88      "8b  88   Y8,    ,8P
-    88 `8b    88  88        88  88`8b       d8'88  88           88      ,8P  88    `8b  d8'
-    88  `8b   88  88        88  88 `8b     d8' 88  88aaaaa      88aaaaaa8P'  88      Y88P
-    88   `8b  88  88        88  88  `8b   d8'  88  88"""""      88""""88'    88      d88b
-    88    `8b 88  88        88  88   `8b d8'   88  88           88    `8b    88    ,8P  Y8,
-    88     `8888  Y8a.    .a8P  88    `888'    88  88           88     `8b   88   d8'    `8b
-    88      `888   `"Y8888Y"'   88     `8'     88  88888888888  88      `8b  88  8P        Y8
+    888b      88  88        88  88b           d88  88888888888  88888888ba   88  8b        d8  8b        d8
+    8888b     88  88        88  888b         d888  88           88      "8b  88   Y8,    ,8P    Y8,    ,8P
+    88 `8b    88  88        88  88`8b       d8'88  88           88      ,8P  88    `8b  d8'      `8b  d8'
+    88  `8b   88  88        88  88 `8b     d8' 88  88aaaaa      88aaaaaa8P'  88      Y88P          Y88P
+    88   `8b  88  88        88  88  `8b   d8'  88  88"""""      88""""88'    88      d88b          d88b
+    88    `8b 88  88        88  88   `8b d8'   88  88           88    `8b    88    ,8P  Y8,      ,8P  Y8,
+    88     `8888  Y8a.    .a8P  88    `888'    88  88           88     `8b   88   d8'    `8b    d8'    `8b
+    88      `888   `"Y8888Y"'   88     `8'     88  88888888888  88      `8b  88  8P        Y8  8P        Y8
 
     Copyright © 2022 Kenneth Troldal Balslev
 
@@ -31,7 +31,6 @@
 #ifndef NUMERIXX_ROOTBRACKETING_HPP
 #define NUMERIXX_ROOTBRACKETING_HPP
 
-#include <expected.hpp>
 
 #include "RootError.hpp"
 #include "calculus/Derivatives.hpp"
@@ -132,7 +131,7 @@ namespace nxx::roots
             function_type m_func {}; /**< The function object to find the root for. */
 
             using return_type = decltype(m_func(0.0));
-            std::pair<return_type, return_type> m_bounds; /**< Holds the current bounds around the root. */
+            std::pair<return_type, return_type> m_bounds {0.0, 0.0}; /**< Holds the current bounds around the root. */
 
             /**
              * @brief Constructor, taking a function object as an argument.
@@ -152,36 +151,20 @@ namespace nxx::roots
              * @brief The \ref init function initialises the solver by setting the initial bounds around the root.
              * At the point of initialisation, the solver has already been constructed and provided with the
              * function to solve. The purpose of the initialisation is only to set the initial bounds.
-             * @tparam T1 The value type of the lower bound. Must be a floating point type, convertible to the
-             * parameter type of the function to solve.
-             * @tparam T2 The value type of the upper bound. Must be a floating point type, convertible to the
-             * parameter type of the function to solve.
              * @param bounds A std::pair holding the initial bounds around the root. The root must be contained
              * inside these bounds.
              * @warning If the solver is used without initialising, the behaviour is undefined.
              */
-            template<typename T1, typename T2>
-                requires std::is_floating_point_v<T1> && std::is_floating_point_v<T2>
-            void init(std::pair<T1, T2> bounds)
-            {
-                m_bounds = bounds;
-            }
+            void init(std::pair< return_type, return_type > bounds) { setBounds(bounds); }
 
             /**
              * @brief The \ref evaluate function evaluates the function to solve, at a given point. This is
              * done simply by passing the given argument to the function object to solve.
-             * @tparam T The value type of the argument. Must be a floating point type, convertible to the parameter
-             * type of the function to solve.
              * @param value The value at which to evaluate the function.
              * @return The result of the evaluation. The return type will be the same as the return type of the
              * given function object.
              */
-            template<typename T>
-                requires std::is_floating_point_v<T>
-            auto evaluate(T value)
-            {
-                return m_func(value);
-            }
+            auto evaluate(return_type value) { return m_func(value); }
 
             /**
              * @brief The result function returns the current bounds around the root. Every time an iteration
@@ -190,6 +173,11 @@ namespace nxx::roots
              * The value type of the bounds are the same as the return type of the function object.
              */
             const auto& bounds() const { return m_bounds; }
+
+            /**
+             * @brief
+             */
+            void iterate() { static_cast< POLICY& >(*this).iterate();}
         };
     }    // namespace impl
 
@@ -337,6 +325,7 @@ namespace nxx::roots
      */
     template<typename SOLVER >
     inline auto fsolve(SOLVER solver, std::pair<double, double> bounds, double eps = 1.0E-6, int maxiter = 100)
+        -> tl::expected<double, error::RootError>
     {
         using RT = decltype(solver.evaluate(0.0));
         const auto& curBounds = solver.bounds();
@@ -346,6 +335,7 @@ namespace nxx::roots
 
         int iter = 1;
         while (true) {
+            if (!std::isfinite(curBounds.first) || !std::isfinite(curBounds.second)) return tl::make_unexpected(error::RootError("Root Error!"));
             result = (curBounds.first + curBounds.second) / 2.0;
             if (abs(curBounds.first - curBounds.second) < eps || abs(solver.evaluate(result)) < eps) break;
             solver.iterate();

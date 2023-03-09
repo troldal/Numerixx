@@ -6,10 +6,10 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'Numerix'
+project = 'Numerixx'
 copyright = '2023, TheCodeOwl.com'
 author = 'Troldal'
-release = '1'
+release = '0.0.1'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -26,7 +26,9 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 #html_theme = 'furo'
 html_theme = 'sphinx_rtd_theme'
+#html_theme = 'sphinx_book_theme'
+#html_theme = 'press'
 html_static_path = ['_static']
 
 # Breathe Configuration
-breathe_default_project = "numerix"
+breathe_default_project = "Numerixx"
