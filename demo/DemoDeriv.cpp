@@ -1,6 +1,7 @@
-//
-// Created by Troldal on 14/10/2022.
-//
+// ================================================================================================
+// This demo shows verious ways to compute 1st and 2nd derivatives numerically using the methods
+// in the calculus/Derivatives.hpp header.
+// ================================================================================================
 
 #include <calculus/Derivatives.hpp>
 #include <cmath>
@@ -100,10 +101,12 @@ int main()
                 0.5 * (function(val + 2 * stepsize) - function(val - 2 * stepsize))) /
                (stepsize * 6);
     };
-    std::cout << "Custom algorithm:         "<< *derivative<decltype(algo)>(func, std::numbers::e) << std::endl;
+    std::cout << "Custom algorithm:         "<< *derivative<decltype(algo)>(func, std::numbers::e) << "\n\n";
 
-
-
+    // ============================================================================================
+    // The following code shows the results of computing the derivatives for 10 different functions
+    // numerically, using the central, forward, and backward functions.
+    // ============================================================================================
     auto f0 = [](double x) { return std::pow(x, 3) - 2 * x + 5; };
     auto f1 = [](double x) { return 2 * std::pow(x, 2) + 3 * x - 4; };
     auto f2 = [](double x) { return std::sin(x) + std::cos(x); };
@@ -150,44 +153,44 @@ int main()
 
     std::cout << "CENTER DERIVATIVE USING RICHARDSON EXTRAPOLATION" << std::endl;
     std::vector< std::tuple< std::string, double, double, std::function<double(double)> > > test1;
-    test1.emplace_back(s0, v0, r0, [&](double val){return *derivative<Order1CentralRichardson>(f0, val);});
-    test1.emplace_back(s1, v1, r1, [&](double val){return *derivative<Order1CentralRichardson>(f1, val);});
-    test1.emplace_back(s2, v2, r2, [&](double val){return *derivative<Order1CentralRichardson>(f2, val);});
-    test1.emplace_back(s3, v3, r3, [&](double val){return *derivative<Order1CentralRichardson>(f3, val);});
-    test1.emplace_back(s4, v4, r4, [&](double val){return *derivative<Order1CentralRichardson>(f4, val);});
-    test1.emplace_back(s5, v5, r5, [&](double val){return *derivative<Order1CentralRichardson>(f5, val);});
-    test1.emplace_back(s6, v6, r6, [&](double val){return *derivative<Order1CentralRichardson>(f6, val);});
-    test1.emplace_back(s7, v7, r7, [&](double val){return *derivative<Order1CentralRichardson>(f7, val);});
-    test1.emplace_back(s8, v8, r8, [&](double val){return *derivative<Order1CentralRichardson>(f8, val);});
-    test1.emplace_back(s9, v9, r9, [&](double val){return *derivative<Order1CentralRichardson>(f9, val);});
+    test1.emplace_back(s0, v0, r0, [&](double val){return *central(f0, val);});
+    test1.emplace_back(s1, v1, r1, [&](double val){return *central(f1, val);});
+    test1.emplace_back(s2, v2, r2, [&](double val){return *central(f2, val);});
+    test1.emplace_back(s3, v3, r3, [&](double val){return *central(f3, val);});
+    test1.emplace_back(s4, v4, r4, [&](double val){return *central(f4, val);});
+    test1.emplace_back(s5, v5, r5, [&](double val){return *central(f5, val);});
+    test1.emplace_back(s6, v6, r6, [&](double val){return *central(f6, val);});
+    test1.emplace_back(s7, v7, r7, [&](double val){return *central(f7, val);});
+    test1.emplace_back(s8, v8, r8, [&](double val){return *central(f8, val);});
+    test1.emplace_back(s9, v9, r9, [&](double val){return *central(f9, val);});
     print(test1);
 
     std::cout << "FORWARD DERIVATIVE USING RICHARDSON EXTRAPOLATION" << std::endl;
     std::vector< std::tuple< std::string, double, double, std::function<double(double)> > > test2;
-    test2.emplace_back(s0, v0, r0, [&](double val){return *derivative<Order1ForwardRichardson>(f0, val);});
-    test2.emplace_back(s1, v1, r1, [&](double val){return *derivative<Order1ForwardRichardson>(f1, val);});
-    test2.emplace_back(s2, v2, r2, [&](double val){return *derivative<Order1ForwardRichardson>(f2, val);});
-    test2.emplace_back(s3, v3, r3, [&](double val){return *derivative<Order1ForwardRichardson>(f3, val);});
-    test2.emplace_back(s4, v4, r4, [&](double val){return *derivative<Order1ForwardRichardson>(f4, val);});
-    test2.emplace_back(s5, v5, r5, [&](double val){return *derivative<Order1ForwardRichardson>(f5, val);});
-    test2.emplace_back(s6, v6, r6, [&](double val){return *derivative<Order1ForwardRichardson>(f6, val);});
-    test2.emplace_back(s7, v7, r7, [&](double val){return *derivative<Order1ForwardRichardson>(f7, val);});
-    test2.emplace_back(s8, v8, r8, [&](double val){return *derivative<Order1ForwardRichardson>(f8, val);});
-    test2.emplace_back(s9, v9, r9, [&](double val){return *derivative<Order1ForwardRichardson>(f9, val);});
+    test2.emplace_back(s0, v0, r0, [&](double val){return *forward(f0, val);});
+    test2.emplace_back(s1, v1, r1, [&](double val){return *forward(f1, val);});
+    test2.emplace_back(s2, v2, r2, [&](double val){return *forward(f2, val);});
+    test2.emplace_back(s3, v3, r3, [&](double val){return *forward(f3, val);});
+    test2.emplace_back(s4, v4, r4, [&](double val){return *forward(f4, val);});
+    test2.emplace_back(s5, v5, r5, [&](double val){return *forward(f5, val);});
+    test2.emplace_back(s6, v6, r6, [&](double val){return *forward(f6, val);});
+    test2.emplace_back(s7, v7, r7, [&](double val){return *forward(f7, val);});
+    test2.emplace_back(s8, v8, r8, [&](double val){return *forward(f8, val);});
+    test2.emplace_back(s9, v9, r9, [&](double val){return *forward(f9, val);});
     print(test2);
 
     std::cout << "BACKWARD DERIVATIVE USING RICHARDSON EXTRAPOLATION" << std::endl;
     std::vector< std::tuple< std::string, double, double, std::function<double(double)> > > test3;
-    test3.emplace_back(s0, v0, r0, [&](double val){return *derivative<Order1BackwardRichardson>(f0, val);});
-    test3.emplace_back(s1, v1, r1, [&](double val){return *derivative<Order1BackwardRichardson>(f1, val);});
-    test3.emplace_back(s2, v2, r2, [&](double val){return *derivative<Order1BackwardRichardson>(f2, val);});
-    test3.emplace_back(s3, v3, r3, [&](double val){return *derivative<Order1BackwardRichardson>(f3, val);});
-    test3.emplace_back(s4, v4, r4, [&](double val){return *derivative<Order1BackwardRichardson>(f4, val);});
-    test3.emplace_back(s5, v5, r5, [&](double val){return *derivative<Order1BackwardRichardson>(f5, val);});
-    test3.emplace_back(s6, v6, r6, [&](double val){return *derivative<Order1BackwardRichardson>(f6, val);});
-    test3.emplace_back(s7, v7, r7, [&](double val){return *derivative<Order1BackwardRichardson>(f7, val);});
-    test3.emplace_back(s8, v8, r8, [&](double val){return *derivative<Order1BackwardRichardson>(f8, val);});
-    test3.emplace_back(s9, v9, r9, [&](double val){return *derivative<Order1BackwardRichardson>(f9, val);});
+    test3.emplace_back(s0, v0, r0, [&](double val){return *backward(f0, val);});
+    test3.emplace_back(s1, v1, r1, [&](double val){return *backward(f1, val);});
+    test3.emplace_back(s2, v2, r2, [&](double val){return *backward(f2, val);});
+    test3.emplace_back(s3, v3, r3, [&](double val){return *backward(f3, val);});
+    test3.emplace_back(s4, v4, r4, [&](double val){return *backward(f4, val);});
+    test3.emplace_back(s5, v5, r5, [&](double val){return *backward(f5, val);});
+    test3.emplace_back(s6, v6, r6, [&](double val){return *backward(f6, val);});
+    test3.emplace_back(s7, v7, r7, [&](double val){return *backward(f7, val);});
+    test3.emplace_back(s8, v8, r8, [&](double val){return *backward(f8, val);});
+    test3.emplace_back(s9, v9, r9, [&](double val){return *backward(f9, val);});
     print(test3);
 
     return 0;

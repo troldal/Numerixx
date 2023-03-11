@@ -21,4 +21,4 @@ target_sources(NumerixxBench
         benchmark.cpp
         )
 
-target_link_libraries(NumerixxBench PRIVATE benchmark::benchmark numerixx)
+target_link_libraries(NumerixxBench PRIVATE benchmark::benchmark benchmark::benchmark_main numerixx)

@@ -1,11 +1,12 @@
 /*
-    ##    ## ##     ## ##     ## ######## ########  #### ##     ## ##     ##
-    ###   ## ##     ## ###   ### ##       ##     ##  ##   ##   ##   ##   ##
-    ####  ## ##     ## #### #### ##       ##     ##  ##    ## ##     ## ##
-    ## ## ## ##     ## ## ### ## ######   ########   ##     ###       ###
-    ##  #### ##     ## ##     ## ##       ##   ##    ##    ## ##     ## ##
-    ##   ### ##     ## ##     ## ##       ##    ##   ##   ##   ##   ##   ##
-    ##    ##  #######  ##     ## ######## ##     ## #### ##     ## ##     ##
+    o.     O O       o Oo      oO o.OOoOoo `OooOOo.  ooOoOOo o      O o      O
+    Oo     o o       O O O    o o  O        o     `o    O     O    o   O    o
+    O O    O O       o o  o  O  O  o        O      O    o      o  O     o  O
+    O  o   o o       o O   Oo   O  ooOO     o     .O    O       oO       oO
+    O   o  O o       O O        o  O        OOooOO'     o       Oo       Oo
+    o    O O O       O o        O  o        o    o      O      o  o     o  o
+    o     Oo `o     Oo o        O  O        O     O     O     O    O   O    O
+    O     `o  `OoooO'O O        o ooOooOoO  O      o ooOOoOo O      o O      o
 
     Copyright © 2022 Kenneth Troldal Balslev
 
@@ -32,6 +33,7 @@
 
 #include "DerivativeError.hpp"
 #include "../.dependencies/expected/expected.hpp"
+#include "../.dependencies/gcem/gcem.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -56,45 +58,61 @@ namespace nxx::deriv
     template< typename T >
     using ReturnType = std::invoke_result_t< T, double >;
 
+    template<typename T>
+    struct StepSizeHelper {
+        static constexpr T value = gcem::pow(std::numeric_limits< T >::epsilon(), 1.0/3);
+    };
+
+    template<typename T>
+    inline constexpr T StepSize = StepSizeHelper<T>::value;
+
 
     // ====================================================================
     // Central finite difference formulas
     // ====================================================================
 
+    /**
+     * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
+     * using a centered Richardson extrapolation method.
+     */
     class Order1CentralRichardson
     {
     public:
+
+        /**
+         * @brief Function call operator.
+         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+         * floating point type as an argument, and returns a value of the same type.
+         * @param val The value at which to compute the derivative.
+         * @param stepsize The finite difference used for computing the derivative.
+         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         */
         inline auto
             operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
         {
             return (4.0 * (function(val + stepsize) - function(val - stepsize)) -
-                    0.5 * (function(val + 2 * stepsize) - function(val - 2 * stepsize))) /
-                   (stepsize * 6);
+                    0.5 * (function(val + 2 * stepsize) - function(val - 2 * stepsize))) / (stepsize * 6);
         }
     };
 
     /**
-     * @brief Compute the 1st order derivative of the provided function, using a 3-point centered finite
-     * divided-difference formula.
-     * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
-     * @tparam Fn The type of the function. Can be any callable object, e.g. a lambda.
-     * @param function The function for which to compute the derivative.
-     * @param val The value at which to compute the derivative.
-     * @param stepsize The step size to use when using the divided-difference formula.
-     * @return The approximated derivative. The type is the same as the return type of the provided function.
-     * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the
-     * convenience functions.
+     * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
+     * using a 3-point centered finite divided-difference method.
      */
     class Order1Central3Point
     {
     public:
+
         /**
-         * @brief
-         * @tparam FN
-         * @param function
-         * @param val
-         * @param stepsize
-         * @return
+         * @brief Function call operator.
+         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+         * floating point type as an argument, and returns a value of the same type.
+         * @param val The value at which to compute the derivative.
+         * @param stepsize The finite difference used for computing the derivative.
+         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * or one of the convenience functions.
+         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
          */
         inline auto
             operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
@@ -104,20 +122,24 @@ namespace nxx::deriv
     };
 
     /**
-     * @brief Compute the 1st order derivative of the provided function, using a 5-point centered finite
-     * divided-difference formula.
-     * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
-     * @tparam Fn The type of the function. Can be any callable object, e.g. a lambda.
-     * @param function The function for which to compute the derivative.
-     * @param val The value at which to compute the derivative.
-     * @param stepsize The step size to use when using the divided-difference formula.
-     * @return The approximated derivative. The type is the same as the return type of the provided function.
-     * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the
-     * convenience functions.
+     * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
+     * using a 5-point centered finite divided-difference method.
      */
     class Order1Central5Point
     {
     public:
+
+        /**
+         * @brief Function call operator.
+         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+         * floating point type as an argument, and returns a value of the same type.
+         * @param val The value at which to compute the derivative.
+         * @param stepsize The finite difference used for computing the derivative.
+         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * or one of the convenience functions.
+         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         */
         inline auto
             operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
         {
@@ -128,20 +150,24 @@ namespace nxx::deriv
     };
 
     /**
-     * @brief Compute the 2nd order derivative of the provided function, using a 3-point centered finite
-     * divided-difference formula.
-     * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
-     * @tparam Fn The type of the function. Can be any callable object, e.g. a lambda.
-     * @param function The function for which to compute the derivative.
-     * @param val The value at which to compute the derivative.
-     * @param stepsize The step size to use when using the divided-difference formula.
-     * @return The approximated derivative. The type is the same as the return type of the provided function.
-     * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the
-     * convenience functions.
+     * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
+     * using a 3-point centered finite divided-difference method.
      */
     class Order2Central3Point
     {
     public:
+
+        /**
+         * @brief Function call operator.
+         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+         * floating point type as an argument, and returns a value of the same type.
+         * @param val The value at which to compute the derivative.
+         * @param stepsize The finite difference used for computing the derivative.
+         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * or one of the convenience functions.
+         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         */
         inline auto
             operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
         {
@@ -150,20 +176,24 @@ namespace nxx::deriv
     };
 
     /**
-     * @brief Compute the 2nd order derivative of the provided function, using a 5-point centered finite
-     * divided-difference formula.
-     * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
-     * @tparam Fn The type of the function. Can be any callable object, e.g. a lambda.
-     * @param function The function for which to compute the derivative.
-     * @param val The value at which to compute the derivative.
-     * @param stepsize The step size to use when using the divided-difference formula.
-     * @return The approximated derivative. The type is the same as the return type of the provided function.
-     * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the
-     * convenience functions.
+     * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
+     * using a 5-point centered finite divided-difference method.
      */
     class Order2Central5Point
     {
     public:
+
+        /**
+         * @brief Function call operator.
+         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+         * floating point type as an argument, and returns a value of the same type.
+         * @param val The value at which to compute the derivative.
+         * @param stepsize The finite difference used for computing the derivative.
+         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * or one of the convenience functions.
+         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         */
         inline auto
             operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
         {
@@ -177,9 +207,25 @@ namespace nxx::deriv
     // Forward finite difference formulas
     // ====================================================================
 
+    /**
+     * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
+     * using a forward Richardson extrapolation method.
+     */
     class Order1ForwardRichardson
     {
     public:
+
+        /**
+         * @brief Function call operator.
+         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+         * floating point type as an argument, and returns a value of the same type.
+         * @param val The value at which to compute the derivative.
+         * @param stepsize The finite difference used for computing the derivative.
+         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * or one of the convenience functions.
+         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         */
         inline auto
             operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
         {
@@ -193,20 +239,24 @@ namespace nxx::deriv
     };
 
     /**
-     * @brief Compute the 1st order derivative of the provided function, using a 2-point forward finite
-     * divided-difference formula.
-     * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
-     * @tparam Fn The type of the function. Can be any callable object, e.g. a lambda.
-     * @param function The function for which to compute the derivative.
-     * @param val The value at which to compute the derivative.
-     * @param stepsize The step size to use when using the divided-difference formula.
-     * @return The approximated derivative. The type is the same as the return type of the provided function.
-     * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the
-     * convenience functions.
+     * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
+     * using a 2-point forward finite divided-difference method.
      */
     class Order1Forward2Point
     {
     public:
+
+        /**
+         * @brief Function call operator.
+         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+         * floating point type as an argument, and returns a value of the same type.
+         * @param val The value at which to compute the derivative.
+         * @param stepsize The finite difference used for computing the derivative.
+         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * or one of the convenience functions.
+         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         */
         inline auto
             operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
         {
@@ -215,20 +265,24 @@ namespace nxx::deriv
     };
 
     /**
-     * @brief Compute the 1st order derivative of the provided function, using a 3-point forward finite
-     * divided-difference formula.
-     * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
-     * @tparam Fn The type of the function. Can be any callable object, e.g. a lambda.
-     * @param function The function for which to compute the derivative.
-     * @param val The value at which to compute the derivative.
-     * @param stepsize The step size to use when using the divided-difference formula.
-     * @return The approximated derivative. The type is the same as the return type of the provided function.
-     * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the
-     * convenience functions.
+     * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
+     * using a 3-point forward finite divided-difference method.
      */
     class Order1Forward3Point
     {
     public:
+
+        /**
+         * @brief Function call operator.
+         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+         * floating point type as an argument, and returns a value of the same type.
+         * @param val The value at which to compute the derivative.
+         * @param stepsize The finite difference used for computing the derivative.
+         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * or one of the convenience functions.
+         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         */
         inline auto
             operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
         {
@@ -237,20 +291,24 @@ namespace nxx::deriv
     };
 
     /**
-     * @brief Compute the 2nd order derivative of the provided function, using a 3-point forward finite
-     * divided-difference formula.
-     * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
-     * @tparam Fn The type of the function. Can be any callable object, e.g. a lambda.
-     * @param function The function for which to compute the derivative.
-     * @param val The value at which to compute the derivative.
-     * @param stepsize The step size to use when using the divided-difference formula.
-     * @return The approximated derivative. The type is the same as the return type of the provided function.
-     * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the
-     * convenience functions.
+     * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
+     * using a 3-point forward finite divided-difference method.
      */
     class Order2Forward3Point
     {
     public:
+
+        /**
+         * @brief Function call operator.
+         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+         * floating point type as an argument, and returns a value of the same type.
+         * @param val The value at which to compute the derivative.
+         * @param stepsize The finite difference used for computing the derivative.
+         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * or one of the convenience functions.
+         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         */
         inline auto
             operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
         {
@@ -259,20 +317,24 @@ namespace nxx::deriv
     };
 
     /**
-     * @brief Compute the 2nd order derivative of the provided function, using a 4-point forward finite
-     * divided-difference formula.
-     * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
-     * @tparam Fn The type of the function. Can be any callable object, e.g. a lambda.
-     * @param function The function for which to compute the derivative.
-     * @param val The value at which to compute the derivative.
-     * @param stepsize The step size to use when using the divided-difference formula.
-     * @return The approximated derivative. The type is the same as the return type of the provided function.
-     * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the
-     * convenience functions.
+     * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
+     * using a 4-point forward finite divided-difference method.
      */
     class Order2Forward4Point
     {
     public:
+
+        /**
+         * @brief Function call operator.
+         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+         * floating point type as an argument, and returns a value of the same type.
+         * @param val The value at which to compute the derivative.
+         * @param stepsize The finite difference used for computing the derivative.
+         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * or one of the convenience functions.
+         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         */
         inline auto
             operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
         {
@@ -285,9 +347,25 @@ namespace nxx::deriv
     // Backward finite difference formulas
     // ====================================================================
 
+    /**
+     * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
+     * using a backward Richardson extrapolation method.
+     */
     class Order1BackwardRichardson
     {
     public:
+
+        /**
+         * @brief Function call operator.
+         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+         * floating point type as an argument, and returns a value of the same type.
+         * @param val The value at which to compute the derivative.
+         * @param stepsize The finite difference used for computing the derivative.
+         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * or one of the convenience functions.
+         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         */
         inline auto
             operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
         {
@@ -301,20 +379,24 @@ namespace nxx::deriv
     };
 
     /**
-     * @brief Compute the 1st order derivative of the provided function, using a 2-point backward finite
-     * divided-difference formula.
-     * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
-     * @tparam Fn The type of the function. Can be any callable object, e.g. a lambda.
-     * @param function The function for which to compute the derivative.
-     * @param val The value at which to compute the derivative.
-     * @param stepsize The step size to use when using the divided-difference formula.
-     * @return The approximated derivative. The type is the same as the return type of the provided function.
-     * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the
-     * convenience functions.
+     * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
+     * using a 2-point backward finite divided-difference method.
      */
     class Order1Backward2Point
     {
     public:
+
+        /**
+         * @brief Function call operator.
+         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+         * floating point type as an argument, and returns a value of the same type.
+         * @param val The value at which to compute the derivative.
+         * @param stepsize The finite difference used for computing the derivative.
+         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * or one of the convenience functions.
+         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         */
         inline auto
             operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
         {
@@ -323,20 +405,24 @@ namespace nxx::deriv
     };
 
     /**
-     * @brief Compute the 1st order derivative of the provided function, using a 3-point backward finite
-     * divided-difference formula.
-     * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
-     * @tparam Fn The type of the function. Can be any callable object, e.g. a lambda.
-     * @param function The function for which to compute the derivative.
-     * @param val The value at which to compute the derivative.
-     * @param stepsize The step size to use when using the divided-difference formula.
-     * @return The approximated derivative. The type is the same as the return type of the provided function.
-     * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the
-     * convenience functions.
+     * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
+     * using a 3-point backward finite divided-difference method.
      */
     class Order1Backward3Point
     {
     public:
+
+        /**
+         * @brief Function call operator.
+         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+         * floating point type as an argument, and returns a value of the same type.
+         * @param val The value at which to compute the derivative.
+         * @param stepsize The finite difference used for computing the derivative.
+         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * or one of the convenience functions.
+         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         */
         inline auto
             operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
         {
@@ -345,20 +431,24 @@ namespace nxx::deriv
     };
 
     /**
-     * @brief Compute the 2nd order derivative of the provided function, using a 3-point backward finite
-     * divided-difference formula.
-     * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
-     * @tparam Fn The type of the function. Can be any callable object, e.g. a lambda.
-     * @param function The function for which to compute the derivative.
-     * @param val The value at which to compute the derivative.
-     * @param stepsize The step size to use when using the divided-difference formula.
-     * @return The approximated derivative. The type is the same as the return type of the provided function.
-     * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the
-     * convenience functions.
+     * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
+     * using a 3-point backward finite divided-difference method.
      */
     class Order2Backward3Point
     {
     public:
+
+        /**
+         * @brief Function call operator.
+         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+         * floating point type as an argument, and returns a value of the same type.
+         * @param val The value at which to compute the derivative.
+         * @param stepsize The finite difference used for computing the derivative.
+         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * or one of the convenience functions.
+         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         */
         inline auto
             operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
         {
@@ -367,20 +457,24 @@ namespace nxx::deriv
     };
 
     /**
-     * @brief Compute the 2nd order derivative of the provided function, using a 4-point backward finite
-     * divided-difference formula.
-     * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
-     * @tparam Fn The type of the function. Can be any callable object, e.g. a lambda.
-     * @param function The function for which to compute the derivative.
-     * @param val The value at which to compute the derivative.
-     * @param stepsize The step size to use when using the divided-difference formula.
-     * @return The approximated derivative. The type is the same as the return type of the provided function.
-     * @note This function is not intended to be used directly. Instead, use the Derivative class, or one of the
-     * convenience functions.
+     * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
+     * using a 4-point backward finite divided-difference method.
      */
     class Order2Backward4Point
     {
     public:
+
+        /**
+         * @brief Function call operator.
+         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+         * floating point type as an argument, and returns a value of the same type.
+         * @param val The value at which to compute the derivative.
+         * @param stepsize The finite difference used for computing the derivative.
+         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * or one of the convenience functions.
+         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         */
         inline auto
             operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
         {
@@ -390,76 +484,80 @@ namespace nxx::deriv
     };
 
     /**
-     * @brief
-     * @tparam ALGO
-     * @param function
-     * @param val
-     * @param stepsize
-     * @return
+     * @brief Compute the derivative of a function, using the specified algorithm. This function checks the result
+     * for errors and will return a tl::expected object that will contain the result or an error object.
+     * @tparam ALGO The algorithm for computing the derivative. This can be one of the provided function objects, or
+     * a custom function object type conforming to the required interface.
+     * @param function The function for which to compute the derivative.
+     * @param val The value at which to compute the derivative.
+     * @param stepsize (Optional) The finite difference used to compute the derivative. If an argument for this parameter is not provided,
+     * a default value vill be used. The default value is the cubic root of the machine epsilon for the function return type.
+     * @return A tl::expected (std::expected) containing the (approximated) derivative of the function, or (in case of an error)
+     * a DerivativeError exception object describing the error.
      */
     template< typename ALGO >
     inline auto derivative(
         IsFunction auto                  function,
         ReturnType< decltype(function) > val,
-        ReturnType< decltype(function) > stepsize = std::cbrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()))
+        ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
         tl::expected< ReturnType< decltype(function) >, error::DerivativeError > result;
-
-        auto solver = ALGO {};
-        auto deriv  = solver(function, val, stepsize);
+        auto deriv  = ALGO {}(function, val, stepsize);
 
         if (std::isfinite(deriv))
             result = deriv;
         else
             result = tl::make_unexpected(error::DerivativeError { "Computation of derivative gave non-finite result." });
-
         return result;
     }
 
     /**
-     * @brief
-     * @tparam Fn
-     * @param function
-     * @param val
-     * @param order
-     * @return
+     * @brief A convenience function for computing the derivative using a centered divided difference method.
+     * @param function The function for which to compute the derivative.
+     * @param val The value at which to compute the derivative.
+     * @param stepsize (Optional) The finite difference used to compute the derivative. If an argument for this parameter is not provided,
+     * a default value vill be used. The default value is the cubic root of the machine epsilon for the function return type.
+     * @return A tl::expected (std::expected) containing the (approximated) derivative of the function, or (in case of an error)
+     * a DerivativeError exception object describing the error.
      */
     inline auto
         central(IsFunction auto                  function,
                 ReturnType< decltype(function) > val,
-                ReturnType< decltype(function) > stepsize = std::cbrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()))
+                ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
         return derivative< Order1CentralRichardson >(function, val, stepsize);
     }
 
     /**
-     * @brief
-     * @tparam Fn
-     * @param function
-     * @param val
-     * @param order
-     * @return
+     * @brief A convenience function for computing the derivative using a forward divided difference method.
+     * @param function The function for which to compute the derivative.
+     * @param val The value at which to compute the derivative.
+     * @param stepsize (Optional) The finite difference used to compute the derivative. If an argument for this parameter is not provided,
+     * a default value vill be used. The default value is the cubic root of the machine epsilon for the function return type.
+     * @return A tl::expected (std::expected) containing the (approximated) derivative of the function, or (in case of an error)
+     * a DerivativeError exception object describing the error.
      */
     inline auto
         forward(IsFunction auto                  function,
                 ReturnType< decltype(function) > val,
-                ReturnType< decltype(function) > stepsize = std::cbrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()))
+                ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
         return derivative< Order1ForwardRichardson >(function, val, stepsize);
     }
 
     /**
-     * @brief
-     * @tparam Fn
-     * @param function
-     * @param val
-     * @param order
-     * @return
+     * @brief A convenience function for computing the derivative using a backward divided difference method.
+     * @param function The function for which to compute the derivative.
+     * @param val The value at which to compute the derivative.
+     * @param stepsize (Optional) The finite difference used to compute the derivative. If an argument for this parameter is not provided,
+     * a default value vill be used. The default value is the cubic root of the machine epsilon for the function return type.
+     * @return A tl::expected (std::expected) containing the (approximated) derivative of the function, or (in case of an error)
+     * a DerivativeError exception object describing the error.
      */
     inline auto
         backward(IsFunction auto                  function,
                  ReturnType< decltype(function) > val,
-                 ReturnType< decltype(function) > stepsize = std::cbrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()))
+                 ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
         return derivative< Order1BackwardRichardson >(function, val, stepsize);
     }

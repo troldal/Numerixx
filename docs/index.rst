@@ -7,7 +7,9 @@ Welcome to the Numerixx Documentation!
 
    docIntro
    docError
+   docDerivative
    docRoots
+
 
 :ref:`genindex`
 
