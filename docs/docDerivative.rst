@@ -2,7 +2,7 @@
 Numerical Derivatives
 *********************
 
-This sections describes classes and functions for finding derivatives of arbitrary one-dimensional functions. Functions for computing numerical derivatives can be found in :file:`calculus/Derivatives.hpp`
+This sections describes classes and functions for finding derivatives of arbitrary one-dimensional functions. Functions for computing numerical derivatives can be found in :file:`calculus/Derivatives.hpp`.
 
 Overview
 ========
@@ -64,6 +64,9 @@ The API for using the :code:`central`, :code:`forward`, or :code:`backward` func
 
 Advanced Use
 ============
+
+Algorithms
+----------
 
 In case more fine-grained usage is required, the :code:`derivative<>` template function can be used. The :code:`derivative<>` function has the same signature as the convenience functions described above. However, in addition it also takes a single template argument with the type of the algorithm used to compute the derivative.
 
@@ -134,9 +137,44 @@ In addition to the bundled algorithms, it is also possible to provide a custom a
     auto func = [](double x) { return std::log(x) + 2 * x; };
     auto result = *derivative<decltype(algo)>(func, std::numbers::e);
 
-The API for using the :code:`derivative<>` function is given below.
+The API for using the :code:`diff<>` function is given below.
 
-.. doxygenfunction:: derivative(IsFunction auto function, ReturnType<decltype(function)> val, ReturnType<decltype(function)> stepsize)
+.. doxygenfunction:: diff(IsFunction auto function, ReturnType<decltype(function)> val, ReturnType<decltype(function)> stepsize)
+   :project: Numerixx
+
+Derivative Function Objects
+---------------------------
+The functions and algorithms described above can of course be wrapped in a function object representing the derivative
+of the function in question. However, Numerixx provides a convenience function for creating function objects like this
+automatically.
+
+The :code:`derivativeOf<>` template function can be used to create a function object representing the derivative of
+any input function, provided it has the correct interface. The function uses the :code:`Order1CentralRichardson`
+algorithm by default, but other algorithms can be specified manually.
+
+The following code illustrates how to use it:
+
+.. code-block:: c++
+
+    #include <numbers>
+    #include <calculus/Derivatives.hpp>
+
+    using namespace nxx::deriv;
+    auto func = [](double x) { return std::log(x) + 2 * x; };
+    auto d1func = derivativeOf(func);
+    auto d2func = derivativeOf<Order2Central5Point>(func);
+
+    double d1func_val = d1func(std::numbers::e);
+    double d2func_val = d2func(std::numbers::e);
+
+.. note::
+    For objects of the :code:`Polynomial` class, a separate :code:`derivativeOf<>` function is defined in the
+    :code:`nxx::poly` namespace. This function will create a function object that will compute the derivative
+    analytically, rather than numerically. See the :ref:`polynomials` section for details.
+
+The API for using the :code:`derivativeOf<>` function is given below.
+
+.. doxygenfunction:: derivativeOf(IsFunction auto function, ReturnType< decltype(function) > stepsize)
    :project: Numerixx
 
 .. [1] William H. Press et al. (2007). Numerical Recipes, 3rd Edition.

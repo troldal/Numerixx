@@ -7,6 +7,7 @@ Welcome to the Numerixx Documentation!
 
    docIntro
    docError
+   docPolynomial
    docDerivative
    docRoots
 

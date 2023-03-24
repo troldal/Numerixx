@@ -62,31 +62,31 @@ int main()
     // ============================================================================================
     std::cout << "The following examples show how to use the nxx::deriv::derivative template function\n";
     std::cout << "to manually specify the algorithm used to compute the 1st derivative.\n";
-    std::cout << "Order1CentralRichardson:   " << *derivative<Order1CentralRichardson>(func, std::numbers::e) << std::endl;
-    std::cout << "Order1Central3Point:       " << *derivative<Order1Central3Point>(func, std::numbers::e) << std::endl;
-    std::cout << "Order1Central5Point:       " << *derivative<Order1Central5Point>(func, std::numbers::e) << "\n\n";
+    std::cout << "Order1CentralRichardson:   " << *diff<Order1CentralRichardson>(func, std::numbers::e) << std::endl;
+    std::cout << "Order1Central3Point:       " << *diff<Order1Central3Point>(func, std::numbers::e) << std::endl;
+    std::cout << "Order1Central5Point:       " << *diff<Order1Central5Point>(func, std::numbers::e) << "\n\n";
 
-    std::cout << "Order1ForwardRichardson:   " << *derivative<Order1ForwardRichardson>(func, std::numbers::e) << std::endl;
-    std::cout << "Order1Forward2Point:       " << *derivative<Order1Forward2Point>(func, std::numbers::e) << std::endl;
-    std::cout << "Order1Forward3Point:       " << *derivative<Order1Forward3Point>(func, std::numbers::e) << "\n\n";
+    std::cout << "Order1ForwardRichardson:   " << *diff<Order1ForwardRichardson>(func, std::numbers::e) << std::endl;
+    std::cout << "Order1Forward2Point:       " << *diff<Order1Forward2Point>(func, std::numbers::e) << std::endl;
+    std::cout << "Order1Forward3Point:       " << *diff<Order1Forward3Point>(func, std::numbers::e) << "\n\n";
 
-    std::cout << "Order1BackwardRichardson:  " << *derivative<Order1BackwardRichardson>(func, std::numbers::e) << std::endl;
-    std::cout << "Order1Backward2Point:      " << *derivative<Order1Backward2Point>(func, std::numbers::e) << std::endl;
-    std::cout << "Order1Backward3Point:      " << *derivative<Order1Backward3Point>(func, std::numbers::e) << "\n\n";
+    std::cout << "Order1BackwardRichardson:  " << *diff<Order1BackwardRichardson>(func, std::numbers::e) << std::endl;
+    std::cout << "Order1Backward2Point:      " << *diff<Order1Backward2Point>(func, std::numbers::e) << std::endl;
+    std::cout << "Order1Backward3Point:      " << *diff<Order1Backward3Point>(func, std::numbers::e) << "\n\n";
 
     // ============================================================================================
     // Similarly, algorithms for computing the 2nd derivatives are also provided:
     // ============================================================================================
     std::cout << "Similarly, the following examples show how to use the nxx::deriv::derivative template function\n";
     std::cout << "to manually specify the algorithm used to compute the 2nd derivative.\n";
-    std::cout << "Order2Central3Point:      " << *derivative<Order2Central3Point>(func, std::numbers::e) << std::endl;
-    std::cout << "Order2Central5Point:      " << *derivative<Order2Central5Point>(func, std::numbers::e) << "\n\n";
+    std::cout << "Order2Central3Point:      " << *diff<Order2Central3Point>(func, std::numbers::e) << std::endl;
+    std::cout << "Order2Central5Point:      " << *diff<Order2Central5Point>(func, std::numbers::e) << "\n\n";
 
-    std::cout << "Order2Forward3Point:      " << *derivative<Order2Forward3Point>(func, std::numbers::e) << std::endl;
-    std::cout << "Order2Forward4Point:      " << *derivative<Order2Forward4Point>(func, std::numbers::e) << "\n\n";
+    std::cout << "Order2Forward3Point:      " << *diff<Order2Forward3Point>(func, std::numbers::e) << std::endl;
+    std::cout << "Order2Forward4Point:      " << *diff<Order2Forward4Point>(func, std::numbers::e) << "\n\n";
 
-    std::cout << "Order2Backward3Point:     " << *derivative<Order2Backward3Point>(func, std::numbers::e) << std::endl;
-    std::cout << "Order2Backward4Point:     " << *derivative<Order2Backward4Point>(func, std::numbers::e) << "\n\n";
+    std::cout << "Order2Backward3Point:     " << *diff<Order2Backward3Point>(func, std::numbers::e) << std::endl;
+    std::cout << "Order2Backward4Point:     " << *diff<Order2Backward4Point>(func, std::numbers::e) << "\n\n";
 
     // ============================================================================================
     // Finally, it is also possible to provide a custom algorithm, as long as it has the correct
@@ -101,7 +101,23 @@ int main()
                 0.5 * (function(val + 2 * stepsize) - function(val - 2 * stepsize))) /
                (stepsize * 6);
     };
-    std::cout << "Custom algorithm:         "<< *derivative<decltype(algo)>(func, std::numbers::e) << "\n\n";
+    std::cout << "Custom algorithm:         "<< *diff<decltype(algo)>(func, std::numbers::e) << "\n\n";
+
+    // ============================================================================================
+    // As a convenience function, the derivativeOf() template function can be used to create a
+    // function object representing the derivative of the input function.
+    // As a template argument, it is possible to pass any algorithm with the correct signature (see
+    // above). If no template argument is given, the function will use the Order1CentralRichardson
+    // algorithm as the default.
+    // As above, it is possible to pass a custom algorithm and a custom stepsize. Also, the return
+    // type of the function object created will be tl::expected (std::expected in the future).
+    // The following code example shows how to create function objects for the 1st and 2nd derivatives.
+    // ============================================================================================
+    auto d1func = derivativeOf(func);
+    auto d2func = derivativeOf<Order2Central5Point>(func);
+    std::cout << "Derivative function objects using the .derivativeOf() function:\n";
+    std::cout << "d1func:                   " << *d1func(std::numbers::e) << "\n";
+    std::cout << "d2func:                  " <<  *d2func(std::numbers::e) << "\n\n";
 
     // ============================================================================================
     // The following code shows the results of computing the derivatives for 10 different functions

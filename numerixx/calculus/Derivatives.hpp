@@ -86,6 +86,9 @@ namespace nxx::deriv
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
          * @return The derivative. The return type is the same as the retrun type of the provided function.
+         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
+         * or one of the convenience functions.
+         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
          */
         inline auto
             operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
@@ -110,7 +113,7 @@ namespace nxx::deriv
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
          * @return The derivative. The return type is the same as the retrun type of the provided function.
-         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
          * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
          */
@@ -136,7 +139,7 @@ namespace nxx::deriv
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
          * @return The derivative. The return type is the same as the retrun type of the provided function.
-         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
          * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
          */
@@ -164,7 +167,7 @@ namespace nxx::deriv
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
          * @return The derivative. The return type is the same as the retrun type of the provided function.
-         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
          * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
          */
@@ -190,7 +193,7 @@ namespace nxx::deriv
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
          * @return The derivative. The return type is the same as the retrun type of the provided function.
-         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
          * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
          */
@@ -222,7 +225,7 @@ namespace nxx::deriv
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
          * @return The derivative. The return type is the same as the retrun type of the provided function.
-         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
          * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
          */
@@ -253,7 +256,7 @@ namespace nxx::deriv
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
          * @return The derivative. The return type is the same as the retrun type of the provided function.
-         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
          * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
          */
@@ -279,7 +282,7 @@ namespace nxx::deriv
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
          * @return The derivative. The return type is the same as the retrun type of the provided function.
-         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
          * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
          */
@@ -305,7 +308,7 @@ namespace nxx::deriv
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
          * @return The derivative. The return type is the same as the retrun type of the provided function.
-         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
          * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
          */
@@ -331,7 +334,7 @@ namespace nxx::deriv
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
          * @return The derivative. The return type is the same as the retrun type of the provided function.
-         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
          * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
          */
@@ -362,7 +365,7 @@ namespace nxx::deriv
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
          * @return The derivative. The return type is the same as the retrun type of the provided function.
-         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
          * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
          */
@@ -393,7 +396,7 @@ namespace nxx::deriv
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
          * @return The derivative. The return type is the same as the retrun type of the provided function.
-         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
          * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
          */
@@ -419,7 +422,7 @@ namespace nxx::deriv
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
          * @return The derivative. The return type is the same as the retrun type of the provided function.
-         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
          * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
          */
@@ -445,7 +448,7 @@ namespace nxx::deriv
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
          * @return The derivative. The return type is the same as the retrun type of the provided function.
-         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
          * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
          */
@@ -471,7 +474,7 @@ namespace nxx::deriv
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
          * @return The derivative. The return type is the same as the retrun type of the provided function.
-         * @note This function is not intended to be used directly. Instead, use the \c derivative template function,
+         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
          * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
          */
@@ -492,11 +495,11 @@ namespace nxx::deriv
      * @param val The value at which to compute the derivative.
      * @param stepsize (Optional) The finite difference used to compute the derivative. If an argument for this parameter is not provided,
      * a default value vill be used. The default value is the cubic root of the machine epsilon for the function return type.
-     * @return A tl::expected (std::expected) containing the (approximated) derivative of the function, or (in case of an error)
-     * a DerivativeError exception object describing the error.
+     * @return A \c tl::expected (\c std::expected) containing the (approximated) derivative of the function, or (in case of an error)
+     * a \c DerivativeError exception object describing the error.
      */
     template< typename ALGO >
-    inline auto derivative(
+    inline auto diff(
         IsFunction auto                  function,
         ReturnType< decltype(function) > val,
         ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
@@ -517,15 +520,15 @@ namespace nxx::deriv
      * @param val The value at which to compute the derivative.
      * @param stepsize (Optional) The finite difference used to compute the derivative. If an argument for this parameter is not provided,
      * a default value vill be used. The default value is the cubic root of the machine epsilon for the function return type.
-     * @return A tl::expected (std::expected) containing the (approximated) derivative of the function, or (in case of an error)
-     * a DerivativeError exception object describing the error.
+     * @return A \c tl::expected (\c std::expected) containing the (approximated) derivative of the function, or (in case of an error)
+     * a \c DerivativeError exception object describing the error.
      */
     inline auto
         central(IsFunction auto                  function,
                 ReturnType< decltype(function) > val,
                 ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
-        return derivative< Order1CentralRichardson >(function, val, stepsize);
+        return diff< Order1CentralRichardson >(function, val, stepsize);
     }
 
     /**
@@ -534,15 +537,15 @@ namespace nxx::deriv
      * @param val The value at which to compute the derivative.
      * @param stepsize (Optional) The finite difference used to compute the derivative. If an argument for this parameter is not provided,
      * a default value vill be used. The default value is the cubic root of the machine epsilon for the function return type.
-     * @return A tl::expected (std::expected) containing the (approximated) derivative of the function, or (in case of an error)
-     * a DerivativeError exception object describing the error.
+     * @return A \c tl::expected (\c std::expected) containing the (approximated) derivative of the function, or (in case of an error)
+     * a \c DerivativeError exception object describing the error.
      */
     inline auto
         forward(IsFunction auto                  function,
                 ReturnType< decltype(function) > val,
                 ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
-        return derivative< Order1ForwardRichardson >(function, val, stepsize);
+        return diff< Order1ForwardRichardson >(function, val, stepsize);
     }
 
     /**
@@ -551,15 +554,34 @@ namespace nxx::deriv
      * @param val The value at which to compute the derivative.
      * @param stepsize (Optional) The finite difference used to compute the derivative. If an argument for this parameter is not provided,
      * a default value vill be used. The default value is the cubic root of the machine epsilon for the function return type.
-     * @return A tl::expected (std::expected) containing the (approximated) derivative of the function, or (in case of an error)
-     * a DerivativeError exception object describing the error.
+     * @return A \c tl::expected (\c std::expected) containing the (approximated) derivative of the function, or (in case of an error)
+     * a \c DerivativeError exception object describing the error.
      */
     inline auto
         backward(IsFunction auto                  function,
                  ReturnType< decltype(function) > val,
                  ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
-        return derivative< Order1BackwardRichardson >(function, val, stepsize);
+        return diff< Order1BackwardRichardson >(function, val, stepsize);
+    }
+
+    /**
+     * @brief Create a function object representing the derivative of the input function, using numerical differentiation.
+     * @tparam ALGO The algorithm type for computing the derivative. This can be any algorithm with the right interface,
+     * and can be both 1st order and higher order derivatives. The default is \c Order1CentralRichardson.
+     * @param function The function to compute the derivative of.
+     * @param stepsize (Optional) The step size to use in the computation. The default is the cubic root of the machine epsilon.
+     * @return A lambda function representing the derivative of the input function. The lambda will take one floating point
+     * argument, and return a \c tl::expected (\c std::expected) containing the (approximated) derivative of the function,
+     * or (in case of an error) a \c DerivativeError exception object describing the error.
+     * @note For objects of the \c Polynomial class, an overload of the \c derivativeOf function is provided for computing the
+     * derivative function analytically.
+     */
+    template< typename ALGO = Order1CentralRichardson>
+    inline auto derivativeOf(IsFunction auto function, ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
+    {
+        using RT = ReturnType< decltype(function) >;
+        return [=](RT val) { return diff< ALGO >(function, val, stepsize); };
     }
 
 }    // namespace nxx::deriv

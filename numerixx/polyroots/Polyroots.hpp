@@ -1,12 +1,12 @@
 /*
-    888b      88  88        88  88b           d88  88888888888  88888888ba   88  8b        d8  8b        d8
-    8888b     88  88        88  888b         d888  88           88      "8b  88   Y8,    ,8P    Y8,    ,8P
-    88 `8b    88  88        88  88`8b       d8'88  88           88      ,8P  88    `8b  d8'      `8b  d8'
-    88  `8b   88  88        88  88 `8b     d8' 88  88aaaaa      88aaaaaa8P'  88      Y88P          Y88P
-    88   `8b  88  88        88  88  `8b   d8'  88  88"""""      88""""88'    88      d88b          d88b
-    88    `8b 88  88        88  88   `8b d8'   88  88           88    `8b    88    ,8P  Y8,      ,8P  Y8,
-    88     `8888  Y8a.    .a8P  88    `888'    88  88           88     `8b   88   d8'    `8b    d8'    `8b
-    88      `888   `"Y8888Y"'   88     `8'     88  88888888888  88      `8b  88  8P        Y8  8P        Y8
+    o.     O O       o Oo      oO o.OOoOoo `OooOOo.  ooOoOOo o      O o      O
+    Oo     o o       O O O    o o  O        o     `o    O     O    o   O    o
+    O O    O O       o o  o  O  O  o        O      O    o      o  O     o  O
+    O  o   o o       o O   Oo   O  ooOO     o     .O    O       oO       oO
+    O   o  O o       O O        o  O        OOooOO'     o       Oo       Oo
+    o    O O O       O o        O  o        o    o      O      o  o     o  o
+    o     Oo `o     Oo o        O  O        O     O     O     O    O   O    O
+    O     `o  `OoooO'O O        o ooOooOoO  O      o ooOOoOo O      o O      o
 
     Copyright © 2022 Kenneth Troldal Balslev
 
@@ -39,6 +39,17 @@
 
 namespace nxx::polyroots
 {
+
+    template<typename POLYTYPE>
+        requires std::is_floating_point_v<typename POLYTYPE::value_type> &&
+                 std::same_as<POLYTYPE, poly::Polynomial<typename POLYTYPE::value_type>>
+    inline auto linear(POLYTYPE poly) {
+
+        if (poly.order() != 1) throw std::invalid_argument("Polynomial Error: Polynomial is not linear.");
+        using result_vector = std::vector<typename POLYTYPE::value_type>;
+
+        return result_vector { -poly.coefficients().front() / poly.coefficients().back() };
+    }
 
     /**
      * @brief Compute the real roots of a quadratic polynomial.
@@ -121,6 +132,28 @@ namespace nxx::polyroots
         return result_vector { P + Q - a_2 / 3.0 };
     }
 
+    /**
+     * @brief
+     * @tparam POLYTYPE
+     * @param poly
+     * @return
+     */
+    template<typename POLYTYPE>
+        requires std::is_floating_point_v<typename POLYTYPE::value_type> &&
+                 std::same_as<POLYTYPE, poly::Polynomial<typename POLYTYPE::value_type>>
+    inline auto polysolve(POLYTYPE poly) {
+        std::cout << poly.order() << std::endl;
+        switch (poly.order()) {
+            case 1:
+                return linear(poly);
+            case 2:
+                return quadratic(poly);
+            case 3:
+                return cubic(poly);
+            default:
+                throw std::invalid_argument("Polynomial Error: Polynomial order is too high.");
+        }
+    }
 }    // namespace numerix::polyroots
 
 #endif    // NUMERIXX_POLYROOTS_HPP
