@@ -8,7 +8,7 @@
     o     Oo `o     Oo o        O  O        O     O     O     O    O   O    O
     O     `o  `OoooO'O O        o ooOooOoO  O      o ooOOoOo O      o O      o
 
-    Copyright © 2022 Kenneth Troldal Balslev
+    Copyright © 2023 Kenneth Troldal Balslev
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the “Software”), to deal
@@ -31,6 +31,8 @@
 #ifndef NUMERIXX_POLYNOMIAL_HPP
 #define NUMERIXX_POLYNOMIAL_HPP
 
+#include "PolynomialError.hpp"
+#include "../.dependencies/expected/expected.hpp"
 #include "../utils/Concepts.hpp"
 
 #include <algorithm>
@@ -44,14 +46,64 @@
 namespace nxx::poly
 {
 
+    // TODO: Use tl::expected as the return type for all functions that can fail.
+    // TODO: Implement constructor that can take the roots of a polynomial and create a polynomial from that (Newton's Divided Difference method).
+
+    /**
+     * @brief A concept that checks whether a container is suitable for storing polynomial coefficients.
+     *
+     * This concept checks whether a container has a value type that is a floating-point type or a
+     * complex type, and whether its iterator type is bidirectional.
+     *
+     * @tparam CONTAINER The container to check.
+     */
     template< typename CONTAINER >
     concept IsCoefficientContainer = (std::floating_point< typename CONTAINER::value_type > ||
                                       utils::IsComplex< typename CONTAINER::value_type >) &&
                                      (std::bidirectional_iterator< typename CONTAINER::iterator >);
 
+    template< typename T >
+        requires std::floating_point< T > || utils::IsComplex< T >
+    class Polynomial;
+
+    /*
+         * Forward declaration of the MatrixTraits class.
+     */
+    template<typename T>
+    struct PolynomialTraits;
+
+    /*
+         * Specialization of the MatrixTraits class for Matrix<T>
+     */
+    template<typename T>
+        requires std::floating_point< T >
+    struct PolynomialTraits<Polynomial<T>>
+    {
+        using value_type = T;
+        using fundamental_type = T;
+    };
+
+    /*
+         * Specialization of the MatrixTraits class for MatrixView<T>
+     */
+    template<typename T>
+    struct PolynomialTraits<Polynomial<std::complex<T>>>
+    {
+        using value_type = std::complex<T>;
+        using fundamental_type = T;
+    };
+
+
     /**
-     * @brief The Polynomial class implements the functionality of a polynomial with arbitrary number of coefficients.
-     * @tparam T The type of the polynomial coefficients (must be of floating-point type)
+     * @brief A class representing a polynomial with coefficients of type T.
+     *
+     * This class provides functionality to evaluate a polynomial at a point,
+     * retrieve the polynomial's coefficients, get the polynomial's order, and
+     * output the polynomial as a string. Additionally, it provides operators
+     * for addition and subtraction of polynomials.
+     *
+     * @tparam T The type of the polynomial coefficients. This must be a floating
+     * point type or a type that satisfies the `utils::IsComplex` concept.
      */
     template< typename T >
         requires std::floating_point< T > || utils::IsComplex< T >
@@ -60,16 +112,21 @@ namespace nxx::poly
         std::vector< T > m_coefficients; /**< The internal store of polynomial coefficients. */
 
     public:
-        /*
-         * Alias declarations.
+        /**
+         * @brief The type of the polynomial coefficients.
          */
         using value_type = T;
 
         /**
-         * @brief Constructor taking a container of coefficients as an argument.
-         * @param coefficients The container of coefficients. The value type must be of floating-point type, and must
-         * support iterators. The coefficients must be in order of increasing power, starting with the constant (power of zero).
-         * @note Trailing zeros will be trimmed away.
+         * @brief Constructs a polynomial from a range of coefficients.
+         *
+         * The range must be a container whose value type is convertible to T. The
+         * constructed polynomial will have a degree equal to the number of
+         * non-zero coefficients minus one.
+         *
+         * @tparam IsCoefficientContainer A type trait that verifies that the
+         * template argument is a container of coefficients.
+         * @param coefficients The range of coefficients.
          */
         explicit Polynomial(const IsCoefficientContainer auto& coefficients)
             : m_coefficients { coefficients.cbegin(),
@@ -77,65 +134,73 @@ namespace nxx::poly
         {}
 
         /**
-         * @brief Constructor taking an std::initializer_list with the polynomial coefficients as an argument.
-         * @param coefficients The list of coefficients of the polynomial. The coefficients must be in order of increasing power,
-         * starting with the constant (power of zero).
-         * @note This constructor calls the previous constructor, by converting the std::initializer_list to a std::vector.
+         * @brief Constructs a polynomial from a list of coefficients.
+         *
+         * The constructed polynomial will have a degree equal to the number of
+         * non-zero coefficients minus one.
+         *
+         * @param coefficients The list of coefficients.
          */
         Polynomial(std::initializer_list< T > coefficients) : Polynomial(std::vector< T >(coefficients)) {}
 
         /**
-         * @brief Function call operator, for evaluating the polynomial at a given value.
-         * @param value The floating point value at which to evaluate the polynomial.
-         * @return A floating point value with the result of the evaluation.
+         * @brief Evaluates the polynomial at a given value.
+         *
+         * This function evaluates the polynomial at a given value using Horner's method and returns the result.
+         * The function template parameter `U` specifies the type of the input value, which can be either a real or
+         * complex number.
+         *
+         * @param value The value to evaluate the polynomial at.
+         * @return The value of the polynomial at the specified input value.
          */
-        inline auto operator()(value_type value) const { return evaluate(value); }
+        inline auto operator()(auto value) const { return evaluate(value); }
 
         /**
-         * @brief Function call operator, for evaluating the polynomial at a given value.
-         * @param value The std::complex value at which to evaluate the polynomial.
-         * @return A std::complex value with the result of the evaluation.
+         * @brief Evaluates the polynomial at a given value.
+         *
+         * This function evaluates the polynomial at a given value using Horner's method and returns the result.
+         * The function template parameter `U` specifies the type of the input value, which can be either a real or
+         * complex number.
+         *
+         * @tparam U The type of the input value.
+         * @param value The value to evaluate the polynomial at.
+         * @return The value of the polynomial at the specified input value.
          */
-        inline auto operator()(std::complex< value_type > value) const { return evaluate(value); }
-
-        /**
-         * @brief Function for evaluating the polynomial at a given value.
-         * @param value The floating point value at which to evaluate the polynomial.
-         * @return A floating point value with the result of the evaluation.
-         */
-        [[nodiscard]] inline auto evaluate(value_type value) const
+        template< typename U >
+            requires std::floating_point< U > || utils::IsComplex< U >
+        [[nodiscard]] inline auto evaluate(U value) const
         {
+            using TYPE = std::common_type_t< T, U >;
+            tl::expected< TYPE, error::PolynomialError > result;
+
             // ===== Horner's method implemented in terms of std::accummulate.
-            return std::accumulate(m_coefficients.crbegin() + 1,
-                                   m_coefficients.crend(),
-                                   m_coefficients.back(),
-                                   [value](value_type curr, value_type coeff) { return curr * value + coeff; });
+            TYPE eval = std::accumulate(m_coefficients.crbegin() + 1,
+                                        m_coefficients.crend(),
+                                        static_cast< TYPE >(m_coefficients.back()),
+                                        [value](TYPE curr, TYPE coeff) { return curr * value + coeff; });
+
+            if (std::isfinite(abs(eval)))
+                result = eval;
+            else
+                result = tl::make_unexpected(error::PolynomialError { "Evaluation of polynomial gave non-finite result." });
+            return result;
         }
 
         /**
-         * @brief Function for evaluating the polynomial at a given value.
-         * @param value The std::complex value at which to evaluate the polynomial.
-         * @return A std::complex value with the result of the evaluation.
-         */
-        [[nodiscard]] inline auto evaluate(std::complex< value_type > value) const
-        {
-            // ===== Horner's method implemented in terms of std::accummulate.
-            return std::accumulate(m_coefficients.crbegin() + 1,
-                                   m_coefficients.crend(),
-                                   std::complex< value_type >(m_coefficients.back()),
-                                   [value](std::complex< value_type > curr, value_type coeff) { return curr * value + coeff; });
-        }
-
-        /**
-         * @brief Get the vector of polynomial coefficients.
-         * @return A const reference to the vector of coefficients.
+         * @brief Gets the coefficients of the polynomial.
+         *
+         * @return A constant reference to the vector of coefficients.
          */
         [[nodiscard]] const auto& coefficients() const { return m_coefficients; }
 
         /**
-         * @brief Get the polynomial coefficients in an arbitrary container.
-         * @tparam CONTAINER The type of the container. The value type must be floating type, and it must support iterators.
-         * @return A CONTAINER object with the polynomial coefficients.
+         * @brief Gets the coefficients of the polynomial as a container of a different type.
+         *
+         * The container must be constructible from a range of values convertible to T.
+         *
+         * @tparam CONTAINER The type of the container to use. Must be a container of coefficients.
+         * @param coefficients The container in which to store the coefficients.
+         * @return The container of coefficients.
          */
         template< typename CONTAINER >
             requires IsCoefficientContainer< CONTAINER >
@@ -145,48 +210,58 @@ namespace nxx::poly
         }
 
         /**
-         * @brief Create a string representation of the polynomial.
-         * @return A std::string with the polynomial in text format.
+         * @brief Returns a string representation of the polynomial.
+         *
+         * The polynomial is output in the form `a_0 + a_1 x + a_2 x^2 + ... + a_{n-1} x^{n-1} + a_n x^n`.
+         * If a coefficient is zero, it is omitted. If a coefficient is negative, it is
+         * shown with a negative sign.
+         *
+         * @return A string representation of the polynomial.
          */
         [[nodiscard]] std::string asString() const
         {
-            std::stringstream ss;
+            std::ostringstream oss;
 
-            ss << m_coefficients.front();
-
-            int power = 1;
-            std::for_each(m_coefficients.begin() + 1, m_coefficients.end(), [&](T value) {
-                if (value == 0.0) {
-                    ++power;
-                    return;
+            // Print highest degree term with sign, if non-zero
+            if (!m_coefficients.empty()) {
+                oss << m_coefficients.front();
+                for (size_t i = 1; i < m_coefficients.size(); ++i) {
+                    auto coeff = m_coefficients[i];
+                    if constexpr (!utils::IsComplex< T > ) {
+                        if (coeff == 0) { continue; }
+                        else if (coeff > 0) { oss << " + "; }
+                        else { oss << " - "; }
+                        oss << abs(coeff) << "x";
+                    }
+                    else {
+                        if (abs(coeff) == 0) { continue; }
+                        else { oss << " + "; }
+                        oss << coeff << "x";
+                    }
+                    if (i >= 2) { oss << "^" << i; }
                 }
-
-                if (value < 0.0)
-                    ss << " - ";
-                else
-                    ss << " + ";
-
-                ss << std::abs(value);
-                ss << "x";
-
-                if (power >= 2) ss << "^" << power;
-
-                ++power;
-            });
-
-            return ss.str();
+            }
+            return oss.str();
         }
 
         /**
-         * @brief Get the order of the polynomial, i.e. the highest highest power of the polynomial.
-         * @return The power of the polynomial as an int.
+         * @brief Returns the order of the polynomial.
+         *
+         * The order of the polynomial is one less than the number of coefficients.
+         *
+         * @return The order of the polynomial.
          */
         [[nodiscard]] auto order() const { return m_coefficients.size() - 1; }
 
         /**
-         * @brief
-         * @param rhs
-         * @return
+         * @brief Adds another polynomial to this polynomial.
+         *
+         * This operator adds the given polynomial to this polynomial and returns
+         * the result as a new polynomial. The degree of the result will be equal
+         * to the maximum degree of the two polynomials.
+         *
+         * @param rhs The polynomial to add to this polynomial.
+         * @return The sum of the two polynomials.
          */
         auto& operator+=(Polynomial< T > const& rhs)
         {
@@ -195,15 +270,82 @@ namespace nxx::poly
         }
 
         /**
-         * @brief
-         * @param rhs
-         * @return
+         * @brief Subtracts another polynomial from this polynomial.
+         *
+         * This operator subtracts the given polynomial from this polynomial and returns
+         * the result as a new polynomial. The degree of the result will be equal
+         * to the maximum degree of the two polynomials.
+         *
+         * @param rhs The polynomial to subtract from this polynomial.
+         * @return The difference between the two polynomials.
          */
         auto& operator-=(Polynomial< T > const& rhs)
         {
             auto temp = *this - rhs;
             std::swap(*this, temp);
         }
+
+        /**
+         * @brief Multiplies the polynomial by another polynomial and returns the result.
+         *
+         * This operator multiplies the polynomial by another polynomial and assigns the resulting polynomial
+         * to the current polynomial object. The function uses the free operator*() function to perform
+         * the multiplication.
+         *
+         * @param rhs The other polynomial to multiply by.
+         * @return A reference to the modified polynomial object.
+         */
+        auto& operator*=(Polynomial< T > const& rhs)
+        {
+            auto temp = *this * rhs;
+            std::swap(*this, temp);
+        }
+
+        /**
+         * @brief Divides the polynomial by another polynomial and returns the result.
+         *
+         * This operator divides the polynomial by another polynomial and assigns the resulting polynomial
+         * to the current polynomial object. The function uses the operator/() function to perform the division.
+         *
+         * @param rhs The other polynomial to divide by.
+         * @return A reference to the modified polynomial object.
+         */
+        auto& operator/=(Polynomial< T > const& rhs)
+        {
+            auto temp = *this / rhs;
+            std::swap(*this, temp);
+        }
+
+        /**
+         * @brief Returns a const iterator to the beginning of the coefficients container of the Polynomial.
+         *
+         * This member function provides a const iterator pointing to the first coefficient of the Polynomial.
+         * It can be used for traversing the coefficients in a read-only manner.
+         *
+         * @return A const iterator pointing to the first coefficient of the Polynomial.
+         *
+         * @note The returned iterator is compatible with standard C++ library algorithms and functions that
+         * expect const_iterators as input.
+         */
+        auto begin() const { return m_coefficients.cbegin(); }
+        auto cbegin() const { return m_coefficients.cbegin(); }
+
+
+        /**
+         * @brief Returns a const iterator to the end of the coefficients container of the Polynomial.
+         *
+         * This member function provides a const iterator pointing to one past the last coefficient of the
+         * Polynomial. It can be used for traversing the coefficients in a read-only manner.
+         *
+         * @return A const iterator pointing to one past the last coefficient of the Polynomial.
+         *
+         * @note The returned iterator is compatible with standard C++ library algorithms and functions that
+         * expect const_iterators as input.
+         */
+        auto end() const { return m_coefficients.cend(); }
+        auto cend() const { return m_coefficients.cend(); }
+
+
     };
 
     /*
@@ -212,41 +354,53 @@ namespace nxx::poly
     Polynomial(IsCoefficientContainer auto coefficients) -> Polynomial< typename decltype(coefficients)::value_type >;
 
     /**
-     * @brief A concept that checks if the given type is a specialization of the Polynomial class template.
-     * This concept verifies if the given type is a specialization of the Polynomial class template with the same
-     * value type as the type itself.
-     * @tparam POLY The type to be checked if it is a specialization of the Polynomial class template.
-     * @return std::true_type if the type is a specialization of the Polynomial class template; otherwise std::false_type.
+     * @brief A concept that checks if the given type is a Polynomial of some type T.
+     *
+     * This concept checks if the given type is a Polynomial of some type T. It requires
+     * that the value_type of the Polynomial be the same as the given type.
+     *
+     * @tparam POLY The type to check.
      */
-    template<typename POLY>
-    concept IsPolynomial = std::same_as< POLY, Polynomial< typename POLY::value_type> >;
+    template< typename POLY >
+    concept IsPolynomial = std::same_as< POLY, Polynomial< typename POLY::value_type > >;
 
     /**
-     * @brief Create a function object representing the derivative of the input function.
-     * @tparam T The exact type of the polynomial coefficients (will be auto-deduced from the argument)
-     * @param func The function object to get the derivative of.
-     * @return A Polynomial object representing the derivative of the input function.
-     * @note This function is similar to the .derivativeOf() function in the nxx::deriv namespace. This
-     * function works only on polynomials, where the derivative will always be another polynomial.
+     * @brief Computes the derivative of a polynomial.
+     *
+     * This function computes the derivative of the given polynomial and returns the result
+     * as a new polynomial. The derivative of a polynomial f(x) of degree n is given by
+     * f'(x) = a_1 + 2 a_2 x + ... + n a_n x^{n-1}.
+     *
+     * @param func The polynomial to differentiate.
+     * @return The derivative of the polynomial.
      */
     template< typename T >
     inline auto derivativeOf(const Polynomial< T >& func)
     {
-        using value_type = T;
-        std::vector< value_type > coefficients { func.coefficients().cbegin() + 1, func.coefficients().cend() };
+        std::vector< T > coefficients { func.coefficients().cbegin() + 1, func.coefficients().cend() };
 
         int n = 1;
-        std::transform(coefficients.cbegin(), coefficients.cend(), coefficients.begin(), [&n](value_type elem) { return elem * n++; });
+        if constexpr (utils::IsComplex< T >) {
+            std::transform(coefficients.cbegin(), coefficients.cend(), coefficients.begin(), [&n](T elem) { return elem * static_cast<typename T::value_type>(n++); });
+        }
+        else {
+            std::transform(coefficients.cbegin(), coefficients.cend(), coefficients.begin(), [&n](T elem) { return elem * static_cast<T>(n++); });
+        }
+
         return Polynomial(coefficients);
     }
 
     /**
      * @brief Adds two polynomials.
-     * @tparam T Type of coefficients of the first polynomial.
-     * @tparam U Type of coefficients of the second polynomial.
+     *
+     * This operator adds the given two polynomials and returns the result as a new polynomial.
+     * The degree of the result will be equal to the maximum degree of the two polynomials.
+     *
+     * @tparam T The type of the coefficients of the first polynomial.
+     * @tparam U The type of the coefficients of the second polynomial.
      * @param lhs The first polynomial to add.
      * @param rhs The second polynomial to add.
-     * @return The polynomial resulting from adding rhs to lhs.
+     * @return The sum of the two polynomials.
      */
     template< typename T, typename U >
     auto operator+(Polynomial< T > const& lhs, Polynomial< U > const& rhs)
@@ -267,11 +421,16 @@ namespace nxx::poly
 
     /**
      * @brief Subtracts two polynomials.
-     * @tparam T Type of coefficients of the first polynomial.
-     * @tparam U Type of coefficients of the second polynomial.
-     * @param lhs The first polynomial to subtract.
-     * @param rhs The second polynomial to subtract.
-     * @return The polynomial resulting from subtracting rhs from lhs.
+     *
+     * This operator subtracts the second polynomial from the first polynomial and returns
+     * the result as a new polynomial. The degree of the result will be equal to the maximum
+     * degree of the two polynomials.
+     *
+     * @tparam T The type of the coefficients of the first polynomial.
+     * @tparam U The type of the coefficients of the second polynomial.
+     * @param lhs The polynomial to subtract from.
+     * @param rhs The polynomial to subtract.
+     * @return The difference between the two polynomials.
      */
     template< typename T, typename U >
     auto operator-(Polynomial< T > const& lhs, Polynomial< U > const& rhs)
@@ -280,26 +439,32 @@ namespace nxx::poly
 
         if (lhs.order() < rhs.order()) {
             auto coeffs = rhs.coefficients();
-            std::transform(coeffs.cbegin(), coeffs.cend(), lhs.coefficients().begin(), coeffs.begin(), [](TYPE a, TYPE b) { return b - a; });
+            std::transform(coeffs.cbegin(), coeffs.cend(), lhs.coefficients().begin(), coeffs.begin(), [](TYPE a, TYPE b) {
+                return b - a;
+            });
             return Polynomial(coeffs);
         }
         else {
             auto coeffs = lhs.coefficients();
-            std::transform(coeffs.cbegin(), coeffs.cend(), rhs.coefficients().begin(), coeffs.begin(), [](TYPE a, TYPE b) { return a - b; });
+            std::transform(coeffs.cbegin(), coeffs.cend(), rhs.coefficients().begin(), coeffs.begin(), [](TYPE a, TYPE b) {
+                return a - b;
+            });
             return Polynomial(coeffs);
         }
     }
 
     /**
-     * @brief Multiply two polynomials using the `*` operator.
-     * This operator multiplies the polynomial `lhs` by the polynomial `rhs` and returns the result as a new polynomial.
-     * @tparam T The type of coefficients in the polynomial `lhs`.
-     * @tparam U The type of coefficients in the polynomial `rhs`.
+     * @brief Multiplies two polynomials.
+     *
+     * This operator multiplies the given two polynomials and returns the result as a new
+     * polynomial. The degree of the result will be equal to the sum of the degrees of the
+     * two polynomials.
+     *
+     * @tparam T The type of the coefficients of the first polynomial.
+     * @tparam U The type of the coefficients of the second polynomial.
      * @param lhs The first polynomial to multiply.
      * @param rhs The second polynomial to multiply.
-     * @return The product of `lhs` and `rhs`.
-     * @note The function assumes that the coefficient type `T` is convertible to the coefficient type `U`, or vice versa.
-     * @see Polynomial
+     * @return The product of the two polynomials.
      */
     template< typename T, typename U >
     auto operator*(Polynomial< T > const& lhs, Polynomial< U > const& rhs)
@@ -320,65 +485,102 @@ namespace nxx::poly
     }
 
     /**
-     *   @brief Divide one polynomial by another.
-     *   This function divides the polynomial lhs by the polynomial rhs and returns
-     *   the quotient and remainder as polynomials.
-     *   @tparam T The type of coefficients in the polynomial lhs.
-     *   @tparam U The type of coefficients in the polynomial rhs.
-     *   @param lhs The polynomial to be divided.
-     *   @param rhs The polynomial to divide by.
-     *   @return A pair of polynomials (quotient and remainder).
-     *   @note The function assumes that the coefficient type T is convertible to the coefficient type U, or vice versa.
-     *   @note The degree of the remainder polynomial is less than the degree of the divisor polynomial.
-     *   @see Polynomial
+     * @brief Divides two polynomials and returns the quotient and remainder.
+     *
+     * This function divides the first polynomial by the second polynomial and returns the
+     * quotient and remainder as a pair of polynomials. The degree of the remainder will be
+     * less than the degree of the second polynomial.
+     *
+     * @tparam T The type of the coefficients of the first polynomial.
+     * @tparam U The type of the coefficients of the second polynomial.
+     * @param lhs The polynomial to divide.
+     * @param rhs The polynomial to divide by.
+     * @return The quotient and remainder of the two polynomials.
      */
     template< typename T, typename U >
     auto divide(Polynomial< T > const& lhs, Polynomial< U > const& rhs)
     {
         using TYPE = std::common_type_t< T, U >;
 
-        const auto& lhs_coeffs = lhs.coefficients();
-        const auto& rhs_coeffs = rhs.coefficients();
+        std::vector<TYPE> dividend = lhs.coefficients();
+        std::vector<TYPE> divisor = rhs.coefficients();
+        std::vector<TYPE> remainder {};
 
-        std::vector< TYPE > quotient(lhs.order() - rhs.order() + 1, 0.0);
-        std::vector< TYPE > remainder(lhs_coeffs.begin(), lhs_coeffs.end());
+        if (divisor.empty() || divisor.back() == 0.0) {
+            throw std::invalid_argument("Invalid divisor polynomial");
+        }
 
-        // ===== Consider simplifying this loop =====
-        auto odiff  = lhs.order() - rhs.order();
-        for (auto q_iter = quotient.rbegin(), r_iter = remainder.rbegin(); q_iter != quotient.rend(); ++q_iter, ++r_iter) {
-            *q_iter = *r_iter / rhs_coeffs.back();
+        std::size_t dividendDegree = dividend.size() - 1;
+        std::size_t divisorDegree = divisor.size() - 1;
 
-            auto counter = lhs.order() - 1;
-            for (auto iter = r_iter + 1; iter != r_iter + odiff + 1; ++iter) {
-                *iter -= *q_iter * rhs_coeffs[(counter--) - odiff];
+        if (dividendDegree < divisorDegree) {
+            remainder = dividend;
+            return std::make_pair(Polynomial<TYPE>({}), Polynomial(remainder));
+        }
+
+        std::vector<TYPE> quotient(dividendDegree - divisorDegree + 1, 0);
+        remainder = dividend;
+
+        for (std::size_t i = dividendDegree; i >= divisorDegree && i < dividend.size(); --i) {
+            TYPE coef = remainder[i] / divisor.back();
+            quotient[i - divisorDegree] = coef;
+
+            for (std::size_t j = 0; j <= divisorDegree; ++j) {
+                remainder[i - j] -= coef * divisor[divisorDegree - j];
             }
         }
 
-        remainder.erase(remainder.begin() + rhs.order(), remainder.end());
+        // Remove leading zeros in the remainder
+        while (!remainder.empty() && remainder.back() == 0.0) {
+            remainder.pop_back();
+        }
+
         return std::make_pair(Polynomial(quotient), Polynomial(remainder));
+
+//        const auto& lhs_coeffs = lhs.coefficients();
+//        const auto& rhs_coeffs = rhs.coefficients();
+//
+//        std::vector< TYPE > quotient(lhs.order() - rhs.order() + 1, 0.0);
+//        std::vector< TYPE > remainder(lhs_coeffs.begin(), lhs_coeffs.end());
+//
+//        // TODO: Consider simplifying this loop
+//        auto odiff = lhs.order() - rhs.order();
+//        for (auto q_iter = quotient.rbegin(), r_iter = remainder.rbegin(); q_iter != quotient.rend(); ++q_iter, ++r_iter) {
+//            *q_iter = *r_iter / rhs_coeffs.back();
+//
+//            auto counter = lhs.order() - 1;
+//            for (auto iter = r_iter + 1; iter != r_iter + odiff + 1; ++iter) {
+//                *iter -= *q_iter * rhs_coeffs[(counter--) - odiff];
+//            }
+//        }
+//
+//        remainder.erase(remainder.begin() + rhs.order(), remainder.end());
+//        return std::make_pair(Polynomial(quotient), Polynomial(remainder));
     }
 
     /**
-     * @brief Divide one polynomial by another using the `/` operator.
-     * This operator divides the polynomial `lhs` by the polynomial `rhs` using the `divide` function
-     * and returns the quotient as a polynomial.
-     * @param lhs The polynomial to be divided.
+     * @brief Divides two polynomials and returns the quotient.
+     *
+     * This operator divides the first polynomial by the second polynomial and returns the
+     * quotient as a new polynomial. The degree of the quotient will be less than or equal to
+     * the degree of the first polynomial minus the degree of the second polynomial.
+     *
+     * @param lhs The polynomial to divide.
      * @param rhs The polynomial to divide by.
-     * @return The quotient of dividing `lhs` by `rhs`.
-     * @see Polynomial
-     * @see divide
+     * @return The quotient of the two polynomials.
      */
     auto operator/(const IsPolynomial auto& lhs, const IsPolynomial auto& rhs) { return divide(lhs, rhs).first; }
 
     /**
-     * @brief Compute the remainder of dividing one polynomial by another using the % operator.
-     * This operator divides the polynomial lhs by the polynomial rhs using the divide function
-     * and returns the remainder as a polynomial.
-     * @param lhs The polynomial to be divided.
+     * @brief Divides two polynomials and returns the remainder.
+     *
+     * This operator divides the first polynomial by the second polynomial and returns the
+     * remainder as a new polynomial. The degree of the remainder will be less than the
+     * degree of the second polynomial.
+     *
+     * @param lhs The polynomial to divide.
      * @param rhs The polynomial to divide by.
-     * @return The remainder of dividing `lhs` by `rhs`.
-     * @see Polynomial
-     * @see divide
+     * @return The remainder of the two polynomials.
      */
     auto operator%(const IsPolynomial auto& lhs, const IsPolynomial auto& rhs) { return divide(lhs, rhs).second; }
 

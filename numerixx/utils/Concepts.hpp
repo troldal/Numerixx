@@ -9,14 +9,17 @@
 
 namespace nxx::utils {
 
-    template <typename T>
-    struct is_complex : std::false_type {};
+//    template <typename T>
+//    struct is_complex : std::false_type {};
+//
+//    template <std::floating_point T>
+//    struct is_complex<std::complex<T>> : std::true_type {};
 
-    template <std::floating_point T>
-    struct is_complex<std::complex<T>> : std::true_type {};
+//    template <typename T>
+//    concept IsComplex = is_complex<T>::value;
 
     template <typename T>
-    concept IsComplex = is_complex<T>::value;
+    concept IsComplex = std::same_as<T, std::complex<typename T::value_type>>;
 
 }
 

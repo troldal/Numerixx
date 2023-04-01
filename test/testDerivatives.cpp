@@ -69,74 +69,74 @@ TEST_CASE("Numerical Derivatives Test", "[derivatives]")
 
     SECTION("Order1CentralRichardson")
     {
-        REQUIRE_THAT(*nxx::deriv::derivative<Order1CentralRichardson>(functions[i], evals[i]) - first_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.000001));
-        REQUIRE_THROWS(nxx::deriv::derivative<Order1CentralRichardson>([](double x){return std::sqrt(x);}, 0.0).value());
-        REQUIRE(nxx::deriv::derivative<Order1CentralRichardson>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
-        REQUIRE(nxx::deriv::derivative<Order1CentralRichardson>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
+        REQUIRE_THAT(*nxx::deriv::diff<Order1CentralRichardson>(functions[i], evals[i]) - first_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.000001));
+        REQUIRE_THROWS(nxx::deriv::diff<Order1CentralRichardson>([](double x){return std::sqrt(x);}, 0.0).value());
+        REQUIRE(nxx::deriv::diff<Order1CentralRichardson>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
+        REQUIRE(nxx::deriv::diff<Order1CentralRichardson>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
     }
 
     SECTION("Order1Central3Point")
     {
-        REQUIRE_THAT(*nxx::deriv::derivative<Order1Central3Point>(functions[i], evals[i]) - first_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.000001));
-        REQUIRE_THROWS(nxx::deriv::derivative<Order1Central3Point>([](double x){return std::sqrt(x);}, 0.0).value());
-        REQUIRE(nxx::deriv::derivative<Order1Central3Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
-        REQUIRE(nxx::deriv::derivative<Order1Central3Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
+        REQUIRE_THAT(*nxx::deriv::diff<Order1Central3Point>(functions[i], evals[i]) - first_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.000001));
+        REQUIRE_THROWS(nxx::deriv::diff<Order1Central3Point>([](double x){return std::sqrt(x);}, 0.0).value());
+        REQUIRE(nxx::deriv::diff<Order1Central3Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
+        REQUIRE(nxx::deriv::diff<Order1Central3Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
     }
 
     SECTION("Order1Central5Point")
     {
-        REQUIRE_THAT(*nxx::deriv::derivative<Order1Central5Point>(functions[i], evals[i]) - first_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.000001));
-        REQUIRE_THROWS(nxx::deriv::derivative<Order1Central5Point>([](double x){return std::sqrt(x);}, 0.0).value());
-        REQUIRE(nxx::deriv::derivative<Order1Central5Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
-        REQUIRE(nxx::deriv::derivative<Order1Central5Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
+        REQUIRE_THAT(*nxx::deriv::diff<Order1Central5Point>(functions[i], evals[i]) - first_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.000001));
+        REQUIRE_THROWS(nxx::deriv::diff<Order1Central5Point>([](double x){return std::sqrt(x);}, 0.0).value());
+        REQUIRE(nxx::deriv::diff<Order1Central5Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
+        REQUIRE(nxx::deriv::diff<Order1Central5Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
     }
 
     SECTION("Order1ForwardRichardson")
     {
-        REQUIRE_THAT(*nxx::deriv::derivative<Order1ForwardRichardson>(functions[i], evals[i]) - first_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.000001));
-        REQUIRE_NOTHROW(nxx::deriv::derivative<Order1ForwardRichardson>([](double x){return std::sqrt(x);}, 0.0).value());
-        REQUIRE(nxx::deriv::derivative<Order1ForwardRichardson>([](double x){return std::sqrt(x);}, 0.0).has_value() == true);
-        REQUIRE(nxx::deriv::derivative<Order1ForwardRichardson>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
+        REQUIRE_THAT(*nxx::deriv::diff<Order1ForwardRichardson>(functions[i], evals[i]) - first_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.000001));
+        REQUIRE_NOTHROW(nxx::deriv::diff<Order1ForwardRichardson>([](double x){return std::sqrt(x);}, 0.0).value());
+        REQUIRE(nxx::deriv::diff<Order1ForwardRichardson>([](double x){return std::sqrt(x);}, 0.0).has_value() == true);
+        REQUIRE(nxx::deriv::diff<Order1ForwardRichardson>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
     }
 
     SECTION("Order1Forward2Point")
     {
-        REQUIRE_THAT(*nxx::deriv::derivative<Order1Forward2Point>(functions[i], evals[i]) - first_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.001));
-        REQUIRE_NOTHROW(nxx::deriv::derivative<Order1Forward2Point>([](double x){return std::sqrt(x);}, 0.0).value());
-        REQUIRE(nxx::deriv::derivative<Order1Forward2Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == true);
-        REQUIRE(nxx::deriv::derivative<Order1Forward2Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
+        REQUIRE_THAT(*nxx::deriv::diff<Order1Forward2Point>(functions[i], evals[i]) - first_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.001));
+        REQUIRE_NOTHROW(nxx::deriv::diff<Order1Forward2Point>([](double x){return std::sqrt(x);}, 0.0).value());
+        REQUIRE(nxx::deriv::diff<Order1Forward2Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == true);
+        REQUIRE(nxx::deriv::diff<Order1Forward2Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
     }
 
     SECTION("Order1Forward3Point")
     {
-        REQUIRE_THAT(*nxx::deriv::derivative<Order1Forward3Point>(functions[i], evals[i]) - first_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.000001));
-        REQUIRE_NOTHROW(nxx::deriv::derivative<Order1Forward3Point>([](double x){return std::sqrt(x);}, 0.0).value());
-        REQUIRE(nxx::deriv::derivative<Order1Forward3Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == true);
-        REQUIRE(nxx::deriv::derivative<Order1Forward3Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
+        REQUIRE_THAT(*nxx::deriv::diff<Order1Forward3Point>(functions[i], evals[i]) - first_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.000001));
+        REQUIRE_NOTHROW(nxx::deriv::diff<Order1Forward3Point>([](double x){return std::sqrt(x);}, 0.0).value());
+        REQUIRE(nxx::deriv::diff<Order1Forward3Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == true);
+        REQUIRE(nxx::deriv::diff<Order1Forward3Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
     }
 
     SECTION("Order1BackwardRichardson")
     {
-        REQUIRE_THAT(*nxx::deriv::derivative<Order1BackwardRichardson>(functions[i], evals[i]) - first_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.000001));
-        REQUIRE_THROWS(nxx::deriv::derivative<Order1BackwardRichardson>([](double x){return std::sqrt(x);}, 0.0).value());
-        REQUIRE(nxx::deriv::derivative<Order1BackwardRichardson>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
-        REQUIRE(nxx::deriv::derivative<Order1BackwardRichardson>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
+        REQUIRE_THAT(*nxx::deriv::diff<Order1BackwardRichardson>(functions[i], evals[i]) - first_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.000001));
+        REQUIRE_THROWS(nxx::deriv::diff<Order1BackwardRichardson>([](double x){return std::sqrt(x);}, 0.0).value());
+        REQUIRE(nxx::deriv::diff<Order1BackwardRichardson>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
+        REQUIRE(nxx::deriv::diff<Order1BackwardRichardson>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
     }
 
     SECTION("Order1Backward2Point")
     {
-        REQUIRE_THAT(*nxx::deriv::derivative<Order1Backward2Point>(functions[i], evals[i]) - first_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.001));
-        REQUIRE_THROWS(nxx::deriv::derivative<Order1Backward2Point>([](double x){return std::sqrt(x);}, 0.0).value());
-        REQUIRE(nxx::deriv::derivative<Order1Backward2Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
-        REQUIRE(nxx::deriv::derivative<Order1Backward2Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
+        REQUIRE_THAT(*nxx::deriv::diff<Order1Backward2Point>(functions[i], evals[i]) - first_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.001));
+        REQUIRE_THROWS(nxx::deriv::diff<Order1Backward2Point>([](double x){return std::sqrt(x);}, 0.0).value());
+        REQUIRE(nxx::deriv::diff<Order1Backward2Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
+        REQUIRE(nxx::deriv::diff<Order1Backward2Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
     }
 
     SECTION("Order1Backward3Point")
     {
-        REQUIRE_THAT(*nxx::deriv::derivative<Order1Backward3Point>(functions[i], evals[i]) - first_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.000001));
-        REQUIRE_THROWS(nxx::deriv::derivative<Order1Backward3Point>([](double x){return std::sqrt(x);}, 0.0).value());
-        REQUIRE(nxx::deriv::derivative<Order1Backward3Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
-        REQUIRE(nxx::deriv::derivative<Order1Backward3Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
+        REQUIRE_THAT(*nxx::deriv::diff<Order1Backward3Point>(functions[i], evals[i]) - first_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.000001));
+        REQUIRE_THROWS(nxx::deriv::diff<Order1Backward3Point>([](double x){return std::sqrt(x);}, 0.0).value());
+        REQUIRE(nxx::deriv::diff<Order1Backward3Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
+        REQUIRE(nxx::deriv::diff<Order1Backward3Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
     }
 
     // ============================================================================================
@@ -145,49 +145,49 @@ TEST_CASE("Numerical Derivatives Test", "[derivatives]")
 
     SECTION("Order2Central3Point")
     {
-        REQUIRE_THAT(*nxx::deriv::derivative<Order2Central3Point>(functions[i], evals[i]) - second_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.0001));
-        REQUIRE_THROWS(nxx::deriv::derivative<Order2Central3Point>([](double x){return std::sqrt(x);}, 0.0).value());
-        REQUIRE(nxx::deriv::derivative<Order2Central3Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
-        REQUIRE(nxx::deriv::derivative<Order2Central3Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
+        REQUIRE_THAT(*nxx::deriv::diff<Order2Central3Point>(functions[i], evals[i]) - second_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.0001));
+        REQUIRE_THROWS(nxx::deriv::diff<Order2Central3Point>([](double x){return std::sqrt(x);}, 0.0).value());
+        REQUIRE(nxx::deriv::diff<Order2Central3Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
+        REQUIRE(nxx::deriv::diff<Order2Central3Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
     }
 
     SECTION("Order2Central5Point")
     {
-        REQUIRE_THAT(*nxx::deriv::derivative<Order2Central5Point>(functions[i], evals[i]) - second_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.0001));
-        REQUIRE_THROWS(nxx::deriv::derivative<Order2Central5Point>([](double x){return std::sqrt(x);}, 0.0).value());
-        REQUIRE(nxx::deriv::derivative<Order2Central5Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
-        REQUIRE(nxx::deriv::derivative<Order2Central5Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
+        REQUIRE_THAT(*nxx::deriv::diff<Order2Central5Point>(functions[i], evals[i]) - second_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.0001));
+        REQUIRE_THROWS(nxx::deriv::diff<Order2Central5Point>([](double x){return std::sqrt(x);}, 0.0).value());
+        REQUIRE(nxx::deriv::diff<Order2Central5Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
+        REQUIRE(nxx::deriv::diff<Order2Central5Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
     }
 
     SECTION("Order2Forward3Point")
     {
-        REQUIRE_THAT(*nxx::deriv::derivative<Order2Forward3Point>(functions[i], evals[i]) - second_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.001));
-        REQUIRE_NOTHROW(nxx::deriv::derivative<Order2Forward3Point>([](double x){return std::sqrt(x);}, 0.0).value());
-        REQUIRE(nxx::deriv::derivative<Order2Forward3Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == true);
-        REQUIRE(nxx::deriv::derivative<Order2Forward3Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
+        REQUIRE_THAT(*nxx::deriv::diff<Order2Forward3Point>(functions[i], evals[i]) - second_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.001));
+        REQUIRE_NOTHROW(nxx::deriv::diff<Order2Forward3Point>([](double x){return std::sqrt(x);}, 0.0).value());
+        REQUIRE(nxx::deriv::diff<Order2Forward3Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == true);
+        REQUIRE(nxx::deriv::diff<Order2Forward3Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
     }
 
     SECTION("Order2Forward4Point")
     {
-        REQUIRE_THAT(*nxx::deriv::derivative<Order2Forward4Point>(functions[i], evals[i]) - second_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.001));
-        REQUIRE_NOTHROW(nxx::deriv::derivative<Order2Forward4Point>([](double x){return std::sqrt(x);}, 0.0).value());
-        REQUIRE(nxx::deriv::derivative<Order2Forward4Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == true);
-        REQUIRE(nxx::deriv::derivative<Order2Forward4Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
+        REQUIRE_THAT(*nxx::deriv::diff<Order2Forward4Point>(functions[i], evals[i]) - second_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.001));
+        REQUIRE_NOTHROW(nxx::deriv::diff<Order2Forward4Point>([](double x){return std::sqrt(x);}, 0.0).value());
+        REQUIRE(nxx::deriv::diff<Order2Forward4Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == true);
+        REQUIRE(nxx::deriv::diff<Order2Forward4Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
     }
 
     SECTION("Order2Backward3Point")
     {
-        REQUIRE_THAT(*nxx::deriv::derivative<Order2Backward3Point>(functions[i], evals[i]) - second_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.001));
-        REQUIRE_THROWS(nxx::deriv::derivative<Order2Backward3Point>([](double x){return std::sqrt(x);}, 0.0).value());
-        REQUIRE(nxx::deriv::derivative<Order2Backward3Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
-        REQUIRE(nxx::deriv::derivative<Order2Backward3Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
+        REQUIRE_THAT(*nxx::deriv::diff<Order2Backward3Point>(functions[i], evals[i]) - second_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.001));
+        REQUIRE_THROWS(nxx::deriv::diff<Order2Backward3Point>([](double x){return std::sqrt(x);}, 0.0).value());
+        REQUIRE(nxx::deriv::diff<Order2Backward3Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
+        REQUIRE(nxx::deriv::diff<Order2Backward3Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
     }
 
     SECTION("Order2Backward4Point")
     {
-        REQUIRE_THAT(*nxx::deriv::derivative<Order2Backward4Point>(functions[i], evals[i]) - second_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.001));
-        REQUIRE_THROWS(nxx::deriv::derivative<Order2Backward4Point>([](double x){return std::sqrt(x);}, 0.0).value());
-        REQUIRE(nxx::deriv::derivative<Order2Backward4Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
-        REQUIRE(nxx::deriv::derivative<Order2Backward4Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
+        REQUIRE_THAT(*nxx::deriv::diff<Order2Backward4Point>(functions[i], evals[i]) - second_derivatives[i], Catch::Matchers::WithinAbs(0.0, 0.001));
+        REQUIRE_THROWS(nxx::deriv::diff<Order2Backward4Point>([](double x){return std::sqrt(x);}, 0.0).value());
+        REQUIRE(nxx::deriv::diff<Order2Backward4Point>([](double x){return std::sqrt(x);}, 0.0).has_value() == false);
+        REQUIRE(nxx::deriv::diff<Order2Backward4Point>([](double x){return std::sqrt(x);}, 1.0).has_value() == true);
     }
 }

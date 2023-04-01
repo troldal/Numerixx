@@ -15,6 +15,7 @@ add_subdirectory(Catch2)
 add_executable(NumerixxTests EXCLUDE_FROM_ALL "")
 target_sources(NumerixxTests
         PRIVATE
+        testPolynomials.cpp
         testDerivatives.cpp
         testMatrix.cpp
         testRootBracketing.cpp
