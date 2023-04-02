@@ -407,12 +407,12 @@ namespace nxx::poly
 
         if (lhs.order() < rhs.order()) {
             auto coeffs = rhs.coefficients();
-            std::transform(coeffs.cbegin(), coeffs.cend(), lhs.coefficients().begin(), coeffs.begin(), std::plus< TYPE >());
+            std::transform(lhs.coefficients().cbegin(), lhs.coefficients().cend(), coeffs.cbegin(), coeffs.begin(), std::plus< TYPE >());
             return Polynomial(coeffs);
         }
         else {
             auto coeffs = lhs.coefficients();
-            std::transform(coeffs.cbegin(), coeffs.cend(), rhs.coefficients().begin(), coeffs.begin(), std::plus< TYPE >());
+            std::transform(rhs.coefficients().cbegin(), rhs.coefficients().cend(), coeffs.cbegin(), coeffs.begin(), std::plus< TYPE >());
             return Polynomial(coeffs);
         }
     }
@@ -437,14 +437,14 @@ namespace nxx::poly
 
         if (lhs.order() < rhs.order()) {
             auto coeffs = rhs.coefficients();
-            std::transform(coeffs.cbegin(), coeffs.cend(), lhs.coefficients().begin(), coeffs.begin(), [](TYPE a, TYPE b) {
+            std::transform(lhs.coefficients().cbegin(), lhs.coefficients().cend(), coeffs.cbegin(), coeffs.begin(), [](TYPE a, TYPE b) {
                 return b - a;
             });
             return Polynomial(coeffs);
         }
         else {
             auto coeffs = lhs.coefficients();
-            std::transform(coeffs.cbegin(), coeffs.cend(), rhs.coefficients().begin(), coeffs.begin(), [](TYPE a, TYPE b) {
+            std::transform(rhs.coefficients().cbegin(), rhs.coefficients().cend(), coeffs.cbegin(), coeffs.begin(), [](TYPE a, TYPE b) {
                 return a - b;
             });
             return Polynomial(coeffs);
@@ -507,25 +507,23 @@ namespace nxx::poly
         if (divisor.empty() || divisor.back() == 0.0 || rhs.order() > lhs.order())
             throw error::PolynomialError("Invalid divisor polynomial");
 
-        std::size_t dividendDegree = dividend.size() - 1;
-        std::size_t divisorDegree = divisor.size() - 1;
-
-        std::vector<TYPE> quotient(dividendDegree - divisorDegree + 1, 0);
+        std::vector<TYPE> quotient(lhs.order() - rhs.order() + 1, 0);
         remainder = dividend;
 
-        for (std::size_t i = dividendDegree; i >= divisorDegree && i < dividend.size(); --i) {
+        for (std::size_t i = lhs.order(); i >= rhs.order() && i < dividend.size(); --i) {
             TYPE coef = remainder[i] / divisor.back();
-            quotient[i - divisorDegree] = coef;
+            quotient[i - rhs.order()] = coef;
 
-            for (std::size_t j = 0; j <= divisorDegree; ++j) {
-                remainder[i - j] -= coef * divisor[divisorDegree - j];
+            for (std::size_t j = 0; j <= rhs.order(); ++j) {
+                remainder[i - j] -= coef * divisor[rhs.order() - j];
             }
         }
 
         // Remove leading zeros in the remainder
-        while (!remainder.empty() && remainder.back() == 0.0) {
-            remainder.pop_back();
-        }
+//        while (!remainder.empty() && remainder.back() == 0.0) {
+//            remainder.pop_back();
+//        }
+        remainder.erase(std::find_if(remainder.crbegin(), remainder.crend(), [](TYPE val) { return val != 0.0; }).base() + 1, remainder.end());
 
         return std::make_pair(Polynomial(quotient), Polynomial(remainder));
     }

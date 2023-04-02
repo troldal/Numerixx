@@ -572,16 +572,17 @@ namespace nxx::deriv
      * @param function The function to compute the derivative of.
      * @param stepsize (Optional) The step size to use in the computation. The default is the cubic root of the machine epsilon.
      * @return A lambda function representing the derivative of the input function. The lambda will take one floating point
-     * argument, and return a \c tl::expected (\c std::expected) containing the (approximated) derivative of the function,
-     * or (in case of an error) a \c DerivativeError exception object describing the error.
+     * argument, and return the (approximated) derivative of the function.
      * @note For objects of the \c Polynomial class, an overload of the \c derivativeOf function is provided for computing the
      * derivative function analytically.
+     * @note The returned function object will not check the result for errors. If you want to check the result for errors,
+     * use the \c diff function instead, or create a custom function object (e.g., a lambda) that checks the result for errors.
      */
     template< typename ALGO = Order1CentralRichardson>
     inline auto derivativeOf(IsFunction auto function, ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
         using RT = ReturnType< decltype(function) >;
-        return [=](RT val) { return diff< ALGO >(function, val, stepsize); };
+        return [=](RT val) { return *diff< ALGO >(function, val, stepsize); };
     }
 
 }    // namespace nxx::deriv

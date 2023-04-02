@@ -53,14 +53,14 @@ namespace nxx::roots
      * Forward declaration of the DNewton class.
      */
     template< typename FN, typename DFN >
-        requires std::invocable< FN, float > && std::invocable< DFN, float >
+        requires std::invocable< FN, double > && std::invocable< DFN, double >
     class DNewton;
 
     /*
      * Forward declaration of the Newton class.
      */
     template< typename FN, typename DFN >
-        requires std::invocable< FN, float > && std::invocable< DFN, float >
+        requires std::invocable< FN, double > && std::invocable< DFN, double >
     class Newton;
 
     /*
@@ -193,7 +193,7 @@ namespace nxx::roots
      * @tparam DFN The type of the function object for the derivative (deducet automatically).
      */
     template< typename FN, typename DFN >
-        requires std::invocable< FN, float > && std::invocable< DFN, float >
+        requires std::invocable< FN, double > && std::invocable< DFN, double >
     class DNewton final : public impl::PolishingBase< DNewton< FN, DFN > >
     {
         /*
@@ -212,7 +212,6 @@ namespace nxx::roots
          * @brief Constructor, taking the function object as an argument.
          * @param objective The function object for which to find the root.
          */
-//        explicit DNewton(FN objective) : Base(objective, [=](double x) { return *nxx::deriv::central(objective, x); }) {}
         explicit DNewton(FN objective) : Base(objective, nxx::deriv::derivativeOf(objective)) {}
 
 
@@ -238,7 +237,7 @@ namespace nxx::roots
      * @tparam DFN The type of the function object for the derivative.
      */
     template< typename FN, typename DFN >
-        requires std::invocable< FN, float > && std::invocable< DFN, float >
+        requires std::invocable< FN, double > && std::invocable< DFN, double >
     class Newton final : public impl::PolishingBase< Newton< FN, DFN > >
     {
         /*

@@ -142,6 +142,17 @@ int main() {
     for (auto root : polysolve<double>(func2)) std::cout << root << "\n";
 
 
+    auto dividend = Polynomial({ 5.0, -3.0, 4.0, -1.0, 2.0 });
+    auto divisor = Polynomial({ 1.0, 0.0, 1.0 });
+    auto quotient = dividend / divisor;
+    auto remainder = dividend % divisor;
+    auto temp = quotient * divisor + remainder;
+
+    std::cout << "Dividend: " << dividend.asString() << std::endl;
+    std::cout << "Divisor: " << divisor.asString() << std::endl;
+    std::cout << "Quotient: " << quotient.asString() << std::endl;
+    std::cout << "Remainder: " << remainder.asString() << std::endl;
+    std::cout << "Quotient * Divisor + Remainder: " << temp.asString() << std::endl;
 //
 //    std::cout << guess << std::endl;
 //    std::cout << a << std::endl;

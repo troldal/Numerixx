@@ -119,7 +119,7 @@ int main() {
         {0.0, 0.2}
     };
 
-    for (auto i = 0; i <= 6; ++i)
+    for (size_t i = 0; i <= 6; ++i)
         std::cout << fdfsolve(Newton(functions[i], derivatives[i]), (brackets[i].second + brackets[i].second)/2.0, 1.0E-15) << std::endl;
 
     return 0;
