@@ -64,6 +64,10 @@ namespace nxx::roots
         throw std::logic_error("Bracket not found!");
     }
 
+    // bracket_search_down
+    // bracket_search_out
+    // bracket_search_in
+
     // ========================================================================
     // ROOT-FINDING WITHOUT DERIVATIVES
     // ========================================================================
@@ -130,7 +134,7 @@ namespace nxx::roots
             using function_type = typename BracketingTraits<POLICY>::function_type;
             function_type m_func {}; /**< The function object to find the root for. */
 
-            using return_type = decltype(m_func(0.0));
+            using return_type = std::invoke_result_t<function_type, double>;
             std::pair<return_type, return_type> m_bounds {0.0, 0.0}; /**< Holds the current bounds around the root. */
 
             /**

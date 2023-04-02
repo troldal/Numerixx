@@ -46,9 +46,6 @@
 namespace nxx::poly
 {
 
-    // TODO: Use tl::expected as the return type for all functions that can fail.
-    // TODO: Implement constructor that can take the roots of a polynomial and create a polynomial from that (Newton's Divided Difference method).
-
     /**
      * @brief A concept that checks whether a container is suitable for storing polynomial coefficients.
      *
@@ -62,6 +59,9 @@ namespace nxx::poly
                                       IsComplex< typename CONTAINER::value_type >) &&
                                      (std::bidirectional_iterator< typename CONTAINER::iterator >);
 
+    /*
+     * Forward declaration of the Polynomial class.
+     */
     template< typename T >
         requires std::floating_point< T > || IsComplex< T >
     class Polynomial;
@@ -84,7 +84,7 @@ namespace nxx::poly
     };
 
     /*
-     * Specialization of the MatrixTraits class for Polynomial objects with complex coefficients.
+     * Specialization of the PolynomialTraits class for Polynomial objects with complex coefficients.
      */
     template<typename T>
     struct PolynomialTraits<Polynomial<std::complex<T>>>
@@ -92,7 +92,6 @@ namespace nxx::poly
         using value_type = std::complex<T>;
         using fundamental_type = T;
     };
-
 
     /**
      * @brief A class representing a polynomial with coefficients of type T.
@@ -519,10 +518,6 @@ namespace nxx::poly
             }
         }
 
-        // Remove leading zeros in the remainder
-//        while (!remainder.empty() && remainder.back() == 0.0) {
-//            remainder.pop_back();
-//        }
         remainder.erase(std::find_if(remainder.crbegin(), remainder.crend(), [](TYPE val) { return val != 0.0; }).base() + 1, remainder.end());
 
         return std::make_pair(Polynomial(quotient), Polynomial(remainder));

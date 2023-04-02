@@ -41,9 +41,13 @@
 #include <utility>
 
 #include "calculus/Derivatives.hpp"
+#include "poly/Polynomial.hpp"
 
 namespace nxx::roots
 {
+    using nxx::poly::derivativeOf;
+    using nxx::deriv::derivativeOf;
+
 
     // ========================================================================
     // ROOT-FINDING WITH DERIVATIVES
@@ -117,14 +121,14 @@ namespace nxx::roots
             friend POLICY;
 
         private:
-            using function_type = typename impl::PolishingTraits< POLICY >::function_type;
-            function_type m_func {}; /**< The function object to find the root for. */
+            using function_type = typename impl::PolishingTraits< POLICY >::function_type; /**< The type of the function object. */
+            function_type m_func {};                                                       /**< The function object to find the root for. */
 
-            using deriv_type = typename impl::PolishingTraits< POLICY >::deriv_type;
-            deriv_type m_deriv {}; /**< The function object for the derivative. */
+            using deriv_type = typename impl::PolishingTraits< POLICY >::deriv_type; /**< The type of the derivative function object. */
+            deriv_type m_deriv {};                                                   /**< The function object for the derivative. */
 
-            using RT = decltype(m_func(0.0));
-            RT m_guess; /**< The current root estimate. */
+            using RT = std::invoke_result_t< function_type, double >;                /**< The return type of the function object. */
+            RT m_guess;                                                              /**< The current root estimate. */
 
         public:
             /**
@@ -212,7 +216,7 @@ namespace nxx::roots
          * @brief Constructor, taking the function object as an argument.
          * @param objective The function object for which to find the root.
          */
-        explicit DNewton(FN objective) : Base(objective, nxx::deriv::derivativeOf(objective)) {}
+        explicit DNewton(FN objective) : Base(objective, derivativeOf(objective)) {}
 
 
         /**
@@ -282,6 +286,7 @@ namespace nxx::roots
      */
     template< typename SOLVER >
     inline auto fdfsolve(SOLVER solver, double guess, double eps = 1.0E-6, int maxiter = 100)
+        -> tl::expected<double, error::RootError>
     {
         // using RT = decltype(solver.evaluate(0.0));
 
@@ -291,6 +296,7 @@ namespace nxx::roots
         while (true) {
             if (abs(solver.evaluate(solver.result())) < eps) break;
             solver.iterate();
+            if (!std::isfinite(solver.result())) return tl::make_unexpected(error::RootError("Root Error!"));;
 
             ++iter;
             if (iter > maxiter) break;

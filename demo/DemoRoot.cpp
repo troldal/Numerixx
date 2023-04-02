@@ -70,6 +70,8 @@ int main() {
     using nxx::roots::Bisection;
     using nxx::roots::DNewton;
     using nxx::roots::Newton;
+    using namespace nxx::deriv;
+    using namespace nxx::poly;
 
     std::cout << "RIDDERS:" << std::endl;
     print(Ridders(fun), {0.0, 2.5});
@@ -81,13 +83,12 @@ int main() {
     print(DNewton(fun), 3.0);
 
     std::cout << "NEWTON:" << std::endl;
-    print(Newton(fun, nxx::deriv::derivativeOf(fun)), 1.25);
+    print(Newton(fun, derivativeOf(fun)), 1.25);
 
-    auto s1 = fsolve(Ridders(fun), {0.0, 2.5}, 1.0E-15);
-    std::cout << "Ridders:         " << (s1 ? *s1 : 0) << std::endl;
+    std::cout << "Ridders:         " << *fsolve(Ridders(fun), {0.0, 2.5}, 1.0E-15) << std::endl;
     std::cout << "Bisection:       " << *fsolve(Bisection(fun), {0.0, 2.5}, 1.0E-15) << std::endl;
-    std::cout << "Discrete Newton: " << fdfsolve(DNewton(fun), 1.25, 1.0E-15) << std::endl;
-    std::cout << "Newton:          " << fdfsolve(Newton(fun, nxx::deriv::derivativeOf(fun)), 1.25, 1.0E-15) << std::endl;
+    std::cout << "Discrete Newton: " << *fdfsolve(DNewton(fun), 1.25, 1.0E-15) << std::endl;
+    std::cout << "Newton:          " << *fdfsolve(Newton(fun, derivativeOf(fun)), 1.25, 1.0E-15) << std::endl;
 
     std::vector<std::function<double(double)>> functions {
         [](double x){return std::sin(x) - x/2.0;},
@@ -120,7 +121,7 @@ int main() {
     };
 
     for (size_t i = 0; i <= 6; ++i)
-        std::cout << fdfsolve(Newton(functions[i], derivatives[i]), (brackets[i].second + brackets[i].second)/2.0, 1.0E-15) << std::endl;
+        std::cout << *fdfsolve(Newton(functions[i], derivatives[i]), (brackets[i].second + brackets[i].second)/2.0, 1.0E-15) << std::endl;
 
     return 0;
 }

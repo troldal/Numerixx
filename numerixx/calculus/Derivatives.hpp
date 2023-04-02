@@ -32,6 +32,7 @@
 #define NUMERIXX_DIFFERENTIATION_HPP
 
 #include "DerivativeError.hpp"
+#include "../poly/Polynomial.hpp"
 #include "../.dependencies/expected/expected.hpp"
 #include "../.dependencies/gcem/gcem.hpp"
 
@@ -580,6 +581,7 @@ namespace nxx::deriv
      */
     template< typename ALGO = Order1CentralRichardson>
     inline auto derivativeOf(IsFunction auto function, ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
+    requires (!poly::IsPolynomial< decltype(function) >)
     {
         using RT = ReturnType< decltype(function) >;
         return [=](RT val) { return *diff< ALGO >(function, val, stepsize); };
