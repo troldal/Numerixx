@@ -95,8 +95,16 @@ namespace nxx::roots
         };
 
         /**
-         * @brief The PolishingBase class is a CRTP base class for polishing solvers (i.e. with derivatives)
-         * @tparam POLICY The type of the (derived) solver class.
+         * @brief A CRTP base class for root-finding algorithms using derivatives.
+         *
+         * This class serves as a CRTP base class for root-finding algorithms that require the use of derivatives.
+         * It requires that the derived class provides the necessary function and derivative callable objects,
+         * which should be invocable with a double argument.
+         *
+         * @tparam POLICY The derived class, which should inherit from PolishingBase.
+         *
+         * @note This class should not be used directly by clients; it is intended for use as a base class.
+         * @note The derived class should satisfy the requirements for the PolishingTraits type trait.
          */
         template< typename POLICY >
             requires std::invocable< typename impl::PolishingTraits< POLICY >::function_type, double > &&
@@ -204,7 +212,9 @@ namespace nxx::roots
          * @brief Constructor, taking the function object as an argument.
          * @param objective The function object for which to find the root.
          */
-        explicit DNewton(FN objective) : Base(objective, [=](double x) { return *nxx::deriv::central(objective, x); }) {}
+//        explicit DNewton(FN objective) : Base(objective, [=](double x) { return *nxx::deriv::central(objective, x); }) {}
+        explicit DNewton(FN objective) : Base(objective, nxx::deriv::derivativeOf(objective)) {}
+
 
         /**
          * @brief Perform one iteration. This is the main algorithm of the DNewton method.

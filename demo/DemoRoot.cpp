@@ -81,13 +81,13 @@ int main() {
     print(DNewton(fun), 3.0);
 
     std::cout << "NEWTON:" << std::endl;
-    print(Newton(fun, [&](double x){return fun.derivative(x);}), 1.25);
+    print(Newton(fun, nxx::deriv::derivativeOf(fun)), 1.25);
 
     auto s1 = fsolve(Ridders(fun), {0.0, 2.5}, 1.0E-15);
     std::cout << "Ridders:         " << (s1 ? *s1 : 0) << std::endl;
     std::cout << "Bisection:       " << *fsolve(Bisection(fun), {0.0, 2.5}, 1.0E-15) << std::endl;
     std::cout << "Discrete Newton: " << fdfsolve(DNewton(fun), 1.25, 1.0E-15) << std::endl;
-    std::cout << "Newton:          " << fdfsolve(Newton(fun, [&](double x){return fun.derivative(x);}), 1.25, 1.0E-15) << std::endl;
+    std::cout << "Newton:          " << fdfsolve(Newton(fun, nxx::deriv::derivativeOf(fun)), 1.25, 1.0E-15) << std::endl;
 
     std::vector<std::function<double(double)>> functions {
         [](double x){return std::sin(x) - x/2.0;},

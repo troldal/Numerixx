@@ -59,21 +59,21 @@ namespace nxx::poly
      */
     template< typename CONTAINER >
     concept IsCoefficientContainer = (std::floating_point< typename CONTAINER::value_type > ||
-                                      utils::IsComplex< typename CONTAINER::value_type >) &&
+                                      IsComplex< typename CONTAINER::value_type >) &&
                                      (std::bidirectional_iterator< typename CONTAINER::iterator >);
 
     template< typename T >
-        requires std::floating_point< T > || utils::IsComplex< T >
+        requires std::floating_point< T > || IsComplex< T >
     class Polynomial;
 
     /*
-         * Forward declaration of the MatrixTraits class.
+     * Forward declaration of the PolynomialTraits class.
      */
     template<typename T>
     struct PolynomialTraits;
 
     /*
-         * Specialization of the MatrixTraits class for Matrix<T>
+     * Specialization of the PolynomialTraits class for Polynomial objects with floating point coefficients.
      */
     template<typename T>
         requires std::floating_point< T >
@@ -84,7 +84,7 @@ namespace nxx::poly
     };
 
     /*
-         * Specialization of the MatrixTraits class for MatrixView<T>
+     * Specialization of the MatrixTraits class for Polynomial objects with complex coefficients.
      */
     template<typename T>
     struct PolynomialTraits<Polynomial<std::complex<T>>>
@@ -106,7 +106,7 @@ namespace nxx::poly
      * point type or a type that satisfies the `utils::IsComplex` concept.
      */
     template< typename T >
-        requires std::floating_point< T > || utils::IsComplex< T >
+        requires std::floating_point< T > || IsComplex< T >
     class Polynomial final
     {
         std::vector< T > m_coefficients; /**< The internal store of polynomial coefficients. */
@@ -130,8 +130,11 @@ namespace nxx::poly
          */
         explicit Polynomial(const IsCoefficientContainer auto& coefficients)
             : m_coefficients { coefficients.cbegin(),
-                               std::find_if(coefficients.crbegin(), coefficients.crend(), [](T val) { return val != 0.0; }).base() }
-        {}
+                               std::find_if(coefficients.crbegin(), coefficients.crend(), [](T val) { return val != 0.0; }).base() } {
+                if (m_coefficients.empty()) {
+                    m_coefficients.push_back(0.0);
+                }
+        }
 
         /**
          * @brief Constructs a polynomial from a list of coefficients.
@@ -167,11 +170,10 @@ namespace nxx::poly
          * @return The value of the polynomial at the specified input value.
          */
         template< typename U >
-            requires std::floating_point< U > || utils::IsComplex< U >
+            requires std::floating_point< U > || IsComplex< U >
         [[nodiscard]] inline auto evaluate(U value) const
         {
             using TYPE = std::common_type_t< T, U >;
-            tl::expected< TYPE, error::PolynomialError > result;
 
             // ===== Horner's method implemented in terms of std::accummulate.
             TYPE eval = std::accumulate(m_coefficients.crbegin() + 1,
@@ -179,11 +181,7 @@ namespace nxx::poly
                                         static_cast< TYPE >(m_coefficients.back()),
                                         [value](TYPE curr, TYPE coeff) { return curr * value + coeff; });
 
-            if (std::isfinite(abs(eval)))
-                result = eval;
-            else
-                result = tl::make_unexpected(error::PolynomialError { "Evaluation of polynomial gave non-finite result." });
-            return result;
+            return eval;
         }
 
         /**
@@ -227,7 +225,7 @@ namespace nxx::poly
                 oss << m_coefficients.front();
                 for (size_t i = 1; i < m_coefficients.size(); ++i) {
                     auto coeff = m_coefficients[i];
-                    if constexpr (!utils::IsComplex< T > ) {
+                    if constexpr (!IsComplex< T > ) {
                         if (coeff == 0) { continue; }
                         else if (coeff > 0) { oss << " + "; }
                         else { oss << " - "; }
@@ -267,6 +265,7 @@ namespace nxx::poly
         {
             auto temp = *this + rhs;
             std::swap(*this, temp);
+            return *this;
         }
 
         /**
@@ -283,6 +282,7 @@ namespace nxx::poly
         {
             auto temp = *this - rhs;
             std::swap(*this, temp);
+            return *this;
         }
 
         /**
@@ -299,6 +299,7 @@ namespace nxx::poly
         {
             auto temp = *this * rhs;
             std::swap(*this, temp);
+            return *this;
         }
 
         /**
@@ -314,6 +315,7 @@ namespace nxx::poly
         {
             auto temp = *this / rhs;
             std::swap(*this, temp);
+            return *this;
         }
 
         /**
@@ -344,8 +346,6 @@ namespace nxx::poly
          */
         auto end() const { return m_coefficients.cend(); }
         auto cend() const { return m_coefficients.cend(); }
-
-
     };
 
     /*
@@ -374,19 +374,17 @@ namespace nxx::poly
      * @param func The polynomial to differentiate.
      * @return The derivative of the polynomial.
      */
-    template< typename T >
-    inline auto derivativeOf(const Polynomial< T >& func)
+    inline auto derivativeOf(IsPolynomial auto func)
     {
-        std::vector< T > coefficients { func.coefficients().cbegin() + 1, func.coefficients().cend() };
+        if (func.order() == 0) throw error::PolynomialError("Cannot differentiate a constant polynomial.");
+
+        using VALUE_TYPE   = typename PolynomialTraits< decltype(func) >::value_type;
+        using FLOAT_TYPE   = typename PolynomialTraits< decltype(func) >::fundamental_type;
+
+        std::vector< VALUE_TYPE > coefficients { func.coefficients().cbegin() + 1, func.coefficients().cend() };
 
         int n = 1;
-        if constexpr (utils::IsComplex< T >) {
-            std::transform(coefficients.cbegin(), coefficients.cend(), coefficients.begin(), [&n](T elem) { return elem * static_cast<typename T::value_type>(n++); });
-        }
-        else {
-            std::transform(coefficients.cbegin(), coefficients.cend(), coefficients.begin(), [&n](T elem) { return elem * static_cast<T>(n++); });
-        }
-
+        std::transform(coefficients.cbegin(), coefficients.cend(), coefficients.begin(), [&n](VALUE_TYPE elem) { return elem * static_cast<FLOAT_TYPE>(n++); });
         return Polynomial(coefficients);
     }
 
@@ -506,17 +504,11 @@ namespace nxx::poly
         std::vector<TYPE> divisor = rhs.coefficients();
         std::vector<TYPE> remainder {};
 
-        if (divisor.empty() || divisor.back() == 0.0) {
-            throw std::invalid_argument("Invalid divisor polynomial");
-        }
+        if (divisor.empty() || divisor.back() == 0.0 || rhs.order() > lhs.order())
+            throw error::PolynomialError("Invalid divisor polynomial");
 
         std::size_t dividendDegree = dividend.size() - 1;
         std::size_t divisorDegree = divisor.size() - 1;
-
-        if (dividendDegree < divisorDegree) {
-            remainder = dividend;
-            return std::make_pair(Polynomial<TYPE>({}), Polynomial(remainder));
-        }
 
         std::vector<TYPE> quotient(dividendDegree - divisorDegree + 1, 0);
         remainder = dividend;
@@ -536,26 +528,6 @@ namespace nxx::poly
         }
 
         return std::make_pair(Polynomial(quotient), Polynomial(remainder));
-
-//        const auto& lhs_coeffs = lhs.coefficients();
-//        const auto& rhs_coeffs = rhs.coefficients();
-//
-//        std::vector< TYPE > quotient(lhs.order() - rhs.order() + 1, 0.0);
-//        std::vector< TYPE > remainder(lhs_coeffs.begin(), lhs_coeffs.end());
-//
-//        // TODO: Consider simplifying this loop
-//        auto odiff = lhs.order() - rhs.order();
-//        for (auto q_iter = quotient.rbegin(), r_iter = remainder.rbegin(); q_iter != quotient.rend(); ++q_iter, ++r_iter) {
-//            *q_iter = *r_iter / rhs_coeffs.back();
-//
-//            auto counter = lhs.order() - 1;
-//            for (auto iter = r_iter + 1; iter != r_iter + odiff + 1; ++iter) {
-//                *iter -= *q_iter * rhs_coeffs[(counter--) - odiff];
-//            }
-//        }
-//
-//        remainder.erase(remainder.begin() + rhs.order(), remainder.end());
-//        return std::make_pair(Polynomial(quotient), Polynomial(remainder));
     }
 
     /**

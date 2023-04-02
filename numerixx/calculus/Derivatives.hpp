@@ -47,10 +47,10 @@ namespace nxx::deriv
 {
     template< typename FN >
     concept IsFunction = requires(FN fn) {
-                             {
-                                 fn(0.0)
-                             } -> std::floating_point;
-                         };
+        {
+            fn(0.0)
+        } -> std::floating_point;
+    };
 
     template< typename SOLVER >
     concept IsSolver = std::invocable< SOLVER, std::function< double(double) >, double, double >;

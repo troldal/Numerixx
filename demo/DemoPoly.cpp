@@ -2,15 +2,15 @@
 // This demo shows how to use the nxx:poly::Polynomial class to create polynomial function objects.
 // ================================================================================================
 
-#include <deque>
-#include <list>
-#include <set>
-#include <unordered_set>
+#include "poly/Polyroots.hpp"
 #include <complex>
+#include <deque>
 #include <iomanip>
 #include <iostream>
+#include <list>
 #include <poly/Polynomial.hpp>
-#include <polyroots/Polyroots.hpp>
+#include <set>
+#include <unordered_set>
 
 void printpoly(auto coefficients) {
 
@@ -27,7 +27,6 @@ void printpoly(auto coefficients) {
 int main() {
 
     using namespace nxx::poly;
-    using namespace nxx::polyroots;
 
     // ============================================================================================
     // Creating a polynomial function object is done by passing a list of the polynomial coefficients
@@ -48,14 +47,14 @@ int main() {
     std::cout << "Created the polynomial f(x) = " << func1.asString() << std::endl << std::endl;
 
     std::cout << "Evaluation using function call operator:" << std::endl;
-    std::cout << "Evaluation at -1.0: f(x) = " << *func1(-1.0) << std::endl;
-    std::cout << "Evaluation at 0.0:  f(x) = " << *func1(0.0) << std::endl;
-    std::cout << "Evaluation at 1.0:  f(x) = " << *func1(1.0) << std::endl << std::endl;
+    std::cout << "Evaluation at -1.0: f(x) = " << func1(-1.0) << std::endl;
+    std::cout << "Evaluation at 0.0:  f(x) = " << func1(0.0) << std::endl;
+    std::cout << "Evaluation at 1.0:  f(x) = " << func1(1.0) << std::endl << std::endl;
 
     std::cout << "Evaluation using the .evaluate() function:" << std::endl;
-    std::cout << "Evaluation at -1.0: f(x) = " << *func1.evaluate(-1.0) << std::endl;
-    std::cout << "Evaluation at 0.0:  f(x) = " << *func1.evaluate(0.0) << std::endl;
-    std::cout << "Evaluation at 1.0:  f(x) = " << *func1.evaluate(1.0) << std::endl << std::endl;
+    std::cout << "Evaluation at -1.0: f(x) = " << func1.evaluate(-1.0) << std::endl;
+    std::cout << "Evaluation at 0.0:  f(x) = " << func1.evaluate(0.0) << std::endl;
+    std::cout << "Evaluation at 1.0:  f(x) = " << func1.evaluate(1.0) << std::endl << std::endl;
 
     // ============================================================================================
     // While the coefficients must be of floating-point type, the function object can be called
@@ -63,10 +62,10 @@ int main() {
     // the coefficients cannot be std::complex objects.
     // ============================================================================================
     std::cout << "Evaluation using function call operator, with std::complex argument:" << std::endl;
-    std::cout << "Evaluation at (-0.072 - 0.638i): f(x) = " << *func1(std::complex<double>(-0.0720852, -0.638327)) << "\n\n";
+    std::cout << "Evaluation at (-0.072 - 0.638i): f(x) = " << func1(std::complex<double>(-0.0720852, -0.638327)) << "\n\n";
 
     std::cout << "Evaluation using the .evaluate() function, with std::complex argument:" << std::endl;
-    std::cout << "Evaluation at (-0.072 - 0.638i): f(x) = " << *func1.evaluate(std::complex<double>(-0.0720852, -0.638327)) << "\n\n";
+    std::cout << "Evaluation at (-0.072 - 0.638i): f(x) = " << func1.evaluate(std::complex<double>(-0.0720852, -0.638327)) << "\n\n";
 
 
     // ============================================================================================
@@ -105,10 +104,10 @@ int main() {
     auto rpoly = Polynomial({ 1.0, 2.0, 3.0, 4.0 });
     auto cpoly = Polynomial({ 1.0+0i, 2.0+0i, 3.0+0i, 4.0+0i });
 
-    std::cout << "RPoly(1.0) = " << *rpoly(1.0) << std::endl;
-    std::cout << "RPoly(1.0 + 0.0i) = " << *rpoly(std::complex{1.0, 0.0}) << std::endl;
-    std::cout << "CPoly(1.0) = " << *cpoly(1.0) << std::endl;
-    std::cout << "CPoly(1.0 + 0.0i) = " << *cpoly(std::complex{1.0, 0.0}) << std::endl;
+    std::cout << "RPoly(1.0) = " << rpoly(1.0) << std::endl;
+    std::cout << "RPoly(1.0 + 0.0i) = " << rpoly(std::complex{1.0, 0.0}) << std::endl;
+    std::cout << "CPoly(1.0) = " << cpoly(1.0) << std::endl;
+    std::cout << "CPoly(1.0 + 0.0i) = " << cpoly(std::complex{1.0, 0.0}) << std::endl;
 
     auto a_2 = Polynomial({-1.0, 2.0, -4.0, 3.0, 1.0});
     auto b_2 = Polynomial({1.0, -1.0, 1.0});
@@ -132,8 +131,6 @@ int main() {
                                                          { 0.6, -0.9, 1.8, -2.3, 1.2, -3.7, 2.1 },
                                                          { -0.6, 0.8, -1.2, 2.7, -3.5, 1.8, -4.2, 5.5 } };
 
-    //for (const auto& eq : coefficients) printpoly(eq);
-
     auto func0 = Polynomial({-1.0, 0.0, 0.0, 0.0, 0.0, 1.0});
     for (auto root : polysolve(func0)) std::cout << root << "\n";
     for (auto root : polysolve<std::complex<double> >(func0)) std::cout << root << "\n";
@@ -145,31 +142,6 @@ int main() {
     for (auto root : polysolve<double>(func2)) std::cout << root << "\n";
 
 
-
-//    std::cout << func.asString() << "\n";
-//
-//    auto d1func = derivativeOf(func);
-//    auto d2func = derivativeOf(d1func);
-//
-//    //double guess = 0.0;
-//    std::complex<double> guess = 2.0;
-//
-//    auto G = *d1func(guess) / *func(guess);
-//    auto H = G * G - *d2func(guess) / *func(guess);
-//
-//    auto a_func = [&] {
-//        auto temp = std::sqrt(2.0 * (3.0 * H - G*G));
-//        return 3.0 / (abs(G + temp) > abs(G - temp) ? (G + temp) : (G - temp));
-//    };
-//
-//    auto a = a_func();
-//    for (int i = 0; i < 100; ++i) {
-//        guess = guess - a;
-//        G = *d1func(guess) / *func(guess);
-//        H = G * G - *d2func(guess) / *func(guess);
-//        a = a_func();
-//        if (abs(a) < 1E-12) break;
-//    }
 //
 //    std::cout << guess << std::endl;
 //    std::cout << a << std::endl;

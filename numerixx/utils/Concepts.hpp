@@ -7,7 +7,7 @@
 
 #include <complex>
 
-namespace nxx::utils {
+namespace nxx {
 
 //    template <typename T>
 //    struct is_complex : std::false_type {};
