@@ -33,7 +33,7 @@
 
 #include "PolynomialError.hpp"
 #include "../.dependencies/expected/expected.hpp"
-#include "../utils/Concepts.hpp"
+#include "../.utils/Concepts.hpp"
 
 #include <algorithm>
 #include <complex>
@@ -155,7 +155,7 @@ namespace nxx::poly
          * @param value The value to evaluate the polynomial at.
          * @return The value of the polynomial at the specified input value.
          */
-        inline auto operator()(auto value) const { return evaluate(value); }
+        inline auto operator()(auto value) const { return *evaluate(value); }
 
         /**
          * @brief Evaluates the polynomial at a given value.
@@ -172,15 +172,20 @@ namespace nxx::poly
             requires std::floating_point< U > || IsComplex< U >
         [[nodiscard]] inline auto evaluate(U value) const
         {
-            using TYPE = std::common_type_t< T, U >;
+                using TYPE = std::common_type_t< T, U >;
+                tl::expected< TYPE, error::PolynomialError > result;
 
-            // ===== Horner's method implemented in terms of std::accummulate.
-            TYPE eval = std::accumulate(m_coefficients.crbegin() + 1,
-                                        m_coefficients.crend(),
-                                        static_cast< TYPE >(m_coefficients.back()),
-                                        [value](TYPE curr, TYPE coeff) { return curr * value + coeff; });
+                // ===== Horner's method implemented in terms of std::accummulate.
+                TYPE eval = std::accumulate(m_coefficients.crbegin() + 1,
+                                            m_coefficients.crend(),
+                                            static_cast< TYPE >(m_coefficients.back()),
+                                            [value](TYPE curr, TYPE coeff) { return curr * value + coeff; });
 
-            return eval;
+                if (std::isfinite(abs(eval)))
+                    result = eval;
+                else
+                    result = tl::make_unexpected(error::PolynomialError { "Computation of polynomial gave non-finite result." });
+                return result;
         }
 
         /**

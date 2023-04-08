@@ -8,12 +8,13 @@ AlignEscapedNewlines: Left
 AlignOperands: Align
 AlignTrailingComments: true
 AllowAllArgumentsOnNextLine: false
-AllowAllConstructorInitializersOnNextLine: false
+#AllowAllConstructorInitializersOnNextLine: false
+PackConstructorInitializers: Never
 AllowAllParametersOfDeclarationOnNextLine: false
 AllowShortBlocksOnASingleLine: Always
 AllowShortCaseLabelsOnASingleLine: false
 AllowShortEnumsOnASingleLine: true
-AllowShortFunctionsOnASingleLine: All
+AllowShortFunctionsOnASingleLine: Inline
 AllowShortIfStatementsOnASingleLine: WithoutElse
 AllowShortLambdasOnASingleLine: All
 AllowShortLoopsOnASingleLine: true
@@ -42,6 +43,7 @@ BraceWrapping:
   SplitEmptyFunction: false
   SplitEmptyNamespace: true
   SplitEmptyRecord: true
+BreakAfterAttributes: Always
 BreakAfterJavaFieldAnnotations: true
 BreakBeforeBinaryOperators: None
 BreakBeforeConceptDeclarations: Always
@@ -93,6 +95,8 @@ ObjCBlockIndentWidth: 7
 ObjCSpaceAfterProperty: true
 ObjCSpaceBeforeProtocolList: false
 PointerAlignment: Left
+RequiresClausePosition: WithPreceding
+RequiresExpressionIndentation: Keyword
 ReflowComments: true
 SortIncludes: CaseSensitive
 SortUsingDeclarations: true

@@ -12,7 +12,7 @@
 #include <numbers>
 #include <vector>
 
-TEST_CASE("Numerical Derivatives Test", "[derivatives]")
+TEST_CASE("nxx::deriv - Numerical Derivatives Test", "[derivatives]")
 {
     using namespace nxx::deriv;
 

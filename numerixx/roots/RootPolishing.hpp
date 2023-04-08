@@ -1,14 +1,14 @@
 /*
-    888b      88  88        88  88b           d88  88888888888  88888888ba   88  8b        d8  8b        d8
-    8888b     88  88        88  888b         d888  88           88      "8b  88   Y8,    ,8P    Y8,    ,8P
-    88 `8b    88  88        88  88`8b       d8'88  88           88      ,8P  88    `8b  d8'      `8b  d8'
-    88  `8b   88  88        88  88 `8b     d8' 88  88aaaaa      88aaaaaa8P'  88      Y88P          Y88P
-    88   `8b  88  88        88  88  `8b   d8'  88  88"""""      88""""88'    88      d88b          d88b
-    88    `8b 88  88        88  88   `8b d8'   88  88           88    `8b    88    ,8P  Y8,      ,8P  Y8,
-    88     `8888  Y8a.    .a8P  88    `888'    88  88           88     `8b   88   d8'    `8b    d8'    `8b
-    88      `888   `"Y8888Y"'   88     `8'     88  88888888888  88      `8b  88  8P        Y8  8P        Y8
+    o.     O O       o Oo      oO o.OOoOoo `OooOOo.  ooOoOOo o      O o      O
+    Oo     o o       O O O    o o  O        o     `o    O     O    o   O    o
+    O O    O O       o o  o  O  O  o        O      O    o      o  O     o  O
+    O  o   o o       o O   Oo   O  ooOO     o     .O    O       oO       oO
+    O   o  O o       O O        o  O        OOooOO'     o       Oo       Oo
+    o    O O O       O o        O  o        o    o      O      o  o     o  o
+    o     Oo `o     Oo o        O  O        O     O     O     O    O   O    O
+    O     `o  `OoooO'O O        o ooOooOoO  O      o ooOOoOo O      o O      o
 
-    Copyright © 2022 Kenneth Troldal Balslev
+    Copyright © 2023 Kenneth Troldal Balslev
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the “Software”), to deal
@@ -30,6 +30,10 @@
 
 #ifndef NUMERIXX_ROOTPOLISHING_HPP
 #define NUMERIXX_ROOTPOLISHING_HPP
+
+#include "../.utils/Constants.hpp"
+
+#include "RootCommon.hpp"
 
 #include <algorithm>
 #include <array>
@@ -54,65 +58,23 @@ namespace nxx::roots
     // ========================================================================
 
     /*
-     * Forward declaration of the DNewton class.
-     */
-    template< typename FN, typename DFN >
-        requires std::invocable< FN, double > && std::invocable< DFN, double >
-    class DNewton;
-
-    /*
-     * Forward declaration of the Newton class.
-     */
-    template< typename FN, typename DFN >
-        requires std::invocable< FN, double > && std::invocable< DFN, double >
-    class Newton;
-
-    /*
      * Private implementation details.
      */
-    namespace impl
-    {
-        /*
-         * Forward declaration of the PolishingTraits class.
-         */
-        template< typename... SOLVER >
-        struct PolishingTraits;
-
-        /*
-         * Specialization of the PolishingTraits class for Newton<FN, DFN>
-         */
-        template< typename FN, typename DFN >
-        struct PolishingTraits< Newton< FN, DFN > >
-        {
-            using function_type = FN;
-            using deriv_type    = DFN;
-        };
-
-        /*
-         * Specialization of the PolishingTraits class for DNewton<FN, DFN>
-         */
-        template< typename FN, typename DFN >
-        struct PolishingTraits< DNewton< FN, DFN > >
-        {
-            using function_type = FN;
-            using deriv_type    = DFN;
-        };
+    namespace impl {
 
         /**
-         * @brief A CRTP base class for root-finding algorithms using derivatives.
+         * @brief A base class for root polishing methods.
          *
-         * This class serves as a CRTP base class for root-finding algorithms that require the use of derivatives.
-         * It requires that the derived class provides the necessary function and derivative callable objects,
-         * which should be invocable with a double argument.
+         * This class serves as a base for various root polishing methods, providing common functionality
+         * and interface. The POLICY template parameter should provide specific algorithm implementation.
          *
-         * @tparam POLICY The derived class, which should inherit from PolishingBase.
-         *
-         * @note This class should not be used directly by clients; it is intended for use as a base class.
-         * @note The derived class should satisfy the requirements for the PolishingTraits type trait.
+         * @tparam POLICY The policy class defining the specific root polishing method.
+         * @requires The POLICY class should have a specialization of PolishingTraits that defines:
+         *           function_type, deriv_type, function_return_type, and deriv_return_type.
          */
         template< typename POLICY >
-            requires std::invocable< typename impl::PolishingTraits< POLICY >::function_type, double > &&
-                     std::invocable< typename impl::PolishingTraits< POLICY >::deriv_type, double >
+            requires std::floating_point< typename PolishingTraits< POLICY >::function_return_type > &&
+                     std::floating_point< typename PolishingTraits< POLICY >::deriv_return_type >
         class PolishingBase
         {
             /*
@@ -120,17 +82,23 @@ namespace nxx::roots
              */
             friend POLICY;
 
-        private:
-            using function_type = typename impl::PolishingTraits< POLICY >::function_type; /**< The type of the function object. */
-            function_type m_func {};                                                       /**< The function object to find the root for. */
-
-            using deriv_type = typename impl::PolishingTraits< POLICY >::deriv_type; /**< The type of the derivative function object. */
-            deriv_type m_deriv {};                                                   /**< The function object for the derivative. */
-
-            using RT = std::invoke_result_t< function_type, double >;                /**< The return type of the function object. */
-            RT m_guess;                                                              /**< The current root estimate. */
-
         public:
+            using function_type = typename impl::PolishingTraits< POLICY >::function_type; /**< The type of the function object. */
+            using deriv_type = typename impl::PolishingTraits< POLICY >::deriv_type; /**< The type of the derivative function object. */
+            using function_return_type = typename impl::PolishingTraits< POLICY >::function_return_type; /**< The return type of the function object. */
+            using deriv_return_type = typename impl::PolishingTraits< POLICY >::deriv_return_type; /**< The return type of the derivative function object. */
+
+        protected:
+            /**
+             * @brief Default constructor.
+             */
+            ~PolishingBase() = default;
+
+        private:
+            function_type        m_func {};  /**< The function object to find the root for. */
+            deriv_type           m_deriv {}; /**< The function object for the derivative. */
+            function_return_type m_guess;    /**< The current root estimate. */
+
             /**
              * @brief Constructor, taking function objects for the function and its derivative as arguments.
              * @param objective The function object to find the root for.
@@ -144,12 +112,42 @@ namespace nxx::roots
 
         public:
             /**
+             * @brief Copy constructor.
+             *
+             * @param other Another PolishingBase object to be copied.
+             */
+            PolishingBase(const PolishingBase& other)     = default;
+
+            /**
+             * @brief Move constructor.
+             *
+             * @param other Another PolishingBase object to be moved.
+             */
+            PolishingBase(PolishingBase&& other) noexcept = default;
+
+            /**
+             * @brief Copy assignment operator.
+             *
+             * @param other Another PolishingBase object to be copied.
+             * @return A reference to the assigned object.
+             */
+            PolishingBase& operator=(const PolishingBase& other)     = default;
+
+            /**
+             * @brief Move assignment operator.
+             *
+             * @param other Another PolishingBase object to be moved.
+             * @return A reference to the assigned object.
+             */
+            PolishingBase& operator=(PolishingBase&& other) noexcept = default;
+
+            /**
              * @brief Initialize the solver by setting the initial bounds around the root.
              * @tparam T The type of the root estimate.
              * @param guess The root estimate.
              */
             template< typename T >
-                requires std::is_floating_point_v< T >
+                requires std::floating_point< T >
             void init(T guess)
             {
                 m_guess = guess;
@@ -162,7 +160,7 @@ namespace nxx::roots
              * @return The result of the evaluation.
              */
             template< typename T >
-                requires std::is_floating_point_v< T >
+                requires std::floating_point< T >
             auto evaluate(T value)
             {
                 return m_func(value);
@@ -175,7 +173,7 @@ namespace nxx::roots
              * @return The result of the evaluation.
              */
             template< typename T >
-                requires std::is_floating_point_v< T >
+                requires std::floating_point< T >
             auto derivative(T value)
             {
                 return m_deriv(value);
@@ -185,25 +183,29 @@ namespace nxx::roots
              * @brief Get the current estimate of the root.
              * @return A const reference to the root.
              */
-            const auto& result() const { return m_guess; }
+            auto result() const { return m_guess; }
         };
     }    // namespace impl
 
     /**
-     * @brief The DNewton class is a derived class of the PolishingBase CRTP base class.
-     * It implements Newton's method, but uses numerical differentation to evaluate the derivatives,
-     * i.e. discrete Newton's method.
-     * @tparam FN The type of the function object for the function for which to find the root.
-     * @tparam DFN The type of the function object for the derivative (deducet automatically).
+     * @brief A class implementing the Damped Newton method for root finding.
+     *
+     * This class is derived from the PolishingBase class and implements the Damped Newton method
+     * for finding the roots of a given function. The function and its derivative are provided
+     * as template arguments.
+     *
+     * @tparam FN The type of the function object for which to find the root.
+     * @tparam DFN The type of the derivative function object.
+     * @requires FN and DFN should be callable with double and return a floating point type.
      */
     template< typename FN, typename DFN >
-        requires std::invocable< FN, double > && std::invocable< DFN, double >
+        requires std::floating_point< std::invoke_result_t< FN, double > > && std::floating_point< std::invoke_result_t< DFN, double > >
     class DNewton final : public impl::PolishingBase< DNewton< FN, DFN > >
     {
         /*
          * Private alias declarations.
          */
-        using Base = impl::PolishingBase< DNewton< FN, DFN > >;
+        using BASE = impl::PolishingBase< DNewton< FN, DFN > >;
 
     public:
         /*
@@ -216,16 +218,12 @@ namespace nxx::roots
          * @brief Constructor, taking the function object as an argument.
          * @param objective The function object for which to find the root.
          */
-        explicit DNewton(FN objective) : Base(objective, derivativeOf(objective)) {}
-
+        explicit DNewton(FN objective) : BASE(objective, derivativeOf(objective)) {}
 
         /**
          * @brief Perform one iteration. This is the main algorithm of the DNewton method.
          */
-        void iterate()
-        {
-            Base::m_guess = Base::m_guess - Base::evaluate(Base::m_guess) / Base::derivative(Base::m_guess);
-        }
+        void iterate() { BASE::m_guess = BASE::m_guess - BASE::evaluate(BASE::m_guess) / BASE::derivative(BASE::m_guess); }
     };
 
     /**
@@ -235,19 +233,24 @@ namespace nxx::roots
     DNewton(FN objective) -> DNewton< FN, std::function< decltype(objective(0.0))(decltype(objective(0.0))) > >;
 
     /**
-     * @brief The Newton class is a derived class of the PolishingBase CRTP base class.
-     * It implements Newton's method for root finding with derivatives.
-     * @tparam FN The type of the function object for the function for which to find the root.
-     * @tparam DFN The type of the function object for the derivative.
+     * @brief A class implementing the Newton-Raphson method for root finding.
+     *
+     * This class is derived from the PolishingBase class and implements the Newton-Raphson method
+     * for finding the roots of a given function. The function and its derivative are provided
+     * as template arguments.
+     *
+     * @tparam FN The type of the function object for which to find the root.
+     * @tparam DFN The type of the derivative function object.
+     * @requires FN and DFN should be callable with double and return a floating point type.
      */
     template< typename FN, typename DFN >
-        requires std::invocable< FN, double > && std::invocable< DFN, double >
+        requires std::floating_point< std::invoke_result_t< FN, double > > && std::floating_point< std::invoke_result_t< DFN, double > >
     class Newton final : public impl::PolishingBase< Newton< FN, DFN > >
     {
         /*
          * Private alias declarations.
          */
-        using Base = impl::PolishingBase< Newton< FN, DFN > >;
+        using BASE = impl::PolishingBase< Newton< FN, DFN > >;
 
     public:
         /*
@@ -261,14 +264,14 @@ namespace nxx::roots
          * @param objective The function object for the function.
          * @param deriv The function object for the derivative.
          */
-        explicit Newton(FN objective, DFN deriv) : Base(objective, deriv) {}
+        explicit Newton(FN objective, DFN deriv) : BASE(objective, deriv) {}
 
         /**
          * @brief Perform one iteration. This is the main algorithm of the Newton method.
          */
         void iterate()
         {
-            Base::m_guess = Base::m_guess - Base::evaluate(Base::m_guess) / Base::derivative(Base::m_guess);
+            BASE::m_guess = BASE::m_guess - BASE::evaluate(BASE::m_guess) / BASE::derivative(BASE::m_guess);
         }
     };
 
@@ -285,18 +288,24 @@ namespace nxx::roots
      * @return The root estimate.
      */
     template< typename SOLVER >
-    inline auto fdfsolve(SOLVER solver, double guess, double eps = 1.0E-6, int maxiter = 100)
-        -> tl::expected<double, error::RootError>
+    requires requires(SOLVER solver, typename SOLVER::function_return_type guess) {
+            { solver.evaluate(0.0) } -> std::floating_point;
+            { solver.init(guess) };
+            { solver.iterate() };
+        }
+    inline auto fdfsolve(SOLVER                                solver,
+                         typename SOLVER::function_return_type guess,
+                         typename SOLVER::function_return_type eps     = nxx::EPS,
+                         int                                   maxiter = nxx::MAXITER)
+    -> tl::expected< typename SOLVER::function_return_type, RootError >
     {
-        // using RT = decltype(solver.evaluate(0.0));
-
         solver.init(guess);
 
         int iter = 1;
         while (true) {
             if (abs(solver.evaluate(solver.result())) < eps) break;
             solver.iterate();
-            if (!std::isfinite(solver.result())) return tl::make_unexpected(error::RootError("Root Error!"));;
+            if (!std::isfinite(solver.result())) return tl::make_unexpected(RootError("Root Error!"));
 
             ++iter;
             if (iter > maxiter) break;
@@ -304,7 +313,6 @@ namespace nxx::roots
 
         return solver.result();
     }
-
 }    // namespace nxx::roots
 
 #endif    // NUMERIXX_ROOTPOLISHING_HPP

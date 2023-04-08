@@ -31,7 +31,7 @@
 #ifndef NUMERIXX_POLYROOTS_HPP
 #define NUMERIXX_POLYROOTS_HPP
 
-#include "../utils/Constants.hpp"
+#include "../.utils/Constants.hpp"
 #include "Polynomial.hpp"
 #include "PolynomialError.hpp"
 

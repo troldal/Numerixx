@@ -32,6 +32,7 @@
 #ifndef NUMERIXX_ROOTS_HPP
 #define NUMERIXX_ROOTS_HPP
 
+#include "RootSearching.hpp"
 #include "RootBracketing.hpp"
 #include "RootPolishing.hpp"
 

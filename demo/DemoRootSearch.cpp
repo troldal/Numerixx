@@ -1,0 +1,127 @@
+// ================================================================================================
+// This demo shows how to use the nxx::roots namespace to search for a bracketing interval
+// for a root of a function.
+// ================================================================================================
+
+#include <fmt/format.h>
+#include <iostream>
+#include <numerixx.hpp>
+
+int main()
+{
+    using namespace nxx::roots;
+    std::cout << std::fixed << std::setprecision(8);
+    auto func = nxx::poly::Polynomial({ -5.0, 0.0, 1.0 });
+
+    // ============================================================================================
+    // The nxx::roots namespace contains a number of search algorithms, for finding a bracketing
+    // interval for a root of a function. The algorithms are implemented as objects that can be
+    // used to iterate towards a solution, until a bracketing interval is found. The algorithms
+    // are:
+    //
+    // 1. BracketExpandUp
+    // 2. BracketExpandDown
+    // 3. BracketExpandOut
+    // 4. BracketSearchUp
+    // 5. BracketSearchDown
+    // 6. BracketSubdivide
+    //
+    // The BracketExpandXX algorithms will expand the bracketing interval in the positive or
+    // negative direction (or both), until a root is found. The BracketSearchXX algorithms will search
+    // for a bracketing interval by moving the initial bracket in the positive or negative direction,
+    // until a root is found. The BracketSubdivide algorithm will subdivide the bracketing interval
+    // until a root is found. The BracketSubdivide is particularly useful when the bracketing
+    // interval is known to contain a root, but the function is not known to be monotonic, and may
+    // have multiple roots in the interval.
+    //
+    // The easiest way to use the algorithms is to use the search() and providing it with an
+    // algorithm object, and the initial bracketing interval. The search() function will return
+    // a tl::expected object, which will contain the bracketing interval if a root was found, or
+    // an error code if no root was found. When C++23 is available, the tl::expected object will
+    // be replaced with std::expected. The bracketing interval will be returned as a std::pair.
+    // To get the bracketing interval from the tl::expected object, use the * operator, or the
+    // value() method.
+    //
+    // The following code shows how to use the search algorithms to find a bracketing interval
+    // for a root of a function.
+    // ============================================================================================
+
+    auto PrintBounds = [](auto b) { return std::string("(" + std::to_string(b.first) + ", " + std::to_string(b.second) + ")"); };
+
+    std::cout << "\nIdentify the brackets around the root of the polynomial: " << func.asString() << "\n";
+    std::cout << "BracketExpandUp Method:         " << PrintBounds(*search(BracketExpandUp(func), { 1.0, 1.1 })) << std::endl;
+    std::cout << "BracketSearchUp Method:         " << PrintBounds(*search(BracketSearchUp(func), { 1.0, 1.1 })) << std::endl;
+    std::cout << "BracketExpandDown Method:       " << PrintBounds(*search(BracketExpandDown(func), { 4.9, 5.0 })) << std::endl;
+    std::cout << "BracketSearchDown Method:       " << PrintBounds(*search(BracketSearchDown(func), { 4.9, 5.0 })) << std::endl;
+    std::cout << "BracketExpandOut Method:        " << PrintBounds(*search(BracketExpandOut(func), { 1.0, 1.1 })) << std::endl;
+    std::cout << "BracketSubdivide Method:        " << PrintBounds(*search(BracketSubdivide(func), { -5.0, 10.0 })) << std::endl;
+
+    // The given polynomial has two roots, one at x = -2.23606798, and the other at x = 2.23606798. The examples above finds the
+    // bracketing interval for the root at x = 2.23606798, except for the BracketSubdivide method, which finds the bracketing
+    // interval for the root at x = -2.23606798. The reason is that the BracketSubdivide method always will find the lowest
+    // root first.
+
+    // The search() function also has two optional parameters, searchFactor, and maxiter. The searchFactor parameter is used
+    // to control the rate at which the bracketing interval is expanded or subdivided. The default value is the golden ratio
+    // (phi = ~1.6), but can take any value >= 1.0. The maxiter parameter is used to limit the number of iterations. The default
+    // value is 100, but can take any value >= 1. The following code shows how to use the searchFactor and maxiter parameters.
+    // The following code uses a searchFactor of 2.0, and a maxiter of 10.
+
+    std::cout << "\nIdentify the brackets around the root of the polynomial, using a searchFactor of 2.0 and maxiter = 10: "
+              << "\n";
+    std::cout << "BracketExpandUp Method:         " << PrintBounds(*search(BracketExpandUp(func), { 1.0, 1.1 }, 2.0, 10)) << std::endl;
+
+    // ============================================================================================
+    // If more fine-grained control is needed, the algorithms can be used directly. The algorithms
+    // are implemented as objects that can be used to iterate towards a solution, until a bracketing
+    // interval is found.
+    //
+    // The following code shows how to use the algorithms directly.
+    // ============================================================================================
+
+    // Ad hoc lambda function to print the current iteration:
+    auto find_bracket = [](auto solver, std::pair< double, double > bounds) {
+        // Print the header:
+        std::cout << "----------------------------------------------------------------\n";
+        std::cout << fmt::format("{:>10} | {:>15} | {:>15} | {:>15} ", "Iter", "Lower", "Upper", "Factor") << std::endl;
+        std::cout << "----------------------------------------------------------------\n";
+
+        // Initialize the solver:
+        solver.init(bounds);
+
+        // Iterate until convergence (or until 100 iterations have been performed):
+        for (int i = 0; i <= 100; ++i) {
+            // Print the current iteration:
+            std::cout << fmt::format("{:10} | {:15.10f} | {:15.10f} | {:15.10f} ",
+                                     i,
+                                     solver.bounds().first,
+                                     solver.bounds().second,
+                                     solver.factor())
+                      << std::endl;
+
+            // Check if convergence has been reached:
+            if (solver.evaluate(solver.bounds().first) * solver.evaluate(solver.bounds().second) < 0.0) break;
+
+            // Perform one iteration:
+            solver.iterate();
+        }
+
+        // Print the final result:
+        std::cout << std::fixed << std::setprecision(20) << "CONVERGED! Bounds found at: (" << solver.bounds().first << ", "
+                  << solver.bounds().second << ")\n";
+        std::cout << "----------------------------------------------------------------\n\n";
+    };
+
+    std::cout << "\nIdentify the brackets around the root of the polynomial, using the algorithms directly: "
+              << "\n\n";
+
+    std::cout << "BracketExpandUp Method:         " << std::endl;
+    BracketExpandUp solver(func);
+    find_bracket(solver, { 1.0, 1.1 });
+
+    std::cout << "BracketSubdivide Method:         " << std::endl;
+    BracketSubdivide solver2(func);
+    find_bracket(solver2, { -50.0, 100.0 });
+
+    return 0;
+}

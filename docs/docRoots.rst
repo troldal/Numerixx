@@ -11,9 +11,9 @@ Overview
 
 One-dimensional root-finding methods are numerical algorithms that are used to locate the roots or zeros of a function of one variable. These methods are important in a wide range of applications in science, engineering, and mathematics, where it is often necessary to find the value of the independent variable that makes a function equal to zero.
 
-The most commonly used one-dimensional root-finding methods include the bisection method, Newton's method, Ridders' method, and the secant method. Each method has its own strengths and weaknesses, and the choice of method depends on the specific problem being solved.
+The most commonly used one-dimensional root-finding methods include the bisection method, Newton's method, Ridder' method, and the secant method. Each method has its own strengths and weaknesses, and the choice of method depends on the specific problem being solved.
 
-The bisection method is a robust and reliable method that is guaranteed to converge, but may be slow to converge. Newton's method is a faster method that requires the function to be differentiable, but may not converge or converge to a local minimum. Ridders' method and the secant method are faster than the bisection method and can converge faster, but may require the function to have a continuous second derivative and may not converge in some cases. As with any numerical method, it is important to understand the assumptions and limitations of each method and to carefully evaluate the accuracy and convergence properties of the solutions obtained.
+The bisection method is a robust and reliable method that is guaranteed to converge, but may be slow to converge. Newton's method is a faster method that requires the function to be differentiable, but may not converge or converge to a local minimum. Ridder' method and the secant method are faster than the bisection method and can converge faster, but may require the function to have a continuous second derivative and may not converge in some cases. As with any numerical method, it is important to understand the assumptions and limitations of each method and to carefully evaluate the accuracy and convergence properties of the solutions obtained.
 
 Caveats
 =======
@@ -75,12 +75,12 @@ This method is considered to be inefficient as it typically requires more iterat
 .. doxygenclass:: nxx::roots::Bisection
    :members:
 
-Ridders' method
+Ridder' method
 ^^^^^^^^^^^^^^^
 
-Ridders' method is a root-finding algorithm for one-dimensional functions that uses an iterative process to refine the location of the root. It works by fitting a parabola through three points and using the vertex of the parabola as the next estimate for the root. This estimate is then refined by applying a scaling factor to the distance between the estimates to reduce the error. The method is efficient and can converge faster than the bisection method, but it requires the function to be twice differentiable and have a continuous second derivative.
+Ridder' method is a root-finding algorithm for one-dimensional functions that uses an iterative process to refine the location of the root. It works by fitting a parabola through three points and using the vertex of the parabola as the next estimate for the root. This estimate is then refined by applying a scaling factor to the distance between the estimates to reduce the error. The method is efficient and can converge faster than the bisection method, but it requires the function to be twice differentiable and have a continuous second derivative.
 
-.. doxygenclass:: nxx::roots::Ridders
+.. doxygenclass:: nxx::roots::Ridder
    :members:
 
 Polishing Methods
@@ -91,7 +91,7 @@ Polishing methods typically start with an initial guess and iteratively improve 
 Newton's method
 ^^^^^^^^^^^^^^^
 
-Newton's method is a popular root-finding algorithm for one-dimensional functions. It works by making a linear approximation of the function at the current estimate of the root and finding the point where this approximation crosses the x-axis. This point becomes the next estimate for the root, and the process is repeated until convergence is achieved. Newton's method is generally faster than the bisection and Ridders' methods, but it requires the function to be differentiable and the derivative to be non-zero at the estimate. Additionally, the method may fail to converge or converge to a local minimum instead of a root.
+Newton's method is a popular root-finding algorithm for one-dimensional functions. It works by making a linear approximation of the function at the current estimate of the root and finding the point where this approximation crosses the x-axis. This point becomes the next estimate for the root, and the process is repeated until convergence is achieved. Newton's method is generally faster than the bisection and Ridder' methods, but it requires the function to be differentiable and the derivative to be non-zero at the estimate. Additionally, the method may fail to converge or converge to a local minimum instead of a root.
 
 .. doxygenclass:: nxx::roots::Newton
    :members:

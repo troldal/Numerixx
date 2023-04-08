@@ -1,5 +1,5 @@
 // ================================================================================================
-// This demo shows verious ways to compute 1st and 2nd derivatives numerically using the methods
+// This demo shows various ways to compute 1st and 2nd derivatives numerically using the methods
 // in the calculus/Derivatives.hpp header.
 // ================================================================================================
 
@@ -116,8 +116,8 @@ int main()
     auto d1func = derivativeOf(func);
     auto d2func = derivativeOf<Order2Central5Point>(func);
     std::cout << "Derivative function objects using the .derivativeOf() function:\n";
-    std::cout << "d1func:                   " << *d1func(std::numbers::e) << "\n";
-    std::cout << "d2func:                  " <<  *d2func(std::numbers::e) << "\n\n";
+    std::cout << "d1func:                   " << d1func(std::numbers::e) << "\n";
+    std::cout << "d2func:                  " <<  d2func(std::numbers::e) << "\n\n";
 
     // ============================================================================================
     // The following code shows the results of computing the derivatives for 10 different functions

@@ -32,6 +32,7 @@
 
 #include "calculus/Derivatives.hpp"
 //#include "calculus/Jacobian.hpp"
+#include "function/Function.hpp"
 #include "linalg/FactorizeGJ.hpp"
 #include "linalg/Matrix.hpp"
 #include "multiroots/MultiFunction.hpp"

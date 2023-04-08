@@ -25,6 +25,25 @@ target_sources(DemoRoot
 
 target_link_libraries(DemoRoot PRIVATE fmt numerixx)
 
+# Target: Root searching
+add_executable(DemoRootSearch)
+target_sources(DemoRootSearch
+        PRIVATE
+        DemoRootSearch.cpp
+        )
+
+target_link_libraries(DemoRootSearch PRIVATE fmt numerixx)
+
+# Target: Function
+add_executable(DemoFunction)
+target_sources(DemoFunction
+        PRIVATE
+        DemoFunction.cpp
+        )
+
+target_link_libraries(DemoFunction PRIVATE fmt numerixx)
+
+
 # Target: Polynomials
 add_executable(DemoPoly)
 target_sources(DemoPoly

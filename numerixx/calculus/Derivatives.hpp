@@ -31,7 +31,6 @@
 #ifndef NUMERIXX_DIFFERENTIATION_HPP
 #define NUMERIXX_DIFFERENTIATION_HPP
 
-#include "DerivativeError.hpp"
 #include "../poly/Polynomial.hpp"
 #include "../.dependencies/expected/expected.hpp"
 #include "../.dependencies/gcem/gcem.hpp"
@@ -46,6 +45,13 @@
 
 namespace nxx::deriv
 {
+
+    class DerivativeError : public std::runtime_error
+    {
+    public:
+        explicit DerivativeError(const char* msg) : std::runtime_error(msg) {};
+    };
+
     template< typename FN >
     concept IsFunction = requires(FN fn) {
         {
@@ -505,13 +511,13 @@ namespace nxx::deriv
         ReturnType< decltype(function) > val,
         ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
-        tl::expected< ReturnType< decltype(function) >, error::DerivativeError > result;
+        tl::expected< ReturnType< decltype(function) >, DerivativeError > result;
         auto deriv  = ALGO {}(function, val, stepsize);
 
         if (std::isfinite(deriv))
             result = deriv;
         else
-            result = tl::make_unexpected(error::DerivativeError { "Computation of derivative gave non-finite result." });
+            result = tl::make_unexpected(DerivativeError { "Computation of derivative gave non-finite result." });
         return result;
     }
 
