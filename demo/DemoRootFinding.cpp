@@ -2,6 +2,8 @@
 // This demo shows how to use the nxx::roots namespace to find the roots of arbitrary functions.
 // ================================================================================================
 
+#include <algorithm>
+#include <array>
 #include <fmt/format.h>
 #include <iomanip>
 #include <iostream>
@@ -71,15 +73,15 @@ int main()
         std::cout << "Iterations:        " << error.iterations() << std::endl << std::endl;
     };
 
-    std::cout << "Initial Bracket:   [5.0, 10.0]\n"; // This bracket does not contain a root
+    std::cout << "Initial Bracket:   [5.0, 10.0]\n";    // This bracket does not contain a root
     auto root = fsolve(Bisection([](double x) { return std::log(x); }), { 5.0, 10.0 }, 1.0E-15);
     if (!root) print_error(root.error());
 
-    std::cout << "Initial Bracket:   [-5.0, 10.0]\n"; // The function is undefined at x <= 0
+    std::cout << "Initial Bracket:   [-5.0, 10.0]\n";    // The function is undefined at x <= 0
     root = fsolve(Bisection([](double x) { return std::log(x); }), { -5.0, 10.0 }, 1.0E-15);
     if (!root) print_error(root.error());
 
-    std::cout << "Initial Bracket:   [0.1, 200.0]\n"; // This bracket contains a root, but will require many iterations
+    std::cout << "Initial Bracket:   [0.1, 200.0]\n";    // This bracket contains a root, but will require many iterations
     root = fsolve(Bisection([](double x) { return std::log(x); }), { 0.1, 200.0 }, 1.0E-15, 5);
     if (!root) print_error(root.error());
 
@@ -94,11 +96,11 @@ int main()
 
     // The error object from the fdfsolve() function works in the same way.
     std::cout << "Compute the root of the function f(x) = log(x) using the DNewton method:\n\n";
-    std::cout << "Initial Guess = 0.0:\n"; // The function is undefined at x <= 0
+    std::cout << "Initial Guess = 0.0:\n";    // The function is undefined at x <= 0
     root = fdfsolve(DNewton([](double x) { return std::log(x); }), 0.0, 1.0E-15);
     if (!root.has_value()) print_error(root.error());
 
-    std::cout << "Initial Guess = 1E-3:\n"; // This guess is close to the root, but will require many iterations
+    std::cout << "Initial Guess = 1E-3:\n";    // This guess is close to the root, but will require many iterations
     root = fdfsolve(DNewton([](double x) { return std::log(x); }), 1E-3, 1.0E-15, 5);
     if (!root.has_value()) print_error(root.error());
 
@@ -123,19 +125,35 @@ int main()
         // Initialize the solver:
         solver.init(bounds);
 
+        std::array< decltype(bounds), 2 > guesses;
+        decltype(guesses.begin())         min;
+
         // Iterate until convergence (or until 100 iterations have been performed):
         for (int i = 0; i <= 100; ++i) {
+            // Retrieve the current bracketing interval, and evaluate the function at the endpoints:
+            guesses = { std::make_pair(bounds.first, abs(solver.evaluate(bounds.first))),
+                        std::make_pair(bounds.second, abs(solver.evaluate(bounds.second))) };
+
+            // Find the endpoint with the smallest absolute value:
+            min = std::min_element(guesses.begin(), guesses.end(), [](const auto& a, const auto& b) {
+                return abs(a.second) < abs(b.second);
+            });
+
             // Print the current iteration:
             std::cout << fmt::format("{:10} | {:15.10f} | {:15.10f} | {:15.10f} | {:15.10f} ",
                                      i,
                                      bounds.first,
                                      bounds.second,
-                                     (bounds.first + bounds.second) / 2.0,
-                                     abs(solver.evaluate((bounds.first + bounds.second) / 2.0)))
+                                     min->first,
+                                     min->second)
                       << std::endl;
 
             // Check if convergence has been reached:
-            if (abs(solver.evaluate((bounds.first + bounds.second) / 2.0)) < 1.0E-15) break;
+            if (min->second < 1.0E-15) {
+                bounds.first  = min->first;
+                bounds.second = min->first;
+                break;
+            }
 
             // Perform one iteration:
             solver.iterate();
@@ -145,7 +163,7 @@ int main()
         }
 
         // Print the final result:
-        std::cout << std::fixed << std::setprecision(20) << "CONVERGED! Root found at: " << (bounds.first + bounds.second) / 2.0 << "\n";
+        std::cout << std::fixed << std::setprecision(10) << "CONVERGED! Root found at: " << min->first << "\n";
         std::cout << "----------------------------------------------------------------------------------\n\n";
     };
 
@@ -186,7 +204,7 @@ int main()
         }
 
         // Print the final result:
-        std::cout << std::fixed << std::setprecision(20) << "CONVERGED! Root found at: " << guess << "\n";
+        std::cout << std::fixed << std::setprecision(10) << "CONVERGED! Root found at: " << guess << "\n";
         std::cout << "------------------------------------------------------------------\n\n";
     };
 

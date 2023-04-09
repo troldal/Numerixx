@@ -36,8 +36,9 @@
 #include "RootCommon.hpp"
 #include "calculus/Derivatives.hpp"
 
+#include <array>
+
 // TODO: Throw exceptions when the input is invalid.
-// TODO: Fix the RegulaFalsi method.
 
 namespace nxx::roots
 {
@@ -380,7 +381,7 @@ namespace nxx::roots
             RT f_lo = BASE::evaluate(bounds.first);
             RT f_hi = BASE::evaluate(bounds.second);
 
-            RT root   = bounds.first - f_lo * (bounds.second - bounds.first) / (f_hi - f_lo);
+            RT root = (bounds.first * f_hi - bounds.second * f_lo) / (f_hi - f_lo);
             RT f_root = BASE::evaluate(root);
 
             if (f_lo * f_root < 0.0) {
@@ -427,9 +428,12 @@ namespace nxx::roots
             using RT = tl::expected< typename SOLVER::return_type, ET >;
 
             solver.init(bounds);
+
+            // Declare variables for use in the iteration loop.
             auto curBounds = solver.bounds();
-            RT result         = (curBounds.first + curBounds.second) / 2.0;
-            typename SOLVER::return_type eval;
+            RT   result    = (curBounds.first + curBounds.second) / 2.0;
+            std::array< std::pair< typename SOLVER::return_type, typename SOLVER::return_type >, 2 > roots {};
+            decltype(roots.begin()) min;
 
             // Check for NaN or Inf.
             if (!std::isfinite(solver.evaluate(curBounds.first)) || !std::isfinite(solver.evaluate(curBounds.second))) {
@@ -447,22 +451,25 @@ namespace nxx::roots
             int iter = 1;
             while (true) {
                 curBounds = solver.bounds();
-                result    = (curBounds.first + curBounds.second) / 2.0;
-                eval      = solver.evaluate(*result);
+                roots = { std::make_pair(curBounds.first, abs(solver.evaluate(curBounds.first))),
+                          std::make_pair(curBounds.second, abs(solver.evaluate(curBounds.second))) };
 
                 // Check for NaN or Inf.
-                if (!std::isfinite(curBounds.first) || !std::isfinite(curBounds.second) || !std::isfinite(eval)) {
+                if (std::any_of(roots.begin(), roots.end(), [](const auto& r) { return !std::isfinite(r.second); })) {
                     result = tl::make_unexpected(ET("Non-finite result!", RootErrorType::NumericalError, result.value(), iter));
                     break;
                 }
 
                 // Check for convergence.
-                if (abs(curBounds.first - curBounds.second) < eps || abs(eval) < eps) break;
+                min = std::min_element(roots.begin(), roots.end(), [](const auto& a, const auto& b) { return a.second < b.second; });
+                if (min->second < eps) {
+                    result = min->first;
+                    break;
+                }
 
                 // Check for maximum number of iterations.
                 if (iter >= maxiter) {
-                    result = tl::make_unexpected(
-                        ET("Maximum number of iterations exceeded!", RootErrorType::MaxIterationsExceeded, result.value(), iter));
+                    result = tl::make_unexpected(ET("Max. iterations exceeded!", RootErrorType::MaxIterationsExceeded, min->first, iter));
                     break;
                 }
 
