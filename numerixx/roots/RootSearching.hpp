@@ -33,6 +33,7 @@
 
 #include <numbers>
 
+#include "../.utils/Constants.hpp"
 #include "../.dependencies/expected/expected.hpp"
 
 #include "RootCommon.hpp"
