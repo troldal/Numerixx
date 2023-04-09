@@ -7,11 +7,11 @@
 #include <iostream>
 #include <numerixx.hpp>
 
-int main() {
-
+int main()
+{
     using namespace nxx::roots;
     std::cout << std::fixed << std::setprecision(8);
-    auto func = nxx::poly::Polynomial({-5.0, 0.0, 1.0});
+    auto func = nxx::poly::Polynomial({ -5.0, 0.0, 1.0 });
 
     // ============================================================================================
     // The nxx::roots namespace contains a number of root-finding algorithms, for finding the roots
@@ -46,16 +46,61 @@ int main() {
     // contain a value, the result of using the * operator is undefined.
     // ============================================================================================
     std::cout << "\nCompute the root of the polynomial " << func.asString() << " using bracketing methods:\n";
-    std::cout << "Bisection Method:         " << *fsolve(Bisection(func), {0.0, 2.5}, 1.0E-15) << std::endl;
-    std::cout << "Ridder's Method:          " << *fsolve(Ridder(func), {0.0, 2.5}, 1.0E-15) << std::endl;
-    std::cout << "Regula Falsi Method:      " << *fsolve(RegulaFalsi(func), {0.0, 2.5}, 1.0E-15) << std::endl << std::endl;
+    std::cout << "Bisection Method:         " << *fsolve(Bisection(func), { 0.0, 2.5 }, 1.0E-15) << std::endl;
+    std::cout << "Ridder's Method:          " << *fsolve(Ridder(func), { 0.0, 2.5 }, 1.0E-15) << std::endl;
+    std::cout << "Regula Falsi Method:      " << *fsolve(RegulaFalsi(func), { 0.0, 2.5 }, 1.0E-15) << std::endl << std::endl;
 
-
-    std::cout << "\nCompute the root of the polynomial " << func.asString() << " using polishing methods:\n";
+    std::cout << "Compute the root of the polynomial " << func.asString() << " using polishing methods:\n";
     std::cout << "Discrete Newton's Method: " << *fdfsolve(DNewton(func), 1.25, 1.0E-15) << std::endl;
     std::cout << "Newton's Method:          " << *fdfsolve(Newton(func, derivativeOf(func)), 1.25, 1.0E-15) << std::endl << std::endl;
     // Note that the Discrete Newton's Method uses the numerical derivative of the function, while
     // Newton's Method requires a separate function for the derivative.
+
+    // ============================================================================================
+    // As mentioned, the fsolve() and fdfsolve() functions return a tl::expected object, which can
+    // either contain a value or an error. This is useful if the user wants to check if the
+    // algorithm has converged, or if the user wants to check if the algorithm has failed. The
+    // following code shows how to use the fsolve() and fdfsolve() functions to find the roots
+    // of the function f(x) = log(x) and how to check if the algorithm has failed.
+    // ============================================================================================
+    std::cout << "Compute the root of the function f(x) = log(x) using the Bisection method:\n\n";
+    auto print_error = [](auto error) {
+        std::cout << "Error Description: " << error.what() << std::endl;
+        std::cout << "Error Type:        " << error.typeAsString() << std::endl;
+        std::cout << "Last Value:        " << error.value() << std::endl;
+        std::cout << "Iterations:        " << error.iterations() << std::endl << std::endl;
+    };
+
+    std::cout << "Initial Bracket:   [5.0, 10.0]\n"; // This bracket does not contain a root
+    auto root = fsolve(Bisection([](double x) { return std::log(x); }), { 5.0, 10.0 }, 1.0E-15);
+    if (!root) print_error(root.error());
+
+    std::cout << "Initial Bracket:   [-5.0, 10.0]\n"; // The function is undefined at x <= 0
+    root = fsolve(Bisection([](double x) { return std::log(x); }), { -5.0, 10.0 }, 1.0E-15);
+    if (!root) print_error(root.error());
+
+    std::cout << "Initial Bracket:   [0.1, 200.0]\n"; // This bracket contains a root, but will require many iterations
+    root = fsolve(Bisection([](double x) { return std::log(x); }), { 0.1, 200.0 }, 1.0E-15, 5);
+    if (!root) print_error(root.error());
+
+    // The error object is a subclass of the RootError class, which is a subclass of the std::runtime_error
+    // class. This means that the error object can be used in a try-catch block, as shown below.
+    try {
+        throw root.error();
+    }
+    catch (const RootError& e) {
+        std::cout << "Exception caught: " << e.what() << std::endl << std::endl;
+    }
+
+    // The error object from the fdfsolve() function works in the same way.
+    std::cout << "Compute the root of the function f(x) = log(x) using the DNewton method:\n\n";
+    std::cout << "Initial Guess = 0.0:\n"; // The function is undefined at x <= 0
+    root = fdfsolve(DNewton([](double x) { return std::log(x); }), 0.0, 1.0E-15);
+    if (!root.has_value()) print_error(root.error());
+
+    std::cout << "Initial Guess = 1E-3:\n"; // This guess is close to the root, but will require many iterations
+    root = fdfsolve(DNewton([](double x) { return std::log(x); }), 1E-3, 1.0E-15, 5);
+    if (!root.has_value()) print_error(root.error());
 
     // ============================================================================================
     // If more fine-grained control is needed, the algorithms can be used directly. Both the bracketing
@@ -70,7 +115,6 @@ int main() {
 
     // Lambda function for printing the results of the bracketing solvers:
     auto bracket_root = [](auto solver, std::pair< double, double > bounds) {
-
         // Print the header:
         std::cout << "----------------------------------------------------------------------------------\n";
         std::cout << fmt::format("{:>10} | {:>15} | {:>15} | {:>15} | {:>15} ", "Iter", "Upper", "Lower", "Root", "Error") << std::endl;
@@ -106,17 +150,16 @@ int main() {
     };
 
     std::cout << "Manual root-finding using Ridder's method:" << std::endl;
-    bracket_root(Ridder(func), {0.0, 2.5});
+    bracket_root(Ridder(func), { 0.0, 2.5 });
 
     std::cout << "Manual root-finding using the bisection method:" << std::endl;
-    bracket_root(Bisection(func), {0.0, 2.5});
+    bracket_root(Bisection(func), { 0.0, 2.5 });
 
     std::cout << "Manual root-finding using the regula falsi method:" << std::endl;
-    bracket_root(RegulaFalsi(func), {0.0, 2.5});
+    bracket_root(RegulaFalsi(func), { 0.0, 2.5 });
 
     // Lambda function for printing the results of the polishing solvers:
     auto polish_root = [](auto solver, double guess) {
-
         // Print the header:
         std::cout << "------------------------------------------------------------------\n";
         std::cout << fmt::format("{:>10} | {:>25} | {:>25} ", "Iter", "Root", "Error") << std::endl;

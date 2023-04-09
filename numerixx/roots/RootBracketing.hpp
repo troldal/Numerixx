@@ -36,6 +36,9 @@
 #include "RootCommon.hpp"
 #include "calculus/Derivatives.hpp"
 
+// TODO: Throw exceptions when the input is invalid.
+// TODO: Fix the RegulaFalsi method.
+
 namespace nxx::roots
 {
     // ========================================================================
@@ -54,7 +57,7 @@ namespace nxx::roots
          * @requires POLICY must be invocable with a floating point type as its argument type.
          */
         template< typename POLICY >
-            requires std::floating_point< typename BracketingTraits< POLICY >::return_type >
+        requires std::floating_point< typename BracketingTraits< POLICY >::return_type >
         class BracketingBase
         {
             /*
@@ -73,8 +76,7 @@ namespace nxx::roots
             ~BracketingBase() = default;
 
         private:
-
-            function_type                         m_func {}; /**< The function object to find the root for. */
+            function_type                         m_func {};             /**< The function object to find the root for. */
             std::pair< return_type, return_type > m_bounds { 0.0, 0.0 }; /**< Holds the current bounds around the root. */
 
             /**
@@ -83,14 +85,17 @@ namespace nxx::roots
              * @param objective The function object to find the root for.
              * @note Constructor is private to avoid direct usage by clients.
              */
-            explicit BracketingBase(function_type objective) : m_func { std::move(objective) } {}
+            explicit BracketingBase(function_type objective)
+                : m_func { std::move(objective) }
+            {}
 
             /**
              * @brief Sets the current bounds around the root.
              *
              * @param bounds An object holding the new bounds around the root.
              */
-            void setBounds(auto bounds) {
+            void setBounds(auto bounds)
+            {
                 auto [lower, upper] = bounds;
                 static_assert(std::floating_point< decltype(lower) >);
                 m_bounds = std::pair< return_type, return_type > { lower, upper };
@@ -101,8 +106,8 @@ namespace nxx::roots
              *
              * @param bounds std::initializer_list holding the new bounds around the root.
              */
-            template <typename T>
-                requires std::floating_point< T >
+            template< typename T >
+            requires std::floating_point< T >
             constexpr void setBounds(std::initializer_list< T > bounds)
             {
                 if (bounds.size() != 2) throw std::logic_error("Initializer list must contain exactly two elements!");
@@ -110,7 +115,6 @@ namespace nxx::roots
             }
 
         public:
-
             /**
              * @brief Copy constructor.
              *
@@ -149,7 +153,8 @@ namespace nxx::roots
              * Examples of supported types include pairs, tuples, or custom structs with structured bindings support.
              * @warning If the solver is used without initializing, the behavior is undefined.
              */
-            void init(auto bounds) {
+            void init(auto bounds)
+            {
                 auto [lower, upper] = bounds;
                 setBounds(std::pair< return_type, return_type > { lower, upper });
             }
@@ -189,7 +194,7 @@ namespace nxx::roots
           * @requires FN must be invocable with a double as its argument type.
           */
     template< typename FN >
-        requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires std::floating_point< std::invoke_result_t< FN, double > >
     class Ridder final : public impl::BracketingBase< Ridder< FN > >
     {
         /*
@@ -209,7 +214,9 @@ namespace nxx::roots
          * @param objective The function object for which to find the root.
          * @note This constructor must call the BracketingBase constructor.
          */
-        explicit Ridder(FN objective) : BASE { objective } {}
+        explicit Ridder(FN objective)
+            : BASE { objective }
+        {}
 
         /**
          * @brief Perform one iteration of Ridder's method.
@@ -280,7 +287,7 @@ namespace nxx::roots
      * @requires FN must be invocable with a double as its argument type.
      */
     template< typename FN >
-        requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires std::floating_point< std::invoke_result_t< FN, double > >
     class Bisection final : public impl::BracketingBase< Bisection< FN > >
     {
         /*
@@ -299,7 +306,9 @@ namespace nxx::roots
          * @param objective The function object for which to find the root.
          * @note This constructor must call the BracketingBase constructor.
          */
-        explicit Bisection(FN objective) : BASE { objective } {}
+        explicit Bisection(FN objective)
+            : BASE { objective }
+        {}
 
         /**
          * @brief Perform one iteration of the bisection method.
@@ -333,7 +342,7 @@ namespace nxx::roots
      * with a double argument.
      */
     template< typename FN >
-        requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires std::floating_point< std::invoke_result_t< FN, double > >
     class RegulaFalsi final : public impl::BracketingBase< RegulaFalsi< FN > >
     {
         /*
@@ -353,7 +362,9 @@ namespace nxx::roots
          * @param objective The function object for which to find the root.
          * @note This constructor must call the BracketingBase constructor.
          */
-        explicit RegulaFalsi(FN objective) : BASE { objective } {}
+        explicit RegulaFalsi(FN objective)
+            : BASE { objective }
+        {}
 
         /**
          * @brief Perform one iteration of the Regula Falsi algorithm.
@@ -381,57 +392,88 @@ namespace nxx::roots
         }
     };
 
-    namespace impl {
-     /**
-       * @brief Implementation function for the fsolve functions.
-       *
-       * This function template takes a solver object, initial bounds, an optional convergence
-       * tolerance (epsilon), and an optional maximum number of iterations. It attempts to find the
-       * root of the function within the given bounds using the solver's algorithm.
-       *
-       * @tparam SOLVER The solver type, which must implement the required interface (e.g., evaluate(), init(), iterate()).
-       * @param solver The solver object configured with the function for which to find the root.
-       * @param bounds A std::pair containing the initial lower and upper bounds for the search interval.
-       * @param eps The convergence tolerance (optional, default is 1.0E-6).
-       * @param maxiter The maximum number of iterations allowed (optional, default is 100).
-       * @return A tl::expected<double, RootError> object, which contains the root on success, or a RootError on failure.
-       * @note The solver must implement a compatible interface with the required member functions,
-       *       such as evaluate(), init(), and iterate().
-       */
+    namespace impl
+    {
+        /**
+         * @brief Implementation function for the fsolve functions.
+         *
+         * This function template takes a solver object, initial bounds, an optional convergence
+         * tolerance (epsilon), and an optional maximum number of iterations. It attempts to find the
+         * root of the function within the given bounds using the solver's algorithm.
+         *
+         * @tparam SOLVER The solver type, which must implement the required interface (e.g., evaluate(), init(), iterate()).
+         * @param solver The solver object configured with the function for which to find the root.
+         * @param bounds A std::pair containing the initial lower and upper bounds for the search interval.
+         * @param eps The convergence tolerance (optional, default is 1.0E-6).
+         * @param maxiter The maximum number of iterations allowed (optional, default is 100).
+         * @return A tl::expected<double, RootError> object, which contains the root on success, or a RootError on failure.
+         * @note The solver must implement a compatible interface with the required member functions,
+         *       such as evaluate(), init(), and iterate().
+         */
         template< typename SOLVER >
-            requires requires(SOLVER solver, std::pair< typename SOLVER::return_type, typename SOLVER::return_type > bounds) {
-                {solver.evaluate(0.0)} -> std::floating_point;
-                {solver.init(bounds)};
-                {solver.iterate()};
-            }
+        requires requires(SOLVER solver, std::pair< typename SOLVER::return_type, typename SOLVER::return_type > bounds) {
+                     // clang-format off
+                     { solver.evaluate(0.0) } -> std::floating_point;
+                     { solver.init(bounds) };
+                     { solver.iterate() };
+                     // clang-format on
+                 }
         inline auto fsolve_impl(SOLVER                                                                  solver,
                                 std::pair< typename SOLVER::return_type, typename SOLVER::return_type > bounds,
                                 typename SOLVER::return_type                                            eps     = nxx::EPS,
                                 int                                                                     maxiter = nxx::MAXITER)
-            ->tl::expected< typename SOLVER::return_type, RootError >
         {
-            using RT = typename SOLVER::return_type;
+            using ET = RootErrorImpl< typename SOLVER::return_type >;
+            using RT = tl::expected< typename SOLVER::return_type, ET >;
 
-            const auto& curBounds = solver.bounds();
             solver.init(bounds);
-            RT result;
+            auto curBounds = solver.bounds();
+            RT result         = (curBounds.first + curBounds.second) / 2.0;
+            typename SOLVER::return_type eval;
 
+            // Check for NaN or Inf.
+            if (!std::isfinite(solver.evaluate(curBounds.first)) || !std::isfinite(solver.evaluate(curBounds.second))) {
+                result = tl::make_unexpected(ET("Invalid initial brackets!", RootErrorType::NumericalError, result.value()));
+                return result;
+            }
+
+            // Check for a root in the initial bracket.
+            if (solver.evaluate(curBounds.first) * solver.evaluate(curBounds.second) > 0.0) {
+                result = tl::make_unexpected(ET("Root not bracketed!", RootErrorType::NoRootInBracket, result.value()));
+                return result;
+            }
+
+            // Begin the iteration loop.
             int iter = 1;
             while (true) {
-                if (!std::isfinite(curBounds.first) || !std::isfinite(curBounds.second))
-                    return tl::make_unexpected(RootError("Root brackets not finite!"));
+                curBounds = solver.bounds();
+                result    = (curBounds.first + curBounds.second) / 2.0;
+                eval      = solver.evaluate(*result);
 
-                result = (curBounds.first + curBounds.second) / 2.0;
-                if (abs(curBounds.first - curBounds.second) < eps || abs(solver.evaluate(result)) < eps) break;
+                // Check for NaN or Inf.
+                if (!std::isfinite(curBounds.first) || !std::isfinite(curBounds.second) || !std::isfinite(eval)) {
+                    result = tl::make_unexpected(ET("Non-finite result!", RootErrorType::NumericalError, result.value(), iter));
+                    break;
+                }
+
+                // Check for convergence.
+                if (abs(curBounds.first - curBounds.second) < eps || abs(eval) < eps) break;
+
+                // Check for maximum number of iterations.
+                if (iter >= maxiter) {
+                    result = tl::make_unexpected(
+                        ET("Maximum number of iterations exceeded!", RootErrorType::MaxIterationsExceeded, result.value(), iter));
+                    break;
+                }
+
+                // Perform one iteration.
                 solver.iterate();
-
                 ++iter;
-                if (iter > maxiter) break;
             }
 
             return result;
         }
-    }
+    }    // namespace impl
 
     /**
      * @brief Main fsolve function to find the root of the function with specified bounds.
@@ -446,9 +488,9 @@ namespace nxx::roots
     template< typename SOLVER >
     inline auto fsolve(SOLVER solver, auto bounds, typename SOLVER::return_type eps = nxx::EPS, int maxiter = nxx::MAXITER)
     {
-        using RT = typename SOLVER::return_type;
+        using RT      = typename SOLVER::return_type;
         auto [lo, hi] = bounds;
-        return impl::fsolve_impl(solver, std::pair<RT, RT>{lo, hi}, eps, maxiter);
+        return impl::fsolve_impl(solver, std::pair< RT, RT > { lo, hi }, eps, maxiter);
     }
 
     /**
@@ -463,8 +505,9 @@ namespace nxx::roots
      * @return tl::expected object containing either the root of the function or an error.
      * @throws std::logic_error if the initializer list does not contain exactly two elements.
      */
-    template< typename SOLVER, typename T>
-    inline auto fsolve(SOLVER solver, std::initializer_list<T> bounds, typename SOLVER::return_type eps = nxx::EPS, int maxiter = nxx::MAXITER)
+    template< typename SOLVER, typename T >
+    inline auto
+        fsolve(SOLVER solver, std::initializer_list< T > bounds, typename SOLVER::return_type eps = nxx::EPS, int maxiter = nxx::MAXITER)
     {
         using RT = typename SOLVER::return_type;
         if (bounds.size() != 2) throw std::logic_error("Initializer list must contain exactly two elements!");

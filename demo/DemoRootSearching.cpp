@@ -72,6 +72,37 @@ int main()
     std::cout << "BracketExpandUp Method:         " << PrintBounds(*search(BracketExpandUp(func), { 1.0, 1.1 }, 2.0, 10)) << std::endl;
 
     // ============================================================================================
+    // As mentioned above, the search() function will return a tl::expected object, which will
+    // contain the bracketing interval if a root was found, or an error code if no root was found.
+    // This is useful if the user only wants to know if a root was found, or not.
+    // ============================================================================================
+
+    std::cout << "\nFind the brackets around the root of the function f(x) = log(x):\n\n";
+    auto print_error = [](auto error) {
+        std::cout << "Error Description: " << error.what() << std::endl;
+        std::cout << "Error Type:        " << error.typeAsString() << std::endl;
+        std::cout << "Last Value:        [" << error.value().first << ", " << error.value().second << "]" << std::endl;
+        std::cout << "Iterations:        " << error.iterations() << std::endl << std::endl;
+    };
+
+    std::cout << "Initial Bracket:   [5.0, 10.0] (expanding down)\n";
+    auto root = search(BracketExpandDown([](double x) { return std::log(x); }), { 5.0, 10.0 });
+    if (!root) print_error(root.error());
+
+    std::cout << "Initial Bracket:   [5.0, 10.0] (expanding up)\n";
+    root = search(BracketExpandUp([](double x) { return std::log(x); }), { 5.0, 10.0 }, 1.0, 10);
+    if (!root) print_error(root.error());
+
+    // The error object is a subclass of the RootError class, which is a subclass of the std::runtime_error
+    // class. This means that the error object can be used in a try-catch block, as shown below.
+    try {
+        throw root.error();
+    }
+    catch (const RootError& e) {
+        std::cout << "Exception caught: " << e.what() << std::endl << std::endl;
+    }
+
+    // ============================================================================================
     // If more fine-grained control is needed, the algorithms can be used directly. The algorithms
     // are implemented as objects that can be used to iterate towards a solution, until a bracketing
     // interval is found.

@@ -40,11 +40,99 @@ namespace nxx::roots
     // ROOT ERROR/EXCEPTION CLASSES
     // ========================================================================
 
+    /**
+     * @brief The RootErrorType enum is an enum class for the different types of root-finding errors.
+     */
+    enum class RootErrorType { NoRootInBracket, MaxIterationsExceeded, NumericalError };
+
+    /**
+     * @brief The RootError class is a base class for root-finding errors.
+     */
     class RootError : public std::runtime_error
     {
     public:
-        explicit RootError(const char* msg) : std::runtime_error(msg) {};
+        /**
+         * @brief Constructor.
+         * @param msg The error message.
+         */
+        explicit RootError(const char* msg)
+            : std::runtime_error(msg) {};
     };
+
+    namespace impl
+    { /**
+       * @brief The RootErrorImpl class is a template class for root-finding errors.
+       * @tparam T The type of the root value.
+       */
+        template< typename T >
+        class RootErrorImpl : public RootError
+        {
+            RootErrorType m_type;           /*< The type of the error. */
+            T             m_value;          /*< The value of the root before the error was thrown. */
+            int           m_iterations = 0; /*< The number of iterations performed before the error was thrown. */
+
+        public:
+            /**
+             * @brief Constructor.
+             * @param msg The error message.
+             * @param type The type of the error.
+             * @param value The value of the root before the error was thrown.
+             * @param iter The number of iterations performed before the error was thrown.
+             */
+            explicit RootErrorImpl(const char* msg, RootErrorType type, T value, int iter = 0)
+                : RootError(msg),
+                  m_type(type),
+                  m_value(value),
+                  m_iterations(iter) {};
+
+            /**
+             * @brief Returns the type of the error.
+             * @return The type of the error.
+             */
+            [[nodiscard]]
+            RootErrorType type() const
+            {
+                return m_type;
+            }
+
+            /**
+             * @brief Returns a string representation of the error type.
+             * @return A string representation of the error type.
+             */
+            [[nodiscard]]
+            auto typeAsString() const
+            {
+                switch (m_type) {
+                    case RootErrorType::NoRootInBracket:
+                        return "No root in bracket";
+                    case RootErrorType::MaxIterationsExceeded:
+                        return "Max iterations exceeded";
+                    case RootErrorType::NumericalError:
+                        return "Numerical error";
+                }
+            }
+
+            /**
+             * @brief Returns the value of the root before the error was thrown.
+             * @return The value of the root.
+             */
+            [[nodiscard]]
+            auto value() const
+            {
+                return m_value;
+            }
+
+            /**
+             * @brief Returns the number of iterations performed before the error was thrown.
+             * @return The number of iterations performed before the error was thrown.
+             */
+            [[nodiscard]]
+            auto iterations() const
+            {
+                return m_iterations;
+            }
+        };
+    }    // namespace impl
 
     // ========================================================================
     // TRAITS CLASSES FOR ROOT-FINDING WITHOUT DERIVATIVES
@@ -54,21 +142,21 @@ namespace nxx::roots
      * Forward declaration of the Ridders class.
      */
     template< typename FN >
-        requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires std::floating_point< std::invoke_result_t< FN, double > >
     class Ridder;
 
     /*
      * Forward declaration of the Bisection class.
      */
     template< typename FN >
-        requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires std::floating_point< std::invoke_result_t< FN, double > >
     class Bisection;
 
     /*
      * Forward declaration of the RegulaFalsi class.
      */
     template< typename FN >
-        requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires std::floating_point< std::invoke_result_t< FN, double > >
     class RegulaFalsi;
 
     /*
@@ -122,14 +210,14 @@ namespace nxx::roots
      * Forward declaration of the DNewton class.
      */
     template< typename FN, typename DFN >
-        requires std::floating_point< std::invoke_result_t< FN, double > > && std::floating_point< std::invoke_result_t< DFN, double > >
+    requires std::floating_point< std::invoke_result_t< FN, double > > && std::floating_point< std::invoke_result_t< DFN, double > >
     class DNewton;
 
     /*
      * Forward declaration of the Newton class.
      */
     template< typename FN, typename DFN >
-        requires std::floating_point< std::invoke_result_t< FN, double > > && std::floating_point< std::invoke_result_t< DFN, double > >
+    requires std::floating_point< std::invoke_result_t< FN, double > > && std::floating_point< std::invoke_result_t< DFN, double > >
     class Newton;
 
     namespace impl
@@ -167,11 +255,11 @@ namespace nxx::roots
     }    // namespace impl
 
     template< typename FN >
-        requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires std::floating_point< std::invoke_result_t< FN, double > >
     class BracketSearchUp;
 
     template< typename FN >
-        requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires std::floating_point< std::invoke_result_t< FN, double > >
     class BracketSearchDown;
 
     template< typename FN >
@@ -246,7 +334,7 @@ namespace nxx::roots
             using return_type   = std::invoke_result_t< FN, double >;
         };
 
-    }
+    }    // namespace impl
 
 }    // namespace nxx::roots
 

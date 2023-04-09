@@ -37,6 +37,8 @@
 
 #include "RootCommon.hpp"
 
+// TODO: Throw exceptions when the input is invalid.
+
 namespace nxx::roots
 {
 
@@ -597,49 +599,62 @@ namespace nxx::roots
          */
         template< typename SOLVER >
         requires requires(SOLVER solver, std::pair< typename SOLVER::return_type, typename SOLVER::return_type > bounds) {
-                     {
-                         solver.evaluate(0.0)
-                     } -> std::floating_point;
-                     {
-                         solver.init(bounds)
-                     };
-                     {
-                         solver.iterate()
-                     };
-                     {
-                         solver.bounds()
-                     };
-                     {
-                         solver.factor()
-                     };
+                     // clang-format off
+                     { solver.evaluate(0.0) } -> std::floating_point;
+                     { solver.init(bounds) };
+                     { solver.iterate() };
+                     { solver.bounds() };
+                     { solver.factor() };
+                     // clang-format on
                  }
         inline auto search_impl(SOLVER                                                                  solver,
                                 std::pair< typename SOLVER::return_type, typename SOLVER::return_type > bounds,
                                 typename SOLVER::return_type searchFactor = std::numbers::phi_v< typename SOLVER::return_type >,
                                 int                          maxiter      = nxx::MAXITER)
         {
-            using RT = decltype(bounds);
-            tl::expected< RT, RootError > result;
+            using ET = RootErrorImpl< decltype(bounds) >;
+            using RT = tl::expected< decltype(bounds), ET >;
 
             solver.init(bounds, searchFactor);
+            auto                         curBounds = solver.bounds();
+            RT                           result    = curBounds;
+            typename SOLVER::return_type eval_lower;
+            typename SOLVER::return_type eval_upper;
+
+            // Check for NaN or Inf.
+            if (!std::isfinite(solver.evaluate(curBounds.first)) || !std::isfinite(solver.evaluate(curBounds.second))) {
+                result = tl::make_unexpected(ET("Invalid initial brackets!", RootErrorType::NumericalError, result.value()));
+                return result;
+            }
 
             int iter = 1;
             while (true) {
-                if (!std::isfinite(solver.bounds().first) || !std::isfinite(solver.bounds().second)) {
-                    result = tl::make_unexpected(RootError("Root brackets not finite!"));
+                curBounds  = solver.bounds();
+                eval_lower = solver.evaluate(curBounds.first);
+                eval_upper = solver.evaluate(curBounds.second);
+
+                // Check for NaN or Inf.
+                if (!std::isfinite(curBounds.first) || !std::isfinite(curBounds.second) || !std::isfinite(eval_lower) ||
+                    !std::isfinite(eval_upper))
+                {
+                    result = tl::make_unexpected(ET("Non-finite result!", RootErrorType::NumericalError, curBounds, iter));
                     break;
                 }
 
-                if (solver.evaluate(solver.bounds().first) * solver.evaluate(solver.bounds().second) < 0.0) {
-                    result = solver.bounds();
+                // Check if the root is bracketed by the bounds. If yes, return the bounds.
+                if (eval_lower * eval_upper < 0.0) {
+                    result = curBounds;
                     break;
                 }
 
-                if (iter > maxiter) {
-                    result = tl::make_unexpected(RootError("Maximum number of iterations exceeded!"));
+                // Check for maximum number of iterations.
+                if (iter >= maxiter) {
+                    result = tl::make_unexpected(
+                        ET("Maximum number of iterations exceeded!", RootErrorType::MaxIterationsExceeded, curBounds, iter));
                     break;
                 }
 
+                // Otherwise, iterate the solver
                 solver.iterate();
                 ++iter;
             }
