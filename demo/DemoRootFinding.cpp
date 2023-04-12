@@ -13,7 +13,7 @@ int main()
 {
     using namespace nxx::roots;
     std::cout << std::fixed << std::setprecision(8);
-    auto func = nxx::poly::Polynomial({ -5.0, 0.0, 1.0 });
+    auto func = [](double x) { return x * x - 5.0; };
 
     // ============================================================================================
     // The nxx::roots namespace contains a number of root-finding algorithms, for finding the roots
@@ -47,12 +47,12 @@ int main()
     // the * operator, which will return a reference to the value. If the expected object does not
     // contain a value, the result of using the * operator is undefined.
     // ============================================================================================
-    std::cout << "\nCompute the root of the polynomial " << func.asString() << " using bracketing methods:\n";
+    std::cout << "\nCompute the root of the polynomial f(x) = x^2 - 5 using bracketing methods:\n";
     std::cout << "Bisection Method:         " << *fsolve(Bisection(func), { 0.0, 2.5 }, 1.0E-15) << std::endl;
     std::cout << "Ridder's Method:          " << *fsolve(Ridder(func), { 0.0, 2.5 }, 1.0E-15) << std::endl;
     std::cout << "Regula Falsi Method:      " << *fsolve(RegulaFalsi(func), { 0.0, 2.5 }, 1.0E-15) << std::endl << std::endl;
 
-    std::cout << "Compute the root of the polynomial " << func.asString() << " using polishing methods:\n";
+    std::cout << "\nCompute the root of the polynomial f(x) = x^2 - 5 using polishing methods:\n";
     std::cout << "Discrete Newton's Method: " << *fdfsolve(DNewton(func), 1.25, 1.0E-15) << std::endl;
     std::cout << "Newton's Method:          " << *fdfsolve(Newton(func, derivativeOf(func)), 1.25, 1.0E-15) << std::endl << std::endl;
     // Note that the Discrete Newton's Method uses the numerical derivative of the function, while
@@ -122,48 +122,42 @@ int main()
         std::cout << fmt::format("{:>10} | {:>15} | {:>15} | {:>15} | {:>15} ", "Iter", "Upper", "Lower", "Root", "Error") << std::endl;
         std::cout << "----------------------------------------------------------------------------------\n";
 
+        // Create variables for the iterations.
+        std::array< decltype(bounds), 2 > guesses;    // Stores the endpoints of the bracketing interval
+        decltype(guesses.begin())         min;        // Stores the endpoint with the smallest absolute value
+
         // Initialize the solver:
         solver.init(bounds);
-
-        std::array< decltype(bounds), 2 > guesses;
-        decltype(guesses.begin())         min;
 
         // Iterate until convergence (or until 100 iterations have been performed):
         for (int i = 0; i <= 100; ++i) {
             // Retrieve the current bracketing interval, and evaluate the function at the endpoints:
-            guesses = { std::make_pair(bounds.first, abs(solver.evaluate(bounds.first))),
-                        std::make_pair(bounds.second, abs(solver.evaluate(bounds.second))) };
+            guesses = { std::make_pair(solver.bounds().first, abs(solver.evaluate(solver.bounds().first))),
+                        std::make_pair(solver.bounds().second, abs(solver.evaluate(solver.bounds().second))) };
 
-            // Find the endpoint with the smallest absolute value:
+            // Find the endpoint which has the smallest error:
             min = std::min_element(guesses.begin(), guesses.end(), [](const auto& a, const auto& b) {
                 return abs(a.second) < abs(b.second);
             });
 
             // Print the current iteration:
             std::cout << fmt::format("{:10} | {:15.10f} | {:15.10f} | {:15.10f} | {:15.10f} ",
-                                     i,
-                                     bounds.first,
-                                     bounds.second,
-                                     min->first,
-                                     min->second)
+                                     i,                         // Iteration number
+                                     solver.bounds().first,     // Upper endpoint
+                                     solver.bounds().second,    // Lower endpoint
+                                     min->first,                // Root
+                                     min->second)               // Error
                       << std::endl;
 
             // Check if convergence has been reached:
-            if (min->second < 1.0E-15) {
-                bounds.first  = min->first;
-                bounds.second = min->first;
-                break;
-            }
+            if (min->second < 1.0E-15) break;
 
             // Perform one iteration:
             solver.iterate();
-
-            // Retrieve the current bracketing interval:
-            bounds = solver.bounds();
         }
 
         // Print the final result:
-        std::cout << std::fixed << std::setprecision(10) << "CONVERGED! Root found at: " << min->first << "\n";
+        std::cout << std::fixed << std::setprecision(20) << "CONVERGED! Root found at: " << min->first << "\n";
         std::cout << "----------------------------------------------------------------------------------\n\n";
     };
 
@@ -191,20 +185,21 @@ int main()
             std::cout << std::fixed << std::setprecision(10);
 
             // Print the current iteration:
-            std::cout << fmt::format("{:10} | {:25.20f} | {:25.20f} ", i, guess, abs(solver.evaluate(guess))) << std::endl;
+            std::cout << fmt::format("{:10} | {:25.20f} | {:25.20f} ",
+                                     i,                                        // Iteration number
+                                     solver.result(),                          // Current guess
+                                     abs(solver.evaluate(solver.result())))    // Error
+                      << std::endl;
 
             // Check if convergence has been reached:
-            if (abs(solver.evaluate(guess)) < 1.0E-15) break;
+            if (abs(solver.evaluate(solver.result())) < 1.0E-15) break;
 
             // Perform one iteration:
             solver.iterate();
-
-            // Retrieve the current guess:
-            guess = solver.result();
         }
 
         // Print the final result:
-        std::cout << std::fixed << std::setprecision(10) << "CONVERGED! Root found at: " << guess << "\n";
+        std::cout << std::fixed << std::setprecision(20) << "CONVERGED! Root found at: " << solver.result() << "\n";
         std::cout << "------------------------------------------------------------------\n\n";
     };
 

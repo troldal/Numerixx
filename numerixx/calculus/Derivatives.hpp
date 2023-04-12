@@ -8,7 +8,7 @@
     o     Oo `o     Oo o        O  O        O     O     O     O    O   O    O
     O     `o  `OoooO'O O        o ooOooOoO  O      o ooOOoOo O      o O      o
 
-    Copyright © 2022 Kenneth Troldal Balslev
+    Copyright © 2023 Kenneth Troldal Balslev
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the “Software”), to deal
@@ -31,17 +31,21 @@
 #ifndef NUMERIXX_DIFFERENTIATION_HPP
 #define NUMERIXX_DIFFERENTIATION_HPP
 
+// ===== Numerixx Includes
 #include "../poly/Polynomial.hpp"
+
+// ===== External Includes
 #include "../.dependencies/expected/expected.hpp"
 #include "../.dependencies/gcem/gcem.hpp"
 
+// ===== Standard Library Includes
 #include <cassert>
 #include <cmath>
 #include <functional>
 #include <limits>
 #include <tuple>
-#include <utility>
 #include <type_traits>
+#include <utility>
 
 namespace nxx::deriv
 {
@@ -49,15 +53,16 @@ namespace nxx::deriv
     class DerivativeError : public std::runtime_error
     {
     public:
-        explicit DerivativeError(const char* msg) : std::runtime_error(msg) {};
+        explicit DerivativeError(const char* msg)
+            : std::runtime_error(msg) {};
     };
 
     template< typename FN >
     concept IsFunction = requires(FN fn) {
-        {
-            fn(0.0)
-        } -> std::floating_point;
-    };
+                             {
+                                 fn(0.0)
+                             } -> std::floating_point;
+                         };
 
     template< typename SOLVER >
     concept IsSolver = std::invocable< SOLVER, std::function< double(double) >, double, double >;
@@ -65,14 +70,14 @@ namespace nxx::deriv
     template< typename T >
     using ReturnType = std::invoke_result_t< T, double >;
 
-    template<typename T>
-    struct StepSizeHelper {
-        static constexpr T value = gcem::pow(std::numeric_limits< T >::epsilon(), 1.0/3);
+    template< typename T >
+    struct StepSizeHelper
+    {
+        static constexpr T value = gcem::pow(std::numeric_limits< T >::epsilon(), 1.0 / 3);
     };
 
-    template<typename T>
-    inline constexpr T StepSize = StepSizeHelper<T>::value;
-
+    template< typename T >
+    inline constexpr T StepSize = StepSizeHelper< T >::value;
 
     // ====================================================================
     // Central finite difference formulas
@@ -85,7 +90,6 @@ namespace nxx::deriv
     class Order1CentralRichardson
     {
     public:
-
         /**
          * @brief Function call operator.
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
@@ -101,7 +105,8 @@ namespace nxx::deriv
             operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
         {
             return (4.0 * (function(val + stepsize) - function(val - stepsize)) -
-                    0.5 * (function(val + 2 * stepsize) - function(val - 2 * stepsize))) / (stepsize * 6);
+                    0.5 * (function(val + 2 * stepsize) - function(val - 2 * stepsize))) /
+                   (stepsize * 6);
         }
     };
 
@@ -112,7 +117,6 @@ namespace nxx::deriv
     class Order1Central3Point
     {
     public:
-
         /**
          * @brief Function call operator.
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
@@ -138,7 +142,6 @@ namespace nxx::deriv
     class Order1Central5Point
     {
     public:
-
         /**
          * @brief Function call operator.
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
@@ -166,7 +169,6 @@ namespace nxx::deriv
     class Order2Central3Point
     {
     public:
-
         /**
          * @brief Function call operator.
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
@@ -192,7 +194,6 @@ namespace nxx::deriv
     class Order2Central5Point
     {
     public:
-
         /**
          * @brief Function call operator.
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
@@ -224,7 +225,6 @@ namespace nxx::deriv
     class Order1ForwardRichardson
     {
     public:
-
         /**
          * @brief Function call operator.
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
@@ -255,7 +255,6 @@ namespace nxx::deriv
     class Order1Forward2Point
     {
     public:
-
         /**
          * @brief Function call operator.
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
@@ -281,7 +280,6 @@ namespace nxx::deriv
     class Order1Forward3Point
     {
     public:
-
         /**
          * @brief Function call operator.
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
@@ -307,7 +305,6 @@ namespace nxx::deriv
     class Order2Forward3Point
     {
     public:
-
         /**
          * @brief Function call operator.
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
@@ -333,7 +330,6 @@ namespace nxx::deriv
     class Order2Forward4Point
     {
     public:
-
         /**
          * @brief Function call operator.
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
@@ -364,7 +360,6 @@ namespace nxx::deriv
     class Order1BackwardRichardson
     {
     public:
-
         /**
          * @brief Function call operator.
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
@@ -395,7 +390,6 @@ namespace nxx::deriv
     class Order1Backward2Point
     {
     public:
-
         /**
          * @brief Function call operator.
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
@@ -421,7 +415,6 @@ namespace nxx::deriv
     class Order1Backward3Point
     {
     public:
-
         /**
          * @brief Function call operator.
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
@@ -447,7 +440,6 @@ namespace nxx::deriv
     class Order2Backward3Point
     {
     public:
-
         /**
          * @brief Function call operator.
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
@@ -473,7 +465,6 @@ namespace nxx::deriv
     class Order2Backward4Point
     {
     public:
-
         /**
          * @brief Function call operator.
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
@@ -506,13 +497,12 @@ namespace nxx::deriv
      * a \c DerivativeError exception object describing the error.
      */
     template< typename ALGO >
-    inline auto diff(
-        IsFunction auto                  function,
-        ReturnType< decltype(function) > val,
-        ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
+    inline auto diff(IsFunction auto                  function,
+                     ReturnType< decltype(function) > val,
+                     ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
         tl::expected< ReturnType< decltype(function) >, DerivativeError > result;
-        auto deriv  = ALGO {}(function, val, stepsize);
+        auto                                                              deriv = ALGO {}(function, val, std::max(stepsize, stepsize * val));
 
         if (std::isfinite(deriv))
             result = deriv;
@@ -530,10 +520,9 @@ namespace nxx::deriv
      * @return A \c tl::expected (\c std::expected) containing the (approximated) derivative of the function, or (in case of an error)
      * a \c DerivativeError exception object describing the error.
      */
-    inline auto
-        central(IsFunction auto                  function,
-                ReturnType< decltype(function) > val,
-                ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
+    inline auto central(IsFunction auto                  function,
+                        ReturnType< decltype(function) > val,
+                        ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
         return diff< Order1CentralRichardson >(function, val, stepsize);
     }
@@ -547,10 +536,9 @@ namespace nxx::deriv
      * @return A \c tl::expected (\c std::expected) containing the (approximated) derivative of the function, or (in case of an error)
      * a \c DerivativeError exception object describing the error.
      */
-    inline auto
-        forward(IsFunction auto                  function,
-                ReturnType< decltype(function) > val,
-                ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
+    inline auto forward(IsFunction auto                  function,
+                        ReturnType< decltype(function) > val,
+                        ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
         return diff< Order1ForwardRichardson >(function, val, stepsize);
     }
@@ -564,10 +552,9 @@ namespace nxx::deriv
      * @return A \c tl::expected (\c std::expected) containing the (approximated) derivative of the function, or (in case of an error)
      * a \c DerivativeError exception object describing the error.
      */
-    inline auto
-        backward(IsFunction auto                  function,
-                 ReturnType< decltype(function) > val,
-                 ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
+    inline auto backward(IsFunction auto                  function,
+                         ReturnType< decltype(function) > val,
+                         ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
         return diff< Order1BackwardRichardson >(function, val, stepsize);
     }
@@ -585,12 +572,13 @@ namespace nxx::deriv
      * @note The returned function object will not check the result for errors. If you want to check the result for errors,
      * use the \c diff function instead, or create a custom function object (e.g., a lambda) that checks the result for errors.
      */
-    template< typename ALGO = Order1CentralRichardson>
-    inline auto derivativeOf(IsFunction auto function, ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
-    requires (!poly::IsPolynomial< decltype(function) >)
+    template< typename ALGO = Order1CentralRichardson >
+    inline auto derivativeOf(IsFunction auto                  function,
+                             ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
+        requires(!poly::IsPolynomial< decltype(function) >)
     {
         using RT = ReturnType< decltype(function) >;
-        return [=](RT val) { return *diff< ALGO >(function, val, stepsize); };
+        return [=](RT val) { return ALGO {}(function, val, stepsize); };
     }
 
 }    // namespace nxx::deriv

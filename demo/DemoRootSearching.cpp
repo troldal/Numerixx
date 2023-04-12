@@ -124,13 +124,13 @@ int main()
         for (int i = 0; i <= 100; ++i) {
             // Print the current iteration:
             std::cout << fmt::format("{:10} | {:15.10f} | {:15.10f} | {:15.10f} ",
-                                     i,
-                                     solver.bounds().first,
-                                     solver.bounds().second,
-                                     solver.factor())
+                                     i,                         // Iteration number
+                                     solver.bounds().first,     // Lower bound
+                                     solver.bounds().second,    // Upper bound
+                                     solver.factor())           // Expansion factor
                       << std::endl;
 
-            // Check if convergence has been reached:
+            // Check if a root is in the current interval:
             if (solver.evaluate(solver.bounds().first) * solver.evaluate(solver.bounds().second) < 0.0) break;
 
             // Perform one iteration:
@@ -138,7 +138,7 @@ int main()
         }
 
         // Print the final result:
-        std::cout << std::fixed << std::setprecision(20) << "CONVERGED! Bounds found at: (" << solver.bounds().first << ", "
+        std::cout << std::fixed << std::setprecision(10) << "SUCCESS! Bounds found at: (" << solver.bounds().first << ", "
                   << solver.bounds().second << ")\n";
         std::cout << "----------------------------------------------------------------\n\n";
     };

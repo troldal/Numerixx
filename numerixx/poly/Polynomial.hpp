@@ -31,10 +31,14 @@
 #ifndef NUMERIXX_POLYNOMIAL_HPP
 #define NUMERIXX_POLYNOMIAL_HPP
 
+// ===== Numerixx Includes
 #include "PolynomialError.hpp"
+
+// ===== External Includes
 #include "../.dependencies/expected/expected.hpp"
 #include "../.utils/Concepts.hpp"
 
+// ===== Standard Library Includes
 #include <algorithm>
 #include <complex>
 #include <iterator>

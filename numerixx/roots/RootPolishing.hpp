@@ -31,10 +31,15 @@
 #ifndef NUMERIXX_ROOTPOLISHING_HPP
 #define NUMERIXX_ROOTPOLISHING_HPP
 
+// ===== Numerixx Includes
+#include "RootCommon.hpp"
+#include "calculus/Derivatives.hpp"
+#include "poly/Polynomial.hpp"
+
+// ===== External Includes
 #include "../.utils/Constants.hpp"
 
-#include "RootCommon.hpp"
-
+// ===== Standard Library Includes
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -43,12 +48,6 @@
 #include <stdexcept>
 #include <tuple>
 #include <utility>
-
-#include "calculus/Derivatives.hpp"
-#include "poly/Polynomial.hpp"
-
-// TODO: Throw exceptions when the input is invalid.
-// TODO: Handle errors from computation of derivatives.
 
 namespace nxx::roots
 {
@@ -86,12 +85,14 @@ namespace nxx::roots
             friend POLICY;
 
         public:
-            using function_type = typename impl::PolishingTraits< POLICY >::function_type; /**< The type of the function object. */
-            using deriv_type    = typename impl::PolishingTraits< POLICY >::deriv_type; /**< The type of the derivative function object. */
-            using function_return_type =
-                typename impl::PolishingTraits< POLICY >::function_return_type;         /**< The return type of the function object. */
-            using deriv_return_type =
-                typename impl::PolishingTraits< POLICY >::deriv_return_type; /**< The return type of the derivative function object. */
+            using function_type = /**< The type of the function object. */
+                typename impl::PolishingTraits< POLICY >::function_type;
+            using deriv_type    = /**< The type of the derivative function object. */
+                typename impl::PolishingTraits< POLICY >::deriv_type;
+            using function_return_type = /**< The return type of the function object. */
+                typename impl::PolishingTraits< POLICY >::function_return_type;
+            using deriv_return_type = /**< The return type of the derivative function object. */
+                typename impl::PolishingTraits< POLICY >::deriv_return_type;
 
         protected:
             /**
@@ -100,9 +101,10 @@ namespace nxx::roots
             ~PolishingBase() = default;
 
         private:
-            function_type        m_func {};  /**< The function object to find the root for. */
-            deriv_type           m_deriv {}; /**< The function object for the derivative. */
-            function_return_type m_guess;    /**< The current root estimate. */
+            function_type        m_func {};               /**< The function object to find the root for. */
+            deriv_type           m_deriv {};              /**< The function object for the derivative. */
+            function_return_type m_guess;                 /**< The current root estimate. */
+            bool                 m_initialized { false }; /**< Flag indicating whether the object has been initialized. */
 
             /**
              * @brief Constructor, taking function objects for the function and its derivative as arguments.
@@ -155,8 +157,14 @@ namespace nxx::roots
             requires std::floating_point< T >
             void init(T guess)
             {
-                m_guess = guess;
+                m_initialized = true;
+                m_guess       = guess;
             }
+
+            /**
+             * @brief Reset the solver to its initial state.
+             */
+            void reset() { m_initialized = false; }
 
             /**
              * @brief Evaluate the function object at a given point.
@@ -188,7 +196,11 @@ namespace nxx::roots
              * @brief Get the current estimate of the root.
              * @return A const reference to the root.
              */
-            auto result() const { return m_guess; }
+            auto result() const
+            {
+                if (!m_initialized) throw std::runtime_error("Solver has not been initialized.");
+                return m_guess;
+            }
         };
     }    // namespace impl
 
@@ -295,15 +307,11 @@ namespace nxx::roots
      */
     template< typename SOLVER >
     requires requires(SOLVER solver, typename SOLVER::function_return_type guess) {
-                 {
-                     solver.evaluate(0.0)
-                 } -> std::floating_point;
-                 {
-                     solver.init(guess)
-                 };
-                 {
-                     solver.iterate()
-                 };
+                 // clang-format off
+                 { solver.evaluate(0.0) } -> std::floating_point;
+                 { solver.init(guess) };
+                 { solver.iterate() };
+                 // clang-format on
              }
     inline auto fdfsolve(SOLVER                                solver,
                          typename SOLVER::function_return_type guess,

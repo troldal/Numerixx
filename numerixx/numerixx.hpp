@@ -31,14 +31,14 @@
 #define NUMERIXX_NUMERIXX_HPP
 
 #include "calculus/Derivatives.hpp"
-//#include "calculus/Jacobian.hpp"
 #include "function/Function.hpp"
 #include "linalg/FactorizeGJ.hpp"
 #include "linalg/Matrix.hpp"
-#include "multiroots/MultiFunction.hpp"
 #include "multiroots/Multiroots.hpp"
 #include "poly/Polynomial.hpp"
 #include "poly/Polyroots.hpp"
 #include "roots/Roots.hpp"
+
+#include <blaze/Blaze.h>
 
 #endif    // NUMERIXX_NUMERIXX_HPP

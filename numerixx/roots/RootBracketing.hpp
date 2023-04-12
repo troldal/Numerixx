@@ -31,19 +31,20 @@
 #ifndef NUMERIXX_ROOTBRACKETING_HPP
 #define NUMERIXX_ROOTBRACKETING_HPP
 
-#include "../.utils/Constants.hpp"
-
+// ===== Numerixx Includes
 #include "RootCommon.hpp"
 #include "calculus/Derivatives.hpp"
 
-#include <array>
+// ===== External Includes
+#include "../.utils/Constants.hpp"
 
-// TODO: Throw exceptions when the input is invalid.
+// ===== Standard Library Includes
+#include <array>
 
 namespace nxx::roots
 {
     // ========================================================================
-    // ROOT-FINDING WITHOUT DERIVATIVES
+    // ROOT-FINDING WITHOUT DERIVATIVES (BRACKETING)
     // ========================================================================
 
     namespace impl
@@ -77,8 +78,9 @@ namespace nxx::roots
             ~BracketingBase() = default;
 
         private:
-            function_type                         m_func {};             /**< The function object to find the root for. */
-            std::pair< return_type, return_type > m_bounds { 0.0, 0.0 }; /**< Holds the current bounds around the root. */
+            function_type                         m_func {};                 /**< The function object to find the root for. */
+            std::pair< return_type, return_type > m_bounds { 0.0, 0.0 };     /**< Holds the current bounds around the root. */
+            bool                                  m_isInitialized { false }; /**< Indicates whether the solver has been initialized. */
 
             /**
              * @brief Constructor, taking a function object as an argument.
@@ -97,6 +99,7 @@ namespace nxx::roots
              */
             void setBounds(auto bounds)
             {
+                if (!m_isInitialized) throw std::logic_error("Solver has not been initialized!");
                 auto [lower, upper] = bounds;
                 static_assert(std::floating_point< decltype(lower) >);
                 m_bounds = std::pair< return_type, return_type > { lower, upper };
@@ -112,7 +115,7 @@ namespace nxx::roots
             constexpr void setBounds(std::initializer_list< T > bounds)
             {
                 if (bounds.size() != 2) throw std::logic_error("Initializer list must contain exactly two elements!");
-                m_bounds = std::pair< return_type, return_type > { *bounds.begin(), *(bounds.begin() + 1) };
+                setBounds(std::pair< return_type, return_type > { *bounds.begin(), *(bounds.begin() + 1) });
             }
 
         public:
@@ -156,9 +159,34 @@ namespace nxx::roots
              */
             void init(auto bounds)
             {
+                m_isInitialized     = true;
                 auto [lower, upper] = bounds;
                 setBounds(std::pair< return_type, return_type > { lower, upper });
             }
+
+            /**
+             * @brief Initializes the solver by setting the initial bounds around the root.
+             *
+             * @param bounds std::initializer_list holding the initial bounds around the root. The root must be contained
+             * inside these bounds. The list must contain exactly two elements, which will be interpreted as the lower and
+             * upper bounds, respectively.
+             * @warning If the solver is used without initializing, the behavior is undefined.
+             */
+            template< typename T >
+            requires std::floating_point< T >
+            void init(std::initializer_list< T > bounds)
+            {
+                m_isInitialized = true;
+                setBounds(bounds);
+            }
+
+            /**
+             * @brief Resets the solver to its initial state. To be called before reusing the solver.
+             *
+             * @note After calling this function, the solver must be initialized again before it can be used.
+             * @warning If the solver is used without initializing, the behavior is undefined.
+             */
+            void reset() { m_isInitialized = false; }
 
             /**
              * @brief Evaluates the function to solve at a given point.
@@ -180,7 +208,11 @@ namespace nxx::roots
              *
              * @return A const reference to the current bounds.
              */
-            const auto& bounds() const { return m_bounds; }
+            const auto& bounds() const
+            {
+                if (!m_isInitialized) throw std::logic_error("Solver has not been initialized!");
+                return m_bounds;
+            }
         };
     }    // namespace impl
 
@@ -381,7 +413,7 @@ namespace nxx::roots
             RT f_lo = BASE::evaluate(bounds.first);
             RT f_hi = BASE::evaluate(bounds.second);
 
-            RT root = (bounds.first * f_hi - bounds.second * f_lo) / (f_hi - f_lo);
+            RT root   = (bounds.first * f_hi - bounds.second * f_lo) / (f_hi - f_lo);
             RT f_root = BASE::evaluate(root);
 
             if (f_lo * f_root < 0.0) {
@@ -433,7 +465,7 @@ namespace nxx::roots
             auto curBounds = solver.bounds();
             RT   result    = (curBounds.first + curBounds.second) / 2.0;
             std::array< std::pair< typename SOLVER::return_type, typename SOLVER::return_type >, 2 > roots {};
-            decltype(roots.begin()) min;
+            decltype(roots.begin())                                                                  min;
 
             // Check for NaN or Inf.
             if (!std::isfinite(solver.evaluate(curBounds.first)) || !std::isfinite(solver.evaluate(curBounds.second))) {
@@ -451,8 +483,8 @@ namespace nxx::roots
             int iter = 1;
             while (true) {
                 curBounds = solver.bounds();
-                roots = { std::make_pair(curBounds.first, abs(solver.evaluate(curBounds.first))),
-                          std::make_pair(curBounds.second, abs(solver.evaluate(curBounds.second))) };
+                roots     = { std::make_pair(curBounds.first, abs(solver.evaluate(curBounds.first))),
+                              std::make_pair(curBounds.second, abs(solver.evaluate(curBounds.second))) };
 
                 // Check for NaN or Inf.
                 if (std::any_of(roots.begin(), roots.end(), [](const auto& r) { return !std::isfinite(r.second); })) {

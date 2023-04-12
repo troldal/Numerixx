@@ -1,14 +1,14 @@
 /*
-    888b      88  88        88  88b           d88  88888888888  88888888ba   88  8b        d8  8b        d8
-    8888b     88  88        88  888b         d888  88           88      "8b  88   Y8,    ,8P    Y8,    ,8P
-    88 `8b    88  88        88  88`8b       d8'88  88           88      ,8P  88    `8b  d8'      `8b  d8'
-    88  `8b   88  88        88  88 `8b     d8' 88  88aaaaa      88aaaaaa8P'  88      Y88P          Y88P
-    88   `8b  88  88        88  88  `8b   d8'  88  88"""""      88""""88'    88      d88b          d88b
-    88    `8b 88  88        88  88   `8b d8'   88  88           88    `8b    88    ,8P  Y8,      ,8P  Y8,
-    88     `8888  Y8a.    .a8P  88    `888'    88  88           88     `8b   88   d8'    `8b    d8'    `8b
-    88      `888   `"Y8888Y"'   88     `8'     88  88888888888  88      `8b  88  8P        Y8  8P        Y8
+    o.     O O       o Oo      oO o.OOoOoo `OooOOo.  ooOoOOo o      O o      O
+    Oo     o o       O O O    o o  O        o     `o    O     O    o   O    o
+    O O    O O       o o  o  O  O  o        O      O    o      o  O     o  O
+    O  o   o o       o O   Oo   O  ooOO     o     .O    O       oO       oO
+    O   o  O o       O O        o  O        OOooOO'     o       Oo       Oo
+    o    O O O       O o        O  o        o    o      O      o  o     o  o
+    o     Oo `o     Oo o        O  O        O     O     O     O    O   O    O
+    O     `o  `OoooO'O O        o ooOooOoO  O      o ooOOoOo O      o O      o
 
-    Copyright © 2022 Kenneth Troldal Balslev
+    Copyright © 2023 Kenneth Troldal Balslev
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the “Software”), to deal
@@ -31,17 +31,42 @@
 #ifndef NUMERIXX_MULTIROOTS_HPP
 #define NUMERIXX_MULTIROOTS_HPP
 
-#include "../calculus/Jacobian.hpp"
-#include "../linalg/FactorizeGJ.hpp"
-#include "../linalg/Matrix.hpp"
-#include "MultiFunction.hpp"
+#include <blaze/Blaze.h>
+
+#include ".utils/Constants.hpp"
+#include "../calculus/MultiDerivatives.hpp"
 #include <functional>
+#include <stdexcept>
 
 namespace nxx::multiroots
 {
-    template< typename TMultiFunc >
-    // requires std::same_as<typename FUNCARR::value_type, std::function<typename FUNCARR::value_type::result_type(std::vector<typename
-    // FUNCARR::value_type::result_type>)> >
+
+    namespace impl
+    {
+        template< typename... >
+        struct FunctionTraits;
+
+        template< typename RET, typename ARG >
+        struct FunctionTraits< std::function< RET(ARG) > >
+        {
+            using return_type    = RET;
+            using container_type = ARG;
+            using argument_type  = typename ARG::value_type;
+        };
+
+    }    // namespace impl
+
+    // clang-format off
+    template< typename FunctionType >
+    concept IsMultirootFunction =
+        std::same_as< typename impl::FunctionTraits< FunctionType >::return_type, typename impl::FunctionTraits< FunctionType >::argument_type > &&
+        std::same_as< FunctionType, std::function< typename impl::FunctionTraits< FunctionType >::return_type(typename impl::FunctionTraits< FunctionType >::container_type) > > &&
+        std::floating_point< typename impl::FunctionTraits< FunctionType >::return_type > &&
+        std::floating_point< typename impl::FunctionTraits< FunctionType >::argument_type >;
+    // clang-format on
+
+    template< typename FunctionType >
+    requires IsMultirootFunction< FunctionType >
     class DMultiNewton;
 
     /*
@@ -53,13 +78,13 @@ namespace nxx::multiroots
     /*
      * Specialization of the PolishingTraits class for Newton<FN, DFN>
      */
-    template< typename TMultiFunc >
-    struct MultirootsSolverTraits< DMultiNewton< TMultiFunc > >
+    template< typename FunctionType >
+    struct MultirootsSolverTraits< DMultiNewton< FunctionType > >
     {
-        using function_array = typename TMultiFunc::function_array;
-        using function_type = typename TMultiFunc::function_type;
-        using return_type   = typename TMultiFunc::return_type;
-        using argument_type = typename TMultiFunc::argument_type;
+        using function_type  = FunctionType;
+        using return_type    = typename impl::FunctionTraits< FunctionType >::return_type;
+        using container_type = typename impl::FunctionTraits< FunctionType >::container_type;
+        using argument_type  = typename impl::FunctionTraits< FunctionType >::argument_type;
     };
 
     // ========================================================================
@@ -67,8 +92,7 @@ namespace nxx::multiroots
     // ========================================================================
 
     template< typename SOLVER >
-    // requires std::invocable<typename impl::PolishingTraits<SOLVER>::function_type, double> &&
-    //          std::invocable<typename impl::PolishingTraits<SOLVER>::deriv_type, double>
+    requires IsMultirootFunction< typename MultirootsSolverTraits< SOLVER >::function_type >
     class MultirootBase
     {
         /*
@@ -77,24 +101,48 @@ namespace nxx::multiroots
         friend SOLVER;
 
     public:
-        using function_array = typename MultirootsSolverTraits< SOLVER >::function_array;
-        using function_type = typename MultirootsSolverTraits< SOLVER >::function_type;
-        using return_type   = typename MultirootsSolverTraits< SOLVER >::return_type;
-        using argument_type = typename MultirootsSolverTraits< SOLVER >::argument_type;
+        using function_type  = typename MultirootsSolverTraits< SOLVER >::function_type;
+        using return_type    = typename MultirootsSolverTraits< SOLVER >::return_type;
+        using container_type = typename MultirootsSolverTraits< SOLVER >::container_type;
+        using argument_type  = typename MultirootsSolverTraits< SOLVER >::argument_type;
 
-        MultiFunction< function_array > m_functions {}; /**< The function object to find the root for. */
+    private:
+        std::vector< function_type > m_functions {}; /**< The function object to find the root for. */
 
-        using RT = nxx::linalg::Matrix< return_type >;
+        using RT = blaze::DynamicVector< return_type >;
         RT m_guess; /**< The current root estimate. */
 
-    public:
         /**
          * @brief Constructor, taking function objects for the function and its derivative as arguments.
          * @param objective The function object to find the root for.
          * @param derivative The function object for the derivative
          * @note Constructor is private to avoid direct usage by clients.
          */
-        explicit MultirootBase(const MultiFunction< function_array >& functions) : m_functions { functions }, m_guess(functions.size(), 1) {}
+        explicit MultirootBase(const std::vector< function_type >& functions)
+            : m_functions { functions },
+              m_guess(functions.size(), 1.0)
+        {}
+
+        auto size() const { return m_functions.size(); }
+
+        auto jacobian() const
+        {
+            using namespace nxx::deriv;
+            using namespace blaze;
+
+            blaze::DynamicMatrix< return_type > J(size(), size());
+
+            size_t index = 0;
+            for (auto& fn : m_functions) {
+                auto pdiffs = multidiff< Order1CentralRichardson >(fn, m_guess);
+                auto row    = blaze::row(J, index);
+                auto dst    = row.begin();
+                for (auto src = pdiffs.begin(); src != pdiffs.end(); ++src, ++dst) *dst = *src;
+                ++index;
+            }
+
+            return J;
+        }
 
     public:
         /**
@@ -103,10 +151,10 @@ namespace nxx::multiroots
          * @param guess
          */
         template< typename ARR >
-            requires std::convertible_to< typename ARR::value_type, return_type >
+        requires std::floating_point< typename ARR::value_type >
         void init(const ARR& guess)
         {
-            m_guess = guess;
+            std::copy(guess.begin(), guess.end(), m_guess.begin());
         }
 
         /**
@@ -115,10 +163,10 @@ namespace nxx::multiroots
          * @param guess
          */
         template< typename T >
-            requires std::convertible_to< T, return_type >
+        requires std::floating_point< T >
         void init(std::initializer_list< T > guess)
         {
-            m_guess = guess;
+            std::copy(guess.begin(), guess.end(), m_guess.begin());
         }
 
         /**
@@ -128,92 +176,139 @@ namespace nxx::multiroots
          * @return
          */
         template< typename ARR >
-            requires std::convertible_to< typename ARR::value_type, return_type >
-        auto evaluate(const ARR& values)
+        //requires std::floating_point< typename ARR::value_type >
+        auto evaluate(ARR values)
         {
+            std::vector< return_type > vals(values.begin(), values.end());
 
-            return m_functions(values);
-//            using numerix::linalg::Matrix;
-//
-//            std::vector< return_type > vals = values;
-//
-//            std::vector< return_type > result;
-//            result.reserve(m_functions.size());
-//            for (auto& f : m_functions) result.emplace_back(f(vals));
-//
-//            Matrix< return_type > res(result.size(), 1);
-//            res = result;
-//
-//            return res;
+            size_t index = 0;
+            for (auto& f : m_functions) values[index++] = (f(vals));
+
+            return values;
         }
-
-        /**
-         * @brief Evaluate the derivative at a given point.
-         * @tparam T The type of the argument (must be floating point type)
-         * @param value The value at which to evaluate the derivative.
-         * @return The result of the evaluation.
-         */
-        // template<typename T>
-        //     requires std::is_floating_point_v<T>
-        // auto derivative(T values)
-        //{
-        //     return m_deriv(value);
-        // }
 
         /**
          * @brief Get the current estimate of the root.
          * @return A const reference to the root.
          */
-        const auto& result() const { return m_guess; }
+        [[nodiscard]]
+        auto result() const
+        {
+            return std::vector< return_type >(m_guess.begin(), m_guess.end());
+        }
     };
 
     /**
      * @brief
      * @tparam FUNCARR
      */
-    template< typename TMultiFunc >
-    // requires std::same_as<typename FUNCARR::value_type, std::function<typename FUNCARR::value_type::result_type(std::vector<typename
-    // FUNCARR::value_type::result_type>)> >
-    class DMultiNewton final : public MultirootBase< DMultiNewton< TMultiFunc > >
+    template< typename FunctionType >
+    requires IsMultirootFunction< FunctionType >
+    class DMultiNewton final : public MultirootBase< DMultiNewton< FunctionType > >
     {
-        /*
-         * Private alias declarations.
-         */
-        using Base = MultirootBase< DMultiNewton< TMultiFunc > >;
-
     public:
         /*
          * Public alias declarations.
          */
-        using function_type = typename TMultiFunc::function_type;
-        using return_type   = typename TMultiFunc::return_type;
-        using argument_type = typename TMultiFunc::argument_type;
+        using function_type  = FunctionType;
+        using return_type    = typename impl::FunctionTraits< FunctionType >::return_type;
+        using container_type = typename impl::FunctionTraits< FunctionType >::container_type;
+        using argument_type  = typename impl::FunctionTraits< FunctionType >::argument_type;
 
+    private:
+        /*
+         * Private alias declarations.
+         */
+        using BASE = MultirootBase< DMultiNewton< FunctionType > >;
+
+    public:
         /**
          * @brief Constructor, taking the function object as an argument.
          * @param objective The function object for which to find the root.
          */
-        explicit DMultiNewton(const TMultiFunc& funcArray) : Base(funcArray) {}
+        explicit DMultiNewton(const std::vector< FunctionType >& funcArray)
+            : BASE(funcArray) {}
 
         /**
          * @brief Perform one iteration. This is the main algorithm of the DMultiNewton method.
          */
         void iterate()
         {
-            using nxx::deriv::computeJacobian;
-            using nxx::linalg::FactorizeGJ;
-            using nxx::linalg::Matrix;
-
-            // ===== Create vector of function evaluations, using vector of guesses
-            Matrix< return_type > functionEvals(Base::m_functions.size(), 1);
-            functionEvals = Base::evaluate(Base::m_guess) * (-1);
-
-            // ===== Solve the linear system using the jacobian matrix, and estimate new guesses
-            auto jacobian = computeJacobian(Base::m_functions.functionArray(), Base::m_guess);
-            auto [inv, x] = FactorizeGJ(jacobian, functionEvals);
-            Base::m_guess += x;
+            // Solve the linear system J * dx = -f(x) (solving for dx) and update the root estimate (x_new = x_old + dx).
+            BASE::m_guess += blaze::solve(BASE::jacobian(), -BASE::evaluate(BASE::m_guess));
         }
     };
-}    // namespace numerix::multiroots
+
+    template< typename SOLVER >
+    //    requires requires(SOLVER solver, typename SOLVER::function_return_type guess) {
+    //                 // clang-format off
+    //                 { solver.evaluate(0.0) } -> std::floating_point;
+    //                 { solver.init(guess) };
+    //                 { solver.iterate() };
+    //                 // clang-format on
+    //             }
+    inline auto multisolve(SOLVER                                      solver,
+                           std::vector< typename SOLVER::return_type > guess,
+                           typename SOLVER::return_type                eps     = nxx::EPS,
+                           int                                         maxiter = nxx::MAXITER)
+    {
+        // using ET = std::runtime_error;
+        // using RT = tl::expected< typename SOLVER::return_type, ET >;
+        using RT = std::vector< typename SOLVER::return_type >;
+
+        solver.init(guess);
+        RT result = solver.result();
+
+        auto calcEPS = [&]() {
+            auto                         fvals = solver.evaluate(result);
+            typename SOLVER::return_type eps   = 0.0;
+            for (auto& fval : fvals) eps += abs(fval);
+            return eps;
+        };
+
+        // Check for NaN or Inf.
+        //        if (!std::isfinite(solver.evaluate(result.value()))) {
+        //            result = tl::make_unexpected(ET("Invalid initial guess!", RootErrorType::NumericalError, result.value()));
+        //            return result;
+        //        }
+
+        // Begin iteration loop.
+        int iter = 1;
+        while (true) {
+            result = solver.result();
+
+            // Check for NaN or Inf
+            //            if (!std::isfinite(result.value())) {
+            //                result = tl::make_unexpected(ET("Non-finite result!", RootErrorType::NumericalError, result.value(), iter));
+            //                break;
+            //            }
+
+            // Check for convergence
+            if (calcEPS() < eps) {
+                std::cout << "Converged after " << iter << " iterations." << std::endl;
+                break;
+            }
+
+            if (iter >= maxiter) {
+                std::cout << "Maximum number of iterations exceeded!" << std::endl;
+                break;
+            }
+
+            // Check for max. iterations
+            //            if (iter >= maxiter) {
+            //                result = tl::make_unexpected(
+            //                    ET("Maximum number of iterations exceeded!", RootErrorType::MaxIterationsExceeded, result.value(), iter));
+            //                break;
+            //            }
+
+            // Perform one iteration
+            ++iter;
+            solver.iterate();
+        }
+
+        return result;
+    }
+
+}    // namespace nxx::multiroots
 
 #endif    // NUMERIXX_MULTIROOTS_HPP

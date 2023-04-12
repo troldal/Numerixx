@@ -31,10 +31,14 @@
 #ifndef NUMERIXX_POLYROOTS_HPP
 #define NUMERIXX_POLYROOTS_HPP
 
-#include "../.utils/Constants.hpp"
+// ===== Numerixx Includes
 #include "Polynomial.hpp"
 #include "PolynomialError.hpp"
 
+// ===== External Includes
+#include "../.utils/Constants.hpp"
+
+// ===== Standard Library Includes
 #include <algorithm>
 #include <cassert>
 #include <cmath>

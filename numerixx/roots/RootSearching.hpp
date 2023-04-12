@@ -31,14 +31,15 @@
 #ifndef NUMERIXX_ROOTSEARCHING_HPP
 #define NUMERIXX_ROOTSEARCHING_HPP
 
-#include <numbers>
+// ===== Numerixx Includes
+#include "RootCommon.hpp"
 
+// ===== External Includes
 #include "../.utils/Constants.hpp"
 #include "../.dependencies/expected/expected.hpp"
 
-#include "RootCommon.hpp"
-
-// TODO: Throw exceptions when the input is invalid.
+// ===== Standard Library Includes
+#include <numbers>
 
 namespace nxx::roots
 {

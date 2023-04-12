@@ -72,13 +72,14 @@ target_sources(DemoDeriv
 target_link_libraries(DemoDeriv PRIVATE fmt numerixx)
 
 # Target: Multiple root-finding
+find_package(LAPACK REQUIRED)
 add_executable(DemoMultiroot)
 target_sources(DemoMultiroot
         PRIVATE
         DemoMultiroot.cpp
         )
 
-target_link_libraries(DemoMultiroot PRIVATE numerixx)
+target_link_libraries(DemoMultiroot PRIVATE  LAPACK::LAPACK numerixx)
 
 #=======================================================================================================================
 # COMPILER FLAGS
