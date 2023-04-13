@@ -35,12 +35,56 @@
 
 namespace nxx::deriv
 {
+
+    namespace impl
+    {
+        /*
+         * Forward declaration of the VectorTraits class.
+         */
+        template< typename... >
+        struct VectorTraits;
+
+        /*
+         * Specialization of the VectorTraits class for DynamicVector<T>
+         */
+        template< typename T >
+        struct VectorTraits< blaze::DynamicVector< T > >
+        {
+            using value_type = T;
+        };
+
+        /*
+         * Forward declaration of the MatrixTraits class.
+         */
+        template< typename... >
+        struct MatrixTraits;
+
+        /*
+         * Specialization of the MatrixTraits class for DynamicMatrix<T>
+         */
+        template< typename T >
+        struct MatrixTraits< blaze::DynamicMatrix< T > >
+        {
+            using value_type = T;
+        };
+
+    }    // namespace impl
+
     template< typename FN >
     concept IsMultiFunction = requires(FN fn) {
-                                  {
-                                      fn(std::vector< double > { 0.0 })
-                                  } -> std::floating_point;
+                                  // clang-format off
+                                  { std::floating_point< std::invoke_result_t< FN, std::vector< double > > >};
+                                  // clang-format on
                               };
+
+    template< typename ARR >
+    concept IsMultiFunctionArray = requires(ARR arr) {
+                                       // clang-format off
+                                       { arr.begin() } -> std::input_iterator;
+                                       { arr.end() } -> std::input_iterator;
+                                       { IsMultiFunction< typename ARR::value_type> };
+                                       // clang-format on
+                                   };
 
     template< typename T >
     using MultiReturnType = std::invoke_result_t< T, std::vector< double > >;
@@ -50,8 +94,8 @@ namespace nxx::deriv
                             auto                                  args,
                             size_t                                index,
                             MultiReturnType< decltype(function) > stepsize = StepSize< MultiReturnType< decltype(function) > >)
-//        requires std::convertible_to< typename decltype(args)::value_type, MultiReturnType< decltype(function) > > &&
-//                 std::convertible_to< MultiReturnType< decltype(function) >, typename decltype(args)::value_type >
+        requires std::convertible_to< typename impl::VectorTraits< decltype(args) >::value_type, MultiReturnType< decltype(function) > > ||
+                 std::convertible_to< typename decltype(args)::value_type, MultiReturnType< decltype(function) > >
     {
         std::vector< MultiReturnType< decltype(function) > > argvector(args.begin(), args.end());
 
@@ -70,8 +114,8 @@ namespace nxx::deriv
     inline auto multidiff(IsMultiFunction auto                  function,
                           auto                                  args,
                           MultiReturnType< decltype(function) > stepsize = StepSize< MultiReturnType< decltype(function) > >)
-//        requires std::convertible_to< typename decltype(args)::value_type, MultiReturnType< decltype(function) > > &&
-//                 std::convertible_to< MultiReturnType< decltype(function) >, typename decltype(args)::value_type >
+        requires std::convertible_to< typename impl::VectorTraits< decltype(args) >::value_type, MultiReturnType< decltype(function) > > ||
+                 std::convertible_to< typename decltype(args)::value_type, MultiReturnType< decltype(function) > >
     {
         std::vector< MultiReturnType< decltype(function) > > argvector(args.begin(), args.end());
 
@@ -81,6 +125,32 @@ namespace nxx::deriv
         }
 
         return args;
+    }
+
+    template< typename ALGO >
+    inline auto jacobian(IsMultiFunctionArray auto                                   functions,
+                         auto                                                        args,
+                         MultiReturnType< typename decltype(functions)::value_type > stepsize = StepSize< decltype(stepsize) >)
+        requires std::convertible_to< typename impl::VectorTraits< decltype(args) >::value_type, MultiReturnType< typename decltype(functions)::value_type > > ||
+                 std::convertible_to< typename decltype(args)::value_type, MultiReturnType< typename decltype(functions)::value_type > >
+    {
+        using namespace nxx::deriv;
+        using namespace blaze;
+
+        using return_type = MultiReturnType< typename decltype(functions)::value_type >;
+
+        blaze::DynamicMatrix< return_type > J(functions.size(), functions.size());
+
+        size_t index = 0;
+        for (auto& fn : functions) {
+            auto pdiffs = multidiff< ALGO >(fn, args, stepsize);
+            auto row    = blaze::row(J, index);
+            auto dst    = row.begin();
+            for (auto src = pdiffs.begin(); src != pdiffs.end(); ++src, ++dst) *dst = *src;
+            ++index;
+        }
+
+        return J;
     }
 
 }    // namespace nxx::deriv

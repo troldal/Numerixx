@@ -33,8 +33,8 @@
 
 #include <blaze/Blaze.h>
 
-#include ".utils/Constants.hpp"
 #include "../calculus/MultiDerivatives.hpp"
+#include ".utils/Constants.hpp"
 #include <functional>
 #include <stdexcept>
 
@@ -112,56 +112,24 @@ namespace nxx::multiroots
         using RT = blaze::DynamicVector< return_type >;
         RT m_guess; /**< The current root estimate. */
 
-        /**
-         * @brief Constructor, taking function objects for the function and its derivative as arguments.
-         * @param objective The function object to find the root for.
-         * @param derivative The function object for the derivative
-         * @note Constructor is private to avoid direct usage by clients.
-         */
-        explicit MultirootBase(const std::vector< function_type >& functions)
-            : m_functions { functions },
+        template< typename FunctionArrayT >
+        requires std::convertible_to< typename FunctionArrayT::value_type, function_type >
+        explicit MultirootBase(const FunctionArrayT& functions)
+            : m_functions(functions.cbegin(), functions.cend()),
               m_guess(functions.size(), 1.0)
         {}
 
         auto size() const { return m_functions.size(); }
 
-        auto jacobian() const
-        {
-            using namespace nxx::deriv;
-            using namespace blaze;
-
-            blaze::DynamicMatrix< return_type > J(size(), size());
-
-            size_t index = 0;
-            for (auto& fn : m_functions) {
-                auto pdiffs = multidiff< Order1CentralRichardson >(fn, m_guess);
-                auto row    = blaze::row(J, index);
-                auto dst    = row.begin();
-                for (auto src = pdiffs.begin(); src != pdiffs.end(); ++src, ++dst) *dst = *src;
-                ++index;
-            }
-
-            return J;
-        }
-
     public:
-        /**
-         * @brief
-         * @tparam ARR
-         * @param guess
-         */
         template< typename ARR >
-        requires std::floating_point< typename ARR::value_type >
+        requires std::floating_point< typename nxx::deriv::impl::VectorTraits< ARR >::value_type > ||
+                 std::floating_point< typename ARR::value_type >
         void init(const ARR& guess)
         {
             std::copy(guess.begin(), guess.end(), m_guess.begin());
         }
 
-        /**
-         * @brief
-         * @tparam T
-         * @param guess
-         */
         template< typename T >
         requires std::floating_point< T >
         void init(std::initializer_list< T > guess)
@@ -169,14 +137,9 @@ namespace nxx::multiroots
             std::copy(guess.begin(), guess.end(), m_guess.begin());
         }
 
-        /**
-         * @brief
-         * @tparam ARR
-         * @param values
-         * @return
-         */
         template< typename ARR >
-        //requires std::floating_point< typename ARR::value_type >
+        requires std::floating_point< typename nxx::deriv::impl::VectorTraits< ARR >::value_type > ||
+                 std::floating_point< typename ARR::value_type >
         auto evaluate(ARR values)
         {
             std::vector< return_type > vals(values.begin(), values.end());
@@ -187,10 +150,6 @@ namespace nxx::multiroots
             return values;
         }
 
-        /**
-         * @brief Get the current estimate of the root.
-         * @return A const reference to the root.
-         */
         [[nodiscard]]
         auto result() const
         {
@@ -198,10 +157,6 @@ namespace nxx::multiroots
         }
     };
 
-    /**
-     * @brief
-     * @tparam FUNCARR
-     */
     template< typename FunctionType >
     requires IsMultirootFunction< FunctionType >
     class DMultiNewton final : public MultirootBase< DMultiNewton< FunctionType > >
@@ -222,20 +177,14 @@ namespace nxx::multiroots
         using BASE = MultirootBase< DMultiNewton< FunctionType > >;
 
     public:
-        /**
-         * @brief Constructor, taking the function object as an argument.
-         * @param objective The function object for which to find the root.
-         */
         explicit DMultiNewton(const std::vector< FunctionType >& funcArray)
-            : BASE(funcArray) {}
+            : BASE(funcArray)
+        {}
 
-        /**
-         * @brief Perform one iteration. This is the main algorithm of the DMultiNewton method.
-         */
         void iterate()
         {
             // Solve the linear system J * dx = -f(x) (solving for dx) and update the root estimate (x_new = x_old + dx).
-            BASE::m_guess += blaze::solve(BASE::jacobian(), -BASE::evaluate(BASE::m_guess));
+            BASE::m_guess += blaze::solve(nxx::deriv::jacobian<nxx::deriv::Order1CentralRichardson>(BASE::m_functions, BASE::m_guess), -BASE::evaluate(BASE::m_guess));
         }
     };
 

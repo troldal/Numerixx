@@ -32,8 +32,6 @@
 
 #include "calculus/Derivatives.hpp"
 #include "function/Function.hpp"
-#include "linalg/FactorizeGJ.hpp"
-#include "linalg/Matrix.hpp"
 #include "multiroots/Multiroots.hpp"
 #include "poly/Polynomial.hpp"
 #include "poly/Polyroots.hpp"
