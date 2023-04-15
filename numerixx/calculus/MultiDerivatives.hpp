@@ -33,6 +33,8 @@
 
 #include "Derivatives.hpp"
 
+#include <blaze/Blaze.h>
+
 namespace nxx::deriv
 {
 
