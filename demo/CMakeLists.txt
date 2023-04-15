@@ -1,8 +1,8 @@
 #==================================================================================================================
 # Preamble
 #==================================================================================================================
-cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
-project(numerixx.samples)
+cmake_minimum_required(VERSION 3.24 FATAL_ERROR)
+project(Numerixx.Demos)
 
 #==============================================================================
 # Set compiler settings
@@ -10,7 +10,14 @@ project(numerixx.samples)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_subdirectory(fmt)
+#add_subdirectory(fmt)
+include(FetchContent)
+FetchContent_Declare(Format
+        GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+        GIT_TAG        a337011
+        )
+
+FetchContent_MakeAvailable(Format)
 
 #=================================================================================================================
 # Define targets

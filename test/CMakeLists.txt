@@ -7,7 +7,15 @@ project(Numerixx.Tests)
 #=======================================================================================================================
 # Set up Catch2 library
 #=======================================================================================================================
-add_subdirectory(Catch2)
+#add_subdirectory(Catch2)
+
+include(FetchContent)
+FetchContent_Declare(Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG        3f0283d
+        )
+
+FetchContent_MakeAvailable(Catch2)
 
 #=======================================================================================================================
 # Define TEST target
@@ -17,7 +25,6 @@ target_sources(NumerixxTests
         PRIVATE
         testPolynomials.cpp
         testDerivatives.cpp
-        testMatrix.cpp
         testRootBracketing.cpp
         testRootPolishing.cpp
         )

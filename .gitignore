@@ -33,3 +33,6 @@
 
 # Python environment
 venv
+
+_build
+cmake-build-*
