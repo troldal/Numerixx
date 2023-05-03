@@ -495,6 +495,7 @@ namespace nxx::roots
                 // Check for convergence.
                 min = std::min_element(roots.begin(), roots.end(), [](const auto& a, const auto& b) { return a.second < b.second; });
                 if (min->second < eps) {
+//                if (abs(curBounds.first - curBounds.second) < eps && abs(curBounds.first - curBounds.second) / min->second < eps) {
                     result = min->first;
                     break;
                 }

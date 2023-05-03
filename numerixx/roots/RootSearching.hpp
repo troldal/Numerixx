@@ -35,11 +35,12 @@
 #include "RootCommon.hpp"
 
 // ===== External Includes
-#include "../.utils/Constants.hpp"
 #include "../.dependencies/expected/expected.hpp"
+#include "../.utils/Constants.hpp"
 
 // ===== Standard Library Includes
 #include <numbers>
+#include <optional>
 
 namespace nxx::roots
 {
@@ -80,6 +81,7 @@ namespace nxx::roots
 
         private:
             std::pair< return_type, return_type > m_bounds { 0.0, 1.0 };
+            std::optional< decltype(m_bounds) >   m_limits = std::nullopt;
             function_type                         m_objective {};
             return_type                           m_factor {};
             bool                                  m_isInitialized { false };
@@ -92,8 +94,9 @@ namespace nxx::roots
              *
              * @param objective The objective function to optimize.
              */
-            explicit SearchBase(function_type objective, return_type factor)
+            explicit SearchBase(function_type objective, std::optional< decltype(m_bounds) > limits, return_type factor)
                 : m_objective(std::move(objective)),
+                  m_limits(std::move(limits)),
                   m_factor(factor)
             {
                 if (m_factor < 1.0) throw std::invalid_argument("Invalid factor.");
@@ -115,10 +118,14 @@ namespace nxx::roots
                 auto [lower, upper] = bounds;
                 static_assert(std::floating_point< decltype(lower) >);
                 if (lower == upper) throw std::invalid_argument("Invalid bounds.");
-                if (lower > upper)
-                    m_bounds = std::pair< return_type, return_type > { upper, lower };
-                else
-                    m_bounds = std::pair< return_type, return_type > { lower, upper };
+                if (lower > upper) std::swap(lower, upper);
+
+                if (m_limits.has_value()) {
+                    auto [lowerLimit, upperLimit] = m_limits.value();
+                    if (lower < lowerLimit) lower = lowerLimit;
+                    if (upper > upperLimit) upper = upperLimit;
+                }
+                m_bounds = std::pair< return_type, return_type > { lower, upper };
             }
 
             /**
@@ -291,6 +298,7 @@ namespace nxx::roots
     public:
         using function_type = FN;
         using return_type   = std::invoke_result_t< FN, double >;
+        using limit_type = std::pair< return_type, return_type >;
 
         /**
          * @brief Constructor with objective function.
@@ -300,8 +308,8 @@ namespace nxx::roots
          *
          * @param objective The objective function to optimize.
          */
-        explicit BracketSearchUp(function_type objective, return_type factor = std::numbers::phi_v< return_type >)
-            : BASE(std::move(objective), factor)
+        explicit BracketSearchUp(function_type objective, std::optional<limit_type> limits = std::nullopt, return_type factor = std::numbers::phi_v< return_type >)
+            : BASE(std::move(objective), limits, factor)
         {}
 
         /**
@@ -343,6 +351,7 @@ namespace nxx::roots
     public:
         using function_type = FN;
         using return_type   = std::invoke_result_t< FN, double >;
+        using limit_type = std::pair< return_type, return_type >;
 
         /**
          * @brief Constructor with objective function.
@@ -352,8 +361,8 @@ namespace nxx::roots
          *
          * @param objective The objective function to optimize.
          */
-        explicit BracketSearchDown(function_type objective, return_type factor = std::numbers::phi_v< return_type >)
-            : BASE(std::move(objective), factor)
+        explicit BracketSearchDown(function_type objective, std::optional<limit_type> limits = std::nullopt, return_type factor = std::numbers::phi_v< return_type >)
+            : BASE(std::move(objective), limits, factor)
         {}
 
         /**
@@ -395,6 +404,7 @@ namespace nxx::roots
     public:
         using function_type = FN;
         using return_type   = std::invoke_result_t< FN, double >;
+        using limit_type = std::pair< return_type, return_type >;
 
         /**
          * @brief Constructor with objective function.
@@ -404,8 +414,8 @@ namespace nxx::roots
          *
          * @param objective The objective function to optimize.
          */
-        explicit BracketExpandUp(function_type objective, return_type factor = std::numbers::phi_v< return_type >)
-            : BASE(std::move(objective), factor)
+        explicit BracketExpandUp(function_type objective, std::optional<limit_type> limits = std::nullopt, return_type factor = std::numbers::phi_v< return_type >)
+            : BASE(std::move(objective), limits, factor)
         {}
 
         /**
@@ -446,6 +456,7 @@ namespace nxx::roots
     public:
         using function_type = FN;
         using return_type   = std::invoke_result_t< FN, double >;
+        using limit_type = std::pair< return_type, return_type >;
 
         /**
          * @brief Constructor with objective function.
@@ -455,8 +466,8 @@ namespace nxx::roots
          *
          * @param objective The objective function to optimize.
          */
-        explicit BracketExpandDown(function_type objective, return_type factor = std::numbers::phi_v< return_type >)
-            : BASE(std::move(objective), factor)
+        explicit BracketExpandDown(function_type objective, std::optional<limit_type> limits = std::nullopt, return_type factor = std::numbers::phi_v< return_type >)
+            : BASE(std::move(objective), limits, factor)
         {}
 
         /**
@@ -487,6 +498,7 @@ namespace nxx::roots
     public:
         using function_type = FN;
         using return_type   = std::invoke_result_t< FN, double >;
+        using limit_type = std::pair< return_type, return_type >;
 
         /**
          * @brief Constructor with objective function.
@@ -496,8 +508,8 @@ namespace nxx::roots
          *
          * @param objective The objective function to optimize.
          */
-        explicit BracketExpandOut(function_type objective, return_type factor = std::numbers::phi_v< return_type >)
-            : BASE(std::move(objective), factor)
+        explicit BracketExpandOut(function_type objective, std::optional<limit_type> limits = std::nullopt, return_type factor = std::numbers::phi_v< return_type >)
+            : BASE(std::move(objective), limits, factor)
         {}
 
         /**
@@ -551,7 +563,7 @@ namespace nxx::roots
          * @param factor The initial number of subdivisions of the search interval (default is 1.0).
          */
         explicit BracketSubdivide(function_type objective, return_type factor = std::numbers::phi_v< return_type >)
-            : BASE(std::move(objective), factor)
+            : BASE(std::move(objective), std::nullopt, factor)
         {}
 
         /**
@@ -644,7 +656,7 @@ namespace nxx::roots
                 }
 
                 // Check if the root is bracketed by the bounds. If yes, return the bounds.
-                if (eval_lower * eval_upper < 0.0) {
+                if (eval_lower * eval_upper <= 0.0) {
                     result = curBounds;
                     break;
                 }
