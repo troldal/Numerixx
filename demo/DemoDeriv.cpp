@@ -121,6 +121,27 @@ int main()
     std::cout << "d2func:                  " <<  d2func(std::numbers::e) << "\n\n";
 
     // ============================================================================================
+    // I addition to the above, it is also possible to create a function object representing the
+    // derivative of a function with upper and lower limits. If the derivative is evaluated outside
+    // the limits, the function object will throw an exception. In the viscinity of the limits, the
+    // function object will use forward or backwards differencing, depending on which limit is
+    // closer.
+    // The following code example shows how to create a function object for the 1st derivative with
+    // upper and lower limits.
+    // ============================================================================================
+    auto d1func2 = derivativeOf(func, {2.0, 3.0}, 0.01);
+    std::cout << "d1func2:                  " << d1func2(std::numbers::e) << "\n";
+    std::cout << "d1func2:                  " << d1func2(2.0) << "\n";
+    std::cout << "d1func2:                  " << d1func2(3.0) << "\n";
+
+    try {
+        std::cout << "d1func2:                  " << d1func2(3.1) << "\n";
+    }
+    catch (std::exception& e) {
+        std::cout << e.what() << "\n\n";
+    }
+
+    // ============================================================================================
     // The following code shows the results of computing the derivatives for 10 different functions
     // numerically, using the central, forward, and backward functions.
     // ============================================================================================

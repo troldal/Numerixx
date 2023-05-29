@@ -112,11 +112,15 @@ namespace nxx::multiroots
         using RT = blaze::DynamicVector< return_type >;
         RT m_guess; /**< The current root estimate. */
 
+        using LT = std::optional<std::vector<std::pair<argument_type, argument_type>>>;
+        LT m_limits {};
+
         template< typename FunctionArrayT >
         requires std::convertible_to< typename FunctionArrayT::value_type, function_type >
-        explicit MultirootBase(const FunctionArrayT& functions)
+        explicit MultirootBase(const FunctionArrayT& functions, LT limits = std::nullopt)
             : m_functions(functions.cbegin(), functions.cend()),
-              m_guess(functions.size(), 1.0)
+              m_guess(functions.size(), 1.0),
+              m_limits(limits)
         {}
 
         auto size() const { return m_functions.size(); }
@@ -176,15 +180,35 @@ namespace nxx::multiroots
          */
         using BASE = MultirootBase< DMultiNewton< FunctionType > >;
 
+        using LT = std::optional<std::vector<std::pair<argument_type, argument_type>>>;
+
+
     public:
-        explicit DMultiNewton(const std::vector< FunctionType >& funcArray)
-            : BASE(funcArray)
+        explicit DMultiNewton(const std::vector< FunctionType >& funcArray, LT limits = std::nullopt)
+            : BASE(funcArray, limits)
         {}
 
-        void iterate()
+        void iterate(double multiplier = 1.0)
         {
             // Solve the linear system J * dx = -f(x) (solving for dx) and update the root estimate (x_new = x_old + dx).
-            BASE::m_guess += blaze::solve(nxx::deriv::jacobian<nxx::deriv::Order1CentralRichardson>(BASE::m_functions, BASE::m_guess), -BASE::evaluate(BASE::m_guess));
+
+            using namespace blaze;
+            using namespace nxx::deriv;
+
+            if (BASE::m_limits) {
+                BASE::m_guess += solve(jacobian(BASE::m_functions, BASE::m_guess, *BASE::m_limits), -BASE::evaluate(BASE::m_guess)) * multiplier;
+
+                size_t index = 0;
+                for (auto& [lower, upper] : *BASE::m_limits) {
+                    if (BASE::m_guess[index] < lower) BASE::m_guess[index] = lower;
+                    if (BASE::m_guess[index] > upper) BASE::m_guess[index] = upper;
+                    index++;
+                }
+
+            }
+            else {
+                BASE::m_guess += solve(jacobian(BASE::m_functions, BASE::m_guess), -BASE::evaluate(BASE::m_guess)) * multiplier;
+            }
         }
     };
 
@@ -233,15 +257,9 @@ namespace nxx::multiroots
             //            }
 
             // Check for convergence
-            if (calcEPS() < eps) {
-                std::cout << "Converged after " << iter << " iterations." << std::endl;
-                break;
-            }
+            if (calcEPS() < eps) break;
 
-            if (iter >= maxiter) {
-                std::cout << "Maximum number of iterations exceeded!" << std::endl;
-                break;
-            }
+            if (iter >= maxiter) break; // TODL: Return an error object if not converged.
 
             // Check for max. iterations
             //            if (iter >= maxiter) {
@@ -252,6 +270,7 @@ namespace nxx::multiroots
 
             // Perform one iteration
             ++iter;
+            //if (iter % 10 == 0) multiplier *= 0.5;
             solver.iterate();
         }
 

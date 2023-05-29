@@ -502,7 +502,7 @@ namespace nxx::deriv
                      ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
         tl::expected< ReturnType< decltype(function) >, DerivativeError > result;
-        auto                                                              deriv = ALGO {}(function, val, std::max(stepsize, stepsize * val));
+        auto deriv = ALGO {}(function, val, stepsize);    // std::max(stepsize, stepsize * val));
 
         if (std::isfinite(deriv))
             result = deriv;
@@ -579,6 +579,43 @@ namespace nxx::deriv
     {
         using RT = ReturnType< decltype(function) >;
         return [=](RT val) { return ALGO {}(function, val, stepsize); };
+    }
+
+    template< typename ALGOLOWER   = Order1ForwardRichardson,
+              typename ALGOCENTRAL = Order1CentralRichardson,
+              typename ALGOUPPER   = Order1BackwardRichardson >
+    inline auto derivativeOf(IsFunction auto                                                                 function,
+                             std::pair< ReturnType< decltype(function) >, ReturnType< decltype(function) > > limits,
+                             ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
+        requires(!poly::IsPolynomial< decltype(function) >)
+    {
+        using RT = ReturnType< decltype(function) >;
+        return [=](RT val) {
+
+            if (val < limits.first)
+                throw DerivativeError { "Derivative undefined. Value is below lower limit." };
+            if (val > limits.second)
+                throw DerivativeError { "Derivative undefined. Value is above upper limit." };
+
+            if ((val - stepsize) < limits.first)
+                return ALGOLOWER {}(function, val, stepsize);
+            if ((val + stepsize) > limits.second)
+                return ALGOUPPER {}(function, val, stepsize);
+
+            return ALGOCENTRAL {}(function, val, stepsize);
+        };
+    }
+
+    template< typename ALGOLOWER   = Order1ForwardRichardson,
+              typename ALGOCENTRAL = Order1CentralRichardson,
+              typename ALGOUPPER   = Order1BackwardRichardson >
+    inline auto derivativeOf(IsFunction auto                                           function,
+                             std::initializer_list< ReturnType< decltype(function) > > limits,
+                             ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
+        requires(!poly::IsPolynomial< decltype(function) >)
+    {
+        if (limits.size() != 2) throw DerivativeError { "Derivative undefined. Limits must be a pair of values." };
+        return derivativeOf< ALGOLOWER, ALGOCENTRAL, ALGOUPPER >(function, std::pair { *limits.begin(), *(limits.begin() + 1) }, stepsize);
     }
 
 }    // namespace nxx::deriv
