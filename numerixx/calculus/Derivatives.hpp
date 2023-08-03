@@ -73,7 +73,7 @@ namespace nxx::deriv
     template< typename T >
     struct StepSizeHelper
     {
-        static constexpr T value = gcem::pow(std::numeric_limits< T >::epsilon(), 1.0 / 3);
+        static constexpr T value = gcem::pow(std::numeric_limits< T >::epsilon(), 1.0 / 3.0);
     };
 
     template< typename T >

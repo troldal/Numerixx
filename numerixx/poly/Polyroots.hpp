@@ -240,7 +240,7 @@ namespace nxx::poly
      * using a different root-finding method may be necessary.
      */
     inline auto laguerre(IsPolynomial auto                                                             poly,
-                         std::complex< typename PolynomialTraits< decltype(poly) >::fundamental_type > guess          = 1.0,
+                         std::complex< typename PolynomialTraits< decltype(poly) >::fundamental_type > guess          = typename PolynomialTraits< decltype(poly) >::fundamental_type{1.0},
                          typename PolynomialTraits< decltype(poly) >::fundamental_type                 tolerance      = nxx::EPS,
                          int                                                                           max_iterations = nxx::MAXITER)
     {

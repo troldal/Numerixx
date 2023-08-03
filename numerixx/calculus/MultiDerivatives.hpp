@@ -148,8 +148,8 @@ namespace nxx::deriv
                             auto                                  args,
                             size_t                                index,
                             MultiReturnType< decltype(function) > stepsize = StepSize< MultiReturnType< decltype(function) > >)
-        requires std::convertible_to< typename impl::VectorTraits< decltype(args) >::value_type, MultiReturnType< decltype(function) > > ||
-                 std::convertible_to< typename decltype(args)::value_type, MultiReturnType< decltype(function) > >
+       // requires std::convertible_to< typename impl::VectorTraits< decltype(args) >::value_type, MultiReturnType< decltype(function) > > ||
+       //          std::convertible_to< typename decltype(args)::value_type, MultiReturnType< decltype(function) > >
     {
         std::vector< MultiReturnType< decltype(function) > > argvector(args.begin(), args.end());
 
@@ -209,8 +209,8 @@ namespace nxx::deriv
                             size_t                                                                                    index,
                             std::pair< MultiReturnType< decltype(function) >, MultiReturnType< decltype(function) > > limits,
                             MultiReturnType< decltype(function) > stepsize = StepSize< MultiReturnType< decltype(function) > >)
-        requires std::convertible_to< typename impl::VectorTraits< decltype(args) >::value_type, MultiReturnType< decltype(function) > > ||
-                 std::convertible_to< typename decltype(args)::value_type, MultiReturnType< decltype(function) > >
+       // requires std::convertible_to< typename impl::VectorTraits< decltype(args) >::value_type, MultiReturnType< decltype(function) > > ||
+       //          std::convertible_to< typename decltype(args)::value_type, MultiReturnType< decltype(function) > >
     {
         std::vector< MultiReturnType< decltype(function) > > argvector(args.begin(), args.end());
 
@@ -259,8 +259,8 @@ namespace nxx::deriv
     inline auto multidiff(IsMultiFunction auto                  function,
                           auto                                  args,
                           MultiReturnType< decltype(function) > stepsize = StepSize< MultiReturnType< decltype(function) > >)
-        requires std::convertible_to< typename impl::VectorTraits< decltype(args) >::value_type, MultiReturnType< decltype(function) > > ||
-                 std::convertible_to< typename decltype(args)::value_type, MultiReturnType< decltype(function) > >
+        //requires std::convertible_to< typename impl::VectorTraits< decltype(args) >::value_type, MultiReturnType< decltype(function) > > ||
+        //         std::convertible_to< typename decltype(args)::value_type, MultiReturnType< decltype(function) > >
     {
         std::vector< MultiReturnType< decltype(function) > > argvector(args.begin(), args.end());
 

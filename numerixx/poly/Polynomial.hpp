@@ -359,7 +359,8 @@ namespace nxx::poly
     /*
      * Deduction guide for using arbitrary containers for coefficient input.
      */
-    Polynomial(IsCoefficientContainer auto coefficients) -> Polynomial< typename decltype(coefficients)::value_type >;
+    template<IsCoefficientContainer COEFFTYPE>
+    Polynomial(COEFFTYPE coefficients) -> Polynomial< typename COEFFTYPE::value_type >;
 
     /**
      * @brief A concept that checks if the given type is a Polynomial of some type T.

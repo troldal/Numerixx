@@ -39,8 +39,8 @@ int main()
     std::cout << "\nCompute the numerical derivative of the function ln(x) + 2x at the value 'e'\n";
     std::cout << "using central, forward, and backward difference calculation methods:\n";
     std::cout << "Central difference:  " << *central(func, std::numbers::e) << std::endl;
-    std::cout << "Forward difference:  " << *forward(func, std::numbers::e) << std::endl;
-    std::cout << "Backward difference: " << *backward(func, std::numbers::e) << std::endl;
+    //std::cout << "Forward difference:  " << *forward(func, std::numbers::e) << std::endl;
+    //std::cout << "Backward difference: " << *backward(func, std::numbers::e) << std::endl;
 
     // ============================================================================================
     // The following code does the same as the previous, but the optional step size argument is also
@@ -145,99 +145,99 @@ int main()
     // The following code shows the results of computing the derivatives for 10 different functions
     // numerically, using the central, forward, and backward functions.
     // ============================================================================================
-    auto f0 = [](double x) { return std::pow(x, 3) - 2 * x + 5; };
-    auto f1 = [](double x) { return 2 * std::pow(x, 2) + 3 * x - 4; };
-    auto f2 = [](double x) { return std::sin(x) + std::cos(x); };
-    auto f3 = [](double x) { return std::log(x) + 2 * x; };
-    auto f4 = [](double x) { return 4 * std::pow(x, 4) - 3 * std::pow(x, 3) + 2 * std::pow(x, 2) - x + 1; };
-    auto f5 = [](double x) { return std::exp(x) + 3 * std::pow(x, 2); };
-    auto f6 = [](double x) { return std::cos(x * x) - 2 * x; };
-    auto f7 = [](double x) { return std::sqrt(x) + 2.0 / x; };
-    auto f8 = [](double x) { return 3 * std::pow(x, 3) - 4 * std::pow(x, 2) + 5 * x - 6; };
-    auto f9 = [](double x) { return 1.0 / (x + 1); };
-
-    std::string s0 = "x^3 - 2*x + 5";
-    std::string s1 = "2*x^2 + 3*x - 4";
-    std::string s2 = "sin(x) + cos(x)";
-    std::string s3 = "ln(x) + 2*x";
-    std::string s4 = "4*x^4 - 3*x^3 + 2*x^2 - x + 1";
-    std::string s5 = "exp(x) + 3x^2";
-    std::string s6 = "cos(x^2) - 2*x";
-    std::string s7 = "sqrt(x) + 2.0 / x";
-    std::string s8 = "3*x^3 - 4*x^2 + 5*x - 6";
-    std::string s9 = "1.0 / (x + 1)";
-
-    double v0 = 2.0;
-    double v1 = 1.0;
-    double v2 = std::numbers::pi / 4;
-    double v3 = std::numbers::e;
-    double v4 = 0.0;
-    double v5 = 1.0;
-    double v6 = std::numbers::pi;
-    double v7 = 4.0;
-    double v8 = 2.0;
-    double v9 = 0.0;
-
-    double r0 = 10.0;
-    double r1 = 7.0;
-    double r2 = 0.0;
-    double r3 = 2.367879441;
-    double r4 = -1.0;
-    double r5 = std::numbers::e + 6;
-    double r6 = 0.703662284;
-    double r7 = 0.125;
-    double r8 = 25.0;
-    double r9 = -1.0;
-
-    std::cout << "CENTER DERIVATIVE USING RICHARDSON EXTRAPOLATION" << std::endl;
-    std::vector< std::tuple< std::string, double, double, std::function<double(double)> > > test1;
-    test1.emplace_back(s0, v0, r0, [&](double val){return *central(f0, val);});
-    test1.emplace_back(s1, v1, r1, [&](double val){return *central(f1, val);});
-    test1.emplace_back(s2, v2, r2, [&](double val){return *central(f2, val);});
-    test1.emplace_back(s3, v3, r3, [&](double val){return *central(f3, val);});
-    test1.emplace_back(s4, v4, r4, [&](double val){return *central(f4, val);});
-    test1.emplace_back(s5, v5, r5, [&](double val){return *central(f5, val);});
-    test1.emplace_back(s6, v6, r6, [&](double val){return *central(f6, val);});
-    test1.emplace_back(s7, v7, r7, [&](double val){return *central(f7, val);});
-    test1.emplace_back(s8, v8, r8, [&](double val){return *central(f8, val);});
-    test1.emplace_back(s9, v9, r9, [&](double val){return *central(f9, val);});
-    print(test1);
-
-    std::cout << "FORWARD DERIVATIVE USING RICHARDSON EXTRAPOLATION" << std::endl;
-    std::vector< std::tuple< std::string, double, double, std::function<double(double)> > > test2;
-    test2.emplace_back(s0, v0, r0, [&](double val){return *forward(f0, val);});
-    test2.emplace_back(s1, v1, r1, [&](double val){return *forward(f1, val);});
-    test2.emplace_back(s2, v2, r2, [&](double val){return *forward(f2, val);});
-    test2.emplace_back(s3, v3, r3, [&](double val){return *forward(f3, val);});
-    test2.emplace_back(s4, v4, r4, [&](double val){return *forward(f4, val);});
-    test2.emplace_back(s5, v5, r5, [&](double val){return *forward(f5, val);});
-    test2.emplace_back(s6, v6, r6, [&](double val){return *forward(f6, val);});
-    test2.emplace_back(s7, v7, r7, [&](double val){return *forward(f7, val);});
-    test2.emplace_back(s8, v8, r8, [&](double val){return *forward(f8, val);});
-    test2.emplace_back(s9, v9, r9, [&](double val){return *forward(f9, val);});
-    print(test2);
-
-    std::cout << "BACKWARD DERIVATIVE USING RICHARDSON EXTRAPOLATION" << std::endl;
-    std::vector< std::tuple< std::string, double, double, std::function<double(double)> > > test3;
-    test3.emplace_back(s0, v0, r0, [&](double val){return *backward(f0, val);});
-    test3.emplace_back(s1, v1, r1, [&](double val){return *backward(f1, val);});
-    test3.emplace_back(s2, v2, r2, [&](double val){return *backward(f2, val);});
-    test3.emplace_back(s3, v3, r3, [&](double val){return *backward(f3, val);});
-    test3.emplace_back(s4, v4, r4, [&](double val){return *backward(f4, val);});
-    test3.emplace_back(s5, v5, r5, [&](double val){return *backward(f5, val);});
-    test3.emplace_back(s6, v6, r6, [&](double val){return *backward(f6, val);});
-    test3.emplace_back(s7, v7, r7, [&](double val){return *backward(f7, val);});
-    test3.emplace_back(s8, v8, r8, [&](double val){return *backward(f8, val);});
-    test3.emplace_back(s9, v9, r9, [&](double val){return *backward(f9, val);});
-    print(test3);
-
-    auto somefunc = [](std::vector<double> args) { return args[1]*args[0]*args[0]; };
-
-    auto dfdx = multidiff<Order1CentralRichardson>(somefunc, std::vector<double>{1.0, 1.0});
-
-    for (auto item : dfdx) {
-        std::cout << item << std::endl;
-    }
+//    auto f0 = [](double x) { return std::pow(x, 3) - 2 * x + 5; };
+//    auto f1 = [](double x) { return 2 * std::pow(x, 2) + 3 * x - 4; };
+//    auto f2 = [](double x) { return std::sin(x) + std::cos(x); };
+//    auto f3 = [](double x) { return std::log(x) + 2 * x; };
+//    auto f4 = [](double x) { return 4 * std::pow(x, 4) - 3 * std::pow(x, 3) + 2 * std::pow(x, 2) - x + 1; };
+//    auto f5 = [](double x) { return std::exp(x) + 3 * std::pow(x, 2); };
+//    auto f6 = [](double x) { return std::cos(x * x) - 2 * x; };
+//    auto f7 = [](double x) { return std::sqrt(x) + 2.0 / x; };
+//    auto f8 = [](double x) { return 3 * std::pow(x, 3) - 4 * std::pow(x, 2) + 5 * x - 6; };
+//    auto f9 = [](double x) { return 1.0 / (x + 1); };
+//
+//    std::string s0 = "x^3 - 2*x + 5";
+//    std::string s1 = "2*x^2 + 3*x - 4";
+//    std::string s2 = "sin(x) + cos(x)";
+//    std::string s3 = "ln(x) + 2*x";
+//    std::string s4 = "4*x^4 - 3*x^3 + 2*x^2 - x + 1";
+//    std::string s5 = "exp(x) + 3x^2";
+//    std::string s6 = "cos(x^2) - 2*x";
+//    std::string s7 = "sqrt(x) + 2.0 / x";
+//    std::string s8 = "3*x^3 - 4*x^2 + 5*x - 6";
+//    std::string s9 = "1.0 / (x + 1)";
+//
+//    double v0 = 2.0;
+//    double v1 = 1.0;
+//    double v2 = std::numbers::pi / 4;
+//    double v3 = std::numbers::e;
+//    double v4 = 0.0;
+//    double v5 = 1.0;
+//    double v6 = std::numbers::pi;
+//    double v7 = 4.0;
+//    double v8 = 2.0;
+//    double v9 = 0.0;
+//
+//    double r0 = 10.0;
+//    double r1 = 7.0;
+//    double r2 = 0.0;
+//    double r3 = 2.367879441;
+//    double r4 = -1.0;
+//    double r5 = std::numbers::e + 6;
+//    double r6 = 0.703662284;
+//    double r7 = 0.125;
+//    double r8 = 25.0;
+//    double r9 = -1.0;
+//
+//    std::cout << "CENTER DERIVATIVE USING RICHARDSON EXTRAPOLATION" << std::endl;
+//    std::vector< std::tuple< std::string, double, double, std::function<double(double)> > > test1;
+//    test1.emplace_back(s0, v0, r0, [&](double val){return *central(f0, val);});
+//    test1.emplace_back(s1, v1, r1, [&](double val){return *central(f1, val);});
+//    test1.emplace_back(s2, v2, r2, [&](double val){return *central(f2, val);});
+//    test1.emplace_back(s3, v3, r3, [&](double val){return *central(f3, val);});
+//    test1.emplace_back(s4, v4, r4, [&](double val){return *central(f4, val);});
+//    test1.emplace_back(s5, v5, r5, [&](double val){return *central(f5, val);});
+//    test1.emplace_back(s6, v6, r6, [&](double val){return *central(f6, val);});
+//    test1.emplace_back(s7, v7, r7, [&](double val){return *central(f7, val);});
+//    test1.emplace_back(s8, v8, r8, [&](double val){return *central(f8, val);});
+//    test1.emplace_back(s9, v9, r9, [&](double val){return *central(f9, val);});
+//    print(test1);
+//
+//    std::cout << "FORWARD DERIVATIVE USING RICHARDSON EXTRAPOLATION" << std::endl;
+//    std::vector< std::tuple< std::string, double, double, std::function<double(double)> > > test2;
+//    test2.emplace_back(s0, v0, r0, [&](double val){return *forward(f0, val);});
+//    test2.emplace_back(s1, v1, r1, [&](double val){return *forward(f1, val);});
+//    test2.emplace_back(s2, v2, r2, [&](double val){return *forward(f2, val);});
+//    test2.emplace_back(s3, v3, r3, [&](double val){return *forward(f3, val);});
+//    test2.emplace_back(s4, v4, r4, [&](double val){return *forward(f4, val);});
+//    test2.emplace_back(s5, v5, r5, [&](double val){return *forward(f5, val);});
+//    test2.emplace_back(s6, v6, r6, [&](double val){return *forward(f6, val);});
+//    test2.emplace_back(s7, v7, r7, [&](double val){return *forward(f7, val);});
+//    test2.emplace_back(s8, v8, r8, [&](double val){return *forward(f8, val);});
+//    test2.emplace_back(s9, v9, r9, [&](double val){return *forward(f9, val);});
+//    print(test2);
+//
+//    std::cout << "BACKWARD DERIVATIVE USING RICHARDSON EXTRAPOLATION" << std::endl;
+//    std::vector< std::tuple< std::string, double, double, std::function<double(double)> > > test3;
+//    test3.emplace_back(s0, v0, r0, [&](double val){return *backward(f0, val);});
+//    test3.emplace_back(s1, v1, r1, [&](double val){return *backward(f1, val);});
+//    test3.emplace_back(s2, v2, r2, [&](double val){return *backward(f2, val);});
+//    test3.emplace_back(s3, v3, r3, [&](double val){return *backward(f3, val);});
+//    test3.emplace_back(s4, v4, r4, [&](double val){return *backward(f4, val);});
+//    test3.emplace_back(s5, v5, r5, [&](double val){return *backward(f5, val);});
+//    test3.emplace_back(s6, v6, r6, [&](double val){return *backward(f6, val);});
+//    test3.emplace_back(s7, v7, r7, [&](double val){return *backward(f7, val);});
+//    test3.emplace_back(s8, v8, r8, [&](double val){return *backward(f8, val);});
+//    test3.emplace_back(s9, v9, r9, [&](double val){return *backward(f9, val);});
+//    print(test3);
+//
+//    auto somefunc = [](std::vector<double> args) { return args[1]*args[0]*args[0]; };
+//
+//    auto dfdx = multidiff<Order1CentralRichardson>(somefunc, std::vector<double>{1.0, 1.0});
+//
+//    for (auto item : dfdx) {
+//        std::cout << item << std::endl;
+//    }
 
     return 0;
 }

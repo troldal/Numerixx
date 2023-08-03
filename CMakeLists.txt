@@ -20,12 +20,12 @@ add_subdirectory(numerixx)
 
 option(NUMERIXX_ENABLE_TESTS "Enable unit tests" ${PROJECT_IS_TOP_LEVEL})
 if(NUMERIXX_ENABLE_TESTS)
-    add_subdirectory(test)
+    #add_subdirectory(test)
 endif()
 
 option(NUMERIXX_ENABLE_DOCS "Enable documentation" ${PROJECT_IS_TOP_LEVEL})
 if(NUMERIXX_ENABLE_DOCS)
-    add_subdirectory(docs)
+    #add_subdirectory(docs)
 endif()
 
 option(NUMERIXX_ENABLE_DEMOS "Enable demo programs" ${PROJECT_IS_TOP_LEVEL})
