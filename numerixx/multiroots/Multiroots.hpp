@@ -37,6 +37,7 @@
 #include ".utils/Constants.hpp"
 #include <functional>
 #include <stdexcept>
+#include <iostream>
 
 namespace nxx::multiroots
 {

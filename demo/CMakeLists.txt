@@ -53,15 +53,6 @@ target_sources(DemoPoly
 
 target_link_libraries(DemoPoly PRIVATE fmt numerixx)
 
-# Target: Matrix and Linear Algebra
-add_executable(DemoMatrix)
-target_sources(DemoMatrix
-        PRIVATE
-        DemoMatrix.cpp
-        )
-
-target_link_libraries(DemoMatrix PRIVATE fmt numerix)
-
 # Target: Numerical derivatives
 add_executable(DemoDeriv)
 target_sources(DemoDeriv
