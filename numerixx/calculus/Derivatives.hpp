@@ -35,8 +35,8 @@
 #include "../poly/Polynomial.hpp"
 
 // ===== External Includes
-#include "../.dependencies/expected/expected.hpp"
-#include "../.dependencies/gcem/gcem.hpp"
+#include <tl/expected.hpp>
+#include <gcem.hpp>
 
 // ===== Standard Library Includes
 #include <cassert>

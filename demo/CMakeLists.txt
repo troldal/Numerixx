@@ -79,7 +79,7 @@ target_sources(DemoMultiroot
         DemoMultiroot.cpp
         )
 
-target_link_libraries(DemoMultiroot PRIVATE  LAPACK::LAPACK numerixx)
+target_link_libraries(DemoMultiroot PRIVATE LAPACK::LAPACK numerixx)
 
 #=======================================================================================================================
 # COMPILER FLAGS

@@ -35,7 +35,7 @@
 #include "PolynomialError.hpp"
 
 // ===== External Includes
-#include "../.dependencies/expected/expected.hpp"
+#include <tl/expected.hpp>
 #include "../.utils/Concepts.hpp"
 
 // ===== Standard Library Includes
@@ -359,7 +359,8 @@ namespace nxx::poly
     /*
      * Deduction guide for using arbitrary containers for coefficient input.
      */
-    Polynomial(IsCoefficientContainer auto coefficients) -> Polynomial< typename decltype(coefficients)::value_type >;
+    // TODO: Causes internal compiler error on MSVC
+    //Polynomial(IsCoefficientContainer auto coefficients) -> Polynomial< typename decltype(coefficients)::value_type >;
 
     /**
      * @brief A concept that checks if the given type is a Polynomial of some type T.

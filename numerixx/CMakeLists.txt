@@ -10,9 +10,15 @@ project(Numerixx.Lib)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_library( blaze INTERFACE IMPORTED)
-target_include_directories( blaze SYSTEM INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/.dependencies>)
+find_path(GCEM_INCLUDE_DIR NAMES gcem.hpp)
+find_path(EXPECTED_INCLUDE_DIR NAMES expected.hpp PATH_SUFFIXES tl)
+
+#add_library( blaze INTERFACE IMPORTED)
+#target_include_directories( blaze SYSTEM INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/.dependencies>)
+
+find_package(blaze REQUIRED)
 
 add_library(numerixx INTERFACE)
 target_include_directories(numerixx INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>)
-target_link_libraries(numerixx INTERFACE blaze)
+target_include_directories(numerixx SYSTEM INTERFACE ${GCEM_INCLUDE_DIR} ${EXPECTED_INCLUDE_DIR})
+target_link_libraries(numerixx INTERFACE blaze::blaze)

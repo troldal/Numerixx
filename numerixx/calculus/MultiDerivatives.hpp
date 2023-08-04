@@ -132,7 +132,7 @@ namespace nxx::deriv
     template< typename ALGO >
     inline auto jacobian(IsMultiFunctionArray auto                                   functions,
                          auto                                                        args,
-                         MultiReturnType< typename decltype(functions)::value_type > stepsize = StepSize< decltype(stepsize) >)
+                         MultiReturnType< typename decltype(functions)::value_type > stepsize = StepSize< typename decltype(functions)::value_type>)
         requires std::convertible_to< typename impl::VectorTraits< decltype(args) >::value_type, MultiReturnType< typename decltype(functions)::value_type > > ||
                  std::convertible_to< typename decltype(args)::value_type, MultiReturnType< typename decltype(functions)::value_type > >
     {
