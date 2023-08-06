@@ -57,7 +57,7 @@ namespace nxx::roots
          * @param msg The error message.
          */
         explicit RootError(const char* msg)
-            : std::runtime_error(msg) {};
+            : std::runtime_error(msg) {}
     };
 
     namespace impl
@@ -84,7 +84,7 @@ namespace nxx::roots
                 : RootError(msg),
                   m_type(type),
                   m_value(value),
-                  m_iterations(iter) {};
+                  m_iterations(iter) {}
 
             /**
              * @brief Returns the type of the error.
@@ -111,6 +111,8 @@ namespace nxx::roots
                     case RootErrorType::NumericalError:
                         return "Numerical error";
                 }
+
+                return "Unknown error";
             }
 
             /**

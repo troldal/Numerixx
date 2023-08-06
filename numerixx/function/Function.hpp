@@ -44,7 +44,7 @@ namespace nxx::func
     class FunctionError : public std::runtime_error
     {
     public:
-        explicit FunctionError(const char* msg) : std::runtime_error(msg) {};
+        explicit FunctionError(const char* msg) : std::runtime_error(msg) {}
     };
 
     /**

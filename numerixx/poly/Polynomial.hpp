@@ -234,13 +234,13 @@ namespace nxx::poly
                 for (size_t i = 1; i < m_coefficients.size(); ++i) {
                     auto coeff = m_coefficients[i];
                     if constexpr (!IsComplex< T > ) {
-                        if (coeff == 0) { continue; }
-                        else if (coeff > 0) { oss << " + "; }
+                        if (coeff == 0.0) { continue; }
+                        else if (coeff > 0.0) { oss << " + "; }
                         else { oss << " - "; }
                         oss << abs(coeff) << "x";
                     }
                     else {
-                        if (abs(coeff) == 0) { continue; }
+                        if (abs(coeff) == 0.0) { continue; }
                         else { oss << " + "; }
                         oss << coeff << "x";
                     }
@@ -360,7 +360,9 @@ namespace nxx::poly
      * Deduction guide for using arbitrary containers for coefficient input.
      */
     // TODO: Causes internal compiler error on MSVC
-    //Polynomial(IsCoefficientContainer auto coefficients) -> Polynomial< typename decltype(coefficients)::value_type >;
+#if defined(__clang__) || defined(__GNUC__)
+    Polynomial(IsCoefficientContainer auto coefficients) -> Polynomial< typename decltype(coefficients)::value_type >;
+#endif
 
     /**
      * @brief A concept that checks if the given type is a Polynomial of some type T.

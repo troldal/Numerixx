@@ -54,7 +54,7 @@ namespace nxx::deriv
     {
     public:
         explicit DerivativeError(const char* msg)
-            : std::runtime_error(msg) {};
+            : std::runtime_error(msg) {}
     };
 
     template< typename FN >

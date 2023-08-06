@@ -309,6 +309,8 @@ namespace nxx::roots
         }
     };
 
+    Ridder(std::invocable auto func) -> Ridder< decltype(func) >;
+
     /**
      * @brief Implements the bisection method for root-finding.
      *
@@ -363,6 +365,8 @@ namespace nxx::roots
                 BASE::setBounds({ root, bounds.second });
         }
     };
+
+    Bisection(std::invocable auto func) -> Bisection< decltype(func) >;
 
     /**
      * @brief Regula Falsi (False Position) method for root-finding.
@@ -424,6 +428,8 @@ namespace nxx::roots
             }
         }
     };
+
+    RegulaFalsi(std::invocable auto func) -> RegulaFalsi< decltype(func) >;
 
     namespace impl
     {

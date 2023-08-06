@@ -11,6 +11,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(fmt)
+set_target_properties(fmt PROPERTIES SYSTEM ON)
 
 #=================================================================================================================
 # Define targets
@@ -23,7 +24,8 @@ target_sources(DemoRootFinding
         DemoRootFinding.cpp
         )
 
-target_link_libraries(DemoRootFinding PRIVATE fmt numerixx)
+target_link_libraries(DemoRootFinding PRIVATE fmt)
+target_link_libraries(DemoRootFinding PUBLIC numerixx)
 
 # Target: Root searching
 add_executable(DemoRootSearching)
@@ -63,14 +65,14 @@ target_sources(DemoDeriv
 target_link_libraries(DemoDeriv PRIVATE fmt numerixx)
 
 # Target: Multiple root-finding
-find_package(LAPACK REQUIRED)
+#find_package(LAPACK REQUIRED)
 add_executable(DemoMultiroot)
 target_sources(DemoMultiroot
         PRIVATE
         DemoMultiroot.cpp
         )
 
-target_link_libraries(DemoMultiroot PRIVATE LAPACK::LAPACK numerixx)
+#target_link_libraries(DemoMultiroot PRIVATE LAPACK::LAPACK numerixx)
 
 #=======================================================================================================================
 # COMPILER FLAGS
@@ -96,7 +98,12 @@ list(APPEND OPENXLSX_DEBUG_FLAGS_GNUCLANG
         "-Wdouble-promotion"
         "-Wformat=2"
         "-Weffc++"
-        "-Wno-unknown-pragmas")
+        "-Wno-unknown-pragmas"
+        "-Wno-c++98-compat"
+        "-Wno-c++98-compat-pedantic"
+        "-Wno-documentation"
+        "-Wno-documentation-unknown-command"
+)
 list(APPEND OPENXLSX_DEBUG_FLAGS_MSVC
         "/permissive"
         "/W4"

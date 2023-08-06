@@ -244,7 +244,7 @@ namespace nxx::poly
                          typename PolynomialTraits< decltype(poly) >::fundamental_type                 tolerance      = nxx::EPS,
                          int                                                                           max_iterations = nxx::MAXITER)
     {
-        using FLOAT_TYPE   = PolynomialTraits< decltype(poly) >::fundamental_type;
+        using FLOAT_TYPE   = typename PolynomialTraits< decltype(poly) >::fundamental_type;
         using COMPLEX_TYPE = std::complex< FLOAT_TYPE >;
 
         // ===== Lambda function for computing the Laguerre step.

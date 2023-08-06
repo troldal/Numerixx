@@ -32,11 +32,11 @@
 
 #include "calculus/Derivatives.hpp"
 #include "function/Function.hpp"
-#include "multiroots/Multiroots.hpp"
+//#include "multiroots/Multiroots.hpp"
 #include "poly/Polynomial.hpp"
 #include "poly/Polyroots.hpp"
 #include "roots/Roots.hpp"
 
-#include <blaze/Blaze.h>
+//#include <blaze/Blaze.h>
 
 #endif    // NUMERIXX_NUMERIXX_HPP

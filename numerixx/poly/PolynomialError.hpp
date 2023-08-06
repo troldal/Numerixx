@@ -40,7 +40,7 @@ namespace nxx::error
     class PolynomialError : public std::runtime_error
     {
     public:
-        explicit PolynomialError(const char* msg) : std::runtime_error(msg) {};
+        explicit PolynomialError(const char* msg) : std::runtime_error(msg) {}
     };
 
 }    // namespace numerix::error

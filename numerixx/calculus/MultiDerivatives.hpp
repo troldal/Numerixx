@@ -56,6 +56,15 @@ namespace nxx::deriv
         };
 
         /*
+         * Specialization of the VectorTraits class for STL containers
+         */
+        template< typename T >
+        struct VectorTraits< T >
+        {
+            using value_type = typename T::value_type;
+        };
+
+        /*
          * Forward declaration of the MatrixTraits class.
          */
         template< typename... >

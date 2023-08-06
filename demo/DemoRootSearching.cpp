@@ -5,6 +5,7 @@
 
 #include <fmt/format.h>
 #include <iostream>
+#include <iomanip>
 #include <numerixx.hpp>
 
 int main()
