@@ -2,6 +2,8 @@
 // Created by Kenneth Balslev on 09/12/2022.
 //
 
+#define _USE_MATH_DEFINES
+
 #include <deque>
 #include <iostream>
 #include <list>

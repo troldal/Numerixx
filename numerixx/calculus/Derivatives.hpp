@@ -71,12 +71,14 @@ namespace nxx::deriv
     using ReturnType = std::invoke_result_t< T, double >;
 
     template< typename T >
+        requires std::floating_point< T >
     struct StepSizeHelper
     {
-        static constexpr T value = gcem::pow(std::numeric_limits< T >::epsilon(), 1.0 / 3);
+        static constexpr T value = gcem::pow(std::numeric_limits< T >::epsilon(), 1.0 / 3.0);
     };
 
     template< typename T >
+        requires std::floating_point< T >
     inline constexpr T StepSize = StepSizeHelper< T >::value;
 
     // ====================================================================

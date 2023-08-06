@@ -105,8 +105,7 @@ namespace nxx::deriv
                             auto                                  args,
                             size_t                                index,
                             MultiReturnType< decltype(function) > stepsize = StepSize< MultiReturnType< decltype(function) > >)
-        requires std::convertible_to< typename impl::VectorTraits< decltype(args) >::value_type, MultiReturnType< decltype(function) > > ||
-                 std::convertible_to< typename decltype(args)::value_type, MultiReturnType< decltype(function) > >
+        requires std::convertible_to< typename impl::VectorTraits< decltype(args) >::value_type, MultiReturnType< decltype(function) > >
     {
         std::vector< MultiReturnType< decltype(function) > > argvector(args.begin(), args.end());
 
@@ -125,8 +124,7 @@ namespace nxx::deriv
     inline auto multidiff(IsMultiFunction auto                  function,
                           auto                                  args,
                           MultiReturnType< decltype(function) > stepsize = StepSize< MultiReturnType< decltype(function) > >)
-        requires std::convertible_to< typename impl::VectorTraits< decltype(args) >::value_type, MultiReturnType< decltype(function) > > ||
-                 std::convertible_to< typename decltype(args)::value_type, MultiReturnType< decltype(function) > >
+        requires std::convertible_to< typename impl::VectorTraits< decltype(args) >::value_type, MultiReturnType< decltype(function) > >
     {
         std::vector< MultiReturnType< decltype(function) > > argvector(args.begin(), args.end());
 
@@ -141,9 +139,8 @@ namespace nxx::deriv
     template< typename ALGO >
     inline auto jacobian(IsMultiFunctionArray auto                                   functions,
                          auto                                                        args,
-                         MultiReturnType< typename decltype(functions)::value_type > stepsize = StepSize< typename decltype(functions)::value_type>)
-        requires std::convertible_to< typename impl::VectorTraits< decltype(args) >::value_type, MultiReturnType< typename decltype(functions)::value_type > > ||
-                 std::convertible_to< typename decltype(args)::value_type, MultiReturnType< typename decltype(functions)::value_type > >
+                         MultiReturnType< typename decltype(functions)::value_type > stepsize = StepSize< MultiReturnType< typename decltype(functions)::value_type > >)
+        requires std::convertible_to< typename impl::VectorTraits< decltype(args) >::value_type, MultiReturnType< typename decltype(functions)::value_type > >
     {
         using namespace nxx::deriv;
         using namespace blaze;
