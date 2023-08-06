@@ -293,7 +293,9 @@ namespace nxx::roots
         void iterate() { BASE::m_guess = BASE::m_guess - BASE::evaluate(BASE::m_guess) / BASE::derivative(BASE::m_guess); }
     };
 
-    Newton(std::invocable auto func, std::invocable auto deriv) -> Newton< decltype(func), decltype(deriv) >;
+    template< typename FN, typename DERIV >
+    requires std::invocable< FN, double > && std::invocable< DERIV, double >
+    Newton(FN func, DERIV deriv) -> Newton< decltype(func), decltype(deriv) >;
 
     /**
      * @brief The fdfsolve function is a convenience function for running a polishing solver (i.e. with derivative),

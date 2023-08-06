@@ -520,7 +520,9 @@ namespace nxx::deriv
      * @return A \c tl::expected (\c std::expected) containing the (approximated) derivative of the function, or (in case of an error)
      * a \c DerivativeError exception object describing the error.
      */
-    inline auto central(IsFunction auto                  function,
+    template< typename FN >
+        requires IsFunction< FN >
+    inline auto central(FN                               function,
                         ReturnType< decltype(function) > val,
                         ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
@@ -536,7 +538,9 @@ namespace nxx::deriv
      * @return A \c tl::expected (\c std::expected) containing the (approximated) derivative of the function, or (in case of an error)
      * a \c DerivativeError exception object describing the error.
      */
-    inline auto forward(IsFunction auto                  function,
+    template< typename FN >
+    requires IsFunction< FN >
+    inline auto forward(FN                               function,
                         ReturnType< decltype(function) > val,
                         ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
@@ -552,7 +556,9 @@ namespace nxx::deriv
      * @return A \c tl::expected (\c std::expected) containing the (approximated) derivative of the function, or (in case of an error)
      * a \c DerivativeError exception object describing the error.
      */
-    inline auto backward(IsFunction auto                  function,
+    template< typename FN >
+    requires IsFunction< FN >
+    inline auto backward(FN                               function,
                          ReturnType< decltype(function) > val,
                          ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {

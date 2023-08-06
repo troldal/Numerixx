@@ -239,7 +239,10 @@ namespace nxx::poly
      * polynomials. However, it may fail to converge for certain ill-conditioned polynomials. In such cases,
      * using a different root-finding method may be necessary.
      */
-    inline auto laguerre(IsPolynomial auto                                                             poly,
+
+    template< typename POLY>
+        requires IsPolynomial<POLY>
+    inline auto laguerre(POLY                                                                          poly,
                          std::complex< typename PolynomialTraits< decltype(poly) >::fundamental_type > guess          = 1.0,
                          typename PolynomialTraits< decltype(poly) >::fundamental_type                 tolerance      = nxx::EPS,
                          int                                                                           max_iterations = nxx::MAXITER)

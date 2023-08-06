@@ -73,14 +73,14 @@ namespace nxx::poly
     /*
      * Forward declaration of the PolynomialTraits class.
      */
-    template<typename T>
+    template<typename...>
     struct PolynomialTraits;
 
     /*
      * Specialization of the PolynomialTraits class for Polynomial objects with floating point coefficients.
      */
     template<typename T>
-        requires std::floating_point< T >
+//        requires std::floating_point< T >
     struct PolynomialTraits<Polynomial<T>>
     {
         using value_type = T;
@@ -359,10 +359,9 @@ namespace nxx::poly
     /*
      * Deduction guide for using arbitrary containers for coefficient input.
      */
-    // TODO: Causes internal compiler error on MSVC
-#if defined(__clang__) || defined(__GNUC__)
-    Polynomial(IsCoefficientContainer auto coefficients) -> Polynomial< typename decltype(coefficients)::value_type >;
-#endif
+    template < typename CONTAINER >
+        requires IsCoefficientContainer< CONTAINER >
+    Polynomial(CONTAINER coefficients) -> Polynomial< typename decltype(coefficients)::value_type >;
 
     /**
      * @brief A concept that checks if the given type is a Polynomial of some type T.
