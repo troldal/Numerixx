@@ -31,9 +31,9 @@
 #ifndef NUMERIXX_MULTIDERIVATIVES_HPP
 #define NUMERIXX_MULTIDERIVATIVES_HPP
 
-#include "Derivatives.hpp"
+#include "calculus/Derivatives.hpp"
 
-#include <blaze/Blaze.h>
+#include "blaze/Blaze.h"
 
 namespace nxx::deriv
 {

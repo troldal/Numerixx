@@ -33,11 +33,11 @@
 
 #include <blaze/Blaze.h>
 
-#include "../calculus/MultiDerivatives.hpp"
 #include ".utils/Constants.hpp"
+#include "MultiDerivatives.hpp"
 #include <functional>
-#include <stdexcept>
 #include <iostream>
+#include <stdexcept>
 
 namespace nxx::multiroots
 {
