@@ -28,10 +28,9 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef NUMERIXX_MULTIROOTS_HPP
-#define NUMERIXX_MULTIROOTS_HPP
+#ifndef NUMERIXX_FUNC_HPP
+#define NUMERIXX_FUNC_HPP
 
-#include "impl/MultiDerivatives.hpp"
-#include "impl/Multiroots.hpp"
+#include "impl/Function.hpp"
 
-#endif    // NUMERIXX_MULTIROOTS_HPP
+#endif    // NUMERIXX_FUNC_HPP

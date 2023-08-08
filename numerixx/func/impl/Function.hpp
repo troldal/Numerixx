@@ -32,8 +32,8 @@
 #define NUMERIXX_FUNCTION_HPP
 
 // ===== External Includes
+#include "../../.utils/Concepts.hpp"
 #include <expected.hpp>
-#include "../.utils/Concepts.hpp"
 
 namespace nxx::func
 {

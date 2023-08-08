@@ -3,7 +3,8 @@
 // ================================================================================================
 
 #include <cmath>
-#include <numerixx.hpp>
+#include <iostream>
+#include <Func.hpp>
 
 int main()
 {
