@@ -33,11 +33,11 @@
 
 // ===== Numerixx Includes
 #include "RootCommon.hpp"
-#include "calculus/Derivatives.hpp"
-#include "poly/Polynomial.hpp"
+#include <Deriv.hpp>
+#include <Poly.hpp>
 
 // ===== External Includes
-#include "../.utils/Constants.hpp"
+#include "../../.utils/Constants.hpp"
 
 // ===== Standard Library Includes
 #include <algorithm>

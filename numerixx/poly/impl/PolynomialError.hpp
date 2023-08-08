@@ -28,11 +28,26 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef NUMERIXX_POLY_HPP
-#define NUMERIXX_POLY_HPP
 
-#include "impl/Polynomial.hpp"
-#include "impl/PolynomialError.hpp"
-#include "impl/Polyroots.hpp"
+#ifndef NUMERIXX_POLYNOMIALERROR_HPP
+#define NUMERIXX_POLYNOMIALERROR_HPP
 
-#endif    // NUMERIXX_POLY_HPP
+//===== Standard Library Includes
+#include <stdexcept>
+
+namespace nxx::error
+{
+    /**
+     * @brief The PolynomialError class represents an exception that is thrown when there is an error related to polynomials.
+     *
+     * This class is derived from the std::runtime_error class.
+     */
+    class PolynomialError : public std::runtime_error
+    {
+    public:
+        explicit PolynomialError(const char* msg) : std::runtime_error(msg) {}
+    };
+
+}    // namespace numerix::error
+
+#endif    // NUMERIXX_POLYNOMIALERROR_HPP

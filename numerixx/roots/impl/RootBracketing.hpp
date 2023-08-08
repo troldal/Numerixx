@@ -33,10 +33,10 @@
 
 // ===== Numerixx Includes
 #include "RootCommon.hpp"
-#include "calculus/Derivatives.hpp"
+#include <Deriv.hpp>
 
 // ===== External Includes
-#include "../.utils/Constants.hpp"
+#include "../../.utils/Constants.hpp"
 
 // ===== Standard Library Includes
 #include <array>

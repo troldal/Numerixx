@@ -35,8 +35,8 @@
 #include "PolynomialError.hpp"
 
 // ===== External Includes
+#include "../../.utils/Concepts.hpp"
 #include <tl/expected.hpp>
-#include "../.utils/Concepts.hpp"
 
 // ===== Standard Library Includes
 #include <algorithm>

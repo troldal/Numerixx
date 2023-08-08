@@ -3,8 +3,7 @@
 // in the calculus/Derivatives.hpp header.
 // ================================================================================================
 
-#include "multiroots/MultiDerivatives.hpp"
-#include <calculus/Derivatives.hpp>
+#include <Deriv.hpp>
 #include <cmath>
 #include <fmt/format.h>
 #include <iomanip>
@@ -209,14 +208,6 @@ int main()
     test3.emplace_back(s8, v8, r8, [&](double val){return *backward(f8, val);});
     test3.emplace_back(s9, v9, r9, [&](double val){return *backward(f9, val);});
     print(test3);
-
-    auto somefunc = [](std::vector<double> args) { return args[1]*args[0]*args[0]; };
-
-    auto dfdx = multidiff<Order1CentralRichardson>(somefunc, std::vector<double>{1.0, 1.0});
-
-    for (auto item : dfdx) {
-        std::cout << item << std::endl;
-    }
 
     return 0;
 }

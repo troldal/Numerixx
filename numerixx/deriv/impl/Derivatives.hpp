@@ -32,7 +32,7 @@
 #define NUMERIXX_DIFFERENTIATION_HPP
 
 // ===== Numerixx Includes
-#include "../poly/Polynomial.hpp"
+#include <Poly.hpp>
 
 // ===== External Includes
 #include <tl/expected.hpp>

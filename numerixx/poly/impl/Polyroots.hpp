@@ -36,7 +36,7 @@
 #include "PolynomialError.hpp"
 
 // ===== External Includes
-#include "../.utils/Constants.hpp"
+#include "../../.utils/Constants.hpp"
 
 // ===== Standard Library Includes
 #include <algorithm>

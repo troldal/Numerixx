@@ -28,21 +28,9 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+#ifndef NUMERIXX_DERIV_HPP
+#define NUMERIXX_DERIV_HPP
 
-#ifndef NUMERIXX_POLYNOMIALERROR_HPP
-#define NUMERIXX_POLYNOMIALERROR_HPP
+#include "impl/Derivatives.hpp"
 
-//===== Standard Library Includes
-#include <stdexcept>
-
-namespace nxx::error
-{
-    class PolynomialError : public std::runtime_error
-    {
-    public:
-        explicit PolynomialError(const char* msg) : std::runtime_error(msg) {}
-    };
-
-}    // namespace numerix::error
-
-#endif    // NUMERIXX_POLYNOMIALERROR_HPP
+#endif    // NUMERIXX_DERIV_HPP

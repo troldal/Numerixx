@@ -2,13 +2,11 @@
 // This demo shows how to use the nxx:poly::Polynomial class to create polynomial function objects.
 // ================================================================================================
 
-#include "poly/Polyroots.hpp"
-#include <complex>
+#include <Poly.hpp>
 #include <deque>
 #include <iomanip>
 #include <iostream>
 #include <list>
-#include <poly/Polynomial.hpp>
 #include <set>
 #include <unordered_set>
 
