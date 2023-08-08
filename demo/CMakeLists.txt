@@ -24,8 +24,7 @@ target_sources(DemoRootFinding
         DemoRootFinding.cpp
         )
 
-target_link_libraries(DemoRootFinding PRIVATE fmt)
-target_link_libraries(DemoRootFinding PUBLIC numerixx::roots)
+target_link_libraries(DemoRootFinding PRIVATE fmt numerixx::roots)
 
 # Target: Root searching
 add_executable(DemoRootSearching)
