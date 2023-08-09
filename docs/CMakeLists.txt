@@ -2,7 +2,7 @@ find_package(Doxygen REQUIRED)
 find_package(Sphinx REQUIRED)
 
 # Find all the public headers
-get_target_property(NUMERIXX_PUBLIC_HEADER_DIR numerixx INTERFACE_INCLUDE_DIRECTORIES)
+get_target_property(NUMERIXX_PUBLIC_HEADER_DIR nxx_all INTERFACE_INCLUDE_DIRECTORIES)
 file(GLOB_RECURSE NUMERIXX_PUBLIC_HEADERS ${NUMERIXX_PUBLIC_HEADER_DIR}/*.hpp)
 
 set(DOXYGEN_INPUT_DIR ${PROJECT_SOURCE_DIR}/numerixx)
