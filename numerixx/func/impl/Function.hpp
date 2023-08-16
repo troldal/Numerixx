@@ -1,14 +1,14 @@
 /*
-    o.     O O       o Oo      oO o.OOoOoo `OooOOo.  ooOoOOo o      O o      O
-    Oo     o o       O O O    o o  O        o     `o    O     O    o   O    o
-    O O    O O       o o  o  O  O  o        O      O    o      o  O     o  O
-    O  o   o o       o O   Oo   O  ooOO     o     .O    O       oO       oO
-    O   o  O o       O O        o  O        OOooOO'     o       Oo       Oo
-    o    O O O       O o        O  o        o    o      O      o  o     o  o
-    o     Oo `o     Oo o        O  O        O     O     O     O    O   O    O
-    O     `o  `OoooO'O O        o ooOooOoO  O      o ooOOoOo O      o O      o
+    888b      88  88        88  88b           d88  88888888888  88888888ba   88  8b        d8  8b        d8
+    8888b     88  88        88  888b         d888  88           88      "8b  88   Y8,    ,8P    Y8,    ,8P
+    88 `8b    88  88        88  88`8b       d8'88  88           88      ,8P  88    `8b  d8'      `8b  d8'
+    88  `8b   88  88        88  88 `8b     d8' 88  88aaaaa      88aaaaaa8P'  88      Y88P          Y88P
+    88   `8b  88  88        88  88  `8b   d8'  88  88"""""      88""""88'    88      d88b          d88b
+    88    `8b 88  88        88  88   `8b d8'   88  88           88    `8b    88    ,8P  Y8,      ,8P  Y8,
+    88     `8888  Y8a.    .a8P  88    `888'    88  88           88     `8b   88   d8'    `8b    d8'    `8b
+    88      `888   `"Y8888Y"'   88     `8'     88  88888888888  88      `8b  88  8P        Y8  8P        Y8
 
-    Copyright © 2023 Kenneth Troldal Balslev
+    Copyright © 2022 Kenneth Troldal Balslev
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the “Software”), to deal
@@ -31,8 +31,10 @@
 #ifndef NUMERIXX_FUNCTION_HPP
 #define NUMERIXX_FUNCTION_HPP
 
+// ===== Numerixx Includes
+#include <Concepts.hpp>
+
 // ===== External Includes
-#include "../../.utils/Concepts.hpp"
 #include <tl/expected.hpp>
 
 namespace nxx::func
@@ -44,7 +46,9 @@ namespace nxx::func
     class FunctionError : public std::runtime_error
     {
     public:
-        explicit FunctionError(const char* msg) : std::runtime_error(msg) {}
+        explicit FunctionError(const char* msg)
+            : std::runtime_error(msg)
+        {}
     };
 
     /**
@@ -54,7 +58,7 @@ namespace nxx::func
      * @requires FN should be invocable with double or std::complex<double> as its argument type.
      */
     template< typename FN >
-        requires std::invocable< FN, double > || std::invocable< FN, std::complex< double > >
+    requires std::invocable< FN, double > || std::invocable< FN, std::complex< double > >
     class Function
     {
     public:
@@ -63,14 +67,18 @@ namespace nxx::func
          *
          * @param fn The function to be wrapped by the Function object.
          */
-        explicit Function(FN fn) : m_fn(fn) {}
+        explicit Function(FN fn)
+            : m_fn(fn)
+        {}
 
         /**
          * @brief Constructs a Function object from an rvalue reference.
          *
          * @param fn The function to be wrapped by the Function object.
          */
-        explicit Function(FN&& fn) : m_fn(std::forward< FN >(fn)) {}
+        explicit Function(FN&& fn)
+            : m_fn(std::forward< FN >(fn))
+        {}
 
         /**
          * @brief Function call operator.
@@ -80,8 +88,8 @@ namespace nxx::func
          * @return The result of the function evaluation.
          */
         template< typename T >
-            requires (std::floating_point<T> && std::floating_point< std::invoke_result_t<FN, T> >) ||
-                     (IsComplex<T> && IsComplex< std::invoke_result_t<FN, T> >)
+        requires(std::floating_point< T > && std::floating_point< std::invoke_result_t< FN, T > >) ||
+                (IsComplex< T > && IsComplex< std::invoke_result_t< FN, T > >)
         auto operator()(T x) const
         {
             return m_fn(std::forward< T >(x));
@@ -95,8 +103,8 @@ namespace nxx::func
          * @return A tl::expected object containing either the result of the function evaluation or a FunctionError.
          */
         template< typename T >
-            requires (std::floating_point<T> && std::floating_point< std::invoke_result_t<FN, T> >) ||
-                    (IsComplex<T> && IsComplex< std::invoke_result_t<FN, T> >)
+        requires(std::floating_point< T > && std::floating_point< std::invoke_result_t< FN, T > >) ||
+                (IsComplex< T > && IsComplex< std::invoke_result_t< FN, T > >)
         auto evaluate(T x) const
         {
             using RT = std::invoke_result_t< FN, T >;

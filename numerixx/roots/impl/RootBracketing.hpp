@@ -1,14 +1,14 @@
 /*
-    o.     O O       o Oo      oO o.OOoOoo `OooOOo.  ooOoOOo o      O o      O
-    Oo     o o       O O O    o o  O        o     `o    O     O    o   O    o
-    O O    O O       o o  o  O  O  o        O      O    o      o  O     o  O
-    O  o   o o       o O   Oo   O  ooOO     o     .O    O       oO       oO
-    O   o  O o       O O        o  O        OOooOO'     o       Oo       Oo
-    o    O O O       O o        O  o        o    o      O      o  o     o  o
-    o     Oo `o     Oo o        O  O        O     O     O     O    O   O    O
-    O     `o  `OoooO'O O        o ooOooOoO  O      o ooOOoOo O      o O      o
+    888b      88  88        88  88b           d88  88888888888  88888888ba   88  8b        d8  8b        d8
+    8888b     88  88        88  888b         d888  88           88      "8b  88   Y8,    ,8P    Y8,    ,8P
+    88 `8b    88  88        88  88`8b       d8'88  88           88      ,8P  88    `8b  d8'      `8b  d8'
+    88  `8b   88  88        88  88 `8b     d8' 88  88aaaaa      88aaaaaa8P'  88      Y88P          Y88P
+    88   `8b  88  88        88  88  `8b   d8'  88  88"""""      88""""88'    88      d88b          d88b
+    88    `8b 88  88        88  88   `8b d8'   88  88           88    `8b    88    ,8P  Y8,      ,8P  Y8,
+    88     `8888  Y8a.    .a8P  88    `888'    88  88           88     `8b   88   d8'    `8b    d8'    `8b
+    88      `888   `"Y8888Y"'   88     `8'     88  88888888888  88      `8b  88  8P        Y8  8P        Y8
 
-    Copyright © 2023 Kenneth Troldal Balslev
+    Copyright © 2022 Kenneth Troldal Balslev
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the “Software”), to deal
@@ -33,10 +33,8 @@
 
 // ===== Numerixx Includes
 #include "RootCommon.hpp"
+#include <Constants.hpp>
 #include <Deriv.hpp>
-
-// ===== External Includes
-#include "../../.utils/Constants.hpp"
 
 // ===== Standard Library Includes
 #include <array>
@@ -216,16 +214,16 @@ namespace nxx::roots
         };
     }    // namespace impl
 
-         /**
-          * @brief Implements Ridder's method for root-finding.
-          *
-          * This class implements Ridder's method, a bracketing root-finding algorithm, as a derived class of
-          * impl::BracketingBase. It inherits the base functionality from impl::BracketingBase and adds the
-          * specific algorithm implementation for Ridder's method.
-          *
-          * @tparam FN The function object type for which to find the root.
-          * @requires FN must be invocable with a double as its argument type.
-          */
+    /**
+     * @brief Implements Ridder's method for root-finding.
+     *
+     * This class implements Ridder's method, a bracketing root-finding algorithm, as a derived class of
+     * impl::BracketingBase. It inherits the base functionality from impl::BracketingBase and adds the
+     * specific algorithm implementation for Ridder's method.
+     *
+     * @tparam FN The function object type for which to find the root.
+     * @requires FN must be invocable with a double as its argument type.
+     */
     template< typename FN >
     requires std::floating_point< std::invoke_result_t< FN, double > >
     class Ridder final : public impl::BracketingBase< Ridder< FN > >
@@ -310,7 +308,7 @@ namespace nxx::roots
     };
 
     template< typename FN >
-        requires std::invocable< FN, double >
+    requires std::invocable< FN, double >
     Ridder(FN func) -> Ridder< decltype(func) >;
 
     /**
@@ -369,7 +367,7 @@ namespace nxx::roots
     };
 
     template< typename FN >
-        requires std::invocable< FN, double >
+    requires std::invocable< FN, double >
     Bisection(FN func) -> Bisection< decltype(func) >;
 
     /**
@@ -434,7 +432,7 @@ namespace nxx::roots
     };
 
     template< typename FN >
-        requires std::invocable< FN, double >
+    requires std::invocable< FN, double >
     RegulaFalsi(FN func) -> RegulaFalsi< decltype(func) >;
 
     namespace impl

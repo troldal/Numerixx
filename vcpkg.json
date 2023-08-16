@@ -14,5 +14,8 @@
   }, {
     "name" : "fmt",
     "version>=" : "10.0.0"
+  }, {
+    "name" : "catch2",
+    "version>=" : "3.4.0"
   } ]
 }

@@ -1,14 +1,14 @@
 /*
-    o.     O O       o Oo      oO o.OOoOoo `OooOOo.  ooOoOOo o      O o      O
-    Oo     o o       O O O    o o  O        o     `o    O     O    o   O    o
-    O O    O O       o o  o  O  O  o        O      O    o      o  O     o  O
-    O  o   o o       o O   Oo   O  ooOO     o     .O    O       oO       oO
-    O   o  O o       O O        o  O        OOooOO'     o       Oo       Oo
-    o    O O O       O o        O  o        o    o      O      o  o     o  o
-    o     Oo `o     Oo o        O  O        O     O     O     O    O   O    O
-    O     `o  `OoooO'O O        o ooOooOoO  O      o ooOOoOo O      o O      o
+    888b      88  88        88  88b           d88  88888888888  88888888ba   88  8b        d8  8b        d8
+    8888b     88  88        88  888b         d888  88           88      "8b  88   Y8,    ,8P    Y8,    ,8P
+    88 `8b    88  88        88  88`8b       d8'88  88           88      ,8P  88    `8b  d8'      `8b  d8'
+    88  `8b   88  88        88  88 `8b     d8' 88  88aaaaa      88aaaaaa8P'  88      Y88P          Y88P
+    88   `8b  88  88        88  88  `8b   d8'  88  88"""""      88""""88'    88      d88b          d88b
+    88    `8b 88  88        88  88   `8b d8'   88  88           88    `8b    88    ,8P  Y8,      ,8P  Y8,
+    88     `8888  Y8a.    .a8P  88    `888'    88  88           88     `8b   88   d8'    `8b    d8'    `8b
+    88      `888   `"Y8888Y"'   88     `8'     88  88888888888  88      `8b  88  8P        Y8  8P        Y8
 
-    Copyright © 2023 Kenneth Troldal Balslev
+    Copyright © 2022 Kenneth Troldal Balslev
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the “Software”), to deal
@@ -33,9 +33,9 @@
 
 // ===== Numerixx Includes
 #include "PolynomialError.hpp"
+#include <Concepts.hpp>
 
 // ===== External Includes
-#include "../../.utils/Concepts.hpp"
 #include <tl/expected.hpp>
 
 // ===== Standard Library Includes
@@ -59,41 +59,41 @@ namespace nxx::poly
      * @tparam CONTAINER The container to check.
      */
     template< typename CONTAINER >
-    concept IsCoefficientContainer = (std::floating_point< typename CONTAINER::value_type > ||
-                                      IsComplex< typename CONTAINER::value_type >) &&
-                                     (std::bidirectional_iterator< typename CONTAINER::iterator >);
+    concept IsCoefficientContainer =
+        (std::floating_point< typename CONTAINER::value_type > ||
+         IsComplex< typename CONTAINER::value_type >)&&(std::bidirectional_iterator< typename CONTAINER::iterator >);
 
     /*
      * Forward declaration of the Polynomial class.
      */
     template< typename T >
-        requires std::floating_point< T > || IsComplex< T >
+    requires std::floating_point< T > || IsComplex< T >
     class Polynomial;
 
     /*
      * Forward declaration of the PolynomialTraits class.
      */
-    template<typename...>
+    template< typename... >
     struct PolynomialTraits;
 
     /*
      * Specialization of the PolynomialTraits class for Polynomial objects with floating point coefficients.
      */
-    template<typename T>
-//        requires std::floating_point< T >
-    struct PolynomialTraits<Polynomial<T>>
+    template< typename T >
+    //        requires std::floating_point< T >
+    struct PolynomialTraits< Polynomial< T > >
     {
-        using value_type = T;
+        using value_type       = T;
         using fundamental_type = T;
     };
 
     /*
      * Specialization of the PolynomialTraits class for Polynomial objects with complex coefficients.
      */
-    template<typename T>
-    struct PolynomialTraits<Polynomial<std::complex<T>>>
+    template< typename T >
+    struct PolynomialTraits< Polynomial< std::complex< T > > >
     {
-        using value_type = std::complex<T>;
+        using value_type       = std::complex< T >;
         using fundamental_type = T;
     };
 
@@ -109,7 +109,7 @@ namespace nxx::poly
      * point type or a type that satisfies the `utils::IsComplex` concept.
      */
     template< typename T >
-        requires std::floating_point< T > || IsComplex< T >
+    requires std::floating_point< T > || IsComplex< T >
     class Polynomial final
     {
         std::vector< T > m_coefficients; /**< The internal store of polynomial coefficients. */
@@ -133,10 +133,11 @@ namespace nxx::poly
          */
         explicit Polynomial(const IsCoefficientContainer auto& coefficients)
             : m_coefficients { coefficients.cbegin(),
-                               std::find_if(coefficients.crbegin(), coefficients.crend(), [](T val) { return val != 0.0; }).base() } {
-                if (m_coefficients.empty()) {
-                    m_coefficients.push_back(0.0);
-                }
+                               std::find_if(coefficients.crbegin(), coefficients.crend(), [](T val) { return val != 0.0; }).base() }
+        {
+            if (m_coefficients.empty()) {
+                m_coefficients.push_back(0.0);
+            }
         }
 
         /**
@@ -147,7 +148,9 @@ namespace nxx::poly
          *
          * @param coefficients The list of coefficients.
          */
-        Polynomial(std::initializer_list< T > coefficients) : Polynomial(std::vector< T >(coefficients)) {}
+        Polynomial(std::initializer_list< T > coefficients)
+            : Polynomial(std::vector< T >(coefficients))
+        {}
 
         /**
          * @brief Evaluates the polynomial at a given value.
@@ -173,23 +176,24 @@ namespace nxx::poly
          * @return The value of the polynomial at the specified input value.
          */
         template< typename U >
-            requires std::floating_point< U > || IsComplex< U >
-        [[nodiscard]] inline auto evaluate(U value) const
+        requires std::floating_point< U > || IsComplex< U >
+        [[nodiscard]]
+        inline auto evaluate(U value) const
         {
-                using TYPE = std::common_type_t< T, U >;
-                tl::expected< TYPE, error::PolynomialError > result;
+            using TYPE = std::common_type_t< T, U >;
+            tl::expected< TYPE, error::PolynomialError > result;
 
-                // ===== Horner's method implemented in terms of std::accummulate.
-                TYPE eval = std::accumulate(m_coefficients.crbegin() + 1,
-                                            m_coefficients.crend(),
-                                            static_cast< TYPE >(m_coefficients.back()),
-                                            [value](TYPE curr, TYPE coeff) { return curr * value + coeff; });
+            // ===== Horner's method implemented in terms of std::accummulate.
+            TYPE eval = std::accumulate(m_coefficients.crbegin() + 1,
+                                        m_coefficients.crend(),
+                                        static_cast< TYPE >(m_coefficients.back()),
+                                        [value](TYPE curr, TYPE coeff) { return curr * value + coeff; });
 
-                if (std::isfinite(abs(eval)))
-                    result = eval;
-                else
-                    result = tl::make_unexpected(error::PolynomialError { "Computation of polynomial gave non-finite result." });
-                return result;
+            if (std::isfinite(abs(eval)))
+                result = eval;
+            else
+                result = tl::make_unexpected(error::PolynomialError { "Computation of polynomial gave non-finite result." });
+            return result;
         }
 
         /**
@@ -197,7 +201,11 @@ namespace nxx::poly
          *
          * @return A constant reference to the vector of coefficients.
          */
-        [[nodiscard]] const auto& coefficients() const { return m_coefficients; }
+        [[nodiscard]]
+        const auto& coefficients() const
+        {
+            return m_coefficients;
+        }
 
         /**
          * @brief Gets the coefficients of the polynomial as a container of a different type.
@@ -209,8 +217,9 @@ namespace nxx::poly
          * @return The container of coefficients.
          */
         template< typename CONTAINER >
-            requires IsCoefficientContainer< CONTAINER >
-        [[nodiscard]] CONTAINER coefficients() const
+        requires IsCoefficientContainer< CONTAINER >
+        [[nodiscard]]
+        CONTAINER coefficients() const
         {
             return CONTAINER { m_coefficients.cbegin(), m_coefficients.cend() };
         }
@@ -224,7 +233,8 @@ namespace nxx::poly
          *
          * @return A string representation of the polynomial.
          */
-        [[nodiscard]] std::string asString() const
+        [[nodiscard]]
+        std::string asString() const
         {
             std::ostringstream oss;
 
@@ -233,18 +243,30 @@ namespace nxx::poly
                 oss << m_coefficients.front();
                 for (size_t i = 1; i < m_coefficients.size(); ++i) {
                     auto coeff = m_coefficients[i];
-                    if constexpr (!IsComplex< T > ) {
-                        if (coeff == 0.0) { continue; }
-                        else if (coeff > 0.0) { oss << " + "; }
-                        else { oss << " - "; }
+                    if constexpr (!IsComplex< T >) {
+                        if (coeff == 0.0) {
+                            continue;
+                        }
+                        else if (coeff > 0.0) {
+                            oss << " + ";
+                        }
+                        else {
+                            oss << " - ";
+                        }
                         oss << abs(coeff) << "x";
                     }
                     else {
-                        if (abs(coeff) == 0.0) { continue; }
-                        else { oss << " + "; }
+                        if (abs(coeff) == 0.0) {
+                            continue;
+                        }
+                        else {
+                            oss << " + ";
+                        }
                         oss << coeff << "x";
                     }
-                    if (i >= 2) { oss << "^" << i; }
+                    if (i >= 2) {
+                        oss << "^" << i;
+                    }
                 }
             }
             return oss.str();
@@ -257,7 +279,11 @@ namespace nxx::poly
          *
          * @return The order of the polynomial.
          */
-        [[nodiscard]] auto order() const { return m_coefficients.size() - 1; }
+        [[nodiscard]]
+        auto order() const
+        {
+            return m_coefficients.size() - 1;
+        }
 
         /**
          * @brief Adds another polynomial to this polynomial.
@@ -340,7 +366,6 @@ namespace nxx::poly
         auto begin() const { return m_coefficients.cbegin(); }
         auto cbegin() const { return m_coefficients.cbegin(); }
 
-
         /**
          * @brief Returns a const iterator to the end of the coefficients container of the Polynomial.
          *
@@ -359,8 +384,8 @@ namespace nxx::poly
     /*
      * Deduction guide for using arbitrary containers for coefficient input.
      */
-    template < typename CONTAINER >
-        requires IsCoefficientContainer< CONTAINER >
+    template< typename CONTAINER >
+    requires IsCoefficientContainer< CONTAINER >
     Polynomial(CONTAINER coefficients) -> Polynomial< typename decltype(coefficients)::value_type >;
 
     /**
@@ -388,13 +413,15 @@ namespace nxx::poly
     {
         if (func.order() == 0) throw error::PolynomialError("Cannot differentiate a constant polynomial.");
 
-        using VALUE_TYPE   = typename PolynomialTraits< decltype(func) >::value_type;
-        using FLOAT_TYPE   = typename PolynomialTraits< decltype(func) >::fundamental_type;
+        using VALUE_TYPE = typename PolynomialTraits< decltype(func) >::value_type;
+        using FLOAT_TYPE = typename PolynomialTraits< decltype(func) >::fundamental_type;
 
         std::vector< VALUE_TYPE > coefficients { func.coefficients().cbegin() + 1, func.coefficients().cend() };
 
         int n = 1;
-        std::transform(coefficients.cbegin(), coefficients.cend(), coefficients.begin(), [&n](VALUE_TYPE elem) { return elem * static_cast<FLOAT_TYPE>(n++); });
+        std::transform(coefficients.cbegin(), coefficients.cend(), coefficients.begin(), [&n](VALUE_TYPE elem) {
+            return elem * static_cast< FLOAT_TYPE >(n++);
+        });
         return Polynomial(coefficients);
     }
 
@@ -510,18 +537,18 @@ namespace nxx::poly
     {
         using TYPE = std::common_type_t< T, U >;
 
-        std::vector<TYPE> dividend = lhs.coefficients();
-        std::vector<TYPE> divisor = rhs.coefficients();
-        std::vector<TYPE> remainder {};
+        std::vector< TYPE > dividend = lhs.coefficients();
+        std::vector< TYPE > divisor  = rhs.coefficients();
+        std::vector< TYPE > remainder {};
 
         if (divisor.empty() || divisor.back() == 0.0 || rhs.order() > lhs.order())
             throw error::PolynomialError("Invalid divisor polynomial");
 
-        std::vector<TYPE> quotient(lhs.order() - rhs.order() + 1, 0);
+        std::vector< TYPE > quotient(lhs.order() - rhs.order() + 1, 0);
         remainder = dividend;
 
         for (std::size_t i = lhs.order(); i >= rhs.order() && i < dividend.size(); --i) {
-            TYPE coef = remainder[i] / divisor.back();
+            TYPE coef                 = remainder[i] / divisor.back();
             quotient[i - rhs.order()] = coef;
 
             for (std::size_t j = 0; j <= rhs.order(); ++j) {
@@ -529,7 +556,8 @@ namespace nxx::poly
             }
         }
 
-        remainder.erase(std::find_if(remainder.crbegin(), remainder.crend(), [](TYPE val) { return val != 0.0; }).base() + 1, remainder.end());
+        remainder.erase(std::find_if(remainder.crbegin(), remainder.crend(), [](TYPE val) { return val != 0.0; }).base() + 1,
+                        remainder.end());
 
         return std::make_pair(Polynomial(quotient), Polynomial(remainder));
     }

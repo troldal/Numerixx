@@ -15,7 +15,7 @@ Numerixx is a header-only C++ library that prioritizes ease of use and encapsula
 1. Clone the Numerixx repository:
 
    ```bash
-   git clone https://github.com/yourusername/numerixx.git
+   git clone https://github.com/troldal/numerixx.git
     ```
 2. Add the `include` directory to your project's include path.
 3. Include the desired header files in your source code.

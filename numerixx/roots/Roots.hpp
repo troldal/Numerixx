@@ -28,7 +28,6 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-
 #ifndef NUMERIXX_ROOTS_HPP
 #define NUMERIXX_ROOTS_HPP
 
@@ -37,4 +36,3 @@
 #include "impl/RootSearching.hpp"
 
 #endif    // NUMERIXX_ROOTS_HPP
-

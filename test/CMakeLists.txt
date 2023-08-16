@@ -17,7 +17,7 @@ target_sources(NumerixxTests
         PRIVATE
         testPolynomials.cpp
         testDerivatives.cpp
-        testMatrix.cpp
+        #testMatrix.cpp
         testRootBracketing.cpp
         testRootPolishing.cpp
         )

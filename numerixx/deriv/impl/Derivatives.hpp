@@ -1,14 +1,14 @@
 /*
-    o.     O O       o Oo      oO o.OOoOoo `OooOOo.  ooOoOOo o      O o      O
-    Oo     o o       O O O    o o  O        o     `o    O     O    o   O    o
-    O O    O O       o o  o  O  O  o        O      O    o      o  O     o  O
-    O  o   o o       o O   Oo   O  ooOO     o     .O    O       oO       oO
-    O   o  O o       O O        o  O        OOooOO'     o       Oo       Oo
-    o    O O O       O o        O  o        o    o      O      o  o     o  o
-    o     Oo `o     Oo o        O  O        O     O     O     O    O   O    O
-    O     `o  `OoooO'O O        o ooOooOoO  O      o ooOOoOo O      o O      o
+    888b      88  88        88  88b           d88  88888888888  88888888ba   88  8b        d8  8b        d8
+    8888b     88  88        88  888b         d888  88           88      "8b  88   Y8,    ,8P    Y8,    ,8P
+    88 `8b    88  88        88  88`8b       d8'88  88           88      ,8P  88    `8b  d8'      `8b  d8'
+    88  `8b   88  88        88  88 `8b     d8' 88  88aaaaa      88aaaaaa8P'  88      Y88P          Y88P
+    88   `8b  88  88        88  88  `8b   d8'  88  88"""""      88""""88'    88      d88b          d88b
+    88    `8b 88  88        88  88   `8b d8'   88  88           88    `8b    88    ,8P  Y8,      ,8P  Y8,
+    88     `8888  Y8a.    .a8P  88    `888'    88  88           88     `8b   88   d8'    `8b    d8'    `8b
+    88      `888   `"Y8888Y"'   88     `8'     88  88888888888  88      `8b  88  8P        Y8  8P        Y8
 
-    Copyright © 2023 Kenneth Troldal Balslev
+    Copyright © 2022 Kenneth Troldal Balslev
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the “Software”), to deal
@@ -35,8 +35,8 @@
 #include <Poly.hpp>
 
 // ===== External Includes
-#include <tl/expected.hpp>
 #include <gcem.hpp>
+#include <tl/expected.hpp>
 
 // ===== Standard Library Includes
 #include <cassert>
@@ -50,11 +50,18 @@
 namespace nxx::deriv
 {
 
+    /**
+     * @brief The DerivativeError class.
+     *
+     * This class is a custom exception class that is derived from std::runtime_error.
+     * It represents an error that occurs during the computation of a derivative.
+     */
     class DerivativeError : public std::runtime_error
     {
     public:
         explicit DerivativeError(const char* msg)
-            : std::runtime_error(msg) {}
+            : std::runtime_error(msg)
+        {}
     };
 
     template< typename FN >
@@ -71,14 +78,14 @@ namespace nxx::deriv
     using ReturnType = std::invoke_result_t< T, double >;
 
     template< typename T >
-        requires std::floating_point< T >
+    requires std::floating_point< T >
     struct StepSizeHelper
     {
         static constexpr T value = gcem::pow(std::numeric_limits< T >::epsilon(), 1.0 / 3.0);
     };
 
     template< typename T >
-        requires std::floating_point< T >
+    requires std::floating_point< T >
     inline constexpr T StepSize = StepSizeHelper< T >::value;
 
     // ====================================================================
@@ -504,7 +511,7 @@ namespace nxx::deriv
                      ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
         tl::expected< ReturnType< decltype(function) >, DerivativeError > result;
-        auto                                                              deriv = ALGO {}(function, val, std::max(stepsize, stepsize * val));
+        auto deriv = ALGO {}(function, val, std::max(stepsize, stepsize * val));
 
         if (std::isfinite(deriv))
             result = deriv;
@@ -523,7 +530,7 @@ namespace nxx::deriv
      * a \c DerivativeError exception object describing the error.
      */
     template< typename FN >
-        requires IsFunction< FN >
+    requires IsFunction< FN >
     inline auto central(FN                               function,
                         ReturnType< decltype(function) > val,
                         ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
