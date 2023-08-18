@@ -161,19 +161,6 @@ int main() {
 
     std::cout << "\nReal roots of the complex polynomial (specified by template parameter): " << poly2.asString() << std::endl;
     for (auto root : polysolve<double>(poly2)) std::cout << root << "\n"; // Will print the real roots (complex roots will be ignored)
-//
-//    using CoefficientList = std::vector<double>;
-//
-//    auto coefficients = std::vector< CoefficientList > { { 5.7, 1.6, -3.2, 2.5 },
-//                                                         { -1.2, 0.8, -2.7, 4.0 },
-//                                                         { 2.4, -1.8, 3.2, -2.1, 5.3 },
-//                                                         { 3.9, -0.8, 2.6, -1.2, 3.7 },
-//                                                         { -0.9, 0.8, -2.4, 1.6, -3.1, 2.8 },
-//                                                         { 1.7, 0.6, -2.6, 3.2, -1.9, 4.5 },
-//                                                         { 0.7, -1.1, 2.4, -3.2, 1.8, -4.5, 6.2 },
-//                                                         { 0.6, -0.9, 1.8, -2.3, 1.2, -3.7, 2.1 },
-//                                                         { -0.6, 0.8, -1.2, 2.7, -3.5, 1.8, -4.2, 5.5 } };
-
 
     return 0;
 }

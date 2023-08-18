@@ -34,8 +34,8 @@
 namespace nxx
 {
 
-    constexpr int    MAXITER = 100;
-    constexpr double EPS     = 1.0E-8;
+    constexpr int    MAXITER = 100;    // Maximum number of iterations
+    constexpr double EPS     = 1.0E-8; // Tolerance for convergence
 
 }    // namespace nxx
 

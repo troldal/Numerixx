@@ -44,10 +44,17 @@ namespace nxx::error
     class PolynomialError : public std::runtime_error
     {
     public:
-        explicit PolynomialError(const char* msg)
+        // Takes a lvalue reference (std::string) and just copy it to base class
+        explicit PolynomialError(const std::string& msg)
+            : std::runtime_error(msg)
+        {}
+
+        // Takes a rvalue reference (std::string) and move it to base class
+        explicit PolynomialError(std::string&& msg)
             : std::runtime_error(msg)
         {}
     };
+
 
 }    // namespace nxx::error
 

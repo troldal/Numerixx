@@ -37,9 +37,21 @@
 namespace nxx
 {
 
+    /**
+     * @brief Concept to check if a type is a complex number.
+     * @tparam T The type to check.
+     */
     template< typename T >
-    concept IsComplex = std::same_as< T, std::complex< typename T::value_type > >;
+    concept IsComplex = requires(T x) {
+                            typename T::value_type;
+                            {
+                                std::real(x)
+                            } -> std::floating_point;
+                            {
+                                std::imag(x)
+                            } -> std::floating_point;
+                        };
 
-}
+}    // namespace nxx
 
 #endif    // NUMERIXX_CONCEPTS_HPP

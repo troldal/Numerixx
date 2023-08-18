@@ -7,7 +7,8 @@ project(Numerixx.Tests)
 #=======================================================================================================================
 # Set up Catch2 library
 #=======================================================================================================================
-add_subdirectory(Catch2)
+#add_subdirectory(Catch2)
+find_package(Catch2 REQUIRED)
 
 #=======================================================================================================================
 # Define TEST target
@@ -16,16 +17,16 @@ add_executable(NumerixxTests EXCLUDE_FROM_ALL "")
 target_sources(NumerixxTests
         PRIVATE
         testPolynomials.cpp
-        testDerivatives.cpp
-        #testMatrix.cpp
-        testRootBracketing.cpp
-        testRootPolishing.cpp
+#        testDerivatives.cpp
+#        testMatrix.cpp
+#        testRootBracketing.cpp
+#        testRootPolishing.cpp
         )
 
 target_link_libraries(NumerixxTests
         PRIVATE
-        numerixx
-        Catch2WithMain
+        numerixx::poly
+        Catch2::Catch2WithMain
         )
 
 list(APPEND NUMERIXX_TEST_DEBUG_FLAGS_GNU

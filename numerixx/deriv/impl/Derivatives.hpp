@@ -64,6 +64,10 @@ namespace nxx::deriv
         {}
     };
 
+    /**
+     * @brief Concept checking whether a type is a callable function object that returns a floating point type.
+     * @tparam FN The type to check.
+     */
     template< typename FN >
     concept IsFunction = requires(FN fn) {
                              {
@@ -71,12 +75,23 @@ namespace nxx::deriv
                              } -> std::floating_point;
                          };
 
+    /**
+     * @brief Concept checking whether a type is a solver object.
+     * @tparam SOLVER The type to check.
+     */
     template< typename SOLVER >
     concept IsSolver = std::invocable< SOLVER, std::function< double(double) >, double, double >;
 
+    /**
+     * @brief Alias template for the return type of a function.
+     */
     template< typename T >
     using ReturnType = std::invoke_result_t< T, double >;
 
+    /**
+     * @brief Alias template for determining the step size for a given type when computing numerical derivatives.
+     * @tparam T The type for which to compute the step size.
+     */
     template< typename T >
     requires std::floating_point< T >
     struct StepSizeHelper
@@ -84,6 +99,10 @@ namespace nxx::deriv
         static constexpr T value = gcem::pow(std::numeric_limits< T >::epsilon(), 1.0 / 3.0);
     };
 
+    /**
+     * @brief Constant expression for the step size used when computing numerical derivatives.
+     * @tparam T The type for which to compute the step size.
+     */
     template< typename T >
     requires std::floating_point< T >
     inline constexpr T StepSize = StepSizeHelper< T >::value;

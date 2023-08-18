@@ -176,7 +176,7 @@ namespace nxx::poly
          * @return The value of the polynomial at the specified input value.
          */
         template< typename U >
-        requires std::floating_point< U > || IsComplex< U >
+        requires std::convertible_to<U, T> || std::floating_point< U > || IsComplex< U >
         [[nodiscard]]
         inline auto evaluate(U value) const
         {
@@ -187,7 +187,7 @@ namespace nxx::poly
             TYPE eval = std::accumulate(m_coefficients.crbegin() + 1,
                                         m_coefficients.crend(),
                                         static_cast< TYPE >(m_coefficients.back()),
-                                        [value](TYPE curr, TYPE coeff) { return curr * value + coeff; });
+                                        [value](TYPE curr, TYPE coeff) { return curr * static_cast<TYPE>(value) + coeff; });
 
             if (std::isfinite(abs(eval)))
                 result = eval;
@@ -400,28 +400,35 @@ namespace nxx::poly
     concept IsPolynomial = std::same_as< POLY, Polynomial< typename POLY::value_type > >;
 
     /**
-     * @brief Computes the derivative of a polynomial.
+     * @brief Computes the derivative of a given polynomial function.
      *
-     * This function computes the derivative of the given polynomial and returns the result
-     * as a new polynomial. The derivative of a polynomial f(x) of degree n is given by
-     * f'(x) = a_1 + 2 a_2 x + ... + n a_n x^{n-1}.
+     * This function takes as an input a polynomial (assumed by the "IsPolynomial auto" parameter type),
+     * and computes its derivative. This is done using the power rule of differentiation,
+     * which states that d/dx[aX^n] = a*n*X^(n-1), where a is a coefficient and n is the power of each term in the polynomial.
+     * If the input function is a constant (i.e., it has an order of 0), it throws an error as constants do not have meaningful derivatives.
      *
-     * @param func The polynomial to differentiate.
-     * @return The derivative of the polynomial.
+     * @param func The polynomial function to compute the derivative of.
+     * @return A polynomial function, which is the derivative of the input function.
+     * @throws error::PolynomialError if the input polynomial is constant.
      */
     inline auto derivativeOf(IsPolynomial auto func)
     {
+        // Throw an error if the order of the polynomial function is 0 (i.e., the function is constant).
         if (func.order() == 0) throw error::PolynomialError("Cannot differentiate a constant polynomial.");
 
-        using VALUE_TYPE = typename PolynomialTraits< decltype(func) >::value_type;
-        using FLOAT_TYPE = typename PolynomialTraits< decltype(func) >::fundamental_type;
+        using VALUE_TYPE = typename PolynomialTraits< decltype(func) >::value_type; // This is the type of the coefficients of the polynomial.
+        using FLOAT_TYPE = typename PolynomialTraits< decltype(func) >::fundamental_type; // This is the type of the exponents and other arithmetic operations in the polynomial.
 
+        // Get a list of the coefficients of the input polynomial, skipping the first one (which corresponds to the constant term).
         std::vector< VALUE_TYPE > coefficients { func.coefficients().cbegin() + 1, func.coefficients().cend() };
 
         int n = 1;
+        // Compute the derivative of each term in the polynomial using the power rule, and store them back in the 'coefficients' vector.
         std::transform(coefficients.cbegin(), coefficients.cend(), coefficients.begin(), [&n](VALUE_TYPE elem) {
-            return elem * static_cast< FLOAT_TYPE >(n++);
+            return elem * static_cast< FLOAT_TYPE >(n++); // d/dx[aX^n] = a*n*X^(n-1)
         });
+
+        // Return a new polynomial that represents the derivative of the input function.
         return Polynomial(coefficients);
     }
 
@@ -431,25 +438,38 @@ namespace nxx::poly
      * This operator adds the given two polynomials and returns the result as a new polynomial.
      * The degree of the result will be equal to the maximum degree of the two polynomials.
      *
-     * @tparam T The type of the coefficients of the first polynomial.
-     * @tparam U The type of the coefficients of the second polynomial.
-     * @param lhs The first polynomial to add.
-     * @param rhs The second polynomial to add.
-     * @return The sum of the two polynomials.
+     * @tparam T The type of the first operand. Can be any type.
+     * @tparam U The type of the second operand. Can be any type.
+     * @param lhs The first operand, a Polynomial.
+     * @param rhs The second operand, a Polynomial.
+     *
+     * @returns An object of type Polynomial that represents the sum of lhs and rhs.
      */
     template< typename T, typename U >
     auto operator+(Polynomial< T > const& lhs, Polynomial< U > const& rhs)
     {
+        // Determine the common type between T and U
         using TYPE = std::common_type_t< T, U >;
 
+        // Check if lhs's degree is less than rhs's degree
         if (lhs.order() < rhs.order()) {
+            // Copy rhs's coefficients to add to
             auto coeffs = rhs.coefficients();
+
+            // Add lhs's coefficients to copied rhs's coefficients one by one
             std::transform(lhs.coefficients().cbegin(), lhs.coefficients().cend(), coeffs.cbegin(), coeffs.begin(), std::plus< TYPE >());
+
+            // Return a Polynomial constructed from the resulting coefficients
             return Polynomial(coeffs);
         }
         else {
+            // Copy lhs's coefficients to add to
             auto coeffs = lhs.coefficients();
+
+            // Add rhs's coefficients to copied lhs's coefficients one by one
             std::transform(rhs.coefficients().cbegin(), rhs.coefficients().cend(), coeffs.cbegin(), coeffs.begin(), std::plus< TYPE >());
+
+            // Return a Polynomial constructed from the resulting coefficients
             return Polynomial(coeffs);
         }
     }
@@ -461,29 +481,42 @@ namespace nxx::poly
      * the result as a new polynomial. The degree of the result will be equal to the maximum
      * degree of the two polynomials.
      *
-     * @tparam T The type of the coefficients of the first polynomial.
-     * @tparam U The type of the coefficients of the second polynomial.
-     * @param lhs The polynomial to subtract from.
-     * @param rhs The polynomial to subtract.
-     * @return The difference between the two polynomials.
+     * @tparam T The type of the first operand. Can be any type.
+     * @tparam U The type of the second operand. Can be any type.
+     * @param lhs The first operand, a Polynomial.
+     * @param rhs The second operand, a Polynomial.
+     *
+     * @returns An object of type Polynomial that represents the difference of lhs and rhs.
      */
     template< typename T, typename U >
     auto operator-(Polynomial< T > const& lhs, Polynomial< U > const& rhs)
     {
+        // Determine the common type between T and U
         using TYPE = std::common_type_t< T, U >;
 
+        // Check if lhs's degree is less than rhs's degree
         if (lhs.order() < rhs.order()) {
+            // Copy rhs's coefficients to subtract from
             auto coeffs = rhs.coefficients();
+
+            // Subtract lhs's coefficients from copied rhs's coefficients one by one
             std::transform(lhs.coefficients().cbegin(), lhs.coefficients().cend(), coeffs.cbegin(), coeffs.begin(), [](TYPE a, TYPE b) {
                 return b - a;
             });
+
+            // Return a Polynomial constructed from the resulting coefficients
             return Polynomial(coeffs);
         }
         else {
+            // Copy lhs's coefficients to subtract from
             auto coeffs = lhs.coefficients();
+
+            // Subtract rhs's coefficients from copied lhs's coefficients one by one
             std::transform(rhs.coefficients().cbegin(), rhs.coefficients().cend(), coeffs.cbegin(), coeffs.begin(), [](TYPE a, TYPE b) {
                 return a - b;
             });
+
+            // Return a Polynomial constructed from the resulting coefficients
             return Polynomial(coeffs);
         }
     }
@@ -495,27 +528,43 @@ namespace nxx::poly
      * polynomial. The degree of the result will be equal to the sum of the degrees of the
      * two polynomials.
      *
-     * @tparam T The type of the coefficients of the first polynomial.
-     * @tparam U The type of the coefficients of the second polynomial.
-     * @param lhs The first polynomial to multiply.
-     * @param rhs The second polynomial to multiply.
-     * @return The product of the two polynomials.
+     * @tparam T The type of the first operand. Can be any type.
+     * @tparam U The type of the second operand. Can be any type.
+     * @param lhs The first operand, a Polynomial.
+     * @param rhs The second operand, a Polynomial.
+     *
+     * @returns An object of type Polynomial that represents the product of lhs and rhs.
      */
     template< typename T, typename U >
     auto operator*(Polynomial< T > const& lhs, Polynomial< U > const& rhs)
     {
+        // Determine the common type between T and U
         using TYPE = std::common_type_t< T, U >;
 
+        // Initialize a structure to contain the result
+        // The degree of the product is the sum of degrees of multipliers (plus one for the constant term)
         std::vector< TYPE > result(lhs.order() + rhs.order() + 1, 0.0);
 
+        // Counter for the number of terms already processed
         int counter = 0;
+
+        // Iterate over every term in the RHS polynomial
         for (auto elem : rhs.coefficients()) {
+            // Get a copy of the LHS coefficients
             std::vector< TYPE > subtractor(lhs.coefficients().cbegin(), lhs.coefficients().cend());
+
+            // Multiply each term in LHS by the current term in RHS
             std::transform(subtractor.cbegin(), subtractor.cend(), subtractor.begin(), [=](TYPE val) { return val * elem; });
+
+            // Add the resulting terms to the result polynomial, taking into consideration their respective powers
+            // (represented by the 'counter' variable)
             std::transform(subtractor.cbegin(), subtractor.cend(), result.begin() + counter, result.begin() + counter, std::plus< TYPE >());
+
+            // Advance the counter
             ++counter;
         }
 
+        // Return a Polynomial constructed from the resulting coefficients
         return Polynomial(result);
     }
 
@@ -526,39 +575,52 @@ namespace nxx::poly
      * quotient and remainder as a pair of polynomials. The degree of the remainder will be
      * less than the degree of the second polynomial.
      *
-     * @tparam T The type of the coefficients of the first polynomial.
-     * @tparam U The type of the coefficients of the second polynomial.
-     * @param lhs The polynomial to divide.
-     * @param rhs The polynomial to divide by.
-     * @return The quotient and remainder of the two polynomials.
+     * @tparam T The type of the first operand. Can be any type.
+     * @tparam U The type of the second operand. Can be any type.
+     * @param lhs The first operand, the dividend (polynomial to be divided).
+     * @param rhs The second operand, the divisor (polynomial to divide by).
+     *
+     * @return a pair of polynomials for quotient and remainder respectively.
+     *
+     * @throws error::PolynomialError when invalid divisor polynomial is passed i.e it either handles singleton case when
+     * the divisor doesn't have coefficients or the polynomial order of divisor is larger than the dividend.
      */
     template< typename T, typename U >
     auto divide(Polynomial< T > const& lhs, Polynomial< U > const& rhs)
     {
+        // Determine the type of polynomial which is common between T and U
         using TYPE = std::common_type_t< T, U >;
 
+        // The coefficients of the polynomials
         std::vector< TYPE > dividend = lhs.coefficients();
         std::vector< TYPE > divisor  = rhs.coefficients();
         std::vector< TYPE > remainder {};
 
+        // Handle singleton case when divisor doesn't have coefficients or
+        // when polynomial order of divisor is larger than the dividend
         if (divisor.empty() || divisor.back() == 0.0 || rhs.order() > lhs.order())
             throw error::PolynomialError("Invalid divisor polynomial");
 
+        // Initialize the quotient polynomial coefficients with 0
         std::vector< TYPE > quotient(lhs.order() - rhs.order() + 1, 0);
         remainder = dividend;
 
+        // Iteratively compute the coefficients of the quotient polynomial
         for (std::size_t i = lhs.order(); i >= rhs.order() && i < dividend.size(); --i) {
             TYPE coef                 = remainder[i] / divisor.back();
             quotient[i - rhs.order()] = coef;
 
+            // For each coefficient in the divisor subtract coef*divisor from the dividend (remainder)
             for (std::size_t j = 0; j <= rhs.order(); ++j) {
                 remainder[i - j] -= coef * divisor[rhs.order() - j];
             }
         }
 
+        // Trim the leading zeros in the remainder
         remainder.erase(std::find_if(remainder.crbegin(), remainder.crend(), [](TYPE val) { return val != 0.0; }).base() + 1,
                         remainder.end());
 
+        // Return the quotient and the remainder as a pair
         return std::make_pair(Polynomial(quotient), Polynomial(remainder));
     }
 
