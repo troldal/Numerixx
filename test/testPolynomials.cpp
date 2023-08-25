@@ -12,6 +12,7 @@
 #include <functional>
 #include <numbers>
 #include <vector>
+#include <deque>
 
 //TEST_CASE("nxx::poly - Polynomials with real coefficients and real roots", "[polynomials]")
 //{
@@ -64,11 +65,19 @@ TEST_CASE("Polynomial class tests", "[Polynomial]")
         Polynomial<std::complex<double>> p1({{1, 2}, {2, -1}, {-3, -4}});
         REQUIRE(p1.order() == 2);
         REQUIRE(p1.coefficients() == std::vector<std::complex<double>>{{1, 2}, {2, -1}, {-3, -4}});
+        REQUIRE(p1.coefficients<std::deque<std::complex<double>>>() == std::deque<std::complex<double>>{{1, 2}, {2, -1}, {-3, -4}});
+        auto c1 = std::vector<std::complex<double>>(p1.begin(), p1.end());
+        REQUIRE(c1 == std::vector<std::complex<double>>{{1, 2}, {2, -1}, {-3, -4}});
+
+
 
         // Test using double as coefficients
         Polynomial p2({6.0, -5.0, 1.0});
         REQUIRE(p2.order() == 2);
         REQUIRE(p2.coefficients() == std::vector<double>{6.0, -5.0, 1.0});
+        REQUIRE(p2.coefficients<std::deque<double>>() == std::deque<double>{6.0, -5.0, 1.0});
+        auto c2 = std::vector<double>(p2.begin(), p2.end());
+        REQUIRE(c2 == std::vector<double>{6.0, -5.0, 1.0});
     }
 
     SECTION("Evaluation tests")
@@ -107,59 +116,95 @@ TEST_CASE("Polynomial class tests", "[Polynomial]")
         REQUIRE_THAT(p2(-1.0 + 1.0i).imag(), Catch::Matchers::WithinAbs(-7.0, 1.0e-12));
     }
 
-//    SECTION("Arithmetic Operations tests")
-//    {
-//        Polynomial<double> p1({1, 2, 3});
-//        Polynomial<double> p2({4, 5, 6});
-//
-//        auto p3 = p1 + p2;
-//        REQUIRE(p3.coefficients() == std::vector<double>{5, 7, 9});
-//        // Similarly for subtraction, multiplication, and division
-//    }
-//
-//    SECTION("Order and Coefficient Tests")
-//    {
-//        Polynomial<double> p1({0.0, 0.0, 1, 2, 3});
-//        REQUIRE(p1.order() == 2);
-//        REQUIRE(p1.coefficients() == std::vector<double>{1, 2, 3});
-//    }
-//
-//    SECTION("Derivative Tests")
-//    {
-//        Polynomial<double> p1({1, 3, 3});
-//        auto p2 = derivativeOf(p1);
-//        REQUIRE(p2.coefficients() == std::vector<double>{3, 6});
-//        // Test with other degrees
-//    }
-//
-//    SECTION("String Representation Tests")
-//    {
-//        Polynomial<double> p1({1, 2, 3});
-//        REQUIRE(p1.asString() == "1 + 2x + 3x^2");
-//    }
-//
-//    SECTION("Rest of the Operator Overloads")
-//    {
-//        Polynomial<double> p1({1, 2, 3});
-//        Polynomial<double> p2({3, 2, 1});
-//
-//        p1 += p2;
-//        REQUIRE(p1 == Polynomial<double>{4, 4, 4});
-//        // Similarly for other operators
-//    }
-//
-//    SECTION("Boundary Tests")
-//    {
-//        Polynomial<double> p1({0.0, 0.0, 0.0});
-//        REQUIRE(p1.order() == 0);
-//        REQUIRE(p1.coefficients() == std::vector<double>{0.0});
-//    }
-//
-//    SECTION("Error Handling Tests")
-//    {
-//        Polynomial<double> p1({1, 2, 3});
-//        Polynomial<double> p2({0.0, 0.0, 0.0});
-//
-//        REQUIRE_THROWS_AS(p1 / p2, PolynomialError);
-//    }
+    SECTION("Arithmetic Operations tests")
+    {
+        Polynomial<double> p1({1, 2, 3});
+        Polynomial<double> p2({4, 5, 6});
+        Polynomial<double> p3({5, 6, 7, 8});
+
+        auto p4 = p1 + p2;
+        REQUIRE(p4.coefficients() == std::vector<double>{5, 7, 9});
+        p4 = p2;
+        p4 += p3;
+        REQUIRE(p4.coefficients() == std::vector<double>{9, 11, 13, 8});
+
+        auto p5 = p1 - p2;
+        REQUIRE(p5.coefficients() == std::vector<double>{-3, -3, -3});
+        p5 = p2;
+        p5 -= p3;
+        REQUIRE(p5.coefficients() == std::vector<double>{-1, -1, -1, 8});
+
+        auto p6 = p1 * p2;
+        REQUIRE(p6.coefficients() == std::vector<double>{4, 13, 28, 27, 18});
+        p6 = p2;
+        p6 *= p3;
+        REQUIRE(p6.coefficients() == std::vector<double>{20, 49, 88, 103, 82, 48});
+
+        auto p7 = p1 / p2;
+        REQUIRE(p7.coefficients() == std::vector<double>{0.5});
+        p7 = p1;
+        p7 /= p2;
+        REQUIRE(p7.coefficients() == std::vector<double>{0.5});
+
+        auto p8 = p1 % p2;
+        REQUIRE(p8.coefficients() == std::vector<double>{-1, -0.5});
+
+        // todo: Test with other comlex types
+        // todo: Test with cross-type operations
+    }
+
+    SECTION("Order and Coefficient Tests")
+    {
+        // Test using std::complex<double> as coefficients
+        Polynomial<std::complex<double> > p1({1.0+1i, 2.0+1i, 3.0+1i, 0.0+0i, 0.0+0i});
+        REQUIRE(p1.order() == 2);
+        REQUIRE(p1.coefficients() == std::vector<std::complex<double>>{1.0+1i, 2.0+1i, 3.0+1i});
+
+        // Test using double as coefficients
+        Polynomial p2({1.0, 2.0, 3.0, 0.0, 0.0});
+        REQUIRE(p2.order() == 2);
+        REQUIRE(p2.coefficients() == std::vector<double>{1.0, 2.0, 3.0});
+
+        // Test with zero coefficients (a constant term of 0.0 is added implicitly)
+        Polynomial p3({});
+        REQUIRE(p3.order() == 0);
+        REQUIRE(p3.coefficients() == std::vector<double>{0.0});
+
+        // Test equality and inequality
+        REQUIRE(p1 == p1);
+        REQUIRE(p2 == p2);
+        REQUIRE(p3 == p3);
+        REQUIRE(p2 != p3);
+    }
+
+    SECTION("Derivative Tests")
+    {
+        Polynomial<double> p1({1, 3, 3});
+        auto p2 = derivativeOf(p1);
+        REQUIRE(p2.coefficients() == std::vector<double>{3, 6});
+
+        // todo: Test with other degrees
+        // todo: Test with complex coefficients
+    }
+
+    SECTION("String Representation Tests")
+    {
+        Polynomial<double> p1({1, 2, 3});
+        REQUIRE(p1.asString() == "1 + 2x + 3x^2");
+    }
+
+    SECTION("Boundary Tests")
+    {
+        Polynomial<double> p1({0.0, 0.0, 0.0});
+        REQUIRE(p1.order() == 0);
+        REQUIRE(p1.coefficients() == std::vector<double>{0.0});
+    }
+
+    SECTION("Error Handling Tests")
+    {
+        Polynomial<double> p1({1, 2, 3});
+        Polynomial<double> p2({0.0, 0.0, 0.0});
+
+        REQUIRE_THROWS_AS(p1 / p2, PolynomialError);
+    }
 }

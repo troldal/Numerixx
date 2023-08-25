@@ -108,7 +108,7 @@ namespace nxx::poly
      * @tparam T The type of the polynomial coefficients. This must be a floating
      * point type or a type that satisfies the `utils::IsComplex` concept.
      */
-    template< typename T >
+    template< typename T = double>
     requires std::floating_point< T > || IsComplex< T >
     class Polynomial final
     {
@@ -353,6 +353,23 @@ namespace nxx::poly
         }
 
         /**
+         * @brief Equality operator for polynomials.
+         *
+         * This operator compares two polynomials for equality. Two polynomials are equal if all their
+         * coefficients are equal.
+         *
+         * @param lhs The first polynomial to compare.
+         * @param rhs The second polynomial to compare.
+         * @return True if the two polynomials are equal, false otherwise.
+         *
+         * @todo What constraints (concepts) should be placed on T? Are float and double coefficients considered equal?
+         */
+        friend bool operator==(Polynomial< T > const& lhs, Polynomial< T > const& rhs)
+        {
+            return lhs.m_coefficients == rhs.m_coefficients;
+        }
+
+        /**
          * @brief Returns a const iterator to the beginning of the coefficients container of the Polynomial.
          *
          * This member function provides a const iterator pointing to the first coefficient of the Polynomial.
@@ -501,7 +518,7 @@ namespace nxx::poly
 
             // Subtract lhs's coefficients from copied rhs's coefficients one by one
             std::transform(lhs.coefficients().cbegin(), lhs.coefficients().cend(), coeffs.cbegin(), coeffs.begin(), [](TYPE a, TYPE b) {
-                return b - a;
+                return a - b;
             });
 
             // Return a Polynomial constructed from the resulting coefficients
@@ -513,7 +530,7 @@ namespace nxx::poly
 
             // Subtract rhs's coefficients from copied lhs's coefficients one by one
             std::transform(rhs.coefficients().cbegin(), rhs.coefficients().cend(), coeffs.cbegin(), coeffs.begin(), [](TYPE a, TYPE b) {
-                return a - b;
+                return b - a;
             });
 
             // Return a Polynomial constructed from the resulting coefficients

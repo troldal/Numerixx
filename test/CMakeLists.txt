@@ -1,13 +1,12 @@
 #=======================================================================================================================
 # Preamble
 #=======================================================================================================================
-cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
 project(Numerixx.Tests)
 
 #=======================================================================================================================
 # Set up Catch2 library
 #=======================================================================================================================
-#add_subdirectory(Catch2)
 find_package(Catch2 REQUIRED)
 
 #=======================================================================================================================
@@ -24,7 +23,7 @@ target_sources(NumerixxTests
         )
 
 target_link_libraries(NumerixxTests
-        PRIVATE
+        PUBLIC
         numerixx::poly
         Catch2::Catch2WithMain
         )
@@ -49,7 +48,11 @@ list(APPEND NUMERIXX_TEST_DEBUG_FLAGS_GNUCLANG
         "-Wdouble-promotion"
         "-Wformat=2"
         "-Weffc++"
-        "-Wno-unknown-pragmas")
+        "-Wno-unknown-pragmas"
+        "-Wno-c++98-compat"
+        "-Wno-c++98-compat-pedantic"
+        "-Wno-documentation"
+        "-Wno-documentation-unknown-command")
 list(APPEND NUMERIXX_TEST_DEBUG_FLAGS_MSVC
         "/permissive"
         "/W4"

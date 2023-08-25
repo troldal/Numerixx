@@ -33,9 +33,9 @@ if(MUMERIXX_ENABLE_DEMOS)
     add_subdirectory(demo)
 endif()
 
-option(MUMERIXX_ENABLE_BENCHMARKS "Enable benchmarks" ${PROJECT_IS_TOP_LEVEL})
-if(MUMERIXX_ENABLE_BENCHMARKS)
-    add_subdirectory(benchmark)
-endif()
+#option(MUMERIXX_ENABLE_BENCHMARKS "Enable benchmarks" ${PROJECT_IS_TOP_LEVEL})
+#if(MUMERIXX_ENABLE_BENCHMARKS)
+#    add_subdirectory(benchmark)
+#endif()
 
 
