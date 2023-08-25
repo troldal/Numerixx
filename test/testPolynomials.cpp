@@ -118,6 +118,8 @@ TEST_CASE("Polynomial class tests", "[Polynomial]")
 
     SECTION("Arithmetic Operations tests")
     {
+
+        // Test using double as coefficients
         Polynomial<double> p1({1, 2, 3});
         Polynomial<double> p2({4, 5, 6});
         Polynomial<double> p3({5, 6, 7, 8});
@@ -149,8 +151,54 @@ TEST_CASE("Polynomial class tests", "[Polynomial]")
         auto p8 = p1 % p2;
         REQUIRE(p8.coefficients() == std::vector<double>{-1, -0.5});
 
-        // todo: Test with other comlex types
-        // todo: Test with cross-type operations
+        // Test using std::complex<double> as coefficients
+        Polynomial<std::complex<double>> c1({1.0+0i, 2.0+0i, 3.0+0i});
+        Polynomial<std::complex<double>> c2({4.0+0i, 5.0+0i, 6.0+0i});
+        Polynomial<std::complex<double>> c3({5.0+0i, 6.0+0i, 7.0+0i, 8.0+0i});
+
+        auto c4 = c1 + c2;
+        REQUIRE(c4.coefficients() == std::vector<std::complex<double>>{5.0+0i, 7.0+0i, 9.0+0i});
+        c4 = c2;
+        c4 += c3;
+        REQUIRE(c4.coefficients() == std::vector<std::complex<double>>{9.0+0i, 11.0+0i, 13.0+0i, 8.0+0i});
+
+        auto c5 = c1 - c2;
+        REQUIRE(c5.coefficients() == std::vector<std::complex<double>>{-3.0+0i, -3.0+0i, -3.0+0i});
+        c5 = c2;
+        c5 -= c3;
+        REQUIRE(c5.coefficients() == std::vector<std::complex<double>>{-1.0+0i, -1.0+0i, -1.0+0i, 8.0+0i});
+
+        auto c6 = c1 * c2;
+        REQUIRE(c6.coefficients() == std::vector<std::complex<double>>{4.0+0i, 13.0+0i, 28.0+0i, 27.0+0i, 18.0+0i});
+        c6 = c2;
+        c6 *= c3;
+        REQUIRE(c6.coefficients() == std::vector<std::complex<double>>{20.0+0i, 49.0+0i, 88.0+0i, 103.0+0i, 82.0+0i, 48.0+0i});
+
+        auto c7 = c1 / c2;
+        REQUIRE(c7.coefficients() == std::vector<std::complex<double>>{0.5+0i});
+        c7 = c1;
+        c7 /= c2;
+        REQUIRE(c7.coefficients() == std::vector<std::complex<double>>{0.5+0i});
+
+        auto c8 = c1 % c2;
+        REQUIRE(c8.coefficients() == std::vector<std::complex<double>>{-1.0+0i, -0.5+0i});
+
+        // Test with cross-type operations
+        auto t4 = p1 + c2;
+        REQUIRE(t4.coefficients() == std::vector<std::complex<double>>{5.0+0i, 7.0+0i, 9.0+0i});
+
+        auto t5 = p1 - c2;
+        REQUIRE(t5.coefficients() == std::vector<std::complex<double>>{-3.0+0i, -3.0+0i, -3.0+0i});
+
+        auto t6 = p1 * c2;
+        REQUIRE(t6.coefficients() == std::vector<std::complex<double>>{4.0+0i, 13.0+0i, 28.0+0i, 27.0+0i, 18.0+0i});
+
+        auto t7 = p1 / c2;
+        REQUIRE(t7.coefficients() == std::vector<std::complex<double>>{0.5+0i});
+
+        auto t8 = p1 % c2;
+        REQUIRE(t8.coefficients() == std::vector<std::complex<double>>{-1.0+0i, -0.5+0i});
+
     }
 
     SECTION("Order and Coefficient Tests")

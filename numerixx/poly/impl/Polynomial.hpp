@@ -471,23 +471,23 @@ namespace nxx::poly
         // Check if lhs's degree is less than rhs's degree
         if (lhs.order() < rhs.order()) {
             // Copy rhs's coefficients to add to
-            auto coeffs = rhs.coefficients();
+            std::vector< TYPE > coeffs(rhs.coefficients().cbegin(), rhs.coefficients().cend());
 
             // Add lhs's coefficients to copied rhs's coefficients one by one
             std::transform(lhs.coefficients().cbegin(), lhs.coefficients().cend(), coeffs.cbegin(), coeffs.begin(), std::plus< TYPE >());
 
             // Return a Polynomial constructed from the resulting coefficients
-            return Polynomial(coeffs);
+            return Polynomial<TYPE>(coeffs);
         }
         else {
             // Copy lhs's coefficients to add to
-            auto coeffs = lhs.coefficients();
+            std::vector< TYPE > coeffs(lhs.coefficients().cbegin(), lhs.coefficients().cend());
 
             // Add rhs's coefficients to copied lhs's coefficients one by one
             std::transform(rhs.coefficients().cbegin(), rhs.coefficients().cend(), coeffs.cbegin(), coeffs.begin(), std::plus< TYPE >());
 
             // Return a Polynomial constructed from the resulting coefficients
-            return Polynomial(coeffs);
+            return Polynomial<TYPE>(coeffs);
         }
     }
 
@@ -514,7 +514,7 @@ namespace nxx::poly
         // Check if lhs's degree is less than rhs's degree
         if (lhs.order() < rhs.order()) {
             // Copy rhs's coefficients to subtract from
-            auto coeffs = rhs.coefficients();
+            std::vector< TYPE > coeffs(rhs.coefficients().cbegin(), rhs.coefficients().cend());
 
             // Subtract lhs's coefficients from copied rhs's coefficients one by one
             std::transform(lhs.coefficients().cbegin(), lhs.coefficients().cend(), coeffs.cbegin(), coeffs.begin(), [](TYPE a, TYPE b) {
@@ -526,7 +526,7 @@ namespace nxx::poly
         }
         else {
             // Copy lhs's coefficients to subtract from
-            auto coeffs = lhs.coefficients();
+            std::vector< TYPE > coeffs(lhs.coefficients().cbegin(), lhs.coefficients().cend());
 
             // Subtract rhs's coefficients from copied lhs's coefficients one by one
             std::transform(rhs.coefficients().cbegin(), rhs.coefficients().cend(), coeffs.cbegin(), coeffs.begin(), [](TYPE a, TYPE b) {
@@ -609,8 +609,8 @@ namespace nxx::poly
         using TYPE = std::common_type_t< T, U >;
 
         // The coefficients of the polynomials
-        std::vector< TYPE > dividend = lhs.coefficients();
-        std::vector< TYPE > divisor  = rhs.coefficients();
+        std::vector< TYPE > dividend (lhs.cbegin(), lhs.cend());
+        std::vector< TYPE > divisor (rhs.cbegin(), rhs.cend());
         std::vector< TYPE > remainder {};
 
         // Handle singleton case when divisor doesn't have coefficients or
