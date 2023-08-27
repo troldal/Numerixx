@@ -228,11 +228,23 @@ TEST_CASE("Polynomial class tests", "[Polynomial]")
     SECTION("Derivative Tests")
     {
         Polynomial<double> p1({1, 3, 3});
-        auto p2 = derivativeOf(p1);
-        REQUIRE(p2.coefficients() == std::vector<double>{3, 6});
+        auto d1 = derivativeOf(p1);
+        REQUIRE(d1.coefficients() == std::vector<double>{3, 6});
 
-        // todo: Test with other degrees
-        // todo: Test with complex coefficients
+        // test with 3rd degree polynomial
+        Polynomial<double> p2({1, 2, 3, 4});
+        auto d2 = derivativeOf(p2);
+        REQUIRE(d2.coefficients() == std::vector<double>{2, 6, 12});
+
+        // test with 2nd degree polynomial with complex coefficients
+        Polynomial<std::complex<double>> p3({{1.0+0i, 3.0+0i, 3.0+0i}});
+        auto d3 = derivativeOf(p3);
+        REQUIRE(d3.coefficients() == std::vector<std::complex<double>>{{3.0+0i, 6.0+0i}});
+
+        // test with 3rd degree polynomial with complex coefficients
+        Polynomial<std::complex<double>> p4({{1.0+0i, 2.0+0i, 3.0+0i, 4.0+0i}});
+        auto d4 = derivativeOf(p4);
+        REQUIRE(d4.coefficients() == std::vector<std::complex<double>>{{2.0+0i, 6.0+0i, 12.0+0i}});
     }
 
     SECTION("String Representation Tests")
@@ -254,5 +266,26 @@ TEST_CASE("Polynomial class tests", "[Polynomial]")
         Polynomial<double> p2({0.0, 0.0, 0.0});
 
         REQUIRE_THROWS_AS(p1 / p2, PolynomialError);
+    }
+
+    SECTION("Other Tests")
+    {
+        Polynomial p1({1.0, 0.5, 0.3});
+        REQUIRE_THAT(p1(0.5), Catch::Matchers::WithinAbs(1.0 + 0.5 * 0.5 + 0.3 * 0.5 * 0.5, 1.0E-12));
+
+        Polynomial p2({1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1});
+        REQUIRE_THAT(p2(1.0), Catch::Matchers::WithinAbs(1.0, 1.0E-12));
+
+        Polynomial p3({0.3});
+        REQUIRE_THAT(p3(0.75+1.2i).real(), Catch::Matchers::WithinAbs(0.3, 1.0E-12));
+        REQUIRE_THAT(p3(0.75+1.2i).imag(), Catch::Matchers::WithinAbs(0.0, 1.0E-12));
+
+        Polynomial p4({2.1, -1.34, 0.76, 0.45});
+        REQUIRE_THAT(p4(0.49+0.95i).real(), Catch::Matchers::WithinAbs(0.3959143, 1.0E-5));
+        REQUIRE_THAT(p4(0.49+0.95i).imag(), Catch::Matchers::WithinAbs(-0.643330, 1.0E-5));
+
+        Polynomial p5({-2.31+0.44i, 4.21-3.19i, 0.93+1.04i, -0.42+0.68i});
+        REQUIRE_THAT(p5(0.49+0.95i).real(), Catch::Matchers::WithinAbs(1.8246201, 1.0E-5));
+        REQUIRE_THAT(p5(0.49+0.95i).imag(), Catch::Matchers::WithinAbs(2.30389412, 1.0E-5));
     }
 }

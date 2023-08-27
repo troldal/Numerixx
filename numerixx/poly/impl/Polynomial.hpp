@@ -295,7 +295,9 @@ namespace nxx::poly
          * @param rhs The polynomial to add to this polynomial.
          * @return The sum of the two polynomials.
          */
-        auto& operator+=(Polynomial< T > const& rhs)
+        template <typename U>
+        requires std::floating_point< U > || (IsComplex< T > && IsComplex< U >)
+        auto& operator+=(Polynomial< U > const& rhs)
         {
             auto temp = *this + rhs;
             std::swap(*this, temp);
@@ -312,7 +314,9 @@ namespace nxx::poly
          * @param rhs The polynomial to subtract from this polynomial.
          * @return The difference between the two polynomials.
          */
-        auto& operator-=(Polynomial< T > const& rhs)
+        template <typename U>
+        requires std::floating_point< U > || (IsComplex< T > && IsComplex< U >)
+        auto& operator-=(Polynomial< U > const& rhs)
         {
             auto temp = *this - rhs;
             std::swap(*this, temp);
@@ -329,7 +333,9 @@ namespace nxx::poly
          * @param rhs The other polynomial to multiply by.
          * @return A reference to the modified polynomial object.
          */
-        auto& operator*=(Polynomial< T > const& rhs)
+        template <typename U>
+        requires std::floating_point< U > || (IsComplex< T > && IsComplex< U >)
+        auto& operator*=(Polynomial< U > const& rhs)
         {
             auto temp = *this * rhs;
             std::swap(*this, temp);
@@ -345,7 +351,9 @@ namespace nxx::poly
          * @param rhs The other polynomial to divide by.
          * @return A reference to the modified polynomial object.
          */
-        auto& operator/=(Polynomial< T > const& rhs)
+        template <typename U>
+        requires std::floating_point< U > || (IsComplex< T > && IsComplex< U >)
+        auto& operator/=(Polynomial< U > const& rhs)
         {
             auto temp = *this / rhs;
             std::swap(*this, temp);
@@ -361,12 +369,12 @@ namespace nxx::poly
          * @param lhs The first polynomial to compare.
          * @param rhs The second polynomial to compare.
          * @return True if the two polynomials are equal, false otherwise.
-         *
-         * @todo What constraints (concepts) should be placed on T? Are float and double coefficients considered equal?
          */
-        friend bool operator==(Polynomial< T > const& lhs, Polynomial< T > const& rhs)
+        template <typename U>
+        requires (std::floating_point< T> && std::floating_point< U >) || (IsComplex< T > && IsComplex< U >)
+        bool operator==(Polynomial< U > const& rhs) const
         {
-            return lhs.m_coefficients == rhs.m_coefficients;
+            return m_coefficients == rhs.m_coefficients;
         }
 
         /**
