@@ -70,7 +70,9 @@ namespace nxx::poly
             requires IsComplex< typename decltype(roots)::value_type > &&
                      std::same_as< decltype(roots), std::vector< typename decltype(roots)::value_type > >
         {
-            std::sort(roots.begin(), roots.end(), [](auto a, auto b) { return a.real() < b.real(); });
+            sort(roots.begin(), roots.end(), [tolerance](auto const& a, auto const& b) {
+                return std::abs(b.real() - a.real()) < tolerance ? a.imag() < b.imag() : a.real() < b.real();
+            });
 
             // If the return type is complex, return the roots as is.
             if constexpr (IsComplex< RT >) {
@@ -80,7 +82,7 @@ namespace nxx::poly
             else {
                 auto realroots = std::vector< RT > {};
                 std::for_each(roots.begin(), roots.end(), [&realroots, tolerance](auto elem) {
-                    if (abs(elem.imag()) < tolerance) realroots.push_back(elem.real());
+                    if (std::abs(elem.imag()) < tolerance) realroots.push_back(elem.real());
                 });
                 return realroots;
             }
@@ -308,13 +310,21 @@ namespace nxx::poly
      * @note The returned roots are either complex or real, depending on the provided RT template parameter. If
      * the return type is complex, all roots will be returned. If the return type is real, only roots with
      * imaginary parts smaller than the specified tolerance will be returned.
+     *
+     * @todo: the tolerance argument is used both for the polishing step and for determining if a root is real or complex.
+     * This is not ideal, as the polishing step may cause a complex root to become real. This should be fixed.
+     *
+     * @todo: The polishing step is not very efficient. It should be possible to improve the accuracy of the root
+     * without having to perform a full Laguerre iteration. Consider using a Newton-Raphson step instead.
+     *
+     * @todo: Mixing real and complex roots in the same vector is not ideal. This should be fixed.
      */
     template< typename RT = void >
     inline auto polysolve(IsPolynomial auto                                             poly,
                           typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance      = nxx::EPS,
                           int                                                           max_iterations = nxx::MAXITER)
     {
-        if (poly.order() <= 1) throw error::PolynomialError("Polynomial must have at least two coefficients (a monomial).");
+        if (poly.order() < 1) throw error::PolynomialError("Polynomial must have at least two coefficients (a monomial).");
 
         using VALUE_TYPE   = typename PolynomialTraits< decltype(poly) >::value_type;
         using FLOAT_TYPE   = typename PolynomialTraits< decltype(poly) >::fundamental_type;
@@ -330,13 +340,13 @@ namespace nxx::poly
             }
 
             case 2: {    // Quadratic equation
-                auto quadroots = quadratic(polynomial);
+                auto quadroots = quadratic<COMPLEX_TYPE>(polynomial);
                 roots.insert(roots.end(), quadroots.begin(), quadroots.end());
                 break;
             }
 
             case 3: {    // Cubic equation
-                auto cubicroots = cubic(polynomial);
+                auto cubicroots = cubic<COMPLEX_TYPE>(polynomial);
                 roots.insert(roots.end(), cubicroots.begin(), cubicroots.end());
                 break;
             }

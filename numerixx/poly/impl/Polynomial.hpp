@@ -621,7 +621,7 @@ namespace nxx::poly
         std::vector< TYPE > divisor (rhs.cbegin(), rhs.cend());
         std::vector< TYPE > remainder {};
 
-        // Handle singleton case when divisor doesn't have coefficients or
+        // Handle case when divisor doesn't have coefficients or
         // when polynomial order of divisor is larger than the dividend
         if (divisor.empty() || divisor.back() == 0.0 || rhs.order() > lhs.order())
             throw error::PolynomialError("Invalid divisor polynomial");
