@@ -70,9 +70,13 @@ namespace nxx::poly
             requires IsComplex< typename decltype(roots)::value_type > &&
                      std::same_as< decltype(roots), std::vector< typename decltype(roots)::value_type > >
         {
-            sort(roots.begin(), roots.end(), [tolerance](auto const& a, auto const& b) {
+            // Sorting function
+            auto sortingFunc = [tolerance](auto const& a, auto const& b) {
                 return std::abs(b.real() - a.real()) < tolerance ? a.imag() < b.imag() : a.real() < b.real();
-            });
+            };
+
+            // Sort the roots
+            std::sort(roots.begin(), roots.end(), sortingFunc);
 
             // If the return type is complex, return the roots as is.
             if constexpr (IsComplex< RT >) {
@@ -141,18 +145,24 @@ namespace nxx::poly
     inline auto quadratic(IsPolynomial auto poly, typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance = nxx::EPS)
     {
         // ===== Check that the polynomial is quadratic.
-        if (poly.order() != 2) throw error::PolynomialError("Polynomial Error: Polynomial is not quadratic.");
+        if (poly.order() != 2) throw error::PolynomialError("Quadratic Error: Polynomial is not quadratic.");
 
-        using VALUE_TYPE   = typename PolynomialTraits< decltype(poly) >::value_type;
-        using FLOAT_TYPE   = typename PolynomialTraits< decltype(poly) >::fundamental_type;
+        using POLY_TYPE    = PolynomialTraits< decltype(poly) >;
+        using VALUE_TYPE   = typename POLY_TYPE::value_type;
+        using FLOAT_TYPE   = typename POLY_TYPE::fundamental_type;
         using COMPLEX_TYPE = std::complex< FLOAT_TYPE >;
 
-        auto& a = poly.coefficients()[2];
-        auto& b = poly.coefficients()[1];
-        auto& c = poly.coefficients()[0];
+        const auto& coeffs = poly.coefficients();
+        const auto& a = coeffs[2];
+        const auto& b = coeffs[1];
+        const auto& c = coeffs[0];
 
-        COMPLEX_TYPE q = -0.5 * (b + ((std::conj(b) * sqrt(b * b - 4.0 * a * c)).real() >= 0.0 ? sqrt(b * b - 4.0 * a * c)
-                                                                                               : -sqrt(b * b - 4.0 * a * c)));
+        COMPLEX_TYPE discriminant = sqrt(b * b - 4.0 * a * c);
+        COMPLEX_TYPE sqrt_component = std::conj(b) * discriminant;
+
+        COMPLEX_TYPE q = -0.5 * (b + (sqrt_component.real() >= 0.0 ? discriminant : -discriminant));
+
+        if (std::abs(q) < tolerance || std::abs(a) < tolerance) throw error::PolynomialError("Quadratic polynomial is ill formed.");
 
         std::vector< COMPLEX_TYPE > roots = { q / a, c / q };
 
@@ -185,10 +195,11 @@ namespace nxx::poly
     template< typename RT = void >
     inline auto cubic(IsPolynomial auto poly, typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance = nxx::EPS)
     {
-        if (poly.order() != 3) throw error::PolynomialError("Polynomial Error: Polynomial is not cubic.");
+        if (poly.order() != 3) throw error::PolynomialError("Cubic Error: Polynomial is not cubic.");
 
-        using VALUE_TYPE   = typename PolynomialTraits< decltype(poly) >::value_type;
-        using FLOAT_TYPE   = typename PolynomialTraits< decltype(poly) >::fundamental_type;
+        using POLY_TYPE    = PolynomialTraits< decltype(poly) >;
+        using VALUE_TYPE   = typename POLY_TYPE::value_type;
+        using FLOAT_TYPE   = typename POLY_TYPE::fundamental_type;
         using COMPLEX_TYPE = std::complex< FLOAT_TYPE >;
 
         using std::sqrt;
@@ -201,9 +212,9 @@ namespace nxx::poly
         auto coeff = poly.coefficients();
         std::transform(coeff.cbegin(), coeff.cend(), coeff.begin(), [&coeff](auto elem) { return elem / coeff.back(); });
 
-        auto& a = coeff[2];
-        auto& b = coeff[1];
-        auto& c = coeff[0];
+        const auto& a = coeff[2];
+        const auto& b = coeff[1];
+        const auto& c = coeff[0];
 
         COMPLEX_TYPE Q = (a * a - 3.0 * b) / 9.0;
         COMPLEX_TYPE R = (2.0 * a * a * a - 9.0 * a * b + 27.0 * c) / 54.0;
@@ -212,8 +223,8 @@ namespace nxx::poly
         COMPLEX_TYPE B = (abs(A) == 0.0 ? 0.0 : Q / A);
 
         std::vector< COMPLEX_TYPE > roots = { A + B - a / 3.0,
-                                              -0.5 * (A + B) - a / 3.0 + 0.5 * sqrt(3.0) * (A - B) * 1i,
-                                              -0.5 * (A + B) - a / 3.0 - 0.5 * sqrt(3.0) * (A - B) * 1i };
+                                              -0.5 * (A + B) - a / 3.0 + 0.5 * sqrt(3.0) * (A - B) * 1.0i,
+                                              -0.5 * (A + B) - a / 3.0 - 0.5 * sqrt(3.0) * (A - B) * 1.0i };
 
         using RET = std::conditional_t< std::same_as< RT, void >, VALUE_TYPE, RT >;
         return impl::sortAndReturn< RET >(roots, tolerance);
@@ -239,7 +250,6 @@ namespace nxx::poly
      * polynomials. However, it may fail to converge for certain ill-conditioned polynomials. In such cases,
      * using a different root-finding method may be necessary.
      */
-
     template< typename POLY >
     requires IsPolynomial< POLY >
     inline auto laguerre(POLY                                                                          poly,
@@ -247,7 +257,10 @@ namespace nxx::poly
                          typename PolynomialTraits< decltype(poly) >::fundamental_type                 tolerance      = nxx::EPS,
                          int                                                                           max_iterations = nxx::MAXITER)
     {
-        using FLOAT_TYPE   = typename PolynomialTraits< decltype(poly) >::fundamental_type;
+        if (poly.order() <= 3) throw error::PolynomialError("Laguerre Error: Polynomial is cubic or lower.");
+
+        using POLY_TYPE    = PolynomialTraits< decltype(poly) >;
+        using FLOAT_TYPE   = typename POLY_TYPE::fundamental_type;
         using COMPLEX_TYPE = std::complex< FLOAT_TYPE >;
 
         // ===== Lambda function for computing the Laguerre step.
@@ -269,8 +282,9 @@ namespace nxx::poly
         // ===== Use a random number generator to perturb the step size every 10 iterations.
         std::random_device                       rd;
         std::mt19937                             mt(rd());
-        std::uniform_real_distribution< double > dist(0.0, 1.0);
+        std::uniform_real_distribution< double > dist(0.1, 1.0);
 
+        // TODO: Return a std::expected if the Laguerre method fails to converge.
         // ===== Perform the Laguerre iterations.
         for (int i = 0; i < max_iterations; ++i) {
             G    = d1poly(root) / poly(root);
@@ -324,6 +338,7 @@ namespace nxx::poly
                           typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance      = nxx::EPS,
                           int                                                           max_iterations = nxx::MAXITER)
     {
+        if (max_iterations < 1) throw error::PolynomialError("Maximum number of iterations must be greater than zero.");
         if (poly.order() < 1) throw error::PolynomialError("Polynomial must have at least two coefficients (a monomial).");
 
         using VALUE_TYPE   = typename PolynomialTraits< decltype(poly) >::value_type;
@@ -334,25 +349,24 @@ namespace nxx::poly
         auto roots      = std::vector< COMPLEX_TYPE > {};
 
         switch (poly.order()) {
-            case 1: {    // Linear equation
+            case 1: {    // ===== Linear equation
                 roots.emplace_back(linear(polynomial));
                 break;
             }
 
-            case 2: {    // Quadratic equation
+            case 2: {    // ===== Quadratic equation
                 auto quadroots = quadratic<COMPLEX_TYPE>(polynomial);
                 roots.insert(roots.end(), quadroots.begin(), quadroots.end());
                 break;
             }
 
-            case 3: {    // Cubic equation
+            case 3: {    // ===== Cubic equation
                 auto cubicroots = cubic<COMPLEX_TYPE>(polynomial);
                 roots.insert(roots.end(), cubicroots.begin(), cubicroots.end());
                 break;
             }
 
-            default: {    // Higher order equation
-                // If the polynomial is higher than cubic, use the Laguerre method.
+            default: {    // ===== Higher order equation; use Laguerre's method
                 while (polynomial.order() > 3) {
                     roots.emplace_back(laguerre(polynomial, 0.0, tolerance, max_iterations));
                     roots.back() = laguerre(poly, roots.back(), tolerance, max_iterations);    // Polishing step
