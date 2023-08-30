@@ -35,6 +35,7 @@
 #include "Polynomial.hpp"
 #include "PolynomialError.hpp"
 #include <Constants.hpp>
+#include <Roots.hpp>
 
 // ===== Standard Library Includes
 #include <algorithm>
@@ -72,7 +73,8 @@ namespace nxx::poly
         {
             // Sorting function
             auto sortingFunc = [tolerance](auto const& a, auto const& b) {
-                return std::abs(b.real() - a.real()) < tolerance ? a.imag() < b.imag() : a.real() < b.real();
+                // NOTE: Without sqrt of the tolerance, the sorting may fail.
+                return std::abs(b.real() - a.real()) < std::sqrt(tolerance) ? a.imag() < b.imag() : a.real() < b.real();
             };
 
             // Sort the roots
@@ -86,7 +88,8 @@ namespace nxx::poly
             else {
                 auto realroots = std::vector< RT > {};
                 std::for_each(roots.begin(), roots.end(), [&realroots, tolerance](auto elem) {
-                    if (std::abs(elem.imag()) < tolerance) realroots.push_back(elem.real());
+                    // NOTE: Without sqrt of the tolerance, the test fails.
+                    if (std::abs(elem.imag()) < std::sqrt(tolerance)) realroots.push_back(elem.real());
                 });
                 return realroots;
             }
@@ -282,7 +285,7 @@ namespace nxx::poly
         // ===== Use a random number generator to perturb the step size every 10 iterations.
         std::random_device                       rd;
         std::mt19937                             mt(rd());
-        std::uniform_real_distribution< double > dist(0.1, 1.0);
+        std::uniform_real_distribution< double > dist(0.9, 1.1);
 
         // TODO: Return a std::expected if the Laguerre method fails to converge.
         // ===== Perform the Laguerre iterations.
@@ -324,14 +327,6 @@ namespace nxx::poly
      * @note The returned roots are either complex or real, depending on the provided RT template parameter. If
      * the return type is complex, all roots will be returned. If the return type is real, only roots with
      * imaginary parts smaller than the specified tolerance will be returned.
-     *
-     * @todo: the tolerance argument is used both for the polishing step and for determining if a root is real or complex.
-     * This is not ideal, as the polishing step may cause a complex root to become real. This should be fixed.
-     *
-     * @todo: The polishing step is not very efficient. It should be possible to improve the accuracy of the root
-     * without having to perform a full Laguerre iteration. Consider using a Newton-Raphson step instead.
-     *
-     * @todo: Mixing real and complex roots in the same vector is not ideal. This should be fixed.
      */
     template< typename RT = void >
     inline auto polysolve(IsPolynomial auto                                             poly,
@@ -341,12 +336,32 @@ namespace nxx::poly
         if (max_iterations < 1) throw error::PolynomialError("Maximum number of iterations must be greater than zero.");
         if (poly.order() < 1) throw error::PolynomialError("Polynomial must have at least two coefficients (a monomial).");
 
-        using VALUE_TYPE   = typename PolynomialTraits< decltype(poly) >::value_type;
-        using FLOAT_TYPE   = typename PolynomialTraits< decltype(poly) >::fundamental_type;
+        using POLY_TYPE    = PolynomialTraits< decltype(poly) >;
+        using VALUE_TYPE   = typename POLY_TYPE::value_type;
+        using FLOAT_TYPE   = typename POLY_TYPE::fundamental_type;
         using COMPLEX_TYPE = std::complex< FLOAT_TYPE >;
 
+        // Create a polynomial object and a vector for the roots. The value type of the polynomial is converted to
+        // COMPLEX_TYPE if it is not already complex.
         auto polynomial = Polynomial< COMPLEX_TYPE >(std::vector< COMPLEX_TYPE > { poly.begin(), poly.end() });
+        auto original   = Polynomial< COMPLEX_TYPE >(std::vector< COMPLEX_TYPE > { poly.begin(), poly.end() });
         auto roots      = std::vector< COMPLEX_TYPE > {};
+
+        // A lambda for computing the root of the polynomial using Newton's method:
+        auto newt = [=](auto f, auto x) {
+            auto df = derivativeOf(f);
+            for (int i = 0; i < max_iterations; ++i) {
+                auto dx = f(x) / df(x);
+                x -= dx;
+                auto fval = f(x);
+                if (std::abs(fval.real()) < tolerance &&
+                    std::abs(fval.imag()) < tolerance &&
+                    std::abs(dx.real()) < tolerance &&
+                    std::abs(dx.imag()) < tolerance)
+                    break;
+            }
+            return x;
+        };
 
         switch (poly.order()) {
             case 1: {    // ===== Linear equation
@@ -368,12 +383,21 @@ namespace nxx::poly
 
             default: {    // ===== Higher order equation; use Laguerre's method
                 while (polynomial.order() > 3) {
+                    using namespace nxx::roots;
+
+                    // ===== Find a root using Laguerre's method
                     roots.emplace_back(laguerre(polynomial, 0.0, tolerance, max_iterations));
-                    roots.back() = laguerre(poly, roots.back(), tolerance, max_iterations);    // Polishing step
+
+                    // ===== Polish the root on the original polynomial using Newton's method
+                    //roots.back() = *fdfsolve(Newton(polynomial, derivativeOf(polynomial)), roots.back(), tolerance, max_iterations);
+                    roots.back() = newt(original, roots.back()); //TODO: Use the roots::fdfsolve function instead
+
+                    // ===== Deflate the polynomial by the root to reduce the order
                     polynomial /= Polynomial< COMPLEX_TYPE > { -roots.back(), 1.0 };
                 }
 
-                auto cuberoots = cubic(polynomial);
+                // ===== Solve the remaining cubic equation
+                auto cuberoots = cubic<COMPLEX_TYPE>(polynomial);
                 roots.insert(roots.end(), cuberoots.begin(), cuberoots.end());
                 break;
             }

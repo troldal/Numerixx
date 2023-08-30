@@ -7,10 +7,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <Poly.hpp>
 
-
 #include <cmath>
-#include <functional>
-#include <numbers>
 #include <vector>
 #include <deque>
 
@@ -479,16 +476,16 @@ TEST_CASE("Polynomial roots tests", "[Polynomial]")
 
         // TODO: The tolerance was reduced to make the test pass. Is that the correct thing to do?
         Polynomial p3({ 32.0, -48.0, -8.0, 28.0, -8.0, 16.0, -16.0, 12.0, -16.0, 6.0, 10.0, -17.0, 10.0, 2.0, -4.0, 1.0});
-        auto rroots3 = polysolve(p3);
-//        REQUIRE(rroots3.size() == 7);
-//        REQUIRE_THAT(rroots3[0], Catch::Matchers::WithinAbs(-1.6078107423472359, 1.0E-6));
-//        REQUIRE_THAT(rroots3[1], Catch::Matchers::WithinAbs(-1.3066982484920768, 1.0E-6));
-//        REQUIRE_THAT(rroots3[2], Catch::Matchers::WithinAbs(-1.0, 1.0E-6));
-//        REQUIRE_THAT(rroots3[3], Catch::Matchers::WithinAbs(1.0, 1.0E-6));
-//        REQUIRE_THAT(rroots3[4], Catch::Matchers::WithinAbs(1.0, 1.0E-6));
-//        REQUIRE_THAT(rroots3[5], Catch::Matchers::WithinAbs(2.0, 1.0E-6));
-//        REQUIRE_THAT(rroots3[6], Catch::Matchers::WithinAbs(2.0, 1.0E-6));
-        auto croots3 = polysolve<std::complex<double> >(p3);
+        auto rroots3 = polysolve(p3, 1E-12);
+        REQUIRE(rroots3.size() == 7);
+        REQUIRE_THAT(rroots3[0], Catch::Matchers::WithinAbs(-1.6078107423472359, 1.0E-6));
+        REQUIRE_THAT(rroots3[1], Catch::Matchers::WithinAbs(-1.3066982484920768, 1.0E-6));
+        REQUIRE_THAT(rroots3[2], Catch::Matchers::WithinAbs(-1.0, 1.0E-6));
+        REQUIRE_THAT(rroots3[3], Catch::Matchers::WithinAbs(1.0, 1.0E-6));
+        REQUIRE_THAT(rroots3[4], Catch::Matchers::WithinAbs(1.0, 1.0E-6));
+        REQUIRE_THAT(rroots3[5], Catch::Matchers::WithinAbs(2.0, 1.0E-6));
+        REQUIRE_THAT(rroots3[6], Catch::Matchers::WithinAbs(2.0, 1.0E-6));
+        auto croots3 = polysolve<std::complex<double> >(p3, 1E-12);
         REQUIRE(croots3.size() == 15);
         REQUIRE_THAT(croots3[0].real(), Catch::Matchers::WithinAbs(-1.6078107423472359, 1.0E-6));
         REQUIRE_THAT(croots3[0].imag(), Catch::Matchers::WithinAbs(0.0, 1.0E-6));
@@ -517,7 +514,7 @@ TEST_CASE("Polynomial roots tests", "[Polynomial]")
         REQUIRE_THAT(croots3[12].real(), Catch::Matchers::WithinAbs(1.1142366961812986, 1.0E-6));
         REQUIRE_THAT(croots3[12].imag(), Catch::Matchers::WithinAbs(0.48083981203389980, 1.0E-6));
         REQUIRE_THAT(croots3[13].real(), Catch::Matchers::WithinAbs(2.0, 1.0E-6));
-        REQUIRE_THAT(croots3[13].imag(), Catch::Matchers::WithinAbs(0.0, 1.0E-4));
+        REQUIRE_THAT(croots3[13].imag(), Catch::Matchers::WithinAbs(0.0, 1.0E-6));
         REQUIRE_THAT(croots3[14].real(), Catch::Matchers::WithinAbs(2.0, 1.0E-6));
         REQUIRE_THAT(croots3[14].imag(), Catch::Matchers::WithinAbs(0.0, 1.0E-6));
 
