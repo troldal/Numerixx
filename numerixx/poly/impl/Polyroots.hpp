@@ -44,6 +44,7 @@
 #include <numbers>
 #include <random>
 #include <vector>
+#include <optional>
 
 namespace nxx::poly
 {
@@ -67,7 +68,7 @@ namespace nxx::poly
          */
         template< typename RT >
         requires(std::floating_point< RT > || IsComplex< RT >)
-        inline auto sortAndReturn(auto roots, auto tolerance)
+        inline auto sortRoots(auto roots, auto tolerance)
             requires IsComplex< typename decltype(roots)::value_type > &&
                      std::same_as< decltype(roots), std::vector< typename decltype(roots)::value_type > >
         {
@@ -104,6 +105,9 @@ namespace nxx::poly
      * polynomial coefficients.
      *
      * @param poly A linear polynomial, which should satisfy the poly::IsPolynomial concept.
+     * @param tolerance The tolerance used to determine if the imaginary part of a complex root is
+     * sufficiently small to be considered real. Only relevant if the input polynomial has complex
+     * coefficients. Defaults to nxx::EPS.
      *
      * @return The root of the linear polynomial.
      *
@@ -112,10 +116,22 @@ namespace nxx::poly
      * @note The function checks if the input polynomial is linear by verifying its order.
      * If the order is not equal to 1, an std::invalid_argument exception is thrown.
      */
-    inline auto linear(IsPolynomial auto poly)
+    template< typename RT = void >
+    inline auto linear(IsPolynomial auto poly, typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance = nxx::EPS)
     {
-        if (poly.order() != 1) throw error::PolynomialError("Polynomial Error: Input is not a monomial.");
-        return -poly.coefficients().front() / poly.coefficients().back();
+        if (poly.order() != 1) throw error::PolynomialError("Error: Input is not a monomial.");
+
+        using POLY_TYPE    = PolynomialTraits< decltype(poly) >;
+        using VALUE_TYPE   = typename POLY_TYPE::value_type;
+        using FLOAT_TYPE   = typename POLY_TYPE::fundamental_type;
+        using COMPLEX_TYPE = std::complex< FLOAT_TYPE >;
+
+        std::vector< COMPLEX_TYPE > root;
+        root.emplace_back(-poly.coefficients().front() / poly.coefficients().back());
+
+        using RET = std::conditional_t< std::same_as< RT, void >, VALUE_TYPE, RT >;
+        tl::expected< std::vector< RET >, error::PolynomialError > result = impl::sortRoots< RET >(root, tolerance);
+        return result;
     }
 
     /**
@@ -170,7 +186,8 @@ namespace nxx::poly
         std::vector< COMPLEX_TYPE > roots = { q / a, c / q };
 
         using RET = std::conditional_t< std::same_as< RT, void >, VALUE_TYPE, RT >;
-        return impl::sortAndReturn< RET >(roots, tolerance);
+        tl::expected< std::vector< RET >, error::PolynomialError > result = impl::sortRoots< RET >(roots, tolerance);
+        return result;
     }
 
     /**
@@ -229,8 +246,10 @@ namespace nxx::poly
                                               -0.5 * (A + B) - a / 3.0 + 0.5 * sqrt(3.0) * (A - B) * 1.0i,
                                               -0.5 * (A + B) - a / 3.0 - 0.5 * sqrt(3.0) * (A - B) * 1.0i };
 
+
         using RET = std::conditional_t< std::same_as< RT, void >, VALUE_TYPE, RT >;
-        return impl::sortAndReturn< RET >(roots, tolerance);
+        tl::expected< std::vector< RET >, error::PolynomialError > result = impl::sortRoots< RET >(roots, tolerance);
+        return result;
     }
 
     /**
@@ -365,19 +384,20 @@ namespace nxx::poly
 
         switch (poly.order()) {
             case 1: {    // ===== Linear equation
-                roots.emplace_back(linear(polynomial));
+                auto linroot = linear<COMPLEX_TYPE>(polynomial);
+                roots.insert(roots.end(), (*linroot).begin(), (*linroot).end());
                 break;
             }
 
             case 2: {    // ===== Quadratic equation
                 auto quadroots = quadratic<COMPLEX_TYPE>(polynomial);
-                roots.insert(roots.end(), quadroots.begin(), quadroots.end());
+                roots.insert(roots.end(), (*quadroots).begin(), (*quadroots).end());
                 break;
             }
 
             case 3: {    // ===== Cubic equation
                 auto cubicroots = cubic<COMPLEX_TYPE>(polynomial);
-                roots.insert(roots.end(), cubicroots.begin(), cubicroots.end());
+                roots.insert(roots.end(), (*cubicroots).begin(), (*cubicroots).end());
                 break;
             }
 
@@ -398,13 +418,14 @@ namespace nxx::poly
 
                 // ===== Solve the remaining cubic equation
                 auto cuberoots = cubic<COMPLEX_TYPE>(polynomial);
-                roots.insert(roots.end(), cuberoots.begin(), cuberoots.end());
+                roots.insert(roots.end(), (*cuberoots).begin(), (*cuberoots).end());
                 break;
             }
         }
 
         using RET = std::conditional_t< std::same_as< RT, void >, VALUE_TYPE, RT >;
-        return impl::sortAndReturn< RET >(roots, tolerance);
+        tl::expected< std::vector< RET >, error::PolynomialError > result = impl::sortRoots< RET >(roots, tolerance);
+        return result;
     }
 }    // namespace nxx::poly
 

@@ -33,9 +33,15 @@
 
 //===== Standard Library Includes
 #include <stdexcept>
+#include <vector>
 
 namespace nxx::error
 {
+    /**
+     * @brief The RootErrorType enum is an enum class for the different types of root-finding errors.
+     */
+    enum class PolyErrorType { RootNotFound, MaxIterationsExceeded, NumericalError };
+
     /**
      * @brief The PolynomialError class represents an exception that is thrown when there is an error related to polynomials.
      *
@@ -55,6 +61,71 @@ namespace nxx::error
         {}
     };
 
+    namespace impl
+    { /**
+       * @brief The RootErrorImpl class is a template class for root-finding errors.
+       * @tparam T The type of the root value.
+       */
+        template< typename T >
+        class PolyErrorImpl : public PolynomialError
+        {
+            PolyErrorType   m_type;           /*< The type of the error. */
+            std::vector<T>  m_roots;          /*< The value of the root before the error was thrown. */
+
+        public:
+            /**
+             * @brief Constructor.
+             * @param msg The error message.
+             * @param type The type of the error.
+             * @param value The value of the root before the error was thrown.
+             * @param iter The number of iterations performed before the error was thrown.
+             */
+            explicit PolyErrorImpl(const char* msg, PolyErrorType type, std::vector<T> roots)
+                : PolynomialError(msg),
+                  m_type(type),
+                  m_roots(value)
+            {}
+
+            /**
+             * @brief Returns the type of the error.
+             * @return The type of the error.
+             */
+            [[nodiscard]]
+            PolyErrorType type() const
+            {
+                return m_type;
+            }
+
+            /**
+             * @brief Returns a string representation of the error type.
+             * @return A string representation of the error type.
+             */
+            [[nodiscard]]
+            auto typeAsString() const
+            {
+                switch (m_type) {
+                    case PolyErrorType::RootNotFound:
+                        return "Root missing; number of roots does not match degree of polynomial";
+                    case PolyErrorType::MaxIterationsExceeded:
+                        return "Max iterations exceeded";
+                    case PolyErrorType::NumericalError:
+                        return "Numerical error";
+                }
+
+                return "Unknown error";
+            }
+
+            /**
+             * @brief Returns the value of the root before the error was thrown.
+             * @return The value of the root.
+             */
+            [[nodiscard]]
+            auto value() const
+            {
+                return m_roots;
+            }
+        };
+    }    // namespace impl
 
 }    // namespace nxx::error
 

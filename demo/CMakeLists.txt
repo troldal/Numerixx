@@ -54,14 +54,6 @@ target_sources(DemoPoly
 
 target_link_libraries(DemoPoly PRIVATE fmt numerixx::poly)
 
-add_executable(TestPoly)
-target_sources(TestPoly
-        PRIVATE
-        TestPoly.cpp
-)
-
-target_link_libraries(TestPoly PRIVATE fmt numerixx::poly)
-
 # Target: Numerical derivatives
 add_executable(DemoDeriv)
 target_sources(DemoDeriv

@@ -129,38 +129,47 @@ int main() {
 
     // ============================================================================================
     // Finally, the nxx::poly namespace contains function for finding the roots of a polynomial.
-    // The polyroots() function will return a std::vector object with the roots of the polynomial.
-    // this is the easiest way to find the roots of a polynomial, as it will find all the roots
+    // The polyroots() function will return a tl::expected (std::expected) object containint a
+    // std::vector with the roots of the polynomial.
+    // This is the easiest way to find the roots of a polynomial, as it will find all the roots
     // of the polynomial, including complex roots, regardless of the order of the polynomial. In
     // addition, the quadratic() and cubic() functions can be used to find the roots of quadratic
-    // and cubic polynomials, respectively.
+    // and cubic polynomials, respectively. These functions will also return a tl::expected (std::expected)
     //
     // All three functions accepts an optional template argument that specifies the type of the
     // roots. The default type is the same type as the coefficients, but it is possible explicitly
     // specify the type, e.g. double or std::complex<double>. If the type is specified as a floating-
     // point type, the roots comlex roots will be ignored.
+    //
+    // Note that when getting the std::vector contained in the tl::expected object (using the .value()
+    // function or the * operator), the vector will be returned by reference. This can cause problems
+    // if the tl::expected object is a temporary object, as the vector will be destroyed when the
+    // temporary object goes out of scope. This can happen when iterating over the roots using a
+    // range-based for loop. To address this, the range-based for loop with initializer can be used,
+    // as this will extend the lifetime of the temporary object until the end of the loop. The example
+    // below shows how this can be done.
     // ============================================================================================
     auto poly1 = Polynomial({-1.0, 0.0, 0.0, 0.0, 0.0, 1.0}); // Polynomial with real coefficients and complex roots
 
     std::cout << "Real roots of the polynomial (automatically deduced): " << poly1.asString() << std::endl;
-    for (auto root : polysolve(poly1)) std::cout << root << "\n"; // Will print the real roots (same type as coefficients)
+    for (auto res = polysolve(poly1); auto root : *res) std::cout << root << "\n"; // Will print the real roots (same type as coefficients)
 
     std::cout << "\nAll roots of the polynomial (specified by template parameter): " << poly1.asString() << std::endl;
-    for (auto root : polysolve<std::complex<double> >(poly1)) std::cout << root << "\n"; // Will print all roots (complex and real)
+    for (auto res = polysolve<std::complex<double> >(poly1); auto root : *res) std::cout << root << "\n"; // Will print all roots (complex and real)
 
     std::cout << "\nReal roots of the polynomial (specified by template parameter): " << poly1.asString() << std::endl;
-    for (auto root : polysolve<double>(poly1)) std::cout << root << "\n"; // Will print the real roots (as specified by the template argument)
+    for (auto res = polysolve<double>(poly1); auto root : *res) std::cout << root << "\n"; // Will print the real roots (as specified by the template argument)
 
     auto poly2 = Polynomial({-1.0+0i, 0.0+0i, 0.0+0i, 0.0+0i, 0.0+0i, 1.0+0i}); // Polynomial with complex coefficients and complex roots
 
     std::cout << "\nAll roots of the complex polynomial (automatically deduced): " << poly2.asString() << std::endl;
-    for (auto root : polysolve(poly2)) std::cout << root << "\n"; // Will print all the roots (same type as coefficients)
+    for (auto res = polysolve(poly2); auto root : *res) std::cout << root << "\n"; // Will print all the roots (same type as coefficients)
 
     std::cout << "\nAll roots of the complex polynomial (specified by template parameter): " << poly2.asString() << std::endl;
-    for (auto root : polysolve<std::complex<double> >(poly2)) std::cout << root << "\n"; // Will print all roots (as specified by the template argument
+    for (auto res = polysolve<std::complex<double>>(poly2); auto root : *res) std::cout << root << "\n"; // Will print all roots (as specified by the template argument
 
     std::cout << "\nReal roots of the complex polynomial (specified by template parameter): " << poly2.asString() << std::endl;
-    for (auto root : polysolve<double>(poly2)) std::cout << root << "\n"; // Will print the real roots (complex roots will be ignored)
+    for (auto res = polysolve<double>(poly2); auto root : *res) std::cout << root << "\n"; // Will print the real roots (complex roots will be ignored)
 
     return 0;
 }
