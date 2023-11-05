@@ -38,6 +38,8 @@
 
 // ===== Standard Library Includes
 #include <array>
+#include <algorithm>
+#include <span>
 
 namespace nxx::roots
 {
@@ -113,7 +115,8 @@ namespace nxx::roots
             constexpr void setBounds(std::initializer_list< T > bounds)
             {
                 if (bounds.size() != 2) throw std::logic_error("Initializer list must contain exactly two elements!");
-                setBounds(std::pair< return_type, return_type > { *bounds.begin(), *(bounds.begin() + 1) });
+                auto bnds = std::span( bounds.begin(), bounds.end() );
+                setBounds(std::pair< return_type, return_type > { bnds.front(), bnds.back() });
             }
 
         public:
@@ -560,7 +563,8 @@ namespace nxx::roots
     {
         using RT = typename SOLVER::return_type;
         if (bounds.size() != 2) throw std::logic_error("Initializer list must contain exactly two elements!");
-        return impl::fsolve_impl(solver, std::pair< RT, RT > { *bounds.begin(), *(bounds.begin() + 1) }, eps, maxiter);
+        auto bnds = std::span( bounds.begin(), bounds.end() );
+        return impl::fsolve_impl(solver, std::pair< RT, RT > { bnds.front(), bnds.back() }, eps, maxiter);
     }
 
 }    // namespace nxx::roots

@@ -9,6 +9,7 @@
 #include <list>
 #include <set>
 #include <unordered_set>
+#include <fmt/format.h>
 
 void printpoly(auto coefficients) {
 
@@ -170,6 +171,18 @@ int main() {
 
     std::cout << "\nReal roots of the complex polynomial (specified by template parameter): " << poly2.asString() << std::endl;
     for (auto res = polysolve<double>(poly2); auto root : *res) std::cout << root << "\n"; // Will print the real roots (complex roots will be ignored)
+
+    try {
+        nlohmann::ordered_json data;
+        data["Description"] = "Polynomial evaluation failed; non-finite result";
+        data["Argument"] = std::nan("");
+        data["Coefficients"] = poly2;
+
+        throw nxx::NumerixxError("Integer error", nxx::NumerixxErrorType::General, data.dump());
+    }
+    catch (const nxx::NumerixxError& e) {
+        std::cout << e.log() << std::endl;
+    }
 
     return 0;
 }

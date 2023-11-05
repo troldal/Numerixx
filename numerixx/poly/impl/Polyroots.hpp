@@ -119,7 +119,7 @@ namespace nxx::poly
     template< typename RT = void >
     inline auto linear(IsPolynomial auto poly, typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance = nxx::EPS)
     {
-        if (poly.order() != 1) throw error::PolynomialError("Error: Input is not a monomial.");
+        if (poly.order() != 1) throw std::runtime_error("Error: Input is not a monomial.");
 
         using POLY_TYPE    = PolynomialTraits< decltype(poly) >;
         using VALUE_TYPE   = typename POLY_TYPE::value_type;
@@ -130,7 +130,7 @@ namespace nxx::poly
         root.emplace_back(-poly.coefficients().front() / poly.coefficients().back());
 
         using RET = std::conditional_t< std::same_as< RT, void >, VALUE_TYPE, RT >;
-        tl::expected< std::vector< RET >, error::PolynomialError > result = impl::sortRoots< RET >(root, tolerance);
+        tl::expected< std::vector< RET >, std::runtime_error > result = impl::sortRoots< RET >(root, tolerance);
         return result;
     }
 
@@ -164,7 +164,7 @@ namespace nxx::poly
     inline auto quadratic(IsPolynomial auto poly, typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance = nxx::EPS)
     {
         // ===== Check that the polynomial is quadratic.
-        if (poly.order() != 2) throw error::PolynomialError("Quadratic Error: Polynomial is not quadratic.");
+        if (poly.order() != 2) throw std::runtime_error("Quadratic Error: Polynomial is not quadratic.");
 
         using POLY_TYPE    = PolynomialTraits< decltype(poly) >;
         using VALUE_TYPE   = typename POLY_TYPE::value_type;
@@ -181,12 +181,12 @@ namespace nxx::poly
 
         COMPLEX_TYPE q = -0.5 * (b + (sqrt_component.real() >= 0.0 ? discriminant : -discriminant));
 
-        if (std::abs(q) < tolerance || std::abs(a) < tolerance) throw error::PolynomialError("Quadratic polynomial is ill formed.");
+        if (std::abs(q) < tolerance || std::abs(a) < tolerance) throw std::runtime_error("Quadratic polynomial is ill formed.");
 
         std::vector< COMPLEX_TYPE > roots = { q / a, c / q };
 
         using RET = std::conditional_t< std::same_as< RT, void >, VALUE_TYPE, RT >;
-        tl::expected< std::vector< RET >, error::PolynomialError > result = impl::sortRoots< RET >(roots, tolerance);
+        tl::expected< std::vector< RET >, std::runtime_error > result = impl::sortRoots< RET >(roots, tolerance);
         return result;
     }
 
@@ -215,7 +215,7 @@ namespace nxx::poly
     template< typename RT = void >
     inline auto cubic(IsPolynomial auto poly, typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance = nxx::EPS)
     {
-        if (poly.order() != 3) throw error::PolynomialError("Cubic Error: Polynomial is not cubic.");
+        if (poly.order() != 3) throw std::runtime_error("Cubic Error: Polynomial is not cubic.");
 
         using POLY_TYPE    = PolynomialTraits< decltype(poly) >;
         using VALUE_TYPE   = typename POLY_TYPE::value_type;
@@ -248,7 +248,7 @@ namespace nxx::poly
 
 
         using RET = std::conditional_t< std::same_as< RT, void >, VALUE_TYPE, RT >;
-        tl::expected< std::vector< RET >, error::PolynomialError > result = impl::sortRoots< RET >(roots, tolerance);
+        tl::expected< std::vector< RET >, std::runtime_error > result = impl::sortRoots< RET >(roots, tolerance);
         return result;
     }
 
@@ -279,7 +279,7 @@ namespace nxx::poly
                          typename PolynomialTraits< decltype(poly) >::fundamental_type                 tolerance      = nxx::EPS,
                          int                                                                           max_iterations = nxx::MAXITER)
     {
-        if (poly.order() <= 3) throw error::PolynomialError("Laguerre Error: Polynomial is cubic or lower.");
+        if (poly.order() <= 3) throw std::runtime_error("Laguerre Error: Polynomial is cubic or lower.");
 
         using POLY_TYPE    = PolynomialTraits< decltype(poly) >;
         using FLOAT_TYPE   = typename POLY_TYPE::fundamental_type;
@@ -352,8 +352,8 @@ namespace nxx::poly
                           typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance      = nxx::EPS,
                           int                                                           max_iterations = nxx::MAXITER)
     {
-        if (max_iterations < 1) throw error::PolynomialError("Maximum number of iterations must be greater than zero.");
-        if (poly.order() < 1) throw error::PolynomialError("Polynomial must have at least two coefficients (a monomial).");
+        if (max_iterations < 1) throw std::runtime_error("Maximum number of iterations must be greater than zero.");
+        if (poly.order() < 1) throw std::runtime_error("Polynomial must have at least two coefficients (a monomial).");
 
         using POLY_TYPE    = PolynomialTraits< decltype(poly) >;
         using VALUE_TYPE   = typename POLY_TYPE::value_type;
@@ -424,7 +424,7 @@ namespace nxx::poly
         }
 
         using RET = std::conditional_t< std::same_as< RT, void >, VALUE_TYPE, RT >;
-        tl::expected< std::vector< RET >, error::PolynomialError > result = impl::sortRoots< RET >(roots, tolerance);
+        tl::expected< std::vector< RET >, std::runtime_error > result = impl::sortRoots< RET >(roots, tolerance);
         return result;
     }
 }    // namespace nxx::poly

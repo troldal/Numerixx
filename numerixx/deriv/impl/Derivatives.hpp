@@ -32,7 +32,8 @@
 #define NUMERIXX_DIFFERENTIATION_HPP
 
 // ===== Numerixx Includes
-#include <Poly.hpp>
+//#include <Poly.hpp>
+#include <Concepts.hpp>
 
 // ===== External Includes
 #include <gcem.hpp>
@@ -46,6 +47,7 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
+#include <stdexcept>
 
 namespace nxx::deriv
 {

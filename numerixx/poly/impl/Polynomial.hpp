@@ -34,9 +34,11 @@
 // ===== Numerixx Includes
 #include "PolynomialError.hpp"
 #include <Concepts.hpp>
+#include <Error.hpp>
 
 // ===== External Includes
 #include <tl/expected.hpp>
+#include <nlohmann/json.hpp>
 
 // ===== Standard Library Includes
 #include <algorithm>
@@ -60,15 +62,8 @@ namespace nxx::poly
      */
     template< typename CONTAINER >
     concept IsCoefficientContainer =
-        (std::floating_point< typename CONTAINER::value_type > ||
-         IsComplex< typename CONTAINER::value_type >)&&(std::bidirectional_iterator< typename CONTAINER::iterator >);
-
-    /*
-     * Forward declaration of the Polynomial class.
-     */
-    template< typename T >
-    requires std::floating_point< T > || IsComplex< T >
-    class Polynomial;
+        (std::floating_point< typename CONTAINER::value_type > || IsComplex< typename CONTAINER::value_type >) &&
+        (std::bidirectional_iterator< typename CONTAINER::iterator >);
 
     /*
      * Forward declaration of the PolynomialTraits class.
@@ -80,7 +75,7 @@ namespace nxx::poly
      * Specialization of the PolynomialTraits class for Polynomial objects with floating point coefficients.
      */
     template< typename T >
-    //        requires std::floating_point< T >
+    requires std::floating_point< T >
     struct PolynomialTraits< Polynomial< T > >
     {
         using value_type       = T;
@@ -91,11 +86,26 @@ namespace nxx::poly
      * Specialization of the PolynomialTraits class for Polynomial objects with complex coefficients.
      */
     template< typename T >
+    requires std::floating_point< T >
     struct PolynomialTraits< Polynomial< std::complex< T > > >
     {
         using value_type       = std::complex< T >;
         using fundamental_type = T;
     };
+
+    template<typename X>
+    void to_json(nlohmann::ordered_json& j, Polynomial<X> const& p)
+    {
+        if constexpr (!IsComplex<X>)
+            j = p.coefficients();
+        else {
+
+            std::vector<std::pair<typename X::value_type, typename X::value_type>> coeffs;
+            for (auto const& c : p.coefficients())
+                coeffs.emplace_back(c.real(), c.imag());
+            j = coeffs;
+        }
+    }
 
     /**
      * @brief A class representing a polynomial with coefficients of type T.
@@ -178,22 +188,31 @@ namespace nxx::poly
         template< typename U >
         requires std::convertible_to<U, T> || std::floating_point< U > || IsComplex< U >
         [[nodiscard]]
-        inline auto evaluate(U value) const
+        inline auto evaluate(U value) const -> tl::expected< std::common_type_t< T, U >, nxx::NumerixxError >
         {
             using TYPE = std::common_type_t< T, U >;
-            tl::expected< TYPE, error::PolynomialError > result;
+
+            if (order() == 0) [[unlikely]]
+                return m_coefficients.front();
+
+            if (std::distance(m_coefficients.crbegin(), m_coefficients.crend()) <= 1) [[unlikely]]
+                return m_coefficients.front() + value * m_coefficients.back();
 
             // ===== Horner's method implemented in terms of std::accummulate.
-            TYPE eval = std::accumulate(m_coefficients.crbegin() + 1,
+            TYPE result = std::accumulate(m_coefficients.crbegin() + 1, // TODO: Is this safe?
                                         m_coefficients.crend(),
                                         static_cast< TYPE >(m_coefficients.back()),
                                         [value](TYPE curr, TYPE coeff) { return curr * static_cast<TYPE>(value) + coeff; });
 
-            if (std::isfinite(abs(eval)))
-                result = eval;
-            else
-                result = tl::make_unexpected(error::PolynomialError { "Computation of polynomial gave non-finite result." });
-            return result;
+            if (std::isfinite(abs(result))) [[likely]]
+                return result;
+
+            nlohmann::ordered_json data;
+            data["Description"] = "Polynomial evaluation failed; non-finite result";
+//            data["Argument"] = value;
+            data["Coefficients"] = *this;
+            return tl::unexpected(nxx::NumerixxError("Polynomial error", nxx::NumerixxErrorType::Poly, data.dump()));
+
         }
 
         /**
@@ -421,8 +440,8 @@ namespace nxx::poly
      *
      * @tparam POLY The type to check.
      */
-    template< typename POLY >
-    concept IsPolynomial = std::same_as< POLY, Polynomial< typename POLY::value_type > >;
+//    template< typename POLY >
+//    concept IsPolynomial = std::same_as< POLY, Polynomial< typename POLY::value_type > >;
 
     /**
      * @brief Computes the derivative of a given polynomial function.
@@ -439,7 +458,7 @@ namespace nxx::poly
     inline auto derivativeOf(IsPolynomial auto func)
     {
         // Throw an error if the order of the polynomial function is 0 (i.e., the function is constant).
-        if (func.order() == 0) throw error::PolynomialError("Cannot differentiate a constant polynomial.");
+        if (func.order() == 0) throw std::runtime_error("Cannot differentiate a constant polynomial.");
 
         using VALUE_TYPE = typename PolynomialTraits< decltype(func) >::value_type; // This is the type of the coefficients of the polynomial.
         using FLOAT_TYPE = typename PolynomialTraits< decltype(func) >::fundamental_type; // This is the type of the exponents and other arithmetic operations in the polynomial.
@@ -624,7 +643,7 @@ namespace nxx::poly
         // Handle case when divisor doesn't have coefficients or
         // when polynomial order of divisor is larger than the dividend
         if (divisor.empty() || divisor.back() == 0.0 || rhs.order() > lhs.order())
-            throw error::PolynomialError("Invalid divisor polynomial");
+            throw std::runtime_error("Invalid divisor polynomial");
 
         // Initialize the quotient polynomial coefficients with 0
         std::vector< TYPE > quotient(lhs.order() - rhs.order() + 1, 0);

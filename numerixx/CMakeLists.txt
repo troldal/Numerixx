@@ -17,6 +17,16 @@ find_package(gcem REQUIRED)
 find_package(tl-expected REQUIRED)
 find_package(blaze REQUIRED)
 find_package(LAPACK)
+find_package(Boost REQUIRED)
+find_package(nlohmann_json REQUIRED)
+
+set(FETCHCONTENT_SOURCE_DIR_HWINFO ${CMAKE_CURRENT_LIST_DIR}/../../hwinfo)
+include(FetchContent)
+FetchContent_Declare(hwinfo
+        GIT_REPOSITORY https://github.com/troldal/hwinfo.git
+        GIT_TAG        header_only_dev
+)
+FetchContent_MakeAvailable(hwinfo)
 
 #==============================================================================
 # Define utility interface library
@@ -69,9 +79,9 @@ add_library(numerixx::all ALIAS nxx_all)
 # Link libraries
 #==============================================================================
 target_link_libraries(nxx_func INTERFACE nxx_utility gcem tl::expected)
-target_link_libraries(nxx_poly INTERFACE nxx_utility nxx_roots gcem tl::expected)
-target_link_libraries(nxx_deriv INTERFACE nxx_utility nxx_poly gcem tl::expected)
-target_link_libraries(nxx_roots INTERFACE nxx_utility nxx_deriv gcem tl::expected)
+target_link_libraries(nxx_deriv INTERFACE nxx_utility gcem tl::expected)
+target_link_libraries(nxx_poly INTERFACE nxx_utility nxx_deriv nxx_roots gcem tl::expected nlohmann_json::nlohmann_json)
+target_link_libraries(nxx_roots INTERFACE nxx_utility nxx_poly nxx_deriv gcem tl::expected)
 target_link_libraries(nxx_multiroots INTERFACE nxx_utility nxx_deriv gcem tl::expected)
 target_link_libraries(nxx_multiroots INTERFACE LAPACK::LAPACK blaze::blaze)
 target_link_libraries(nxx_all INTERFACE nxx_func nxx_poly nxx_deriv nxx_roots nxx_multiroots)

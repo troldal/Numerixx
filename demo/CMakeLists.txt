@@ -125,7 +125,8 @@ list(APPEND OPENXLSX_DEBUG_FLAGS_MSVC
         "/w14906"
         "/w14928"
         "/wd4251"
-        "/wd4275")
+        "/wd4275"
+        "/guard:cf")
 list(APPEND OPENXLSX_RELEASE_FLAGS_MSVC
         "/wd4251"
         "/wd4275")

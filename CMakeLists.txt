@@ -18,23 +18,23 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 #==============================================================================
 add_subdirectory(numerixx)
 
-option(MUMERIXX_ENABLE_TESTS "Enable unit tests" ${PROJECT_IS_TOP_LEVEL})
-if(MUMERIXX_ENABLE_TESTS)
+option(NUMERIXX_ENABLE_TESTS "Enable unit tests" ${PROJECT_IS_TOP_LEVEL})
+if(NUMERIXX_ENABLE_TESTS)
     add_subdirectory(test)
 endif()
 
-option(MUMERIXX_ENABLE_DOCS "Enable documentation" ${PROJECT_IS_TOP_LEVEL})
-if(MUMERIXX_ENABLE_DOCS)
-    add_subdirectory(docs)
-endif()
+#option(NUMERIXX_ENABLE_DOCS "Enable documentation" ${PROJECT_IS_TOP_LEVEL})
+#if(NUMERIXX_ENABLE_DOCS)
+#    add_subdirectory(docs)
+#endif()
 
-option(MUMERIXX_ENABLE_DEMOS "Enable demo programs" ${PROJECT_IS_TOP_LEVEL})
-if(MUMERIXX_ENABLE_DEMOS)
+option(NUMERIXX_ENABLE_DEMOS "Enable demo programs" ${PROJECT_IS_TOP_LEVEL})
+if(NUMERIXX_ENABLE_DEMOS)
     add_subdirectory(demo)
 endif()
 
-#option(MUMERIXX_ENABLE_BENCHMARKS "Enable benchmarks" ${PROJECT_IS_TOP_LEVEL})
-#if(MUMERIXX_ENABLE_BENCHMARKS)
+#option(NUMERIXX_ENABLE_BENCHMARKS "Enable benchmarks" ${PROJECT_IS_TOP_LEVEL})
+#if(NUMERIXX_ENABLE_BENCHMARKS)
 #    add_subdirectory(benchmark)
 #endif()
 

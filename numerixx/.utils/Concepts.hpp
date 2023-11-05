@@ -52,6 +52,16 @@ namespace nxx
                             } -> std::floating_point;
                         };
 
+
+
 }    // namespace nxx
 
+namespace nxx::poly {
+    template< typename T >
+    requires std::floating_point< T > || IsComplex< T >
+    class Polynomial;
+
+    template< typename POLY >
+    concept IsPolynomial = std::same_as< POLY, Polynomial< typename POLY::value_type > >;
+}
 #endif    // NUMERIXX_CONCEPTS_HPP

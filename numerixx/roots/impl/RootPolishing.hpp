@@ -35,6 +35,7 @@
 #include "RootCommon.hpp"
 #include <Constants.hpp>
 #include <Deriv.hpp>
+#include <Poly.hpp>
 
 // ===== Standard Library Includes
 #include <algorithm>
