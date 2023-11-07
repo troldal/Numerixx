@@ -38,11 +38,11 @@
 
 // ===== External Includes
 #include <tl/expected.hpp>
-#include <nlohmann/json.hpp>
 
 // ===== Standard Library Includes
 #include <algorithm>
 #include <complex>
+#include <functional>
 #include <iterator>
 #include <numeric>
 #include <sstream>
@@ -53,17 +53,33 @@ namespace nxx::poly
 {
 
     /**
-     * @brief A concept that checks whether a container is suitable for storing polynomial coefficients.
+     * @concept IsCoefficientContainer
+     * @brief Checks if a container type is suitable for storing polynomial coefficients.
      *
-     * This concept checks whether a container has a value type that is a floating-point type or a
-     * complex type, and whether its iterator type is bidirectional.
+     * This concept checks if a container type can be used to store the coefficients of a polynomial.
+     * It enforces that the container must have bidirectional iterators and its value type must be
+     * either a floating point or a complex number. Additionally, it must provide begin and end
+     * member functions that return forward iterators, ensuring the container can be iterated over
+     * in a range-based for loop.
      *
-     * @tparam CONTAINER The container to check.
+     * @tparam CONTAINER The container type to be checked against the concept.
+     *
+     * @requirements
+     * - CONTAINER must provide begin and end functions that return forward iterators.
+     * - CONTAINER::value_type must be a floating point or a complex number type.
+     * - CONTAINER::iterator must be a bidirectional iterator.
      */
     template< typename CONTAINER >
     concept IsCoefficientContainer =
-        (std::floating_point< typename CONTAINER::value_type > || IsComplex< typename CONTAINER::value_type >) &&
-        (std::bidirectional_iterator< typename CONTAINER::iterator >);
+        requires(CONTAINER a) {
+            {
+                begin(a)
+            } -> std::forward_iterator;    // Check if 'begin' gives a forward iterator
+            {
+                end(a)
+            } -> std::forward_iterator;    // Check if 'end' gives a forward iterator
+        } && (std::floating_point< typename CONTAINER::value_type > ||
+              IsComplex< typename CONTAINER::value_type >)&&(std::bidirectional_iterator< typename CONTAINER::iterator >);
 
     /*
      * Forward declaration of the PolynomialTraits class.
@@ -93,19 +109,32 @@ namespace nxx::poly
         using fundamental_type = T;
     };
 
-    template<typename X>
-    void to_json(nlohmann::ordered_json& j, Polynomial<X> const& p)
-    {
-        if constexpr (!IsComplex<X>)
-            j = p.coefficients();
-        else {
+    /**
+     * @brief The default serializer for the Polynomial class.
+     *
+     * This generalized lambda is used to serialize a Polynomial object to a string.
+     *
+     * @param p The polynomial to serialize.
+     * @return A string representation of the polynomial.
+     */
+    constexpr auto DefaultSerializer = [](auto const& p) {
+        std::stringstream ss;
+        auto              first = begin(p);
+        auto              last  = end(p);
 
-            std::vector<std::pair<typename X::value_type, typename X::value_type>> coeffs;
-            for (auto const& c : p.coefficients())
-                coeffs.emplace_back(c.real(), c.imag());
-            j = coeffs;
+        for (auto it = first; it != last; ++it) {
+            // Calculate the index based on iterator position
+            auto index = std::distance(first, it);
+            ss << "c[" << index << "]=" << *it;
+
+            // Only add a comma if this is not the last element
+            if (std::next(it) != last) {
+                ss << ", ";
+            }
         }
-    }
+
+        return ss.str();
+    };
 
     /**
      * @brief A class representing a polynomial with coefficients of type T.
@@ -118,11 +147,12 @@ namespace nxx::poly
      * @tparam T The type of the polynomial coefficients. This must be a floating
      * point type or a type that satisfies the `utils::IsComplex` concept.
      */
-    template< typename T = double>
+    template< typename T = double >
     requires std::floating_point< T > || IsComplex< T >
     class Polynomial final
     {
-        std::vector< T > m_coefficients; /**< The internal store of polynomial coefficients. */
+        std::vector< T >                               m_coefficients; /**< The internal store of polynomial coefficients. */
+        std::function< std::string(std::vector< T >) > m_serializer = DefaultSerializer;
 
     public:
         /**
@@ -131,35 +161,126 @@ namespace nxx::poly
         using value_type = T;
 
         /**
-         * @brief Constructs a polynomial from a range of coefficients.
+         * @brief Constructs a zero polynomial.
          *
-         * The range must be a container whose value type is convertible to T. The
-         * constructed polynomial will have a degree equal to the number of
-         * non-zero coefficients minus one.
-         *
-         * @tparam IsCoefficientContainer A type trait that verifies that the
-         * template argument is a container of coefficients.
-         * @param coefficients The range of coefficients.
+         * This constructor initializes the polynomial with a single zero coefficient.
          */
-        explicit Polynomial(const IsCoefficientContainer auto& coefficients)
-            : m_coefficients { coefficients.cbegin(),
-                               std::find_if(coefficients.crbegin(), coefficients.crend(), [](T val) { return val != 0.0; }).base() }
+        Polynomial()
+            : Polynomial({ 0 })
+        {}
+
+        /**
+         * @brief Constructs a Polynomial with the given coefficients and an optional custom serializer.
+         *
+         * This constructor initializes a Polynomial with the given coefficients, trimming any trailing zeros.
+         * It also sets a custom serializer function for representing the Polynomial as a string, if provided.
+         * The coefficients are processed in reverse to remove any trailing zeros, ensuring that the
+         * polynomial is stored in its minimal form. If no non-zero coefficients are provided, a zero polynomial
+         * is created with a single zero coefficient.
+         *
+         * @tparam IsCoefficientContainer Checks if the input is a container with a valid
+         *                                value type for the coefficients.
+         * @param coefficients An container of coefficients representing the polynomial.
+         *                     The coefficients are expected to be provided in increasing order
+         *                     of degree, i.e., {a0, a1, a2, ...}, where a0 is the constant term.
+         * @param serializer   A std::function object that takes a const reference to a vector of
+         *                     coefficients (std::vector<T>) and returns a std::string. This
+         *                     function is used to serialize the polynomial coefficients. If not
+         *                     provided, the DefaultSerializer is used.
+         *
+         * @throws NumerixxError if the serializer function is not provided.
+         */
+        explicit Polynomial(const IsCoefficientContainer auto&                    coefficients,
+                            std::function< std::string(const std::vector< T >&) > serializer = DefaultSerializer)
+            : m_serializer(serializer)
         {
-            if (m_coefficients.empty()) {
-                m_coefficients.push_back(0.0);
+            // Check for a valid serializer function.
+            if (!serializer) {
+                throw NumerixxError("Serializer function cannot be empty");
+            }
+
+            // Lambda function to determine if a coefficient is near zero, considering both floating-point and complex numbers.
+            auto is_near_zero = [&](auto val) -> bool {
+                // Use a different epsilon value based on whether the type is complex or not.
+                if constexpr (IsComplex< decltype(val) >) {
+                    // Calculate epsilon for complex numbers.
+                    constexpr auto epsilon = std::numeric_limits< typename decltype(val)::value_type >::epsilon();
+                    // Check if the norm of the complex number is within the tolerance defined by epsilon.
+                    return std::norm(val) <= epsilon * epsilon;
+                }
+                else {
+                    // Calculate epsilon for floating-point numbers.
+                    constexpr auto epsilon = std::numeric_limits< decltype(val) >::epsilon();
+                    // Check if the value is within the tolerance defined by epsilon.
+                    return std::norm(val) <= epsilon * epsilon;
+                }
+            };
+
+            // Find the iterator to the first non-zero coefficient when traversing the container in reverse.
+            auto rev_it = std::find_if_not(coefficients.crbegin(), coefficients.crend(), is_near_zero);
+
+            // If all coefficients are near zero, initialize the polynomial as a zero polynomial.
+            if (rev_it == coefficients.crend()) {
+                m_coefficients.push_back(T {});    // Ensure at least one coefficient for a zero polynomial
+            }
+            else {
+                // Assign coefficients from the start to the first non-zero coefficient found, excluding trailing zeros.
+                m_coefficients.assign(coefficients.cbegin(), rev_it.base());
             }
         }
 
         /**
-         * @brief Constructs a polynomial from a list of coefficients.
+         * @brief Constructs a polynomial from an initializer list of coefficients.
          *
-         * The constructed polynomial will have a degree equal to the number of
-         * non-zero coefficients minus one.
+         * This constructor allows for creating a Polynomial object using brace-enclosed
+         * initializer list for coefficients. It will automatically remove any trailing zeros
+         * from the polynomial representation. A serializer function can be provided to
+         * customize the serialization of the polynomial. If no serializer is provided, a
+         * default one is used which serializes the coefficients in a human-readable string format.
          *
-         * @param coefficients The list of coefficients.
+         * @param coefficients An initializer list of coefficients representing the polynomial.
+         *                     The coefficients are expected to be provided in increasing order
+         *                     of degree, i.e., {a0, a1, a2, ...}, where a0 is the constant term.
+         * @param serializer   A std::function object that takes a const reference to a vector of
+         *                     coefficients (std::vector<T>) and returns a std::string. This
+         *                     function is used to serialize the polynomial coefficients. If not
+         *                     provided, the DefaultSerializer is used.
+         *
+         * @note If the initializer list is empty, the constructed polynomial will be the zero
+         *       polynomial. Also, if the serializer function provided is empty, an exception will
+         *       be thrown.
+         *
+         * @throw NumerixxError if the serializer function is empty.
          */
-        Polynomial(std::initializer_list< T > coefficients)
-            : Polynomial(std::vector< T >(coefficients))
+        Polynomial(std::initializer_list< T > coefficients, std::function< std::string(std::vector< T >) > serializer = DefaultSerializer)
+            : Polynomial(std::vector< T >(coefficients), serializer)
+        {}
+
+        /**
+         * @brief Constructs a polynomial with a single coefficient.
+         *
+         * This constructor is explicit to prevent unintentional type conversions.
+         *
+         * @param coefficient The single coefficient of the polynomial.
+         */
+        explicit Polynomial(T coefficient)
+            : Polynomial({ coefficient })
+        {}
+
+        /**
+         * @brief Constructs a polynomial from a range of coefficients.
+         *
+         * This constructor template allows the creation of a polynomial from iterators
+         * pointing to the beginning and end of a range containing coefficients.
+         *
+         * @tparam InputIterator The type of the input iterators. Must satisfy the requirements
+         * of InputIterator.
+         * @param first The beginning iterator of the coefficient range.
+         * @param last The ending iterator of the coefficient range (one-past-the-end).
+         */
+        template< typename InputIterator >
+        Polynomial(InputIterator first, InputIterator last)
+            : Polynomial(std::vector< typename std::iterator_traits< InputIterator >::value_type > { first, last })
         {}
 
         /**
@@ -175,18 +296,34 @@ namespace nxx::poly
         inline auto operator()(auto value) const { return *evaluate(value); }
 
         /**
-         * @brief Evaluates the polynomial at a given value.
+         * @brief Evaluates the polynomial at a given point using Horner's method.
          *
-         * This function evaluates the polynomial at a given value using Horner's method and returns the result.
-         * The function template parameter `U` specifies the type of the input value, which can be either a real or
-         * complex number.
+         * This function evaluates the polynomial for a given value of `U`. It checks for
+         * the polynomial's order and handles edge cases, such as when the polynomial
+         * order is zero or there are no coefficients. It also includes error handling for
+         * non-finite arguments or results. Horner's method is used for the evaluation
+         * which is efficient and numerically stable.
          *
-         * @tparam U The type of the input value.
-         * @param value The value to evaluate the polynomial at.
-         * @return The value of the polynomial at the specified input value.
+         * @tparam U The type of the value at which the polynomial is evaluated. It must
+         *           be convertible to `T` or be a floating-point or complex type.
+         * @param value The point at which to evaluate the polynomial.
+         *
+         * @return tl::expected<std::common_type_t<T, U>, nxx::NumerixxError>
+         *         The result of the polynomial evaluation. It returns a `tl::expected` object
+         *         that contains the evaluation result or an error. The evaluation result is of
+         *         type `std::common_type_t<T, U>`, which is the common type between `T` and `U`.
+         *         If an error occurs during the evaluation, `tl::unexpected` is returned with
+         *         an instance of `nxx::NumerixxError` containing the error details.
+         *
+         * @note This function uses `std::accumulate` for its implementation. The
+         *       accumulation starts from the second to last coefficient to the first,
+         *       ensuring that the iterator does not surpass the bounds.
+         *
+         * @exception nxx::NumerixxError Thrown if the polynomial has no coefficients, or if
+         *            the argument or result of the evaluation is non-finite.
          */
         template< typename U >
-        requires std::convertible_to<U, T> || std::floating_point< U > || IsComplex< U >
+        requires std::convertible_to< U, T > || std::floating_point< U > || IsComplex< U >
         [[nodiscard]]
         inline auto evaluate(U value) const -> tl::expected< std::common_type_t< T, U >, nxx::NumerixxError >
         {
@@ -195,24 +332,31 @@ namespace nxx::poly
             if (order() == 0) [[unlikely]]
                 return m_coefficients.front();
 
-            if (std::distance(m_coefficients.crbegin(), m_coefficients.crend()) <= 1) [[unlikely]]
-                return m_coefficients.front() + value * m_coefficients.back();
+            auto begin = m_coefficients.crbegin();
+            auto end   = m_coefficients.crend();
+
+            if (m_coefficients.size() <= 1 || begin == end) [[unlikely]] {
+                std::stringstream ss;
+                ss << "\tPolynomial evaluation failed; no coefficients\n";
+                ss << "\tArgument: " << value << "\n";
+                ss << "\tCoefficients: " << this->serialize() << "\n";
+                return tl::unexpected(nxx::NumerixxError("Polynomial error", nxx::NumerixxErrorType::Poly, ss.str()));
+            }
 
             // ===== Horner's method implemented in terms of std::accummulate.
-            TYPE result = std::accumulate(m_coefficients.crbegin() + 1, // TODO: Is this safe?
-                                        m_coefficients.crend(),
-                                        static_cast< TYPE >(m_coefficients.back()),
-                                        [value](TYPE curr, TYPE coeff) { return curr * static_cast<TYPE>(value) + coeff; });
+            TYPE result = std::accumulate(begin + 1, end, static_cast< TYPE >(m_coefficients.back()), [value](TYPE curr, TYPE coeff) {
+                return curr * static_cast< TYPE >(value) + coeff;
+            });
 
-            if (std::isfinite(abs(result))) [[likely]]
-                return result;
+            if (!std::isfinite(std::abs(result))) {    // Check if the result is not finite
+                std::stringstream ss;
+                ss << "\tPolynomial evaluation failed; non-finite result\n";
+                ss << "\tArgument: " << value << "\n";
+                ss << "\tCoefficients: " << this->serialize() << "\n";
+                return tl::unexpected(nxx::NumerixxError("Polynomial error", nxx::NumerixxErrorType::Poly, ss.str()));
+            }
 
-            nlohmann::ordered_json data;
-            data["Description"] = "Polynomial evaluation failed; non-finite result";
-//            data["Argument"] = value;
-            data["Coefficients"] = *this;
-            return tl::unexpected(nxx::NumerixxError("Polynomial error", nxx::NumerixxErrorType::Poly, data.dump()));
-
+            return result;
         }
 
         /**
@@ -221,7 +365,7 @@ namespace nxx::poly
          * @return A constant reference to the vector of coefficients.
          */
         [[nodiscard]]
-        const auto& coefficients() const
+        const std::vector< T >& coefficients() const
         {
             return m_coefficients;
         }
@@ -244,7 +388,7 @@ namespace nxx::poly
         }
 
         /**
-         * @brief Returns a string representation of the polynomial.
+         * @brief Outputs the polynomial to an output stream.
          *
          * The polynomial is output in the form `a_0 + a_1 x + a_2 x^2 + ... + a_{n-1} x^{n-1} + a_n x^n`.
          * If a coefficient is zero, it is omitted. If a coefficient is negative, it is
@@ -252,43 +396,81 @@ namespace nxx::poly
          *
          * @return A string representation of the polynomial.
          */
-        [[nodiscard]]
-        std::string asString() const
+        friend std::ostream& operator<<(std::ostream& os, Polynomial const& p)
         {
-            std::ostringstream oss;
+            if (p.m_coefficients.empty()) {
+                return os << 0;    // output zero if the polynomial is empty
+            }
 
-            // Print highest degree term with sign, if non-zero
-            if (!m_coefficients.empty()) {
-                oss << m_coefficients.front();
-                for (size_t i = 1; i < m_coefficients.size(); ++i) {
-                    auto coeff = m_coefficients[i];
-                    if constexpr (!IsComplex< T >) {
-                        if (coeff == 0.0) {
-                            continue;
-                        }
-                        else if (coeff > 0.0) {
-                            oss << " + ";
-                        }
-                        else {
-                            oss << " - ";
-                        }
-                        oss << abs(coeff) << "x";
-                    }
-                    else {
-                        if (abs(coeff) == 0.0) {
-                            continue;
-                        }
-                        else {
-                            oss << " + ";
-                        }
-                        oss << coeff << "x";
-                    }
-                    if (i >= 2) {
-                        oss << "^" << i;
-                    }
+            // Iterator for the coefficients
+            auto coeff_it = p.m_coefficients.cbegin();
+            // Handle the constant term (0th degree) separately
+            os << *coeff_it++;
+
+            // Now handle the rest of the coefficients
+            int degree = 1;
+            for (; coeff_it != p.m_coefficients.cend(); ++coeff_it, ++degree) {
+                // We use 'auto' to work with different types (e.g., float, double, complex)
+                const auto& coeff = *coeff_it;
+
+                // Skip zero coefficients
+                if (coeff == T {}) continue;
+
+                // Use different logic for non-complex and complex types
+                if constexpr (!IsComplex< T >) {
+                    os << (coeff > T {} ? " + " : " - ") << std::abs(coeff);
+                }
+                else {
+                    // Complex numbers might need a different approach for sign and abs
+                    os << " + " << coeff;
+                }
+
+                // For non-zero coefficients, print 'x' and maybe the exponent
+                os << "x";
+                if (degree > 1) {
+                    os << "^" << degree;
                 }
             }
-            return oss.str();
+
+            return os;
+
+            // Old code:
+            //            std::ostringstream oss;
+            //
+            //            // Print highest degree term with sign, if non-zero
+            //            if (!p.m_coefficients.empty()) {
+            //                oss << p.m_coefficients.front();
+            //                for (size_t i = 1; i < p.m_coefficients.size(); ++i) {
+            //                    auto coeff = p.m_coefficients[i];
+            //                    if constexpr (!IsComplex< T >) {
+            //                        if (coeff == 0.0) {
+            //                            continue;
+            //                        }
+            //                        else if (coeff > 0.0) {
+            //                            oss << " + ";
+            //                        }
+            //                        else {
+            //                            oss << " - ";
+            //                        }
+            //                        oss << abs(coeff) << "x";
+            //                    }
+            //                    else {
+            //                        if (abs(coeff) == 0.0) {
+            //                            continue;
+            //                        }
+            //                        else {
+            //                            oss << " + ";
+            //                        }
+            //                        oss << coeff << "x";
+            //                    }
+            //                    if (i >= 2) {
+            //                        oss << "^" << i;
+            //                    }
+            //                }
+            //            }
+            //
+            //            os << oss.str();
+            //            return os;
         }
 
         /**
@@ -305,6 +487,21 @@ namespace nxx::poly
         }
 
         /**
+         * @brief Returns a string representation of the polynomial.
+         *
+         * The polynomial is output in the form `a_0 + a_1 x + a_2 x^2 + ... + a_{n-1} x^{n-1} + a_n x^n`.
+         * If a coefficient is zero, it is omitted. If a coefficient is negative, it is
+         * shown with a negative sign.
+         *
+         * @return A string representation of the polynomial.
+         */
+        [[nodiscard]]
+        std::string serialize() const
+        {
+            return m_serializer(m_coefficients);
+        }
+
+        /**
          * @brief Adds another polynomial to this polynomial.
          *
          * This operator adds the given polynomial to this polynomial and returns
@@ -314,9 +511,9 @@ namespace nxx::poly
          * @param rhs The polynomial to add to this polynomial.
          * @return The sum of the two polynomials.
          */
-        template <typename U>
+        template< typename U >
         requires std::floating_point< U > || (IsComplex< T > && IsComplex< U >)
-        auto& operator+=(Polynomial< U > const& rhs)
+        Polynomial< T >& operator+=(Polynomial< U > const& rhs)
         {
             auto temp = *this + rhs;
             std::swap(*this, temp);
@@ -333,9 +530,9 @@ namespace nxx::poly
          * @param rhs The polynomial to subtract from this polynomial.
          * @return The difference between the two polynomials.
          */
-        template <typename U>
+        template< typename U >
         requires std::floating_point< U > || (IsComplex< T > && IsComplex< U >)
-        auto& operator-=(Polynomial< U > const& rhs)
+        Polynomial< T >& operator-=(Polynomial< U > const& rhs)
         {
             auto temp = *this - rhs;
             std::swap(*this, temp);
@@ -352,9 +549,9 @@ namespace nxx::poly
          * @param rhs The other polynomial to multiply by.
          * @return A reference to the modified polynomial object.
          */
-        template <typename U>
+        template< typename U >
         requires std::floating_point< U > || (IsComplex< T > && IsComplex< U >)
-        auto& operator*=(Polynomial< U > const& rhs)
+        Polynomial< T >& operator*=(Polynomial< U > const& rhs)
         {
             auto temp = *this * rhs;
             std::swap(*this, temp);
@@ -370,9 +567,9 @@ namespace nxx::poly
          * @param rhs The other polynomial to divide by.
          * @return A reference to the modified polynomial object.
          */
-        template <typename U>
+        template< typename U >
         requires std::floating_point< U > || (IsComplex< T > && IsComplex< U >)
-        auto& operator/=(Polynomial< U > const& rhs)
+        Polynomial< T >& operator/=(Polynomial< U > const& rhs)
         {
             auto temp = *this / rhs;
             std::swap(*this, temp);
@@ -389,8 +586,8 @@ namespace nxx::poly
          * @param rhs The second polynomial to compare.
          * @return True if the two polynomials are equal, false otherwise.
          */
-        template <typename U>
-        requires (std::floating_point< T> && std::floating_point< U >) || (IsComplex< T > && IsComplex< U >)
+        template< typename U >
+        requires(std::floating_point< T > && std::floating_point< U >) || (IsComplex< T > && IsComplex< U >)
         bool operator==(Polynomial< U > const& rhs) const
         {
             return m_coefficients == rhs.m_coefficients;
@@ -430,7 +627,88 @@ namespace nxx::poly
      */
     template< typename CONTAINER >
     requires IsCoefficientContainer< CONTAINER >
-    Polynomial(CONTAINER coefficients) -> Polynomial< typename decltype(coefficients)::value_type >;
+    Polynomial(CONTAINER coefficients) -> Polynomial< typename CONTAINER::value_type >;
+
+    template< typename CONTAINER, typename FUNC >
+    requires IsCoefficientContainer< CONTAINER >
+    Polynomial(CONTAINER coefficients, FUNC f) -> Polynomial< typename CONTAINER::value_type >;
+
+    template< typename T >
+    requires std::floating_point< T > || IsComplex< T >
+    Polynomial(std::initializer_list< T > coefficients) -> Polynomial< T >;
+
+    template< typename T, typename FUNC >
+    requires std::floating_point< T > || IsComplex< T >
+    Polynomial(std::initializer_list< T > coefficients, FUNC f) -> Polynomial< T >;
+
+    /**
+     * @brief Creates a polynomial from a given set of roots.
+     *
+     * Constructs a polynomial whose roots are specified in the input container. This function
+     * template is constrained to accept only containers that fulfill the IsCoefficientContainer
+     * concept, ensuring the container supports operations required to iterate over its elements.
+     *
+     * @tparam CONTAINER A container type that satisfies the IsCoefficientContainer concept.
+     *                   The container should hold elements of a numeric type.
+     * @param roots A container holding the roots of the polynomial.
+     * @return A Polynomial object whose coefficients are calculated to have the specified roots.
+     *
+     * @note The function assumes the underlying numeric type of the container can form a polynomial,
+     *       which includes arithmetic operations and value initialization.
+     */
+    template< typename CONTAINER >
+    requires IsCoefficientContainer< CONTAINER >
+    Polynomial< typename CONTAINER::value_type > createPolynomialFromRoots(const CONTAINER& roots)
+    {
+        using ValueType             = typename CONTAINER::value_type;
+        using CoefficientsContainer = std::vector< ValueType >;
+
+        // Start with a constant polynomial p(x) = 1
+        CoefficientsContainer coefficients = { ValueType { 1 } };
+
+        // Iterate over each root to construct the polynomial
+        for (const auto& root : roots) {
+            // Initialize a new vector for the new coefficients with one extra degree
+            CoefficientsContainer newCoefficients(coefficients.size() + 1, ValueType { 0 });
+
+            // Compute the new coefficients
+            for (size_t i = 0; i < coefficients.size(); ++i) {
+                // No out-of-bounds access should occur here, but we'll add an assert as a sanity check
+                assert(i < newCoefficients.size() - 1);    // Ensure we do not go out of bounds
+
+                newCoefficients[i + 1] += coefficients[i];       // x * coefficient
+                newCoefficients[i] -= root * coefficients[i];    // -root * coefficient
+            }
+
+            // Update the coefficients for the next iteration
+            coefficients.swap(newCoefficients);
+        }
+
+        // Construct and return the Polynomial with the final coefficients
+        return Polynomial< ValueType >(coefficients);
+    }
+
+    /**
+     * @brief Creates a polynomial with the given roots specified in an initializer list.
+     *
+     * This overload allows for convenient creation of a polynomial from an initializer list.
+     * It internally converts the initializer list to a vector and calls the vector-based
+     * createPolynomialFromRoots function template.
+     *
+     * @tparam T The numeric type of the polynomial coefficients (e.g., double, std::complex<double>).
+     * @param roots An initializer list containing the roots of the polynomial.
+     * @return A Polynomial object with coefficients calculated based on the provided roots.
+     */
+    template< typename T >
+    requires std::floating_point< T > || IsComplex< T >
+    Polynomial< T > createPolynomialFromRoots(const std::initializer_list< T >& roots)
+    {
+        // Convert initializer_list to a vector
+        std::vector< T > rootsVector(roots.begin(), roots.end());
+
+        // Use the previously defined function template
+        return createPolynomialFromRoots(rootsVector);
+    }
 
     /**
      * @brief A concept that checks if the given type is a Polynomial of some type T.
@@ -440,8 +718,8 @@ namespace nxx::poly
      *
      * @tparam POLY The type to check.
      */
-//    template< typename POLY >
-//    concept IsPolynomial = std::same_as< POLY, Polynomial< typename POLY::value_type > >;
+    //    template< typename POLY >
+    //    concept IsPolynomial = std::same_as< POLY, Polynomial< typename POLY::value_type > >;
 
     /**
      * @brief Computes the derivative of a given polynomial function.
@@ -460,8 +738,10 @@ namespace nxx::poly
         // Throw an error if the order of the polynomial function is 0 (i.e., the function is constant).
         if (func.order() == 0) throw std::runtime_error("Cannot differentiate a constant polynomial.");
 
-        using VALUE_TYPE = typename PolynomialTraits< decltype(func) >::value_type; // This is the type of the coefficients of the polynomial.
-        using FLOAT_TYPE = typename PolynomialTraits< decltype(func) >::fundamental_type; // This is the type of the exponents and other arithmetic operations in the polynomial.
+        using VALUE_TYPE =
+            typename PolynomialTraits< decltype(func) >::value_type;    // This is the type of the coefficients of the polynomial.
+        using FLOAT_TYPE = typename PolynomialTraits< decltype(func) >::fundamental_type;    // This is the type of the exponents and other
+                                                                                             // arithmetic operations in the polynomial.
 
         // Get a list of the coefficients of the input polynomial, skipping the first one (which corresponds to the constant term).
         std::vector< VALUE_TYPE > coefficients { func.coefficients().cbegin() + 1, func.coefficients().cend() };
@@ -469,11 +749,31 @@ namespace nxx::poly
         int n = 1;
         // Compute the derivative of each term in the polynomial using the power rule, and store them back in the 'coefficients' vector.
         std::transform(coefficients.cbegin(), coefficients.cend(), coefficients.begin(), [&n](VALUE_TYPE elem) {
-            return elem * static_cast< FLOAT_TYPE >(n++); // d/dx[aX^n] = a*n*X^(n-1)
+            return elem * static_cast< FLOAT_TYPE >(n++);    // d/dx[aX^n] = a*n*X^(n-1)
         });
 
         // Return a new polynomial that represents the derivative of the input function.
         return Polynomial(coefficients);
+    }
+
+    /**
+     * @brief Converts a Polynomial object to its string representation.
+     *
+     * This function takes a Polynomial of a generic type and converts it into a
+     * string by streaming it into a std::stringstream. It assumes that the
+     * Polynomial class has an overload of the stream insertion operator (`operator<<`)
+     * defined for std::ostream that dictates how the Polynomial is converted to a string.
+     *
+     * @tparam T The type of the coefficients in the Polynomial.
+     * @param p The Polynomial object to convert to a string.
+     * @return A std::string representing the Polynomial.
+     */
+    template< typename T >
+    std::string to_string(Polynomial< T > const& p)
+    {
+        std::stringstream ss;
+        ss << p;
+        return ss.str();
     }
 
     /**
@@ -504,7 +804,7 @@ namespace nxx::poly
             std::transform(lhs.coefficients().cbegin(), lhs.coefficients().cend(), coeffs.cbegin(), coeffs.begin(), std::plus< TYPE >());
 
             // Return a Polynomial constructed from the resulting coefficients
-            return Polynomial<TYPE>(coeffs);
+            return Polynomial< TYPE >(coeffs);
         }
         else {
             // Copy lhs's coefficients to add to
@@ -514,7 +814,7 @@ namespace nxx::poly
             std::transform(rhs.coefficients().cbegin(), rhs.coefficients().cend(), coeffs.cbegin(), coeffs.begin(), std::plus< TYPE >());
 
             // Return a Polynomial constructed from the resulting coefficients
-            return Polynomial<TYPE>(coeffs);
+            return Polynomial< TYPE >(coeffs);
         }
     }
 
@@ -533,6 +833,7 @@ namespace nxx::poly
      * @returns An object of type Polynomial that represents the difference of lhs and rhs.
      */
     template< typename T, typename U >
+    requires(std::floating_point< T > || IsComplex< T >) && (std::floating_point< U > || IsComplex< U >)
     auto operator-(Polynomial< T > const& lhs, Polynomial< U > const& rhs)
     {
         // Determine the common type between T and U
@@ -580,6 +881,7 @@ namespace nxx::poly
      * @returns An object of type Polynomial that represents the product of lhs and rhs.
      */
     template< typename T, typename U >
+    requires(std::floating_point< T > || IsComplex< T >) && (std::floating_point< U > || IsComplex< U >)
     auto operator*(Polynomial< T > const& lhs, Polynomial< U > const& rhs)
     {
         // Determine the common type between T and U
@@ -630,20 +932,20 @@ namespace nxx::poly
      * the divisor doesn't have coefficients or the polynomial order of divisor is larger than the dividend.
      */
     template< typename T, typename U >
+    requires(std::floating_point< T > || IsComplex< T >) && (std::floating_point< U > || IsComplex< U >)
     auto divide(Polynomial< T > const& lhs, Polynomial< U > const& rhs)
     {
         // Determine the type of polynomial which is common between T and U
         using TYPE = std::common_type_t< T, U >;
 
         // The coefficients of the polynomials
-        std::vector< TYPE > dividend (lhs.cbegin(), lhs.cend());
-        std::vector< TYPE > divisor (rhs.cbegin(), rhs.cend());
+        std::vector< TYPE > dividend(lhs.cbegin(), lhs.cend());
+        std::vector< TYPE > divisor(rhs.cbegin(), rhs.cend());
         std::vector< TYPE > remainder {};
 
         // Handle case when divisor doesn't have coefficients or
         // when polynomial order of divisor is larger than the dividend
-        if (divisor.empty() || divisor.back() == 0.0 || rhs.order() > lhs.order())
-            throw std::runtime_error("Invalid divisor polynomial");
+        if (divisor.empty() || divisor.back() == 0.0 || rhs.order() > lhs.order()) throw std::runtime_error("Invalid divisor polynomial");
 
         // Initialize the quotient polynomial coefficients with 0
         std::vector< TYPE > quotient(lhs.order() - rhs.order() + 1, 0);

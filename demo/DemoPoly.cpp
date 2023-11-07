@@ -58,8 +58,21 @@ int main() {
     // the return type will be of std::complex type. If the coefficients are of std::complex type,
     // the return type will always be of std::complex type.
     // ============================================================================================
-    auto func1 = Polynomial({ 1.0, 2.0, 3.0, 4.0 });
-    std::cout << "Created the polynomial f(x) = " << func1.asString() << std::endl << std::endl;
+    constexpr auto MySerializer = [](auto const& p) {
+        std::stringstream ss;
+
+        ss << "Order: " << p.size() - 1 << "\n";
+        ss << "Coefficients: ";
+        for (auto const& c : p) {
+            ss << c << " ";
+        }
+
+        return ss.str();
+    };
+
+    auto func1 = Polynomial({ 1.0, 2.0, 3.0, 4.0 }, MySerializer);
+    std::cout << func1.serialize() << std::endl;
+    std::cout << "Created the polynomial f(x) = " << func1 << std::endl << std::endl;
 
     std::cout << "Evaluation using function call operator:" << std::endl;
     std::cout << "Evaluation at -1.0: f(x) = " << func1(-1.0) << std::endl;
@@ -103,7 +116,7 @@ int main() {
     // that represents the derivative function.
     // ============================================================================================
     auto d1func1 = derivativeOf(func1);
-    std::cout << "Derivative of the function: f'(x) = " << d1func1.asString() << std::endl;
+    std::cout << "Derivative of the function: f'(x) = " << d1func1 << std::endl;
     std::cout << "\n";
 
     // ============================================================================================
@@ -122,11 +135,11 @@ int main() {
     auto remainder = dividend % divisor;
     auto temp = quotient * divisor + remainder;
 
-    std::cout << "Dividend: " << dividend.asString() << std::endl;
-    std::cout << "Divisor: " << divisor.asString() << std::endl;
-    std::cout << "Quotient: " << quotient.asString() << std::endl;
-    std::cout << "Remainder: " << remainder.asString() << std::endl;
-    std::cout << "Quotient * Divisor + Remainder: " << temp.asString() << std::endl << std::endl;
+    std::cout << "Dividend: " << dividend << std::endl;
+    std::cout << "Divisor: " << divisor << std::endl;
+    std::cout << "Quotient: " << quotient << std::endl;
+    std::cout << "Remainder: " << remainder << std::endl;
+    std::cout << "Quotient * Divisor + Remainder: " << temp << std::endl << std::endl;
 
     // ============================================================================================
     // Finally, the nxx::poly namespace contains function for finding the roots of a polynomial.
@@ -152,37 +165,39 @@ int main() {
     // ============================================================================================
     auto poly1 = Polynomial({-1.0, 0.0, 0.0, 0.0, 0.0, 1.0}); // Polynomial with real coefficients and complex roots
 
-    std::cout << "Real roots of the polynomial (automatically deduced): " << poly1.asString() << std::endl;
+    std::cout << "Real roots of the polynomial (automatically deduced): " << poly1 << std::endl;
     for (auto res = polysolve(poly1); auto root : *res) std::cout << root << "\n"; // Will print the real roots (same type as coefficients)
 
-    std::cout << "\nAll roots of the polynomial (specified by template parameter): " << poly1.asString() << std::endl;
+    std::cout << "\nAll roots of the polynomial (specified by template parameter): " << poly1 << std::endl;
     for (auto res = polysolve<std::complex<double> >(poly1); auto root : *res) std::cout << root << "\n"; // Will print all roots (complex and real)
 
-    std::cout << "\nReal roots of the polynomial (specified by template parameter): " << poly1.asString() << std::endl;
+    std::cout << "\nReal roots of the polynomial (specified by template parameter): " << poly1 << std::endl;
     for (auto res = polysolve<double>(poly1); auto root : *res) std::cout << root << "\n"; // Will print the real roots (as specified by the template argument)
 
     auto poly2 = Polynomial({-1.0+0i, 0.0+0i, 0.0+0i, 0.0+0i, 0.0+0i, 1.0+0i}); // Polynomial with complex coefficients and complex roots
 
-    std::cout << "\nAll roots of the complex polynomial (automatically deduced): " << poly2.asString() << std::endl;
+    std::cout << "\nAll roots of the complex polynomial (automatically deduced): " << poly2 << std::endl;
     for (auto res = polysolve(poly2); auto root : *res) std::cout << root << "\n"; // Will print all the roots (same type as coefficients)
 
-    std::cout << "\nAll roots of the complex polynomial (specified by template parameter): " << poly2.asString() << std::endl;
+    std::cout << "\nAll roots of the complex polynomial (specified by template parameter): " << poly2 << std::endl;
     for (auto res = polysolve<std::complex<double>>(poly2); auto root : *res) std::cout << root << "\n"; // Will print all roots (as specified by the template argument
 
-    std::cout << "\nReal roots of the complex polynomial (specified by template parameter): " << poly2.asString() << std::endl;
+    std::cout << "\nReal roots of the complex polynomial (specified by template parameter): " << poly2 << std::endl;
     for (auto res = polysolve<double>(poly2); auto root : *res) std::cout << root << "\n"; // Will print the real roots (complex roots will be ignored)
 
-    try {
-        nlohmann::ordered_json data;
-        data["Description"] = "Polynomial evaluation failed; non-finite result";
-        data["Argument"] = std::nan("");
-        data["Coefficients"] = poly2;
+    auto err_result = poly2.evaluate(std::nan(""));
+    if (!err_result) {
+        std::cout << err_result.error().log() << std::endl;
+    }
+    else {
+        std::cout << "Evaluation at " << std::nan("") << ": " << *err_result << std::endl;
+    }
 
-        throw nxx::NumerixxError("Integer error", nxx::NumerixxErrorType::General, data.dump());
-    }
-    catch (const nxx::NumerixxError& e) {
-        std::cout << e.log() << std::endl;
-    }
+    auto p =
+        createPolynomialFromRoots({ -0.809017 - 0.587785i, -0.809017 + 0.587785i, 0.309017 - 0.951057i, 0.309017 + 0.951057i, 1.0 + 0i });
+
+    std::cout << p << std::endl;
+    for (auto res = polysolve(p); auto root : *res) std::cout << root << "\n";
 
     return 0;
 }
