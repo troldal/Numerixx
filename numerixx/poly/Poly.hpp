@@ -32,7 +32,6 @@
 #define NUMERIXX_POLY_HPP
 
 #include "impl/Polynomial.hpp"
-#include "impl/PolynomialError.hpp"
 #include "impl/Polyroots.hpp"
 
 #endif    // NUMERIXX_POLY_HPP

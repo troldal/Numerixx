@@ -33,7 +33,6 @@
 
 // ===== Numerixx Includes
 #include "Polynomial.hpp"
-#include "PolynomialError.hpp"
 #include <Constants.hpp>
 #include <Roots.hpp>
 
@@ -72,26 +71,32 @@ namespace nxx::poly
             requires IsComplex< typename decltype(roots)::value_type > &&
                      std::same_as< decltype(roots), std::vector< typename decltype(roots)::value_type > >
         {
+            // Check for non-positive tolerance
+            if (tolerance <= 0) {
+                throw NumerixxError("Tolerance must be positive.");
+            }
+
+            // Calculate the square root of tolerance once
+            auto toleranceSqrt = std::sqrt(tolerance);
+
+            if constexpr (!IsComplex< RT >) {
+                std::erase_if(roots, [toleranceSqrt](const auto& elem) { return std::abs(elem.imag()) >= toleranceSqrt; });
+            }
+
             // Sorting function
-            auto sortingFunc = [tolerance](auto const& a, auto const& b) {
-                // NOTE: Without sqrt of the tolerance, the sorting may fail.
-                return std::abs(b.real() - a.real()) < std::sqrt(tolerance) ? a.imag() < b.imag() : a.real() < b.real();
+            auto sortingFunc = [toleranceSqrt](const auto& a, const auto& b) {
+                return std::abs(b.real() - a.real()) < toleranceSqrt ? a.imag() < b.imag() : a.real() < b.real();
             };
 
             // Sort the roots
             std::sort(roots.begin(), roots.end(), sortingFunc);
 
-            // If the return type is complex, return the roots as is.
             if constexpr (IsComplex< RT >) {
                 return roots;
             }
-            // Otherwise, return only the real roots.
             else {
-                auto realroots = std::vector< RT > {};
-                std::for_each(roots.begin(), roots.end(), [&realroots, tolerance](auto elem) {
-                    // NOTE: Without sqrt of the tolerance, the test fails.
-                    if (std::abs(elem.imag()) < std::sqrt(tolerance)) realroots.push_back(elem.real());
-                });
+                std::vector< RT > realroots;
+                std::transform(roots.begin(), roots.end(), std::back_inserter(realroots), [](const auto& elem) { return elem.real(); });
                 return realroots;
             }
         }

@@ -32,7 +32,6 @@
 #define NUMERIXX_POLYNOMIAL_HPP
 
 // ===== Numerixx Includes
-#include "PolynomialError.hpp"
 #include <Concepts.hpp>
 #include <Error.hpp>
 
@@ -790,6 +789,7 @@ namespace nxx::poly
      * @returns An object of type Polynomial that represents the sum of lhs and rhs.
      */
     template< typename T, typename U >
+    requires(std::floating_point< T > || IsComplex< T >) && (std::floating_point< U > || IsComplex< U >)
     auto operator+(Polynomial< T > const& lhs, Polynomial< U > const& rhs)
     {
         // Determine the common type between T and U
@@ -941,23 +941,28 @@ namespace nxx::poly
         // The coefficients of the polynomials
         std::vector< TYPE > dividend(lhs.cbegin(), lhs.cend());
         std::vector< TYPE > divisor(rhs.cbegin(), rhs.cend());
-        std::vector< TYPE > remainder {};
 
         // Handle case when divisor doesn't have coefficients or
         // when polynomial order of divisor is larger than the dividend
-        if (divisor.empty() || divisor.back() == 0.0 || rhs.order() > lhs.order()) throw std::runtime_error("Invalid divisor polynomial");
+        if (divisor.empty() || divisor.back() == 0.0 || rhs.order() > lhs.order())
+            throw NumerixxError("Divisor polynomial cannot be empty or have a higher degree than the dividend.");
 
         // Initialize the quotient polynomial coefficients with 0
-        std::vector< TYPE > quotient(lhs.order() - rhs.order() + 1, 0);
-        remainder = dividend;
+        assert(lhs.order() - rhs.order() + 1 > 0);    // Ensure we do not go out of bounds
+        std::vector< TYPE > quotient(lhs.order() - rhs.order() + 1, TYPE { 0 });
+        std::vector< TYPE > remainder = dividend;
 
         // Iteratively compute the coefficients of the quotient polynomial
         for (std::size_t i = lhs.order(); i >= rhs.order() && i < dividend.size(); --i) {
+            assert(i < remainder.size());                 // Ensure we do not go out of bounds
+            assert(i - rhs.order() < quotient.size());    // Ensure we do not go out of bounds
             TYPE coef                 = remainder[i] / divisor.back();
             quotient[i - rhs.order()] = coef;
 
             // For each coefficient in the divisor subtract coef*divisor from the dividend (remainder)
             for (std::size_t j = 0; j <= rhs.order(); ++j) {
+                assert(i - j < remainder.size());            // Ensure we do not go out of bounds
+                assert(rhs.order() - j < divisor.size());    // Ensure we do not go out of bounds
                 remainder[i - j] -= coef * divisor[rhs.order() - j];
             }
         }
