@@ -41,9 +41,9 @@
 #include <cassert>
 #include <cmath>
 #include <numbers>
+#include <optional>
 #include <random>
 #include <vector>
-#include <optional>
 
 namespace nxx::poly
 {
@@ -51,19 +51,26 @@ namespace nxx::poly
     {
 
         /**
-         * @brief Sorts a vector of complex polynomial roots and returns them as the specified return type.
+         * @brief Sorts a vector of roots either real or complex based on their values.
          *
-         * This function takes a vector of complex polynomial roots, sorts them based on their real parts,
-         * and returns them as the specified return type. If the return type is a floating point, only the
-         * real roots will be returned.
+         * This function sorts a given vector of roots which can be either real numbers or complex numbers.
+         * If the type RT is not complex, it filters out roots with an imaginary part greater or equal to
+         * the square root of the given tolerance and then returns a vector of the real parts.
+         * If the type RT is complex, it sorts the complex roots based on their norm and returns them.
          *
-         * @tparam RT The desired return type. Must be either a floating point type or a complex type.
-         * @param roots A vector of complex polynomial roots.
-         * @return A vector of roots in the specified return type. If RT is a floating point type, only
-         * real roots will be returned.
+         * @tparam RT The data type of the roots to be sorted. Should be either floating-point or complex.
+         * @param roots The vector of roots to sort.
+         * @param tolerance The tolerance used to determine the threshold for filtering out non-real roots.
+         *        It must be a positive value. This is not used for sorting complex types.
+         * @return A vector of sorted roots. The type of the vector is the same as the input type RT.
          *
-         * @note The input roots must be of a complex type.
-         * @note The input roots vector must be of type std::vector.
+         * @pre The roots vector should not be empty.
+         * @pre The tolerance should be a positive number.
+         *
+         * @throw NumerixxError if the tolerance is less than or equal to zero.
+         *
+         * @note The sorting is stable for complex roots and is based on the norm of the complex numbers.
+         *       For real roots, the sort is based on the natural ordering of the numbers.
          */
         template< typename RT >
         requires(std::floating_point< RT > || IsComplex< RT >)
@@ -72,25 +79,27 @@ namespace nxx::poly
                      std::same_as< decltype(roots), std::vector< typename decltype(roots)::value_type > >
         {
             // Check for non-positive tolerance
-            if (tolerance <= 0) {
-                throw NumerixxError("Tolerance must be positive.");
-            }
+            if (tolerance <= 0)
+                throw NumerixxError("Invalid tolerance value: " + std::to_string(tolerance) + ". Tolerance must be a positive number.");
 
             // Calculate the square root of tolerance once
             auto toleranceSqrt = std::sqrt(tolerance);
 
+            // If the type RT is not complex, filter out roots with an imaginary part greater or equal to the square root of the given
+            // tolerance
             if constexpr (!IsComplex< RT >) {
                 std::erase_if(roots, [toleranceSqrt](const auto& elem) { return std::abs(elem.imag()) >= toleranceSqrt; });
             }
 
             // Sorting function
-            auto sortingFunc = [toleranceSqrt](const auto& a, const auto& b) {
-                return std::abs(b.real() - a.real()) < toleranceSqrt ? a.imag() < b.imag() : a.real() < b.real();
+            auto sortingFunc = [toleranceSqrt](const auto& root1, const auto& root2) {
+                return std::abs(root2.real() - root1.real()) < toleranceSqrt ? root1.imag() < root2.imag() : root1.real() < root2.real();
             };
 
             // Sort the roots
             std::sort(roots.begin(), roots.end(), sortingFunc);
 
+            // If the type RT is complex, return the roots as they are. If not, return only the real parts of the roots.
             if constexpr (IsComplex< RT >) {
                 return roots;
             }
@@ -124,17 +133,27 @@ namespace nxx::poly
     template< typename RT = void >
     inline auto linear(IsPolynomial auto poly, typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance = nxx::EPS)
     {
-        if (poly.order() != 1) throw std::runtime_error("Error: Input is not a monomial.");
+        // Check for non-positive tolerance
+        if (tolerance <= 0)
+            throw NumerixxError("Invalid tolerance value: " + std::to_string(tolerance) + ". Tolerance must be a positive number.");
 
+        // Check if the polynomial is linear
+        if (poly.order() != 1) throw NumerixxError("Error: Input is not a linear polynomial.");
+
+        // Define type aliases for readability
         using POLY_TYPE    = PolynomialTraits< decltype(poly) >;
         using VALUE_TYPE   = typename POLY_TYPE::value_type;
         using FLOAT_TYPE   = typename POLY_TYPE::fundamental_type;
         using COMPLEX_TYPE = std::complex< FLOAT_TYPE >;
 
+        // Calculate the root of the linear polynomial
         std::vector< COMPLEX_TYPE > root;
         root.emplace_back(-poly.coefficients().front() / poly.coefficients().back());
 
+        // Define the return type based on the template parameter RT
         using RET = std::conditional_t< std::same_as< RT, void >, VALUE_TYPE, RT >;
+
+        // Sort the root and return it
         tl::expected< std::vector< RET >, std::runtime_error > result = impl::sortRoots< RET >(root, tolerance);
         return result;
     }
@@ -168,30 +187,45 @@ namespace nxx::poly
     template< typename RT = void >
     inline auto quadratic(IsPolynomial auto poly, typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance = nxx::EPS)
     {
-        // ===== Check that the polynomial is quadratic.
-        if (poly.order() != 2) throw std::runtime_error("Quadratic Error: Polynomial is not quadratic.");
+        // Check for non-positive tolerance
+        if (tolerance <= 0)
+            throw NumerixxError("Invalid tolerance value: " + std::to_string(tolerance) + ". Tolerance must be a positive number.");
 
+        // Check if the polynomial is quadratic
+        if (poly.order() != 2) throw NumerixxError("Error: Input is not a quadratic polynomial.");
+
+        // Define type aliases for readability
         using POLY_TYPE    = PolynomialTraits< decltype(poly) >;
         using VALUE_TYPE   = typename POLY_TYPE::value_type;
         using FLOAT_TYPE   = typename POLY_TYPE::fundamental_type;
         using COMPLEX_TYPE = std::complex< FLOAT_TYPE >;
+        using RET          = std::conditional_t< std::same_as< RT, void >, VALUE_TYPE, RT >;
+        using EXPECTED     = tl::expected< std::vector< RET >, NumerixxError >;
 
+        // Extract the coefficients of the polynomial
         const auto& coeffs = poly.coefficients();
-        const auto& a = coeffs[2];
-        const auto& b = coeffs[1];
-        const auto& c = coeffs[0];
+        const auto& a      = coeffs[2];
+        const auto& b      = coeffs[1];
+        const auto& c      = coeffs[0];
 
-        COMPLEX_TYPE discriminant = sqrt(b * b - 4.0 * a * c);
-        COMPLEX_TYPE sqrt_component = std::conj(b) * discriminant;
+        // Calculate the discriminant
+        const COMPLEX_TYPE discriminant   = sqrt(b * b - 4.0 * a * c);
+        const COMPLEX_TYPE sqrt_component = std::conj(b) * discriminant;
 
-        COMPLEX_TYPE q = -0.5 * (b + (sqrt_component.real() >= 0.0 ? discriminant : -discriminant));
+        // Calculate the roots of the quadratic polynomial
+        const COMPLEX_TYPE q = -0.5 * (b + (sqrt_component.real() >= 0.0 ? discriminant : -discriminant));
 
-        if (std::abs(q) < tolerance || std::abs(a) < tolerance) throw std::runtime_error("Quadratic polynomial is ill formed.");
+        // Check if the discriminant or the coefficient 'a' is less than the tolerance
+        if (std::abs(q) < tolerance || std::abs(a) < tolerance) {
+            EXPECTED result = tl::unexpected(NumerixxError("Quadratic polynomial is ill formed."));
+            return result;
+        }
 
+        // Calculate the roots
         std::vector< COMPLEX_TYPE > roots = { q / a, c / q };
 
-        using RET = std::conditional_t< std::same_as< RT, void >, VALUE_TYPE, RT >;
-        tl::expected< std::vector< RET >, std::runtime_error > result = impl::sortRoots< RET >(roots, tolerance);
+        // Sort the roots and return them
+        EXPECTED result = impl::sortRoots< RET >(roots, tolerance);
         return result;
     }
 
@@ -220,7 +254,11 @@ namespace nxx::poly
     template< typename RT = void >
     inline auto cubic(IsPolynomial auto poly, typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance = nxx::EPS)
     {
-        if (poly.order() != 3) throw std::runtime_error("Cubic Error: Polynomial is not cubic.");
+        // Check for non-positive tolerance
+        if (tolerance <= 0)
+            throw NumerixxError("Invalid tolerance value: " + std::to_string(tolerance) + ". Tolerance must be a positive number.");
+
+        if (poly.order() != 3) throw NumerixxError("Cubic Error: Polynomial is not cubic.");
 
         using POLY_TYPE    = PolynomialTraits< decltype(poly) >;
         using VALUE_TYPE   = typename POLY_TYPE::value_type;
@@ -241,18 +279,17 @@ namespace nxx::poly
         const auto& b = coeff[1];
         const auto& c = coeff[0];
 
-        COMPLEX_TYPE Q = (a * a - 3.0 * b) / 9.0;
-        COMPLEX_TYPE R = (2.0 * a * a * a - 9.0 * a * b + 27.0 * c) / 54.0;
-        COMPLEX_TYPE A =
+        const COMPLEX_TYPE Q = (a * a - 3.0 * b) / 9.0;
+        const COMPLEX_TYPE R = (2.0 * a * a * a - 9.0 * a * b + 27.0 * c) / 54.0;
+        const COMPLEX_TYPE A =
             -cbrt(R + ((std::conj(R) * sqrt(R * R - Q * Q * Q)).real() >= 0.0 ? sqrt(R * R - Q * Q * Q) : -sqrt(R * R - Q * Q * Q)));
-        COMPLEX_TYPE B = (abs(A) == 0.0 ? 0.0 : Q / A);
+        const COMPLEX_TYPE B = (abs(A) == 0.0 ? 0.0 : Q / A);
 
         std::vector< COMPLEX_TYPE > roots = { A + B - a / 3.0,
                                               -0.5 * (A + B) - a / 3.0 + 0.5 * sqrt(3.0) * (A - B) * 1.0i,
                                               -0.5 * (A + B) - a / 3.0 - 0.5 * sqrt(3.0) * (A - B) * 1.0i };
 
-
-        using RET = std::conditional_t< std::same_as< RT, void >, VALUE_TYPE, RT >;
+        using RET                                                     = std::conditional_t< std::same_as< RT, void >, VALUE_TYPE, RT >;
         tl::expected< std::vector< RET >, std::runtime_error > result = impl::sortRoots< RET >(roots, tolerance);
         return result;
     }
@@ -284,46 +321,82 @@ namespace nxx::poly
                          typename PolynomialTraits< decltype(poly) >::fundamental_type                 tolerance      = nxx::EPS,
                          int                                                                           max_iterations = nxx::MAXITER)
     {
-        if (poly.order() <= 3) throw std::runtime_error("Laguerre Error: Polynomial is cubic or lower.");
+        // Check if the tolerance is non-positive and throw an error if it is.
+        if (tolerance <= 0)
+            throw NumerixxError("Invalid tolerance value: " + std::to_string(tolerance) + ". Tolerance must be a positive number.");
 
+        // Check if the maximum number of iterations is less than 1 and throw an error if it is.
+        if (max_iterations < 1)
+            throw NumerixxError("Invalid maximum number of iterations: " + std::to_string(max_iterations) +
+                                ". Maximum number of iterations must be greater than zero.");
+
+        // Check if the polynomial is of order 4 or higher and throw an error if it's not.
+        if (poly.order() <= 3) throw NumerixxError("Error: Polynomial must be of order 4 or higher.");
+
+        // Define type aliases for readability
         using POLY_TYPE    = PolynomialTraits< decltype(poly) >;
         using FLOAT_TYPE   = typename POLY_TYPE::fundamental_type;
         using COMPLEX_TYPE = std::complex< FLOAT_TYPE >;
+        using EXPECTED     = tl::expected< COMPLEX_TYPE, NumerixxError >;
+        using OPT          = std::optional< COMPLEX_TYPE >;
 
-        // ===== Lambda function for computing the Laguerre step.
-        auto laguerrestep = [](COMPLEX_TYPE g_param, COMPLEX_TYPE h_param) {
+        // Define a lambda function for computing the Laguerre step.
+        auto laguerrestep = [&](COMPLEX_TYPE g_param, COMPLEX_TYPE h_param) -> OPT {
             COMPLEX_TYPE temp = std::sqrt(2.0 * (3.0 * h_param - g_param * g_param));
+            if (abs(g_param + temp) < nxx::EPS) return std::nullopt;
             return 3.0 / (abs(g_param + temp) > abs(g_param - temp) ? (g_param + temp) : (g_param - temp));
         };
 
-        if (abs(poly(guess)) < tolerance) return guess;
+        // If the absolute value of the polynomial evaluated at the guess is less than the tolerance, return the guess as the root.
+        if (abs(poly(guess)) < tolerance) return EXPECTED(guess);
 
+        // Initialize the root with the guess
         COMPLEX_TYPE root = guess;
         COMPLEX_TYPE G;
         COMPLEX_TYPE H;
-        COMPLEX_TYPE step;
+        OPT          step;
 
+        // Get function objects for the first and second derivatives of the polynomial
         auto d1poly = derivativeOf(poly);
         auto d2poly = derivativeOf(d1poly);
 
-        // ===== Use a random number generator to perturb the step size every 10 iterations.
+        // Initialize a random number generator to perturb the step size every 10 iterations.
         std::random_device                       rd;
         std::mt19937                             mt(rd());
         std::uniform_real_distribution< double > dist(0.9, 1.1);
 
-        // TODO: Return a std::expected if the Laguerre method fails to converge.
-        // ===== Perform the Laguerre iterations.
-        for (int i = 0; i < max_iterations; ++i) {
+        // Perform the Laguerre iterations.
+        int i = 0;
+        while (true) {
+            // Return an error if the maximum number of iterations is reached.
+            if (i >= max_iterations) return EXPECTED(tl::unexpected(NumerixxError("Maximum number of iterations reached.")));
+
+            // If the absolute value of the polynomial evaluated at the root is less than the tolerance, return an error.
+            if (abs(poly(root)) < tolerance) break;
+
+            // Calculate G and H for the Laguerre step
             G    = d1poly(root) / poly(root);
             H    = G * G - d2poly(root) / poly(root);
             step = laguerrestep(G, H);
-            if (!std::isfinite(abs(step))) step = 0.1;    // ===== If the step is not finite, use a small value.
-            if (abs(step) < tolerance) break;             // ===== If the step is below the tolerance, stop.
-            if (i % 10 == 0) step *= dist(mt);            // ===== Perturb the step size every 10 iterations.
-            root = root - step;
+
+            // If the step is not finite, use a small value.
+            if (!step) step = OPT(0.1);
+
+            // If the step is below the tolerance, stop.
+            if (abs(*step) < tolerance) break;
+
+            // Perturb the step size every 10 iterations.
+            if (i % 10 == 0) *step = dist(mt);
+
+            // Update the root
+            root = root - *step;
+
+            // Increment the iteration counter
+            ++i;
         }
 
-        return root;
+        // Return the root
+        return EXPECTED(root);
     }
 
     /**
@@ -357,81 +430,117 @@ namespace nxx::poly
                           typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance      = nxx::EPS,
                           int                                                           max_iterations = nxx::MAXITER)
     {
-        if (max_iterations < 1) throw std::runtime_error("Maximum number of iterations must be greater than zero.");
-        if (poly.order() < 1) throw std::runtime_error("Polynomial must have at least two coefficients (a monomial).");
+        // Check for valid tolerance.
+        if (tolerance <= 0)
+            throw NumerixxError("Invalid tolerance value: " + std::to_string(tolerance) + ". Tolerance must be a positive number.");
 
+        // Check for valid number of iterations.
+        if (max_iterations < 1)
+            throw NumerixxError("Invalid maximum number of iterations: " + std::to_string(max_iterations) +
+                                ". Maximum number of iterations must be greater than zero.");
+
+        // Check if the polynomial has at least two coefficients (not a monomial).
+        if (poly.order() < 1) throw NumerixxError("Polynomial must have at least two coefficients (a monomial).");
+
+        // Define types used in the function for readability and flexibility.
         using POLY_TYPE    = PolynomialTraits< decltype(poly) >;
         using VALUE_TYPE   = typename POLY_TYPE::value_type;
         using FLOAT_TYPE   = typename POLY_TYPE::fundamental_type;
         using COMPLEX_TYPE = std::complex< FLOAT_TYPE >;
+        using RET          = std::conditional_t< std::same_as< RT, void >, VALUE_TYPE, RT >;
+        using EXPECTED     = tl::expected< std::vector< RET >, NumerixxError >;
 
-        // Create a polynomial object and a vector for the roots. The value type of the polynomial is converted to
-        // COMPLEX_TYPE if it is not already complex.
+        // Create a polynomial object and a vector for the roots.
+        // The value type of the polynomial is converted to COMPLEX_TYPE if it is not already complex.
         auto polynomial = Polynomial< COMPLEX_TYPE >(std::vector< COMPLEX_TYPE > { poly.begin(), poly.end() });
         auto original   = Polynomial< COMPLEX_TYPE >(std::vector< COMPLEX_TYPE > { poly.begin(), poly.end() });
         auto roots      = std::vector< COMPLEX_TYPE > {};
 
         // A lambda for computing the root of the polynomial using Newton's method:
         auto newt = [=](auto f, auto x) {
-            auto df = derivativeOf(f);
-            for (int i = 0; i < max_iterations; ++i) {
-                auto dx = f(x) / df(x);
-                x -= dx;
+            auto df = derivativeOf(f);                    // Compute the derivative of the polynomial.
+            for (int i = 0; i < max_iterations; ++i) {    // TODO: Return error if max iterations is reached.
+                // TODO: Check for zero derivative
+                auto dx = f(x) / df(x);    // Calculate the step.
+                x -= dx;                   // Update the root estimate.
+
+                // Check for convergence.
                 auto fval = f(x);
-                if (std::abs(fval.real()) < tolerance &&
-                    std::abs(fval.imag()) < tolerance &&
-                    std::abs(dx.real()) < tolerance &&
+                if (std::abs(fval.real()) < tolerance && std::abs(fval.imag()) < tolerance && std::abs(dx.real()) < tolerance &&
                     std::abs(dx.imag()) < tolerance)
                     break;
             }
             return x;
         };
 
+        // Handle different polynomial orders with specialized methods.
         switch (poly.order()) {
             case 1: {    // ===== Linear equation
-                auto linroot = linear<COMPLEX_TYPE>(polynomial);
+                auto linroot = linear< COMPLEX_TYPE >(polynomial);
+
+                // Check if the linear equation has a solution.
+                if (!linroot) return EXPECTED(tl::unexpected(NumerixxError("Error: Linear equation has no solution.")));
+
                 roots.insert(roots.end(), (*linroot).begin(), (*linroot).end());
                 break;
             }
 
             case 2: {    // ===== Quadratic equation
-                auto quadroots = quadratic<COMPLEX_TYPE>(polynomial);
+                auto quadroots = quadratic< COMPLEX_TYPE >(polynomial);
+
+                // Check if the quadratic equation has a solution.
+                if (!quadroots) return EXPECTED(tl::unexpected(NumerixxError("Error: Quadratic equation has no solution.")));
+
                 roots.insert(roots.end(), (*quadroots).begin(), (*quadroots).end());
                 break;
             }
 
             case 3: {    // ===== Cubic equation
-                auto cubicroots = cubic<COMPLEX_TYPE>(polynomial);
+                auto cubicroots = cubic< COMPLEX_TYPE >(polynomial);
+
+                // Check if the cubic equation has a solution.
+                if (!cubicroots) return EXPECTED(tl::unexpected(NumerixxError("Error: Cubic equation has no solution.")));
+
                 roots.insert(roots.end(), (*cubicroots).begin(), (*cubicroots).end());
                 break;
             }
 
             default: {    // ===== Higher order equation; use Laguerre's method
+
+                // Loop to find and refine the roots until the polynomial is reduced to cubic.
                 while (polynomial.order() > 3) {
                     using namespace nxx::roots;
 
                     // ===== Find a root using Laguerre's method
-                    roots.emplace_back(laguerre(polynomial, 0.0, tolerance, max_iterations));
+                    auto root = laguerre(polynomial, 0.0, tolerance, max_iterations);
+
+                    if (!root) return EXPECTED(tl::unexpected(NumerixxError("Error: Laguerre's method failed to converge.")));
+
+                    roots.emplace_back(*root);
 
                     // ===== Polish the root on the original polynomial using Newton's method
-                    //roots.back() = *fdfsolve(Newton(polynomial, derivativeOf(polynomial)), roots.back(), tolerance, max_iterations);
-                    roots.back() = newt(original, roots.back()); //TODO: Use the roots::fdfsolve function instead
+                    // roots.back() = *fdfsolve(Newton(polynomial, derivativeOf(polynomial)), roots.back(), tolerance, max_iterations);
+                    roots.back() = newt(original, roots.back());    // TODO: Use the roots::fdfsolve function instead
 
-                    // ===== Deflate the polynomial by the root to reduce the order
-                    polynomial /= Polynomial< COMPLEX_TYPE > { -roots.back(), 1.0 };
+                    // ===== Deflate the polynomial by the root to reduce the order by one
+                    polynomial /= Polynomial< COMPLEX_TYPE > { -roots.back(), 1.0 };    // TODO: Check that roots.back() is valid.
                 }
 
                 // ===== Solve the remaining cubic equation
-                auto cuberoots = cubic<COMPLEX_TYPE>(polynomial);
+                auto cuberoots = cubic< COMPLEX_TYPE >(polynomial);
+
+                // Check if the cubic equation has a solution.
+                if (!cuberoots) return EXPECTED(tl::unexpected(NumerixxError("Error: Cubic equation has no solution.")));
+
                 roots.insert(roots.end(), (*cuberoots).begin(), (*cuberoots).end());
                 break;
             }
         }
 
-        using RET = std::conditional_t< std::same_as< RT, void >, VALUE_TYPE, RT >;
-        tl::expected< std::vector< RET >, std::runtime_error > result = impl::sortRoots< RET >(roots, tolerance);
-        return result;
+        // ===== Sort the roots and return them
+        return EXPECTED(impl::sortRoots< RET >(roots, tolerance));
     }
+
 }    // namespace nxx::poly
 
 #endif    // NUMERIXX_POLYROOTS_HPP
