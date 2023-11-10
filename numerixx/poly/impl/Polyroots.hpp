@@ -449,6 +449,7 @@ namespace nxx::poly
         using COMPLEX_TYPE = std::complex< FLOAT_TYPE >;
         using RET          = std::conditional_t< std::same_as< RT, void >, VALUE_TYPE, RT >;
         using EXPECTED     = tl::expected< std::vector< RET >, NumerixxError >;
+        using OPT          = std::optional< COMPLEX_TYPE >;
 
         // Create a polynomial object and a vector for the roots.
         // The value type of the polynomial is converted to COMPLEX_TYPE if it is not already complex.
@@ -457,10 +458,14 @@ namespace nxx::poly
         auto roots      = std::vector< COMPLEX_TYPE > {};
 
         // A lambda for computing the root of the polynomial using Newton's method:
-        auto newt = [=](auto f, auto x) {
+        auto newt = [=](auto f, COMPLEX_TYPE x) -> OPT {
             auto df = derivativeOf(f);                    // Compute the derivative of the polynomial.
-            for (int i = 0; i < max_iterations; ++i) {    // TODO: Return error if max iterations is reached.
-                // TODO: Check for zero derivative
+
+            int i = 0;
+            while (true) {
+                if (i >= max_iterations) return std::nullopt;
+                if (abs(df(x)) < nxx::EPS) return std::nullopt;
+
                 auto dx = f(x) / df(x);    // Calculate the step.
                 x -= dx;                   // Update the root estimate.
 
@@ -469,8 +474,10 @@ namespace nxx::poly
                 if (std::abs(fval.real()) < tolerance && std::abs(fval.imag()) < tolerance && std::abs(dx.real()) < tolerance &&
                     std::abs(dx.imag()) < tolerance)
                     break;
+
+                ++i;
             }
-            return x;
+            return OPT(x);
         };
 
         // Handle different polynomial orders with specialized methods.
@@ -520,10 +527,16 @@ namespace nxx::poly
 
                     // ===== Polish the root on the original polynomial using Newton's method
                     // roots.back() = *fdfsolve(Newton(polynomial, derivativeOf(polynomial)), roots.back(), tolerance, max_iterations);
-                    roots.back() = newt(original, roots.back());    // TODO: Use the roots::fdfsolve function instead
+                    auto polished_root = newt(original, roots.back());
+                    if (!polished_root) return EXPECTED(tl::unexpected(NumerixxError("Error: Newton's method failed to converge.")));
+                    roots.back() = *polished_root;    // TODO: Use the roots::fdfsolve function instead
+
+                    // ===== Check if the root is valid
+                    if (!std::isfinite(original(roots.back()).real()) || !std::isfinite(original(roots.back()).imag()))
+                        return EXPECTED(tl::unexpected(NumerixxError("Error: Root is not finite.")));
 
                     // ===== Deflate the polynomial by the root to reduce the order by one
-                    polynomial /= Polynomial< COMPLEX_TYPE > { -roots.back(), 1.0 };    // TODO: Check that roots.back() is valid.
+                    polynomial /= Polynomial< COMPLEX_TYPE > { -roots.back(), 1.0 };
                 }
 
                 // ===== Solve the remaining cubic equation
