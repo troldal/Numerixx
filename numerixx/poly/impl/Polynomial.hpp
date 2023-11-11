@@ -44,12 +44,46 @@
 #include <functional>
 #include <iterator>
 #include <numeric>
+#include <optional>
 #include <sstream>
 #include <type_traits>
 #include <vector>
 
 namespace nxx::poly
 {
+
+    namespace detail
+    {
+
+        template< typename T >
+        struct PolyErrorData
+        {
+            std::string        details;
+            std::vector< T >   coefficients;
+            std::optional< T > arg    = std::nullopt;
+            std::optional< T > result = std::nullopt;
+
+            friend std::ostream& operator<<(std::ostream& os, const PolyErrorData& data)
+            {
+                os << data.details << "\n";
+                os << "Coefficients: ";
+                for (size_t i = 0; i < data.coefficients.size(); ++i) {
+                    os << data.coefficients[i];
+                    if (i < data.coefficients.size() - 1) {
+                        os << ", ";
+                    }
+                }
+                if (data.arg) {
+                    os << "\nArgument: " << *data.arg;
+                }
+                if (data.result) {
+                    os << "\nResult: " << *data.result;
+                }
+                return os;
+            }
+        };
+
+    }    // namespace detail
 
     /**
      * @concept IsCoefficientContainer
@@ -109,33 +143,6 @@ namespace nxx::poly
     };
 
     /**
-     * @brief The default serializer for the Polynomial class.
-     *
-     * This generalized lambda is used to serialize a Polynomial object to a string.
-     *
-     * @param p The polynomial to serialize.
-     * @return A string representation of the polynomial.
-     */
-    constexpr auto DefaultSerializer = [](auto const& p) {
-        std::stringstream ss;
-        auto              first = begin(p);
-        auto              last  = end(p);
-
-        for (auto it = first; it != last; ++it) {
-            // Calculate the index based on iterator position
-            auto index = std::distance(first, it);
-            ss << "c[" << index << "]=" << *it;
-
-            // Only add a comma if this is not the last element
-            if (std::next(it) != last) {
-                ss << ", ";
-            }
-        }
-
-        return ss.str();
-    };
-
-    /**
      * @brief A class representing a polynomial with coefficients of type T.
      *
      * This class provides functionality to evaluate a polynomial at a point,
@@ -150,8 +157,7 @@ namespace nxx::poly
     requires std::floating_point< T > || IsComplex< T >
     class Polynomial final
     {
-        std::vector< T >                               m_coefficients; /**< The internal store of polynomial coefficients. */
-        std::function< std::string(std::vector< T >) > m_serializer = DefaultSerializer;
+        std::vector< T > m_coefficients; /**< The internal store of polynomial coefficients. */
 
     public:
         /**
@@ -189,15 +195,8 @@ namespace nxx::poly
          *
          * @throws NumerixxError if the serializer function is not provided.
          */
-        explicit Polynomial(const IsCoefficientContainer auto&                    coefficients,
-                            std::function< std::string(const std::vector< T >&) > serializer = DefaultSerializer)
-            : m_serializer(serializer)
+        explicit Polynomial(const IsCoefficientContainer auto& coefficients)
         {
-            // Check for a valid serializer function.
-            if (!serializer) {
-                throw NumerixxError("Serializer function cannot be empty");
-            }
-
             // Lambda function to determine if a coefficient is near zero, considering both floating-point and complex numbers.
             auto is_near_zero = [&](auto val) -> bool {
                 // Use a different epsilon value based on whether the type is complex or not.
@@ -251,8 +250,8 @@ namespace nxx::poly
          *
          * @throw NumerixxError if the serializer function is empty.
          */
-        Polynomial(std::initializer_list< T > coefficients, std::function< std::string(std::vector< T >) > serializer = DefaultSerializer)
-            : Polynomial(std::vector< T >(coefficients), serializer)
+        Polynomial(std::initializer_list< T > coefficients)
+            : Polynomial(std::vector< T >(coefficients))
         {}
 
         /**
@@ -324,9 +323,11 @@ namespace nxx::poly
         template< typename U >
         requires std::convertible_to< U, T > || std::floating_point< U > || IsComplex< U >
         [[nodiscard]]
-        inline auto evaluate(U value) const -> tl::expected< std::common_type_t< T, U >, nxx::NumerixxError >
+        inline auto evaluate(U value) const
+            -> tl::expected< std::common_type_t< T, U >, Error< detail::PolyErrorData< std::common_type_t< T, U > > > >
         {
-            using TYPE = std::common_type_t< T, U >;
+            using TYPE      = std::common_type_t< T, U >;
+            using PolyError = Error< detail::PolyErrorData< TYPE > >;
 
             if (order() == 0) [[unlikely]]
                 return m_coefficients.front();
@@ -334,26 +335,25 @@ namespace nxx::poly
             auto begin = m_coefficients.crbegin();
             auto end   = m_coefficients.crend();
 
-            if (m_coefficients.size() <= 1 || begin == end) [[unlikely]] {
-                std::stringstream ss;
-                ss << "\tPolynomial evaluation failed; no coefficients\n";
-                ss << "\tArgument: " << value << "\n";
-                ss << "\tCoefficients: " << this->serialize() << "\n";
-                return tl::unexpected(nxx::NumerixxError("Polynomial error", nxx::NumerixxErrorType::Poly, ss.str()));
-            }
+            if (m_coefficients.size() <= 1 || begin == end) [[unlikely]]
+
+                return tl::unexpected(PolyError("Polynomial error",
+                                                nxx::NumerixxErrorType::Poly,
+                                                { .details      = "Polynomial evaluation failed; no coefficients.",
+                                                  .coefficients = { m_coefficients.begin(), m_coefficients.end() } }));
 
             // ===== Horner's method implemented in terms of std::accummulate.
             TYPE result = std::accumulate(begin + 1, end, static_cast< TYPE >(m_coefficients.back()), [value](TYPE curr, TYPE coeff) {
                 return curr * static_cast< TYPE >(value) + coeff;
             });
 
-            if (!std::isfinite(std::abs(result))) {    // Check if the result is not finite
-                std::stringstream ss;
-                ss << "\tPolynomial evaluation failed; non-finite result\n";
-                ss << "\tArgument: " << value << "\n";
-                ss << "\tCoefficients: " << this->serialize() << "\n";
-                return tl::unexpected(nxx::NumerixxError("Polynomial error", nxx::NumerixxErrorType::Poly, ss.str()));
-            }
+            if (!std::isfinite(std::abs(result))) [[unlikely]]
+                return tl::unexpected(PolyError("Polynomial error",
+                                                nxx::NumerixxErrorType::Poly,
+                                                { .details      = "Polynomial evaluation failed; non-finite result.",
+                                                  .coefficients = { m_coefficients.begin(), m_coefficients.end() },
+                                                  .arg          = value,
+                                                  .result       = result }));
 
             return result;
         }
@@ -494,11 +494,11 @@ namespace nxx::poly
          *
          * @return A string representation of the polynomial.
          */
-        [[nodiscard]]
-        std::string serialize() const
-        {
-            return m_serializer(m_coefficients);
-        }
+        //        [[nodiscard]]
+        //        std::string serialize() const
+        //        {
+        //            return m_serializer(m_coefficients);
+        //        }
 
         /**
          * @brief Adds another polynomial to this polynomial.

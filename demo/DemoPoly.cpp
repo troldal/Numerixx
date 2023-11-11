@@ -58,20 +58,8 @@ int main() {
     // the return type will be of std::complex type. If the coefficients are of std::complex type,
     // the return type will always be of std::complex type.
     // ============================================================================================
-    constexpr auto MySerializer = [](auto const& p) {
-        std::stringstream ss;
 
-        ss << "Order: " << p.size() - 1 << "\n";
-        ss << "Coefficients: ";
-        for (auto const& c : p) {
-            ss << c << " ";
-        }
-
-        return ss.str();
-    };
-
-    auto func1 = Polynomial({ 1.0, 2.0, 3.0, 4.0 }, MySerializer);
-    std::cout << func1.serialize() << std::endl;
+    auto func1 = Polynomial({ 1.0, 2.0, 3.0, 4.0 });
     std::cout << "Created the polynomial f(x) = " << func1 << std::endl << std::endl;
 
     std::cout << "Evaluation using function call operator:" << std::endl;
@@ -192,12 +180,6 @@ int main() {
     else {
         std::cout << "Evaluation at " << std::nan("") << ": " << *err_result << std::endl;
     }
-
-    auto p =
-        createPolynomialFromRoots({ -0.809017 - 0.587785i, -0.809017 + 0.587785i, 0.309017 - 0.951057i, 0.309017 + 0.951057i, 1.0 + 0i });
-
-    std::cout << p << std::endl;
-    for (auto res = polysolve(p); auto root : *res) std::cout << root << "\n";
 
     return 0;
 }

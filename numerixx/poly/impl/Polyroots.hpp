@@ -473,14 +473,14 @@ namespace nxx::poly
         // Lambda function to find roots based on the order of the polynomial.
         auto findRoots = [&](Polynomial< COMPLEX_T > p) {
             switch (p.order()) {
-                case 1:
-                    return linear< COMPLEX_T >(p);    // Linear polynomial.
-                case 2:
-                    return quadratic< COMPLEX_T >(p);    // Quadratic polynomial.
-                case 3:
-                    return cubic< COMPLEX_T >(p);    // Cubic polynomial.
-                default:
-                    return laguerre(p, 1.0, tolerance, max_iterations);    // Higher-order polynomial.
+                case 1:    // Linear polynomial.
+                    return linear< COMPLEX_T >(p);
+                case 2:    // Quadratic polynomial.
+                    return quadratic< COMPLEX_T >(p);
+                case 3:    // Cubic polynomial.
+                    return cubic< COMPLEX_T >(p);
+                default:    // Higher-order polynomials.
+                    return laguerre(p, 1.0, tolerance, max_iterations);
             }
         };
 

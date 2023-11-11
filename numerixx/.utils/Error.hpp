@@ -52,15 +52,17 @@ namespace nxx
     public:
         explicit NumerixxError(const std::string&            str,
                                NumerixxErrorType             type  = NumerixxErrorType::General,
-                               JSONString                    data  = {},
+                               //                               JSONString                    data  = {},
                                const std::source_location&   loc   = std::source_location::current(),
                                boost::stacktrace::stacktrace trace = boost::stacktrace::stacktrace())
             : std::runtime_error { str },
               m_type { type },
-              m_data { std::move(data) },
+              //              m_data { std::move(data) },
               m_location { loc },
               m_backtrace { std::move(trace) }
         {}
+
+        virtual ~NumerixxError() = default;
 
         [[nodiscard]]
         virtual NumerixxErrorType type() const noexcept
@@ -68,11 +70,11 @@ namespace nxx
             return m_type;
         }
 
-        [[nodiscard]]
-        virtual JSONString data() const noexcept
-        {
-            return m_data;
-        }
+        //        [[nodiscard]]
+        //        virtual JSONString data() const noexcept
+        //        {
+        //            return m_data;
+        //        }
 
         [[nodiscard]]
         virtual const std::source_location& where() const noexcept
@@ -96,16 +98,44 @@ namespace nxx
             logStream << "Function: " << m_location.function_name() << "\n\t";
             logStream << "Line: " << m_location.line() << "\n\t";
             logStream << "Column: " << m_location.column() << "\n\n";
-            logStream << "Details:\n" << m_data << "\n\n";
+            //            logStream << "Details:\n" << m_data << "\n\n";
             logStream << "Stacktrace:\n" << boost::stacktrace::to_string(m_backtrace) << "\n";
             return logStream.str();
         }
 
     private:
-        const NumerixxErrorType             m_type { NumerixxErrorType::General };
-        const JSONString                    m_data {};
-        const std::source_location          m_location;
-        const boost::stacktrace::stacktrace m_backtrace;
+        NumerixxErrorType m_type { NumerixxErrorType::General };
+        //        const JSONString                    m_data {};
+        std::source_location          m_location;
+        boost::stacktrace::stacktrace m_backtrace;
+    };
+
+    template< typename T >
+    class Error : public NumerixxError
+    {
+    public:
+        explicit Error(const std::string& str, NumerixxErrorType type = NumerixxErrorType::General, T data = {})
+            : NumerixxError(str, type),
+              m_data { std::move(data) }
+        {}
+
+        [[nodiscard]]
+        virtual T data() const noexcept
+        {
+            return m_data;
+        }
+
+        [[nodiscard]]
+        std::string log() const override
+        {
+            std::stringstream logStream;
+            logStream << NumerixxError::log() << "\n";
+            logStream << "Details:\n" << m_data << "\n\n";
+            return logStream.str();
+        }
+
+    private:
+        T m_data;
     };
 
 }    // namespace nxx
