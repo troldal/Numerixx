@@ -70,7 +70,7 @@ namespace nxx::roots
 
         public:
             using function_type = typename SearchingTraits< POLICY >::function_type;
-            using return_type   = typename SearchingTraits< POLICY >::return_type;
+            using return_type   = typename SearchingTraits< POLICY >::RETURN_T;
 
         protected:
             /**

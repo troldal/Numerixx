@@ -31,6 +31,8 @@
 #ifndef NUMERIXX_ROOTCOMMON_HPP
 #define NUMERIXX_ROOTCOMMON_HPP
 
+#include <Concepts.hpp>
+
 // ===== Standard Library Includes
 #include <stdexcept>
 
@@ -181,8 +183,8 @@ namespace nxx::roots
         template< typename FN >
         struct BracketingTraits< Ridder< FN > >
         {
-            using function_type = FN;
-            using return_type   = std::invoke_result_t< FN, double >;
+            using FUNCTION_T = FN;
+            using RETURN_T   = std::invoke_result_t< FN, double >;
         };
 
         /*
@@ -191,8 +193,8 @@ namespace nxx::roots
         template< typename FN >
         struct BracketingTraits< Bisection< FN > >
         {
-            using function_type = FN;
-            using return_type   = std::invoke_result_t< FN, double >;
+            using FUNCTION_T = FN;
+            using RETURN_T   = std::invoke_result_t< FN, double >;
         };
 
         /*
@@ -201,8 +203,8 @@ namespace nxx::roots
         template< typename FN >
         struct BracketingTraits< RegulaFalsi< FN > >
         {
-            using function_type = FN;
-            using return_type   = std::invoke_result_t< FN, double >;
+            using FUNCTION_T = FN;
+            using RETURN_T   = std::invoke_result_t< FN, double >;
         };
 
     }    // namespace impl
@@ -222,7 +224,8 @@ namespace nxx::roots
      * Forward declaration of the Newton class.
      */
     template< typename FN, typename DFN >
-    requires std::floating_point< std::invoke_result_t< FN, double > > && std::floating_point< std::invoke_result_t< DFN, double > >
+    requires(std::floating_point< std::invoke_result_t< FN, double > > && std::floating_point< std::invoke_result_t< DFN, double > >) ||
+            (IsComplex< std::invoke_result_t< FN, double > > && IsComplex< std::invoke_result_t< DFN, double > >)
     class Newton;
 
     namespace impl
@@ -239,10 +242,10 @@ namespace nxx::roots
         template< typename FN, typename DFN >
         struct PolishingTraits< Newton< FN, DFN > >
         {
-            using function_type        = FN;
-            using deriv_type           = DFN;
-            using function_return_type = std::invoke_result_t< FN, double >;
-            using deriv_return_type    = std::invoke_result_t< DFN, double >;
+            using FUNCTION_T        = FN;
+            using DERIV_T           = DFN;
+            using FUNCTION_RETURN_T = std::invoke_result_t< FN, double >;
+            using DERIV_RETURN_T    = std::invoke_result_t< DFN, double >;
         };
 
         /*
@@ -251,10 +254,10 @@ namespace nxx::roots
         template< typename FN, typename DFN >
         struct PolishingTraits< DNewton< FN, DFN > >
         {
-            using function_type        = FN;
-            using deriv_type           = DFN;
-            using function_return_type = std::invoke_result_t< FN, double >;
-            using deriv_return_type    = std::invoke_result_t< DFN, double >;
+            using FUNCTION_T        = FN;
+            using DERIV_T           = DFN;
+            using FUNCTION_RETURN_T = std::invoke_result_t< FN, double >;
+            using DERIV_RETURN_T    = std::invoke_result_t< DFN, double >;
         };
 
     }    // namespace impl
@@ -300,43 +303,43 @@ namespace nxx::roots
         template< typename FN >
         struct SearchingTraits< BracketSearchUp< FN > >
         {
-            using function_type = FN;
-            using return_type   = std::invoke_result_t< FN, double >;
+            using FUNCTION_T = FN;
+            using RETURN_T   = std::invoke_result_t< FN, double >;
         };
 
         template< typename FN >
         struct SearchingTraits< BracketSearchDown< FN > >
         {
-            using function_type = FN;
-            using return_type   = std::invoke_result_t< FN, double >;
+            using FUNCTION_T = FN;
+            using RETURN_T   = std::invoke_result_t< FN, double >;
         };
 
         template< typename FN >
         struct SearchingTraits< BracketExpandUp< FN > >
         {
-            using function_type = FN;
-            using return_type   = std::invoke_result_t< FN, double >;
+            using FUNCTION_T = FN;
+            using RETURN_T   = std::invoke_result_t< FN, double >;
         };
 
         template< typename FN >
         struct SearchingTraits< BracketExpandDown< FN > >
         {
-            using function_type = FN;
-            using return_type   = std::invoke_result_t< FN, double >;
+            using FUNCTION_T = FN;
+            using RETURN_T   = std::invoke_result_t< FN, double >;
         };
 
         template< typename FN >
         struct SearchingTraits< BracketExpandOut< FN > >
         {
-            using function_type = FN;
-            using return_type   = std::invoke_result_t< FN, double >;
+            using FUNCTION_T = FN;
+            using RETURN_T   = std::invoke_result_t< FN, double >;
         };
 
         template< typename FN >
         struct SearchingTraits< BracketSubdivide< FN > >
         {
-            using function_type = FN;
-            using return_type   = std::invoke_result_t< FN, double >;
+            using FUNCTION_T = FN;
+            using RETURN_T   = std::invoke_result_t< FN, double >;
         };
 
     }    // namespace impl

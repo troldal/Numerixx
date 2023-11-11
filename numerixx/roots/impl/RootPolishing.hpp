@@ -73,8 +73,10 @@ namespace nxx::roots
          *           function_type, deriv_type, function_return_type, and deriv_return_type.
          */
         template< typename POLICY >
-        requires std::floating_point< typename PolishingTraits< POLICY >::function_return_type > &&
-                 std::floating_point< typename PolishingTraits< POLICY >::deriv_return_type >
+        requires(std::floating_point< typename PolishingTraits< POLICY >::FUNCTION_RETURN_T > &&
+                 std::floating_point< typename PolishingTraits< POLICY >::DERIV_RETURN_T >) ||
+                (IsComplex< typename PolishingTraits< POLICY >::FUNCTION_RETURN_T > &&
+                 IsComplex< typename PolishingTraits< POLICY >::DERIV_RETURN_T >)
         class PolishingBase
         {
             /*
@@ -83,14 +85,14 @@ namespace nxx::roots
             friend POLICY;
 
         public:
-            using function_type = /**< The type of the function object. */
-                typename impl::PolishingTraits< POLICY >::function_type;
-            using deriv_type = /**< The type of the derivative function object. */
-                typename impl::PolishingTraits< POLICY >::deriv_type;
-            using function_return_type = /**< The return type of the function object. */
-                typename impl::PolishingTraits< POLICY >::function_return_type;
-            using deriv_return_type = /**< The return type of the derivative function object. */
-                typename impl::PolishingTraits< POLICY >::deriv_return_type;
+            using FUNCTION_T = /**< The type of the function object. */
+                typename impl::PolishingTraits< POLICY >::FUNCTION_T;
+            using DERIV_T = /**< The type of the derivative function object. */
+                typename impl::PolishingTraits< POLICY >::DERIV_T;
+            using FUNCTION_RETURN_T = /**< The return type of the function object. */
+                typename impl::PolishingTraits< POLICY >::FUNCTION_RETURN_T;
+            using DERIV_RETURN_T = /**< The return type of the derivative function object. */
+                typename impl::PolishingTraits< POLICY >::DERIV_RETURN_T;
 
         protected:
             /**
@@ -99,9 +101,9 @@ namespace nxx::roots
             ~PolishingBase() = default;
 
         private:
-            function_type        m_func {};               /**< The function object to find the root for. */
-            deriv_type           m_deriv {};              /**< The function object for the derivative. */
-            function_return_type m_guess;                 /**< The current root estimate. */
+            FUNCTION_T        m_func {};               /**< The function object to find the root for. */
+            DERIV_T           m_deriv {};              /**< The function object for the derivative. */
+            FUNCTION_RETURN_T m_guess;                 /**< The current root estimate. */
             bool                 m_initialized { false }; /**< Flag indicating whether the object has been initialized. */
 
             /**
@@ -110,7 +112,7 @@ namespace nxx::roots
              * @param derivative The function object for the derivative
              * @note Constructor is private to avoid direct usage by clients.
              */
-            explicit PolishingBase(function_type objective, deriv_type derivative)
+            explicit PolishingBase(FUNCTION_T objective, DERIV_T derivative)
                 : m_func { objective },
                   m_deriv { derivative }
             {}
@@ -152,7 +154,8 @@ namespace nxx::roots
              * @param guess The root estimate.
              */
             template< typename T >
-            requires std::floating_point< T >
+            //            requires std::floating_point< T >
+            requires std::convertible_to< T, FUNCTION_RETURN_T >
             void init(T guess)
             {
                 m_initialized = true;
@@ -171,7 +174,8 @@ namespace nxx::roots
              * @return The result of the evaluation.
              */
             template< typename T >
-            requires std::floating_point< T >
+            //            requires std::floating_point< T >
+            requires std::convertible_to< T, FUNCTION_RETURN_T >
             auto evaluate(T value)
             {
                 return m_func(value);
@@ -184,7 +188,8 @@ namespace nxx::roots
              * @return The result of the evaluation.
              */
             template< typename T >
-            requires std::floating_point< T >
+            //            requires std::floating_point< T >
+            requires std::convertible_to< T, FUNCTION_RETURN_T >
             auto derivative(T value)
             {
                 return m_deriv(value);
@@ -261,7 +266,8 @@ namespace nxx::roots
      * @requires FN and DFN should be callable with double and return a floating point type.
      */
     template< typename FN, typename DFN >
-    requires std::floating_point< std::invoke_result_t< FN, double > > && std::floating_point< std::invoke_result_t< DFN, double > >
+    requires(std::floating_point< std::invoke_result_t< FN, double > > && std::floating_point< std::invoke_result_t< DFN, double > >) ||
+            (IsComplex< std::invoke_result_t< FN, double > > && IsComplex< std::invoke_result_t< DFN, double > >)
     class Newton final : public impl::PolishingBase< Newton< FN, DFN > >
     {
         /*
@@ -308,27 +314,27 @@ namespace nxx::roots
      * @return The root estimate.
      */
     template< typename SOLVER >
-    requires requires(SOLVER solver, typename SOLVER::function_return_type guess) {
+    requires requires(SOLVER solver, typename SOLVER::FUNCTION_RETURN_T guess) {
                  // clang-format off
-                 { solver.evaluate(0.0) } -> std::floating_point;
+                 { solver.evaluate(0.0) } -> std::same_as< typename SOLVER::FUNCTION_RETURN_T >;
                  { solver.init(guess) };
                  { solver.iterate() };
                  // clang-format on
              }
     inline auto fdfsolve(SOLVER                                solver,
-                         typename SOLVER::function_return_type guess,
-                         typename SOLVER::function_return_type eps     = nxx::EPS,
+                         typename SOLVER::FUNCTION_RETURN_T guess,
+                         std::floating_point auto           eps     = nxx::EPS,
                          int                                   maxiter = nxx::MAXITER)
     {
-        using ET = impl::RootErrorImpl< typename SOLVER::function_return_type >;
-        using RT = tl::expected< typename SOLVER::function_return_type, ET >;
+        using EXPECTED_T = impl::RootErrorImpl< typename SOLVER::FUNCTION_RETURN_T >;
+        using RETURN_T   = tl::expected< typename SOLVER::FUNCTION_RETURN_T, EXPECTED_T >;
 
         solver.init(guess);
-        RT result = solver.result();
+        RETURN_T result = solver.result();
 
         // Check for NaN or Inf.
-        if (!std::isfinite(solver.evaluate(result.value()))) {
-            result = tl::make_unexpected(ET("Invalid initial guess!", RootErrorType::NumericalError, result.value()));
+        if (!std::isfinite(abs(solver.evaluate(result.value())))) {
+            result = tl::make_unexpected(EXPECTED_T("Invalid initial guess!", RootErrorType::NumericalError, result.value()));
             return result;
         }
 
@@ -338,8 +344,8 @@ namespace nxx::roots
             result = solver.result();
 
             // Check for NaN or Inf
-            if (!std::isfinite(result.value())) {
-                result = tl::make_unexpected(ET("Non-finite result!", RootErrorType::NumericalError, result.value(), iter));
+            if (!std::isfinite(abs(result.value()))) {
+                result = tl::make_unexpected(EXPECTED_T("Non-finite result!", RootErrorType::NumericalError, result.value(), iter));
                 break;
             }
 
@@ -349,7 +355,7 @@ namespace nxx::roots
             // Check for max. iterations
             if (iter >= maxiter) {
                 result = tl::make_unexpected(
-                    ET("Maximum number of iterations exceeded!", RootErrorType::MaxIterationsExceeded, result.value(), iter));
+                    EXPECTED_T("Maximum number of iterations exceeded!", RootErrorType::MaxIterationsExceeded, result.value(), iter));
                 break;
             }
 

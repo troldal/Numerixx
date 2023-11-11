@@ -344,29 +344,6 @@ namespace nxx::poly
             return (abs(den) < nxx::EPS ? OPTIONAL_T(std::nullopt) : OPTIONAL_T(order / den));
         };
 
-        // A lambda for computing the root of the polynomial using Newton's method:
-        auto newt = [=](auto f, COMPLEX_T x) -> OPTIONAL_T {
-            auto df = derivativeOf(f);    // Compute the derivative of the polynomial.
-
-            int i = 0;
-            while (true) {
-                if (i >= max_iterations) return std::nullopt;
-                if (abs(df(x)) < nxx::EPS) return std::nullopt;
-
-                auto dx = f(x) / df(x);    // Calculate the step.
-                x -= dx;                   // Update the root estimate.
-
-                // Check for convergence.
-                auto fval = f(x);
-                if (std::abs(fval.real()) < tolerance && std::abs(fval.imag()) < tolerance && std::abs(dx.real()) < tolerance &&
-                    std::abs(dx.imag()) < tolerance)
-                    break;
-
-                ++i;
-            }
-            return OPTIONAL_T(x);
-        };
-
         // Initialize the root with the guess
         COMPLEX_T  root = guess;
         COMPLEX_T  G;
@@ -413,10 +390,8 @@ namespace nxx::poly
         }
 
         // ===== Polish the root on the original polynomial using Newton's method
-        //        const auto polished_root = nxx::roots::fdfsolve(nxx::roots::Newton(poly, derivativeOf(poly)), root, tolerance,
-        //        max_iterations);
-        const auto polished_root = newt(poly, root);
-        if (polished_root) root = *polished_root;    // TODO: Use the roots::fdfsolve function instead
+        const auto polished_root = nxx::roots::fdfsolve(nxx::roots::Newton(poly, derivativeOf(poly)), root, tolerance / 10, max_iterations);
+        if (polished_root) root = *polished_root;
 
         // Return the root
         return EXPECTED_T(std::vector { root });
@@ -469,6 +444,7 @@ namespace nxx::poly
 
         // Convert input polynomial to complex type and initialize a vector for roots.
         auto polynomial = Polynomial< COMPLEX_T >(std::vector< COMPLEX_T > { poly.begin(), poly.end() });
+        auto original   = Polynomial< COMPLEX_T >(std::vector< COMPLEX_T > { poly.begin(), poly.end() });
         auto roots      = std::vector< COMPLEX_T > {};
 
         // Lambda function to find roots based on the order of the polynomial.
@@ -498,8 +474,16 @@ namespace nxx::poly
             // Insert found roots into the roots vector.
             roots.insert(roots.end(), (*roots_found).begin(), (*roots_found).end());
 
-            // Deflate the polynomial if its order is greater than 3.
-            if (polynomial.order() > 3) polynomial /= Polynomial< COMPLEX_T > { -roots.back(), 1.0 };
+            // If its order is greater than 3, polish the root an deflate the polynomial.
+            if (polynomial.order() > 3) {
+                const auto polished_root = nxx::roots::fdfsolve(nxx::roots::Newton(original, derivativeOf(original)),
+                                                                roots.back(),
+                                                                tolerance / 10,
+                                                                max_iterations);
+                if (polished_root) roots.back() = *polished_root;
+
+                polynomial /= Polynomial< COMPLEX_T > { -roots.back(), 1.0 };
+            }
         }
         while (order > 3);    // Continue until the polynomial is of order 3 or less.
 
