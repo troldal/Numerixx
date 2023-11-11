@@ -32,8 +32,8 @@
 #define NUMERIXX_DIFFERENTIATION_HPP
 
 // ===== Numerixx Includes
-//#include <Poly.hpp>
 #include <Concepts.hpp>
+#include <Error.hpp>
 
 // ===== External Includes
 #include <gcem.hpp>
@@ -58,13 +58,32 @@ namespace nxx::deriv
      * This class is a custom exception class that is derived from std::runtime_error.
      * It represents an error that occurs during the computation of a derivative.
      */
-    class DerivativeError : public std::runtime_error
+    //    class DerivativeError : public std::runtime_error
+    //    {
+    //    public:
+    //        explicit DerivativeError(const char* msg)
+    //            : std::runtime_error(msg)
+    //        {}
+    //    };
+
+    namespace detail
     {
-    public:
-        explicit DerivativeError(const char* msg)
-            : std::runtime_error(msg)
-        {}
-    };
+        template< typename T >
+        struct DerivErrorData
+        {
+            T x;
+            T h;
+            T f;
+            T df;
+            T d2f;
+
+            friend std::ostream& operator<<(std::ostream& os, const DerivErrorData& data)
+            {
+                os << "x: " << data.x << " h: " << data.h << " f: " << data.f << " df: " << data.df << " d2f: " << data.d2f;
+                return os;
+            }
+        };
+    }    // namespace detail
 
     /**
      * @brief Concept checking whether a type is a callable function object that returns a floating point type.
@@ -531,13 +550,16 @@ namespace nxx::deriv
                      ReturnType< decltype(function) > val,
                      ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
-        tl::expected< ReturnType< decltype(function) >, DerivativeError > result;
+        tl::expected< ReturnType< decltype(function) >, Error< detail::DerivErrorData< decltype(val) > > > result;
+        using DerivError = Error< detail::DerivErrorData< decltype(val) > >;
         auto deriv = ALGO {}(function, val, std::max(stepsize, stepsize * val));
 
         if (std::isfinite(deriv))
             result = deriv;
         else
-            result = tl::make_unexpected(DerivativeError { "Computation of derivative gave non-finite result." });
+            result = tl::make_unexpected(DerivError("Computation of derivative gave non-finite result.",
+                                                    NumerixxErrorType::Deriv,
+                                                    { .x = val, .h = stepsize, .f = function(val), .df = deriv, .d2f = 0.0 }));
         return result;
     }
 

@@ -413,7 +413,8 @@ namespace nxx::poly
         }
 
         // ===== Polish the root on the original polynomial using Newton's method
-        // roots.back() = *fdfsolve(Newton(polynomial, derivativeOf(polynomial)), roots.back(), tolerance, max_iterations);
+        //        const auto polished_root = nxx::roots::fdfsolve(nxx::roots::Newton(poly, derivativeOf(poly)), root, tolerance,
+        //        max_iterations);
         const auto polished_root = newt(poly, root);
         if (polished_root) root = *polished_root;    // TODO: Use the roots::fdfsolve function instead
 
