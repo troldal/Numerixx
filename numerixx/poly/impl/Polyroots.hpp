@@ -317,7 +317,7 @@ namespace nxx::poly
     template< typename POLY >
     requires IsPolynomial< POLY >
     inline auto laguerre(POLY                                                                          poly,
-                         std::complex< typename PolynomialTraits< decltype(poly) >::fundamental_type > guess          = 1.0,
+                         std::complex< typename PolynomialTraits< decltype(poly) >::fundamental_type > guess          = 0.0,
                          typename PolynomialTraits< decltype(poly) >::fundamental_type                 tolerance      = nxx::EPS,
                          int                                                                           max_iterations = nxx::MAXITER)
     {
@@ -340,15 +340,14 @@ namespace nxx::poly
         using EXPECTED     = tl::expected< COMPLEX_TYPE, NumerixxError >;
         using OPT          = std::optional< COMPLEX_TYPE >;
 
+        const COMPLEX_TYPE& order = poly.order();
+
         // Define a lambda function for computing the Laguerre step.
         auto laguerrestep = [&](COMPLEX_TYPE g_param, COMPLEX_TYPE h_param) -> OPT {
-            COMPLEX_TYPE temp = std::sqrt(2.0 * (3.0 * h_param - g_param * g_param));
-            if (abs(g_param + temp) < nxx::EPS) return std::nullopt;
-            return 3.0 / (abs(g_param + temp) > abs(g_param - temp) ? (g_param + temp) : (g_param - temp));
+            const COMPLEX_TYPE arg = std::sqrt((order - COMPLEX_TYPE(1)) * (order * h_param - g_param * g_param));
+            const COMPLEX_TYPE den = (abs(g_param + arg) > abs(g_param - arg) ? (g_param + arg) : (g_param - arg));
+            return (abs(den) < nxx::EPS ? OPT(std::nullopt) : OPT(order / den));
         };
-
-        // If the absolute value of the polynomial evaluated at the guess is less than the tolerance, return the guess as the root.
-        if (abs(poly(guess)) < tolerance) return EXPECTED(guess);
 
         // Initialize the root with the guess
         COMPLEX_TYPE root = guess;
@@ -363,24 +362,24 @@ namespace nxx::poly
         // Initialize a random number generator to perturb the step size every 10 iterations.
         std::random_device                       rd;
         std::mt19937                             mt(rd());
-        std::uniform_real_distribution< double > dist(0.9, 1.1);
+        std::uniform_real_distribution< FLOAT_TYPE > dist(0.0, 1.0);
 
         // Perform the Laguerre iterations.
         int i = 0;
         while (true) {
+            // If the absolute value of the polynomial evaluated at the root is less than the tolerance, return the root.
+            if (abs(poly(root)) < tolerance) break;
+
             // Return an error if the maximum number of iterations is reached.
             if (i >= max_iterations) return EXPECTED(tl::unexpected(NumerixxError("Maximum number of iterations reached.")));
-
-            // If the absolute value of the polynomial evaluated at the root is less than the tolerance, return an error.
-            if (abs(poly(root)) < tolerance) break;
 
             // Calculate G and H for the Laguerre step
             G    = d1poly(root) / poly(root);
             H    = G * G - d2poly(root) / poly(root);
             step = laguerrestep(G, H);
 
-            // If the step is not finite, use a small value.
-            if (!step) step = OPT(0.1);
+            // If the step is invalid, use a small value.
+            if (!step) step = OPT(root * 0.1);
 
             // If the step is below the tolerance, stop.
             if (abs(*step) < tolerance) break;
@@ -483,30 +482,33 @@ namespace nxx::poly
         // Handle different polynomial orders with specialized methods.
         switch (poly.order()) {
             case 1: {    // ===== Linear equation
-                auto linroot = linear< COMPLEX_TYPE >(polynomial);
+                const auto linroot = linear< COMPLEX_TYPE >(polynomial);
 
                 // Check if the linear equation has a solution.
-                if (!linroot) return EXPECTED(tl::unexpected(NumerixxError("Error: Linear equation has no solution.")));
+                if (!linroot) [[unlikely]]
+                    return EXPECTED(tl::unexpected(NumerixxError("Error: Linear equation has no solution.")));
 
                 roots.insert(roots.end(), (*linroot).begin(), (*linroot).end());
                 break;
             }
 
             case 2: {    // ===== Quadratic equation
-                auto quadroots = quadratic< COMPLEX_TYPE >(polynomial);
+                const auto quadroots = quadratic< COMPLEX_TYPE >(polynomial);
 
                 // Check if the quadratic equation has a solution.
-                if (!quadroots) return EXPECTED(tl::unexpected(NumerixxError("Error: Quadratic equation has no solution.")));
+                if (!quadroots) [[unlikely]]
+                    return EXPECTED(tl::unexpected(NumerixxError("Error: Quadratic equation has no solution.")));
 
                 roots.insert(roots.end(), (*quadroots).begin(), (*quadroots).end());
                 break;
             }
 
             case 3: {    // ===== Cubic equation
-                auto cubicroots = cubic< COMPLEX_TYPE >(polynomial);
+                const auto cubicroots = cubic< COMPLEX_TYPE >(polynomial);
 
                 // Check if the cubic equation has a solution.
-                if (!cubicroots) return EXPECTED(tl::unexpected(NumerixxError("Error: Cubic equation has no solution.")));
+                if (!cubicroots) [[unlikely]]
+                    return EXPECTED(tl::unexpected(NumerixxError("Error: Cubic equation has no solution.")));
 
                 roots.insert(roots.end(), (*cubicroots).begin(), (*cubicroots).end());
                 break;
@@ -519,20 +521,20 @@ namespace nxx::poly
                     using namespace nxx::roots;
 
                     // ===== Find a root using Laguerre's method
-                    auto root = laguerre(polynomial, 0.0, tolerance, max_iterations);
+                    const auto root = laguerre(polynomial, 1.0, tolerance, max_iterations);
 
-                    if (!root) return EXPECTED(tl::unexpected(NumerixxError("Error: Laguerre's method failed to converge.")));
+                    if (!root) [[unlikely]]
+                        return EXPECTED(tl::unexpected(NumerixxError("Error: Laguerre's method failed to converge.")));
 
                     roots.emplace_back(*root);
 
                     // ===== Polish the root on the original polynomial using Newton's method
                     // roots.back() = *fdfsolve(Newton(polynomial, derivativeOf(polynomial)), roots.back(), tolerance, max_iterations);
-                    auto polished_root = newt(original, roots.back());
-                    if (!polished_root) return EXPECTED(tl::unexpected(NumerixxError("Error: Newton's method failed to converge.")));
-                    roots.back() = *polished_root;    // TODO: Use the roots::fdfsolve function instead
+                    const auto polished_root = newt(original, roots.back());
+                    if (polished_root) roots.back() = *polished_root;    // TODO: Use the roots::fdfsolve function instead
 
                     // ===== Check if the root is valid
-                    if (!std::isfinite(original(roots.back()).real()) || !std::isfinite(original(roots.back()).imag()))
+                    if (!std::isfinite(original(roots.back()).real()) || !std::isfinite(original(roots.back()).imag())) [[unlikely]]
                         return EXPECTED(tl::unexpected(NumerixxError("Error: Root is not finite.")));
 
                     // ===== Deflate the polynomial by the root to reduce the order by one
@@ -540,10 +542,11 @@ namespace nxx::poly
                 }
 
                 // ===== Solve the remaining cubic equation
-                auto cuberoots = cubic< COMPLEX_TYPE >(polynomial);
+                const auto cuberoots = cubic< COMPLEX_TYPE >(polynomial);
 
                 // Check if the cubic equation has a solution.
-                if (!cuberoots) return EXPECTED(tl::unexpected(NumerixxError("Error: Cubic equation has no solution.")));
+                if (!cuberoots) [[unlikely]]
+                    return EXPECTED(tl::unexpected(NumerixxError("Error: Cubic equation has no solution.")));
 
                 roots.insert(roots.end(), (*cuberoots).begin(), (*cuberoots).end());
                 break;

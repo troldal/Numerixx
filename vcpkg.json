@@ -22,9 +22,6 @@
     "name" : "boost-stacktrace",
     "version>=" : "1.82.0#2"
   }, {
-    "name" : "catch2",
-    "version>=" : "3.4.0"
-  }, {
     "name" : "nlohmann-json",
     "version>=" : "3.11.2"
   } ]

@@ -12,7 +12,7 @@
 #include <sstream>
 #include <vector>
 
-constexpr double EPS = 1E-5;
+constexpr double EPS = 1E-6;
 
 TEST_CASE("Polynomial class tests", "[Polynomial]")
 {
