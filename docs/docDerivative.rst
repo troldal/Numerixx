@@ -86,10 +86,10 @@ In the example above, the :code:`derivative<>` function is passed the :code:`Ord
 * :code:`Order1CentralRichardson`
 * :code:`Order1Central3Point`
 * :code:`Order1Central5Point`
-* :code:`Order1ForwardRichardson`
+* :code:`Order1ForwardHighOrder`
 * :code:`Order1Forward2Point`
 * :code:`Order1Forward3Point`
-* :code:`Order1BackwardRichardson`
+* :code:`Order1BackwardHighOrder`
 * :code:`Order1Backward2Point`
 * :code:`Order1Backward3Point`
 

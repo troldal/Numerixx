@@ -102,11 +102,9 @@ TEST_CASE("nxx::deriv - Numerical Derivatives Test", "[derivatives]")
     SECTION("nxx::deriv::central")
     { testDerivativeMethod(Order1CentralRichardson {}, functions, first_derivatives, evals, 1E-6); }
 
-    SECTION("nxx::deriv::forward")
-    { testDerivativeMethod(Order1ForwardRichardson {}, functions, first_derivatives, evals, 1E-6); }
+    SECTION("nxx::deriv::forward") { testDerivativeMethod(Order1ForwardHighOrder {}, functions, first_derivatives, evals, 1E-6); }
 
-    SECTION("nxx::deriv::backward")
-    { testDerivativeMethod(Order1BackwardRichardson {}, functions, first_derivatives, evals, 1E-6); }
+    SECTION("nxx::deriv::backward") { testDerivativeMethod(Order1BackwardHighOrder {}, functions, first_derivatives, evals, 1E-6); }
 
     SECTION("Order1CentralRichardson")
     { testDerivativeMethod(Order1CentralRichardson {}, functions, first_derivatives, evals, 1E-6); }
@@ -117,8 +115,7 @@ TEST_CASE("nxx::deriv - Numerical Derivatives Test", "[derivatives]")
     SECTION("Order1Central5Point")
     { testDerivativeMethod(Order1Central5Point {}, functions, first_derivatives, evals, 1E-6); }
 
-    SECTION("Order1ForwardRichardson")
-    { testDerivativeMethod(Order1ForwardRichardson {}, functions, first_derivatives, evals, 1E-6); }
+    SECTION("Order1ForwardHighOrder") { testDerivativeMethod(Order1ForwardHighOrder {}, functions, first_derivatives, evals, 1E-6); }
 
     SECTION("Order1Forward2Point")
     { testDerivativeMethod(Order1Forward2Point {}, functions, first_derivatives, evals, 1E-3); }
@@ -126,8 +123,7 @@ TEST_CASE("nxx::deriv - Numerical Derivatives Test", "[derivatives]")
     SECTION("Order1Forward3Point")
     { testDerivativeMethod(Order1Forward3Point {}, functions, first_derivatives, evals, 1E-6); }
 
-    SECTION("Order1BackwardRichardson")
-    { testDerivativeMethod(Order1BackwardRichardson {}, functions, first_derivatives, evals, 1E-6); }
+    SECTION("Order1BackwardHighOrder") { testDerivativeMethod(Order1BackwardHighOrder {}, functions, first_derivatives, evals, 1E-6); }
 
     SECTION("Order1Backward2Point")
     { testDerivativeMethod(Order1Backward2Point {}, functions, first_derivatives, evals, 1E-3); }

@@ -55,6 +55,13 @@ target_include_directories(nxx_deriv INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT
 add_library(numerixx::deriv ALIAS nxx_deriv)
 
 #==============================================================================
+# nxx::integrate library
+#==============================================================================
+add_library(nxx_integrate INTERFACE)
+target_include_directories(nxx_integrate INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>/integrate)
+add_library(numerixx::integrate ALIAS nxx_integrate)
+
+#==============================================================================
 # nxx::roots library
 #==============================================================================
 add_library(nxx_roots INTERFACE)
@@ -80,6 +87,7 @@ add_library(numerixx::all ALIAS nxx_all)
 target_link_libraries(nxx_utility INTERFACE HWinfo)
 target_link_libraries(nxx_func INTERFACE nxx_utility gcem tl::expected)
 target_link_libraries(nxx_deriv INTERFACE nxx_utility gcem tl::expected)
+target_link_libraries(nxx_integrate INTERFACE nxx_utility gcem tl::expected)
 target_link_libraries(nxx_poly INTERFACE nxx_utility nxx_deriv nxx_roots gcem tl::expected)
 target_link_libraries(nxx_roots INTERFACE nxx_utility nxx_poly nxx_deriv gcem tl::expected)
 target_link_libraries(nxx_multiroots INTERFACE nxx_utility nxx_deriv gcem tl::expected)

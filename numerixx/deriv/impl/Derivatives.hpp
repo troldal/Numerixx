@@ -318,7 +318,7 @@ namespace nxx::deriv
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a forward Richardson extrapolation method.
      */
-    class Order1ForwardRichardson
+    class Order1ForwardHighOrder
     {
     public:
         /**
@@ -510,7 +510,7 @@ namespace nxx::deriv
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a backward Richardson extrapolation method.
      */
-    class Order1BackwardRichardson
+    class Order1BackwardHighOrder
     {
     public:
         /**
@@ -768,7 +768,7 @@ namespace nxx::deriv
                         ReturnType< decltype(function) > val,
                         ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
-        return diff< Order1ForwardRichardson >(function, val, stepsize);
+        return diff< Order1ForwardHighOrder >(function, val, stepsize);
     }
 
     /**
@@ -788,7 +788,7 @@ namespace nxx::deriv
                          ReturnType< decltype(function) > val,
                          ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
-        return diff< Order1BackwardRichardson >(function, val, stepsize);
+        return diff< Order1BackwardHighOrder >(function, val, stepsize);
     }
 
     /**

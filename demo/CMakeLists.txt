@@ -63,6 +63,16 @@ target_sources(DemoDeriv
 
 target_link_libraries(DemoDeriv PRIVATE fmt numerixx::deriv)
 
+# Target: Numerical integration
+add_executable(DemoIntegrate)
+target_sources(DemoIntegrate
+        PRIVATE
+        DemoIntegrate.cpp
+)
+
+target_link_libraries(DemoIntegrate PRIVATE fmt numerixx::integrate)
+
+
 # Target: Multiple root-finding
 add_executable(DemoMultiroot)
 target_sources(DemoMultiroot

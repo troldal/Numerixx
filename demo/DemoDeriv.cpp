@@ -66,11 +66,11 @@ int main()
     std::cout << "Order1Central3Point:       " << *diff<Order1Central3Point>(func, std::numbers::e) << std::endl;
     std::cout << "Order1Central5Point:       " << *diff<Order1Central5Point>(func, std::numbers::e) << "\n\n";
 
-    std::cout << "Order1ForwardRichardson:   " << *diff<Order1ForwardRichardson>(func, std::numbers::e) << std::endl;
+    std::cout << "Order1ForwardRichardson:   " << *diff< Order1ForwardHighOrder >(func, std::numbers::e) << std::endl;
     std::cout << "Order1Forward2Point:       " << *diff<Order1Forward2Point>(func, std::numbers::e) << std::endl;
     std::cout << "Order1Forward3Point:       " << *diff<Order1Forward3Point>(func, std::numbers::e) << "\n\n";
 
-    std::cout << "Order1BackwardRichardson:  " << *diff<Order1BackwardRichardson>(func, std::numbers::e) << std::endl;
+    std::cout << "Order1BackwardRichardson:  " << *diff< Order1BackwardHighOrder >(func, std::numbers::e) << std::endl;
     std::cout << "Order1Backward2Point:      " << *diff<Order1Backward2Point>(func, std::numbers::e) << std::endl;
     std::cout << "Order1Backward3Point:      " << *diff<Order1Backward3Point>(func, std::numbers::e) << "\n\n";
 
