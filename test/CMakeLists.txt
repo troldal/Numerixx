@@ -24,7 +24,7 @@ add_executable(NumerixxTests EXCLUDE_FROM_ALL "")
 target_sources(NumerixxTests
         PRIVATE
         testPolynomials.cpp
-#        testDerivatives.cpp
+        testDerivatives.cpp
 #        testMatrix.cpp
 #        testRootBracketing.cpp
 #        testRootPolishing.cpp

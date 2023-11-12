@@ -33,6 +33,7 @@
 
 // ===== External Includes
 #include <boost/stacktrace.hpp>
+#include <hwinfo/hwinfo.hpp>
 
 // ===== Standard Library Includes
 #include <optional>
@@ -40,8 +41,6 @@
 #include <sstream>
 #include <stdexcept>
 #include <utility>
-
-using JSONString = std::string;
 
 namespace nxx
 {
@@ -52,29 +51,25 @@ namespace nxx
     public:
         explicit NumerixxError(const std::string&            str,
                                NumerixxErrorType             type  = NumerixxErrorType::General,
-                               //                               JSONString                    data  = {},
                                const std::source_location&   loc   = std::source_location::current(),
                                boost::stacktrace::stacktrace trace = boost::stacktrace::stacktrace())
             : std::runtime_error { str },
               m_type { type },
-              //              m_data { std::move(data) },
               m_location { loc },
-              m_backtrace { std::move(trace) }
+              m_backtrace { std::move(trace) },
+              m_os { hwinfo::getOSInfo() },
+              m_cpu { hwinfo::getCpuInfo() },
+              m_ram { hwinfo::getRamInfo() }
+
         {}
 
-        virtual ~NumerixxError() = default;
+        ~NumerixxError() override = default;
 
         [[nodiscard]]
         virtual NumerixxErrorType type() const noexcept
         {
             return m_type;
         }
-
-        //        [[nodiscard]]
-        //        virtual JSONString data() const noexcept
-        //        {
-        //            return m_data;
-        //        }
 
         [[nodiscard]]
         virtual const std::source_location& where() const noexcept
@@ -98,24 +93,32 @@ namespace nxx
             logStream << "Function: " << m_location.function_name() << "\n\t";
             logStream << "Line: " << m_location.line() << "\n\t";
             logStream << "Column: " << m_location.column() << "\n\n";
-            //            logStream << "Details:\n" << m_data << "\n\n";
             logStream << "Stacktrace:\n" << boost::stacktrace::to_string(m_backtrace) << "\n";
+            logStream << "OS:\n" << m_os << "\n";
+            logStream << "CPU:\n" << m_cpu << "\n";
+            logStream << "RAM:\n" << m_ram << "\n";
             return logStream.str();
         }
 
     private:
-        NumerixxErrorType m_type { NumerixxErrorType::General };
-        //        const JSONString                    m_data {};
+        NumerixxErrorType             m_type { NumerixxErrorType::General };
         std::source_location          m_location;
         boost::stacktrace::stacktrace m_backtrace;
+        hwinfo::OS                    m_os;
+        hwinfo::CPU                   m_cpu;
+        hwinfo::RAM                   m_ram;
     };
 
     template< typename T >
     class Error : public NumerixxError
     {
     public:
-        explicit Error(const std::string& str, NumerixxErrorType type = NumerixxErrorType::General, T data = {})
-            : NumerixxError(str, type),
+        explicit Error(const std::string&            str,
+                       NumerixxErrorType             type  = NumerixxErrorType::General,
+                       T                             data  = {},
+                       const std::source_location&   loc   = std::source_location::current(),
+                       boost::stacktrace::stacktrace trace = boost::stacktrace::stacktrace())
+            : NumerixxError(str, type, loc, std::move(trace)),
               m_data { std::move(data) }
         {}
 

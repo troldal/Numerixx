@@ -44,27 +44,13 @@
 #include <cmath>
 #include <functional>
 #include <limits>
+#include <stdexcept>
 #include <tuple>
 #include <type_traits>
 #include <utility>
-#include <stdexcept>
 
 namespace nxx::deriv
 {
-
-    /**
-     * @brief The DerivativeError class.
-     *
-     * This class is a custom exception class that is derived from std::runtime_error.
-     * It represents an error that occurs during the computation of a derivative.
-     */
-    //    class DerivativeError : public std::runtime_error
-    //    {
-    //    public:
-    //        explicit DerivativeError(const char* msg)
-    //            : std::runtime_error(msg)
-    //        {}
-    //    };
 
     namespace detail
     {
@@ -75,11 +61,10 @@ namespace nxx::deriv
             T h;
             T f;
             T df;
-            T d2f;
 
             friend std::ostream& operator<<(std::ostream& os, const DerivErrorData& data)
             {
-                os << "x: " << data.x << " h: " << data.h << " f: " << data.f << " df: " << data.df << " d2f: " << data.d2f;
+                os << "x = " << data.x << ", h = " << data.h << ", f = " << data.f << ", df = " << data.df;
                 return os;
             }
         };
@@ -132,6 +117,12 @@ namespace nxx::deriv
     // Central finite difference formulas
     // ====================================================================
 
+    template< std::floating_point T >
+    void validateStepSize(T stepsize, T minStepSize)
+    {
+        if (stepsize < minStepSize) throw NumerixxError("Step size is too low.");
+    }
+
     /**
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a centered Richardson extrapolation method.
@@ -141,18 +132,30 @@ namespace nxx::deriv
     public:
         /**
          * @brief Function call operator.
+         *
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
          * floating point type as an argument, and returns a value of the same type.
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
-         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         *
+         * @return The derivative. The return type is the same as the return type of the provided function.
+         *
          * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
-         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         *
+         * @details This function uses the Richardson extrapolation method for computing the derivative.
+         * It approximates the derivative by taking the difference of the function evaluated at `val + stepsize` and `val - stepsize`,
+         * and scaling by the reciprocal of `stepsize * 6`. This method provides a more accurate approximation of the derivative
+         * than simple finite difference methods. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra,
+         * for details.
+         *
+         * @throws NumerixxError if stepsize is invalid.
          */
-        inline auto
-            operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
+        inline auto operator()(IsFunction auto                  function,
+                               ReturnType< decltype(function) > val,
+                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
         {
+            validateStepSize(stepsize, std::sqrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
             return (4.0 * (function(val + stepsize) - function(val - stepsize)) -
                     0.5 * (function(val + 2 * stepsize) - function(val - 2 * stepsize))) /
                    (stepsize * 6);
@@ -168,18 +171,29 @@ namespace nxx::deriv
     public:
         /**
          * @brief Function call operator.
+         *
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
          * floating point type as an argument, and returns a value of the same type.
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
-         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         *
+         * @return The derivative. The return type is the same as the return type of the provided function.
+         *
          * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
-         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         *
+         * @details This function uses the 3-point centered finite divided-difference method for computing the derivative.
+         * It approximates the derivative by taking the difference of the function evaluated at `val + stepsize` and `val - stepsize`,
+         * and scaling by the reciprocal of `2 * stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+         * Steven C. Chapra, for details.
+         *
+         * @throws NumerixxError if stepsize is invalid.
          */
-        inline auto
-            operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
+        inline auto operator()(IsFunction auto                  function,
+                               ReturnType< decltype(function) > val,
+                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
         {
+            validateStepSize(stepsize, std::sqrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
             return (function(val + stepsize) - function(val - stepsize)) / (2 * stepsize);
         }
     };
@@ -193,18 +207,29 @@ namespace nxx::deriv
     public:
         /**
          * @brief Function call operator.
+         *
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
          * floating point type as an argument, and returns a value of the same type.
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
-         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         *
+         * @return The derivative. The return type is the same as the return type of the provided function.
+         *
          * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
-         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         *
+         * @details This function uses the 5-point centered finite divided-difference method for computing the derivative.
+         * It approximates the derivative by taking the difference of the function evaluated at `val + 2 * stepsize` and `val - 2 *
+         * stepsize`, and scaling by the reciprocal of `12 * stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition
+         * by Steven C. Chapra, for details.
+         *
+         * @throws NumerixxError if stepsize is invalid.
          */
-        inline auto
-            operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
+        inline auto operator()(IsFunction auto                  function,
+                               ReturnType< decltype(function) > val,
+                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
         {
+            validateStepSize(stepsize, std::sqrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
             return (-function(val + 2 * stepsize) + 8 * function(val + stepsize) - 8 * function(val - stepsize) +
                     function(val - 2 * stepsize)) /
                    (12 * stepsize);
@@ -220,18 +245,29 @@ namespace nxx::deriv
     public:
         /**
          * @brief Function call operator.
+         *
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
          * floating point type as an argument, and returns a value of the same type.
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
-         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         *
+         * @return The derivative. The return type is the same as the return type of the provided function.
+         *
          * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
-         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         *
+         * @details This function uses the 3-point centered finite divided-difference method for computing the derivative.
+         * It approximates the derivative by taking the difference of the function evaluated at `val + stepsize` and `val - stepsize`,
+         * and scaling by the reciprocal of `2 * stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+         * Steven C. Chapra, for details.
+         *
+         * @throws NumerixxError if stepsize is invalid.
          */
-        inline auto
-            operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
+        inline auto operator()(IsFunction auto                  function,
+                               ReturnType< decltype(function) > val,
+                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
         {
+            validateStepSize(stepsize, std::cbrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
             return (function(val + stepsize) - 2 * function(val) + function(val - stepsize)) / std::pow(stepsize, 2);
         }
     };
@@ -245,18 +281,29 @@ namespace nxx::deriv
     public:
         /**
          * @brief Function call operator.
+         *
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
          * floating point type as an argument, and returns a value of the same type.
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
-         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         *
+         * @return The derivative. The return type is the same as the return type of the provided function.
+         *
          * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
-         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         *
+         * @details This function uses the 5-point centered finite divided-difference method for computing the derivative.
+         * It approximates the derivative by taking the difference of the function evaluated at `val + 2 * stepsize` and `val - 2 *
+         * stepsize`, and scaling by the reciprocal of `12 * stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition
+         * by Steven C. Chapra, for details.
+         *
+         * @throws NumerixxError if stepsize is invalid.
          */
-        inline auto
-            operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
+        inline auto operator()(IsFunction auto                  function,
+                               ReturnType< decltype(function) > val,
+                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
         {
+            validateStepSize(stepsize, std::cbrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
             return (-function(val + 2 * stepsize) + 16 * function(val + stepsize) - 30 * function(val) + 16 * function(val - stepsize) -
                     function(val - 2 * stepsize)) /
                    (12 * std::pow(stepsize, 2));
@@ -276,18 +323,31 @@ namespace nxx::deriv
     public:
         /**
          * @brief Function call operator.
+         *
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
          * floating point type as an argument, and returns a value of the same type.
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
-         * @return The derivative. The return type is the same as the retrun type of the provided function.
-         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
+         *
+         * @return The derivative. The return type is the same as the return type of the provided function.
+         *
+         * * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
-         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         *
+         * @details This function uses the Richardson extrapolation method for computing the derivative.
+         * It approximates the derivative by taking the difference of the function evaluated at `val + stepsize` and `val - stepsize`,
+         * and scaling by the reciprocal of `stepsize * 6`. This method provides a more accurate approximation of the derivative
+         * than simple finite difference methods. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra,
+         * for details.
+         *
+         * @throws NumerixxError if stepsize is invalid.
          */
-        inline auto
-            operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
+        inline auto operator()(IsFunction auto                  function,
+                               ReturnType< decltype(function) > val,
+                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
         {
+            validateStepSize(stepsize, std::sqrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
+
             const auto diff1 = function(val + stepsize);
             const auto diff2 = function(val + stepsize * 2);
             const auto diff3 = function(val + stepsize * 3);
@@ -306,18 +366,29 @@ namespace nxx::deriv
     public:
         /**
          * @brief Function call operator.
+         *
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
          * floating point type as an argument, and returns a value of the same type.
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
-         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         *
+         * @return The derivative. The return type is the same as the return type of the provided function.
+         *
          * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
-         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         *
+         * @details This function uses the 2-point forward finite divided-difference method for computing the derivative.
+         * It approximates the derivative by taking the difference of the function evaluated at `val + stepsize` and `val`,
+         * and scaling by the reciprocal of `stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+         * Steven C. Chapra, for details.
+         *
+         * @throws NumerixxError if stepsize is invalid.
          */
-        inline auto
-            operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
+        inline auto operator()(IsFunction auto                  function,
+                               ReturnType< decltype(function) > val,
+                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
         {
+            validateStepSize(stepsize, std::sqrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
             return (function(val + stepsize) - function(val)) / stepsize;
         }
     };
@@ -331,18 +402,29 @@ namespace nxx::deriv
     public:
         /**
          * @brief Function call operator.
+         *
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
          * floating point type as an argument, and returns a value of the same type.
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
-         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         *
+         * @return The derivative. The return type is the same as the return type of the provided function.
+         *
          * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
-         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         *
+         * @details This function uses the 3-point forward finite divided-difference method for computing the derivative.
+         * It approximates the derivative by taking the difference of the function evaluated at `val + 2 * stepsize` and `val`,
+         * and scaling by the reciprocal of `2 * stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+         * Steven C. Chapra, for details.
+         *
+         * @throws NumerixxError if stepsize is invalid.
          */
-        inline auto
-            operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
+        inline auto operator()(IsFunction auto                  function,
+                               ReturnType< decltype(function) > val,
+                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
         {
+            validateStepSize(stepsize, std::sqrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
             return (-function(val + 2 * stepsize) + 4 * function(val + stepsize) - 3 * function(val)) / (2 * stepsize);
         }
     };
@@ -356,18 +438,29 @@ namespace nxx::deriv
     public:
         /**
          * @brief Function call operator.
+         *
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
          * floating point type as an argument, and returns a value of the same type.
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
-         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         *
+         * @return The derivative. The return type is the same as the return type of the provided function.
+         *
          * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
-         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         *
+         * @details This function uses the 3-point forward finite divided-difference method for computing the derivative.
+         * It approximates the derivative by taking the difference of the function evaluated at `val + 2 * stepsize` and `val`,
+         * and scaling by the reciprocal of `stepsize^2`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+         * Steven C. Chapra, for details.
+         *
+         * @throws NumerixxError if stepsize is invalid.
          */
-        inline auto
-            operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
+        inline auto operator()(IsFunction auto                  function,
+                               ReturnType< decltype(function) > val,
+                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
         {
+            validateStepSize(stepsize, std::cbrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
             return (function(val + 2 * stepsize) - 2 * function(val + stepsize) + function(val)) / std::pow(stepsize, 2);
         }
     };
@@ -381,18 +474,29 @@ namespace nxx::deriv
     public:
         /**
          * @brief Function call operator.
+         *
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
          * floating point type as an argument, and returns a value of the same type.
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
-         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         *
+         * @return The derivative. The return type is the same as the return type of the provided function.
+         *
          * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
-         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         *
+         * @details This function uses the 4-point forward finite divided-difference method for computing the derivative.
+         * It approximates the derivative by taking the difference of the function evaluated at `val + 3 * stepsize` and `val`,
+         * and scaling by the reciprocal of `stepsize^2`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+         * Steven C. Chapra, for details.
+         *
+         * @throws NumerixxError if stepsize is invalid.
          */
-        inline auto
-            operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
+        inline auto operator()(IsFunction auto                  function,
+                               ReturnType< decltype(function) > val,
+                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
         {
+            validateStepSize(stepsize, std::cbrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
             return (-function(val + 3 * stepsize) + 4 * function(val + 2 * stepsize) - 5 * function(val + stepsize) + 2 * function(val)) /
                    std::pow(stepsize, 2);
         }
@@ -411,18 +515,31 @@ namespace nxx::deriv
     public:
         /**
          * @brief Function call operator.
+         *
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
          * floating point type as an argument, and returns a value of the same type.
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
-         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         *
+         * @return The derivative. The return type is the same as the return type of the provided function.
+         *
          * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
-         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         *
+         * @details This function uses the Richardson extrapolation method for computing the derivative.
+         * It approximates the derivative by taking the difference of the function evaluated at `val - stepsize` and `val - 4 * stepsize`,
+         * and scaling by the reciprocal of `-stepsize * 12`. This method provides a more accurate approximation of the derivative
+         * than simple finite difference methods. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra,
+         * for details.
+         *
+         * @throws NumerixxError if stepsize is invalid.
          */
-        inline auto
-            operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
+        inline auto operator()(IsFunction auto                  function,
+                               ReturnType< decltype(function) > val,
+                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
         {
+            validateStepSize(stepsize, std::sqrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
+
             const auto diff1 = function(val - stepsize);
             const auto diff2 = function(val - stepsize * 2);
             const auto diff3 = function(val - stepsize * 3);
@@ -441,18 +558,29 @@ namespace nxx::deriv
     public:
         /**
          * @brief Function call operator.
+         *
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
          * floating point type as an argument, and returns a value of the same type.
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
-         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         *
+         * @return The derivative. The return type is the same as the return type of the provided function.
+         *
          * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
-         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         *
+         * @details This function uses the 2-point backward finite divided-difference method for computing the derivative.
+         * It approximates the derivative by taking the difference of the function evaluated at `val` and `val - stepsize`,
+         * and scaling by the reciprocal of `stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+         * Steven C. Chapra, for details.
+         *
+         * @throws NumerixxError if stepsize is invalid.
          */
-        inline auto
-            operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
+        inline auto operator()(IsFunction auto                  function,
+                               ReturnType< decltype(function) > val,
+                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
         {
+            validateStepSize(stepsize, std::sqrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
             return (function(val) - function(val - stepsize)) / stepsize;
         }
     };
@@ -466,18 +594,29 @@ namespace nxx::deriv
     public:
         /**
          * @brief Function call operator.
+         *
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
          * floating point type as an argument, and returns a value of the same type.
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
-         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         *
+         * @return The derivative. The return type is the same as the return type of the provided function.
+         *
          * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
-         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         *
+         * @details This function uses the 3-point backward finite divided-difference method for computing the derivative.
+         * It approximates the derivative by taking the difference of the function evaluated at `val` and `val - 2 * stepsize`,
+         * and scaling by the reciprocal of `2 * stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+         * Steven C. Chapra, for details.
+         *
+         * @throws NumerixxError if stepsize is invalid.
          */
-        inline auto
-            operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
+        inline auto operator()(IsFunction auto                  function,
+                               ReturnType< decltype(function) > val,
+                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
         {
+            validateStepSize(stepsize, std::sqrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
             return (3 * function(val) - 4 * function(val - stepsize) + function(val - 2 * stepsize)) / (2 * stepsize);
         }
     };
@@ -491,18 +630,29 @@ namespace nxx::deriv
     public:
         /**
          * @brief Function call operator.
+         *
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
          * floating point type as an argument, and returns a value of the same type.
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
-         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         *
+         * @return The derivative. The return type is the same as the return type of the provided function.
+         *
          * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
-         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         *
+         * @details This function uses the 3-point backward finite divided-difference method for computing the derivative.
+         * It approximates the derivative by taking the difference of the function evaluated at `val` and `val - 2 * stepsize`,
+         * and scaling by the reciprocal of `stepsize^2`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+         * Steven C. Chapra, for details.
+         *
+         * @throws NumerixxError if stepsize is invalid.
          */
-        inline auto
-            operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
+        inline auto operator()(IsFunction auto                  function,
+                               ReturnType< decltype(function) > val,
+                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
         {
+            validateStepSize(stepsize, std::cbrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
             return (function(val) - 2 * function(val - stepsize) + function(val - 2 * stepsize)) / std::pow(stepsize, 2);
         }
     };
@@ -516,18 +666,29 @@ namespace nxx::deriv
     public:
         /**
          * @brief Function call operator.
+         *
          * @param function The function for which to compute the derivative. The function can be any callable type taking a
          * floating point type as an argument, and returns a value of the same type.
          * @param val The value at which to compute the derivative.
          * @param stepsize The finite difference used for computing the derivative.
-         * @return The derivative. The return type is the same as the retrun type of the provided function.
+         *
+         * @return The derivative. The return type is the same as the return type of the provided function.
+         *
          * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
-         * @details See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra, for details.
+         *
+         * @details This function uses the 4-point backward finite divided-difference method for computing the derivative.
+         * It approximates the derivative by taking the difference of the function evaluated at `val` and `val - 3 * stepsize`,
+         * and scaling by the reciprocal of `stepsize^2`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+         * Steven C. Chapra, for details.
+         *
+         * @throws NumerixxError if stepsize is invalid.
          */
-        inline auto
-            operator()(IsFunction auto function, ReturnType< decltype(function) > val, ReturnType< decltype(function) > stepsize) const
+        inline auto operator()(IsFunction auto                  function,
+                               ReturnType< decltype(function) > val,
+                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
         {
+            validateStepSize(stepsize, std::cbrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
             return (2 * function(val) - 5 * function(val - stepsize) + 4 * function(val - 2 * stepsize) - function(val - 3 * stepsize)) /
                    std::pow(stepsize, 2);
         }
@@ -536,39 +697,48 @@ namespace nxx::deriv
     /**
      * @brief Compute the derivative of a function, using the specified algorithm. This function checks the result
      * for errors and will return a tl::expected object that will contain the result or an error object.
+     *
      * @tparam ALGO The algorithm for computing the derivative. This can be one of the provided function objects, or
      * a custom function object type conforming to the required interface.
-     * @param function The function for which to compute the derivative.
+     * @param function The function for which to compute the derivative. The function can be any callable type taking a
+     * floating point type as an argument, and returns a value of the same type.
      * @param val The value at which to compute the derivative.
      * @param stepsize (Optional) The finite difference used to compute the derivative. If an argument for this parameter is not provided,
      * a default value vill be used. The default value is the cubic root of the machine epsilon for the function return type.
+     *
      * @return A \c tl::expected (\c std::expected) containing the (approximated) derivative of the function, or (in case of an error)
      * a \c DerivativeError exception object describing the error.
+     *
+     * @throws NumerixxError if function is not callable.
      */
     template< typename ALGO >
     inline auto diff(IsFunction auto                  function,
                      ReturnType< decltype(function) > val,
                      ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
     {
-        tl::expected< ReturnType< decltype(function) >, Error< detail::DerivErrorData< decltype(val) > > > result;
+        if (!function) throw NumerixxError("Function object is invalid.");
+
         using DerivError = Error< detail::DerivErrorData< decltype(val) > >;
+        using EXPECTED_T = tl::expected< ReturnType< decltype(function) >, DerivError >;
+
         auto deriv = ALGO {}(function, val, std::max(stepsize, stepsize * val));
 
         if (std::isfinite(deriv))
-            result = deriv;
+            return EXPECTED_T(deriv);
         else
-            result = tl::make_unexpected(DerivError("Computation of derivative gave non-finite result.",
-                                                    NumerixxErrorType::Deriv,
-                                                    { .x = val, .h = stepsize, .f = function(val), .df = deriv, .d2f = 0.0 }));
-        return result;
+            return EXPECTED_T(tl::make_unexpected(DerivError("Computation of derivative gave non-finite result.",
+                                                             NumerixxErrorType::Deriv,
+                                                             { .x = val, .h = stepsize, .f = function(val), .df = deriv })));
     }
 
     /**
      * @brief A convenience function for computing the derivative using a centered divided difference method.
+     *
      * @param function The function for which to compute the derivative.
      * @param val The value at which to compute the derivative.
      * @param stepsize (Optional) The finite difference used to compute the derivative. If an argument for this parameter is not provided,
      * a default value vill be used. The default value is the cubic root of the machine epsilon for the function return type.
+     *
      * @return A \c tl::expected (\c std::expected) containing the (approximated) derivative of the function, or (in case of an error)
      * a \c DerivativeError exception object describing the error.
      */
@@ -583,10 +753,12 @@ namespace nxx::deriv
 
     /**
      * @brief A convenience function for computing the derivative using a forward divided difference method.
+     *
      * @param function The function for which to compute the derivative.
      * @param val The value at which to compute the derivative.
      * @param stepsize (Optional) The finite difference used to compute the derivative. If an argument for this parameter is not provided,
      * a default value vill be used. The default value is the cubic root of the machine epsilon for the function return type.
+     *
      * @return A \c tl::expected (\c std::expected) containing the (approximated) derivative of the function, or (in case of an error)
      * a \c DerivativeError exception object describing the error.
      */
@@ -601,10 +773,12 @@ namespace nxx::deriv
 
     /**
      * @brief A convenience function for computing the derivative using a backward divided difference method.
+     *
      * @param function The function for which to compute the derivative.
      * @param val The value at which to compute the derivative.
      * @param stepsize (Optional) The finite difference used to compute the derivative. If an argument for this parameter is not provided,
      * a default value vill be used. The default value is the cubic root of the machine epsilon for the function return type.
+     *
      * @return A \c tl::expected (\c std::expected) containing the (approximated) derivative of the function, or (in case of an error)
      * a \c DerivativeError exception object describing the error.
      */
@@ -619,22 +793,30 @@ namespace nxx::deriv
 
     /**
      * @brief Create a function object representing the derivative of the input function, using numerical differentiation.
+     *
      * @tparam ALGO The algorithm type for computing the derivative. This can be any algorithm with the right interface,
      * and can be both 1st order and higher order derivatives. The default is \c Order1CentralRichardson.
      * @param function The function to compute the derivative of.
      * @param stepsize (Optional) The step size to use in the computation. The default is the cubic root of the machine epsilon.
+     *
      * @return A lambda function representing the derivative of the input function. The lambda will take one floating point
      * argument, and return the (approximated) derivative of the function.
+     *
      * @note For objects of the \c Polynomial class, an overload of the \c derivativeOf function is provided for computing the
      * derivative function analytically.
+     *
      * @note The returned function object will not check the result for errors. If you want to check the result for errors,
      * use the \c diff function instead, or create a custom function object (e.g., a lambda) that checks the result for errors.
+     *
+     * @throws NumerixxError if function is not callable.
      */
     template< typename ALGO = Order1CentralRichardson >
     inline auto derivativeOf(IsFunction auto                  function,
                              ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
         requires(!poly::IsPolynomial< decltype(function) >)
     {
+        if (!function) throw NumerixxError("Function object is invalid.");
+
         using RT = ReturnType< decltype(function) >;
         return [=](RT val) { return ALGO {}(function, val, stepsize); };
     }

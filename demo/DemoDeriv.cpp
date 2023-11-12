@@ -95,8 +95,7 @@ int main()
     std::cout << "The following example show how to use the nxx::deriv::derivative template function\n";
     std::cout << "with a custom algorithm.\n";
 
-
-    auto algo = [](auto function, double val, double stepsize) {
+    auto algo = [](auto function, double val, double stepsize = 1E-6) {
         return (4.0 * (function(val + stepsize) - function(val - stepsize)) -
                 0.5 * (function(val + 2 * stepsize) - function(val - 2 * stepsize))) /
                (stepsize * 6);

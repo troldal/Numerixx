@@ -77,6 +77,7 @@ add_library(numerixx::all ALIAS nxx_all)
 #==============================================================================
 # Link libraries
 #==============================================================================
+target_link_libraries(nxx_utility INTERFACE HWinfo)
 target_link_libraries(nxx_func INTERFACE nxx_utility gcem tl::expected)
 target_link_libraries(nxx_deriv INTERFACE nxx_utility gcem tl::expected)
 target_link_libraries(nxx_poly INTERFACE nxx_utility nxx_deriv nxx_roots gcem tl::expected)

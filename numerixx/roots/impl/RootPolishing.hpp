@@ -104,7 +104,7 @@ namespace nxx::roots
             FUNCTION_T        m_func {};               /**< The function object to find the root for. */
             DERIV_T           m_deriv {};              /**< The function object for the derivative. */
             FUNCTION_RETURN_T m_guess;                 /**< The current root estimate. */
-            bool                 m_initialized { false }; /**< Flag indicating whether the object has been initialized. */
+            bool              m_initialized { false }; /**< Flag indicating whether the object has been initialized. */
 
             /**
              * @brief Constructor, taking function objects for the function and its derivative as arguments.
@@ -154,7 +154,6 @@ namespace nxx::roots
              * @param guess The root estimate.
              */
             template< typename T >
-            //            requires std::floating_point< T >
             requires std::convertible_to< T, FUNCTION_RETURN_T >
             void init(T guess)
             {
@@ -174,7 +173,6 @@ namespace nxx::roots
              * @return The result of the evaluation.
              */
             template< typename T >
-            //            requires std::floating_point< T >
             requires std::convertible_to< T, FUNCTION_RETURN_T >
             auto evaluate(T value)
             {
@@ -188,7 +186,6 @@ namespace nxx::roots
              * @return The result of the evaluation.
              */
             template< typename T >
-            //            requires std::floating_point< T >
             requires std::convertible_to< T, FUNCTION_RETURN_T >
             auto derivative(T value)
             {
@@ -321,10 +318,10 @@ namespace nxx::roots
                  { solver.iterate() };
                  // clang-format on
              }
-    inline auto fdfsolve(SOLVER                                solver,
+    inline auto fdfsolve(SOLVER                             solver,
                          typename SOLVER::FUNCTION_RETURN_T guess,
                          std::floating_point auto           eps     = nxx::EPS,
-                         int                                   maxiter = nxx::MAXITER)
+                         int                                maxiter = nxx::MAXITER)
     {
         using EXPECTED_T = impl::RootErrorImpl< typename SOLVER::FUNCTION_RETURN_T >;
         using RETURN_T   = tl::expected< typename SOLVER::FUNCTION_RETURN_T, EXPECTED_T >;
