@@ -62,6 +62,20 @@ target_include_directories(nxx_integrate INTERFACE $<BUILD_INTERFACE:${CMAKE_CUR
 add_library(numerixx::integrate ALIAS nxx_integrate)
 
 #==============================================================================
+# nxx::interpolate library
+#==============================================================================
+add_library(nxx_interpolate INTERFACE)
+target_include_directories(nxx_interpolate INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>/interpolate)
+add_library(numerixx::interpolate ALIAS nxx_interpolate)
+
+#==============================================================================
+# nxx::optimize library
+#==============================================================================
+add_library(nxx_optimize INTERFACE)
+target_include_directories(nxx_optimize INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>/optimize)
+add_library(numerixx::optimize ALIAS nxx_optimize)
+
+#==============================================================================
 # nxx::roots library
 #==============================================================================
 add_library(nxx_roots INTERFACE)
@@ -88,6 +102,9 @@ target_link_libraries(nxx_utility INTERFACE HWinfo)
 target_link_libraries(nxx_func INTERFACE nxx_utility gcem tl::expected)
 target_link_libraries(nxx_deriv INTERFACE nxx_utility gcem tl::expected)
 target_link_libraries(nxx_integrate INTERFACE nxx_utility gcem tl::expected)
+target_link_libraries(nxx_interpolate INTERFACE nxx_utility gcem tl::expected)
+target_link_libraries(nxx_interpolate INTERFACE LAPACK::LAPACK blaze::blaze)
+target_link_libraries(nxx_optimize INTERFACE nxx_utility gcem tl::expected)
 target_link_libraries(nxx_poly INTERFACE nxx_utility nxx_deriv nxx_roots gcem tl::expected)
 target_link_libraries(nxx_roots INTERFACE nxx_utility nxx_poly nxx_deriv gcem tl::expected)
 target_link_libraries(nxx_multiroots INTERFACE nxx_utility nxx_deriv gcem tl::expected)

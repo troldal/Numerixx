@@ -72,6 +72,24 @@ target_sources(DemoIntegrate
 
 target_link_libraries(DemoIntegrate PRIVATE fmt numerixx::integrate)
 
+# Target: Numerical interpolation
+add_executable(DemoInterpolate)
+target_sources(DemoInterpolate
+        PRIVATE
+        DemoInterpolate.cpp
+)
+
+target_link_libraries(DemoInterpolate PRIVATE fmt numerixx::interpolate)
+
+# Target: Numerical optimization
+add_executable(DemoOptimize)
+target_sources(DemoOptimize
+        PRIVATE
+        DemoOptimize.cpp
+)
+
+target_link_libraries(DemoOptimize PRIVATE fmt numerixx::optimize)
+
 
 # Target: Multiple root-finding
 add_executable(DemoMultiroot)

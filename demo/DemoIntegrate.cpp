@@ -13,9 +13,16 @@ int main()
 {
     using namespace nxx::integrate;
 
-    auto f      = [](double x) { return x * x; };
-    auto result = integrate(RombergMethod {}, f, 0.0, 100.0);
-    auto check  = (1.0 / 3.0) * std::pow(100.0, 3.0);
+    double a = 0.0;
+    float  b = 2.0;
+
+    auto f      = [](double x) { return std::exp(x); };
+    auto result = integrate< Romberg >(f, a, b);
+
+    auto f_int = integralOf< Trapezoid >(f);
+
+    // auto result = f_int(a, b);
+    auto check = std::exp(b) - std::exp(a);
 
     std::cout << "Result: " << result << std::endl;
     std::cout << "Check:  " << check << std::endl;
