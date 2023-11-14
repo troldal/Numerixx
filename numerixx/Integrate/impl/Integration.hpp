@@ -286,8 +286,6 @@ namespace nxx::integrate
     inline auto integralOf(IsFunction auto function)
     {
         if (!function) throw std::runtime_error("Function object is invalid.");
-
-        using RT = ReturnType< decltype(function) >;
         return [=](std::floating_point auto a, std::floating_point auto b) { return ALGO {}(function, a, b); };
     }
 }    // namespace nxx::integrate

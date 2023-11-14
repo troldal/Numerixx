@@ -82,19 +82,6 @@ namespace nxx::deriv
                          };
 
     /**
-     * @brief Concept checking whether a type is a solver object.
-     * @tparam SOLVER The type to check.
-     */
-    template< typename SOLVER >
-    concept IsSolver = std::invocable< SOLVER, std::function< double(double) >, double, double >;
-
-    /**
-     * @brief Alias template for the return type of a function.
-     */
-    template< typename T >
-    using ReturnType = std::invoke_result_t< T, double >;
-
-    /**
      * @brief Alias template for determining the step size for a given type when computing numerical derivatives.
      * @tparam T The type for which to compute the step size.
      */
@@ -124,10 +111,12 @@ namespace nxx::deriv
     }
 
     /**
-     * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
-     * using a centered Richardson extrapolation method.
+     * @brief A class defining a function object for computing the derivative of an arbitrary function.
+     *
+     * @tparam FN The type of function object to use for computing the derivative.
      */
-    class Order1CentralRichardson
+    template< typename FN >
+    class SolverTemplate
     {
     public:
         /**
@@ -143,172 +132,236 @@ namespace nxx::deriv
          * @note This function is not intended to be used directly. Instead, use the \c diff template function,
          * or one of the convenience functions.
          *
-         * @details This function uses the Richardson extrapolation method for computing the derivative.
-         * It approximates the derivative by taking the difference of the function evaluated at `val + stepsize` and `val - stepsize`,
-         * and scaling by the reciprocal of `stepsize * 6`. This method provides a more accurate approximation of the derivative
-         * than simple finite difference methods. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra,
-         * for details.
-         *
          * @throws NumerixxError if stepsize is invalid.
          */
-        inline auto operator()(IsFunction auto                  function,
-                               ReturnType< decltype(function) > val,
-                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
+        inline auto operator()(IsFunction auto                  function, std::floating_point auto val, std::floating_point auto stepsize) const
         {
-            validateStepSize(stepsize, std::sqrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
+            using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
+            static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
+            validateStepSize(stepsize, std::sqrt(std::numeric_limits< RETURN_T >::epsilon()));
+            return FN {}(function, val, stepsize);
+        }
+    };
+
+    /**
+     * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
+     * using a centered Richardson extrapolation method.
+     *
+     * @param function The function for which to compute the derivative. The function can be any callable type taking a
+     * floating point type as an argument, and returns a value of the same type.
+     * @param val The value at which to compute the derivative.
+     * @param stepsize The finite difference used for computing the derivative.
+     *
+     * @return The derivative. The return type is the same as the return type of the provided function.
+     *
+     * @note This function is not intended to be used directly. Instead, use the \c diff template function,
+     * or one of the convenience functions.
+     *
+     * @details This function uses the Richardson extrapolation method for computing the derivative.
+     * It approximates the derivative by taking the difference of the function evaluated at `val + stepsize` and `val - stepsize`,
+     * and scaling by the reciprocal of `stepsize * 6`. This method provides a more accurate approximation of the derivative
+     * than simple finite difference methods. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra,
+     * for details.
+     *
+     * @throws NumerixxError if stepsize is invalid.
+     */
+    constexpr auto Order1CentralRichardsonLambda =
+        [](IsFunction auto function, std::floating_point auto val, std::floating_point auto stepsize) {
             return (4.0 * (function(val + stepsize) - function(val - stepsize)) -
                     0.5 * (function(val + 2 * stepsize) - function(val - 2 * stepsize))) /
                    (stepsize * 6);
-        }
-    };
+        };
+
+    using Order1CentralRichardson = SolverTemplate< decltype(Order1CentralRichardsonLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a 3-point centered finite divided-difference method.
      */
-    class Order1Central3Point
-    {
-    public:
-        /**
-         * @brief Function call operator.
-         *
-         * @param function The function for which to compute the derivative. The function can be any callable type taking a
-         * floating point type as an argument, and returns a value of the same type.
-         * @param val The value at which to compute the derivative.
-         * @param stepsize The finite difference used for computing the derivative.
-         *
-         * @return The derivative. The return type is the same as the return type of the provided function.
-         *
-         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
-         * or one of the convenience functions.
-         *
-         * @details This function uses the 3-point centered finite divided-difference method for computing the derivative.
-         * It approximates the derivative by taking the difference of the function evaluated at `val + stepsize` and `val - stepsize`,
-         * and scaling by the reciprocal of `2 * stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
-         * Steven C. Chapra, for details.
-         *
-         * @throws NumerixxError if stepsize is invalid.
-         */
-        inline auto operator()(IsFunction auto                  function,
-                               ReturnType< decltype(function) > val,
-                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
-        {
-            validateStepSize(stepsize, std::sqrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
+    //    class Order1Central3Point
+    //    {
+    //    public:
+    //        /**
+    //         * @brief Function call operator.
+    //         *
+    //         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+    //         * floating point type as an argument, and returns a value of the same type.
+    //         * @param val The value at which to compute the derivative.
+    //         * @param stepsize The finite difference used for computing the derivative.
+    //         *
+    //         * @return The derivative. The return type is the same as the return type of the provided function.
+    //         *
+    //         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
+    //         * or one of the convenience functions.
+    //         *
+    //         * @details This function uses the 3-point centered finite divided-difference method for computing the derivative.
+    //         * It approximates the derivative by taking the difference of the function evaluated at `val + stepsize` and `val - stepsize`,
+    //         * and scaling by the reciprocal of `2 * stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+    //         * Steven C. Chapra, for details.
+    //         *
+    //         * @throws NumerixxError if stepsize is invalid.
+    //         */
+    //        inline auto operator()(IsFunction auto                  function,
+    //                               std::floating_point auto val,
+    //                               std::floating_point auto stepsize) const
+    //        {
+    //            using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
+    //            static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
+    //            validateStepSize(stepsize, std::sqrt(std::numeric_limits< RETURN_T >::epsilon()));
+    //            return (function(val + stepsize) - function(val - stepsize)) / (2 * stepsize);
+    //        }
+    //    };
+
+    constexpr auto Order1Central3PointLambda =
+        [](IsFunction auto function, std::floating_point auto val, std::floating_point auto stepsize) {
             return (function(val + stepsize) - function(val - stepsize)) / (2 * stepsize);
-        }
-    };
+        };
+
+    using Order1Central3Point = SolverTemplate< decltype(Order1Central3PointLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a 5-point centered finite divided-difference method.
      */
-    class Order1Central5Point
-    {
-    public:
-        /**
-         * @brief Function call operator.
-         *
-         * @param function The function for which to compute the derivative. The function can be any callable type taking a
-         * floating point type as an argument, and returns a value of the same type.
-         * @param val The value at which to compute the derivative.
-         * @param stepsize The finite difference used for computing the derivative.
-         *
-         * @return The derivative. The return type is the same as the return type of the provided function.
-         *
-         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
-         * or one of the convenience functions.
-         *
-         * @details This function uses the 5-point centered finite divided-difference method for computing the derivative.
-         * It approximates the derivative by taking the difference of the function evaluated at `val + 2 * stepsize` and `val - 2 *
-         * stepsize`, and scaling by the reciprocal of `12 * stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition
-         * by Steven C. Chapra, for details.
-         *
-         * @throws NumerixxError if stepsize is invalid.
-         */
-        inline auto operator()(IsFunction auto                  function,
-                               ReturnType< decltype(function) > val,
-                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
-        {
-            validateStepSize(stepsize, std::sqrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
+    //    class Order1Central5Point
+    //    {
+    //    public:
+    //        /**
+    //         * @brief Function call operator.
+    //         *
+    //         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+    //         * floating point type as an argument, and returns a value of the same type.
+    //         * @param val The value at which to compute the derivative.
+    //         * @param stepsize The finite difference used for computing the derivative.
+    //         *
+    //         * @return The derivative. The return type is the same as the return type of the provided function.
+    //         *
+    //         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
+    //         * or one of the convenience functions.
+    //         *
+    //         * @details This function uses the 5-point centered finite divided-difference method for computing the derivative.
+    //         * It approximates the derivative by taking the difference of the function evaluated at `val + 2 * stepsize` and `val - 2 *
+    //         * stepsize`, and scaling by the reciprocal of `12 * stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th
+    //         Edition
+    //         * by Steven C. Chapra, for details.
+    //         *
+    //         * @throws NumerixxError if stepsize is invalid.
+    //         */
+    //        inline auto operator()(IsFunction auto function, std::floating_point auto val, std::floating_point auto stepsize) const
+    //        {
+    //            using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
+    //            static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
+    //            validateStepSize(stepsize, std::sqrt(std::numeric_limits< RETURN_T >::epsilon()));
+    //            return (-function(val + 2 * stepsize) + 8 * function(val + stepsize) - 8 * function(val - stepsize) +
+    //                    function(val - 2 * stepsize)) /
+    //                   (12 * stepsize);
+    //        }
+    //    };
+
+    constexpr auto Order1Central5PointLambda =
+        [](IsFunction auto function, std::floating_point auto val, std::floating_point auto stepsize) {
             return (-function(val + 2 * stepsize) + 8 * function(val + stepsize) - 8 * function(val - stepsize) +
                     function(val - 2 * stepsize)) /
                    (12 * stepsize);
-        }
-    };
+        };
+
+    using Order1Central5Point = SolverTemplate< decltype(Order1Central5PointLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
      * using a 3-point centered finite divided-difference method.
      */
-    class Order2Central3Point
-    {
-    public:
-        /**
-         * @brief Function call operator.
-         *
-         * @param function The function for which to compute the derivative. The function can be any callable type taking a
-         * floating point type as an argument, and returns a value of the same type.
-         * @param val The value at which to compute the derivative.
-         * @param stepsize The finite difference used for computing the derivative.
-         *
-         * @return The derivative. The return type is the same as the return type of the provided function.
-         *
-         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
-         * or one of the convenience functions.
-         *
-         * @details This function uses the 3-point centered finite divided-difference method for computing the derivative.
-         * It approximates the derivative by taking the difference of the function evaluated at `val + stepsize` and `val - stepsize`,
-         * and scaling by the reciprocal of `2 * stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
-         * Steven C. Chapra, for details.
-         *
-         * @throws NumerixxError if stepsize is invalid.
-         */
-        inline auto operator()(IsFunction auto                  function,
-                               ReturnType< decltype(function) > val,
-                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
-        {
-            validateStepSize(stepsize, std::cbrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
+    //    class Order2Central3Point
+    //    {
+    //    public:
+    //        /**
+    //         * @brief Function call operator.
+    //         *
+    //         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+    //         * floating point type as an argument, and returns a value of the same type.
+    //         * @param val The value at which to compute the derivative.
+    //         * @param stepsize The finite difference used for computing the derivative.
+    //         *
+    //         * @return The derivative. The return type is the same as the return type of the provided function.
+    //         *
+    //         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
+    //         * or one of the convenience functions.
+    //         *
+    //         * @details This function uses the 3-point centered finite divided-difference method for computing the derivative.
+    //         * It approximates the derivative by taking the difference of the function evaluated at `val + stepsize` and `val - stepsize`,
+    //         * and scaling by the reciprocal of `2 * stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+    //         * Steven C. Chapra, for details.
+    //         *
+    //         * @throws NumerixxError if stepsize is invalid.
+    //         */
+    //        inline auto operator()(IsFunction auto                  function,
+    //                               std::floating_point auto val,
+    //                               std::floating_point auto stepsize) const
+    //        {
+    //            using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
+    //            static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
+    //            validateStepSize(stepsize, std::cbrt(std::numeric_limits< RETURN_T >::epsilon()));
+    //            return (function(val + stepsize) - 2 * function(val) + function(val - stepsize)) / std::pow(stepsize, 2);
+    //        }
+    //    };
+
+    constexpr auto Order2Central3PointLambda =
+        [](IsFunction auto function, std::floating_point auto val, std::floating_point auto stepsize) {
             return (function(val + stepsize) - 2 * function(val) + function(val - stepsize)) / std::pow(stepsize, 2);
-        }
-    };
+        };
+
+    using Order2Central3Point = SolverTemplate< decltype(Order2Central3PointLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
      * using a 5-point centered finite divided-difference method.
      */
-    class Order2Central5Point
-    {
-    public:
-        /**
-         * @brief Function call operator.
-         *
-         * @param function The function for which to compute the derivative. The function can be any callable type taking a
-         * floating point type as an argument, and returns a value of the same type.
-         * @param val The value at which to compute the derivative.
-         * @param stepsize The finite difference used for computing the derivative.
-         *
-         * @return The derivative. The return type is the same as the return type of the provided function.
-         *
-         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
-         * or one of the convenience functions.
-         *
-         * @details This function uses the 5-point centered finite divided-difference method for computing the derivative.
-         * It approximates the derivative by taking the difference of the function evaluated at `val + 2 * stepsize` and `val - 2 *
-         * stepsize`, and scaling by the reciprocal of `12 * stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition
-         * by Steven C. Chapra, for details.
-         *
-         * @throws NumerixxError if stepsize is invalid.
-         */
-        inline auto operator()(IsFunction auto                  function,
-                               ReturnType< decltype(function) > val,
-                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
-        {
-            validateStepSize(stepsize, std::cbrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
+    //    class Order2Central5Point
+    //    {
+    //    public:
+    //        /**
+    //         * @brief Function call operator.
+    //         *
+    //         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+    //         * floating point type as an argument, and returns a value of the same type.
+    //         * @param val The value at which to compute the derivative.
+    //         * @param stepsize The finite difference used for computing the derivative.
+    //         *
+    //         * @return The derivative. The return type is the same as the return type of the provided function.
+    //         *
+    //         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
+    //         * or one of the convenience functions.
+    //         *
+    //         * @details This function uses the 5-point centered finite divided-difference method for computing the derivative.
+    //         * It approximates the derivative by taking the difference of the function evaluated at `val + 2 * stepsize` and `val - 2 *
+    //         * stepsize`, and scaling by the reciprocal of `12 * stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th
+    //         Edition
+    //         * by Steven C. Chapra, for details.
+    //         *
+    //         * @throws NumerixxError if stepsize is invalid.
+    //         */
+    //        inline auto operator()(IsFunction auto                  function,
+    //                               std::floating_point auto val,
+    //                               std::floating_point auto stepsize) const
+    //        {
+    //            using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
+    //            static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
+    //            validateStepSize(stepsize, std::cbrt(std::numeric_limits< RETURN_T >::epsilon()));
+    //            return (-function(val + 2 * stepsize) + 16 * function(val + stepsize) - 30 * function(val) + 16 * function(val - stepsize)
+    //            -
+    //                    function(val - 2 * stepsize)) /
+    //                   (12 * std::pow(stepsize, 2));
+    //        }
+    //    };
+
+    constexpr auto Order2Central5PointLambda =
+        [](IsFunction auto function, std::floating_point auto val, std::floating_point auto stepsize) {
             return (-function(val + 2 * stepsize) + 16 * function(val + stepsize) - 30 * function(val) + 16 * function(val - stepsize) -
                     function(val - 2 * stepsize)) /
                    (12 * std::pow(stepsize, 2));
-        }
-    };
+        };
+
+    using Order2Central5Point = SolverTemplate< decltype(Order2Central5PointLambda) >;
 
     // ====================================================================
     // Forward finite difference formulas
@@ -318,189 +371,243 @@ namespace nxx::deriv
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a forward Richardson extrapolation method.
      */
-    class Order1ForwardHighOrder
-    {
-    public:
-        /**
-         * @brief Function call operator.
-         *
-         * @param function The function for which to compute the derivative. The function can be any callable type taking a
-         * floating point type as an argument, and returns a value of the same type.
-         * @param val The value at which to compute the derivative.
-         * @param stepsize The finite difference used for computing the derivative.
-         *
-         * @return The derivative. The return type is the same as the return type of the provided function.
-         *
-         * * @note This function is not intended to be used directly. Instead, use the \c diff template function,
-         * or one of the convenience functions.
-         *
-         * @details This function uses the Richardson extrapolation method for computing the derivative.
-         * It approximates the derivative by taking the difference of the function evaluated at `val + stepsize` and `val - stepsize`,
-         * and scaling by the reciprocal of `stepsize * 6`. This method provides a more accurate approximation of the derivative
-         * than simple finite difference methods. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra,
-         * for details.
-         *
-         * @throws NumerixxError if stepsize is invalid.
-         */
-        inline auto operator()(IsFunction auto                  function,
-                               ReturnType< decltype(function) > val,
-                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
-        {
-            validateStepSize(stepsize, std::sqrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
+    //    class Order1ForwardHighOrder
+    //    {
+    //    public:
+    //        /**
+    //         * @brief Function call operator.
+    //         *
+    //         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+    //         * floating point type as an argument, and returns a value of the same type.
+    //         * @param val The value at which to compute the derivative.
+    //         * @param stepsize The finite difference used for computing the derivative.
+    //         *
+    //         * @return The derivative. The return type is the same as the return type of the provided function.
+    //         *
+    //         * * @note This function is not intended to be used directly. Instead, use the \c diff template function,
+    //         * or one of the convenience functions.
+    //         *
+    //         * @details This function uses the Richardson extrapolation method for computing the derivative.
+    //         * It approximates the derivative by taking the difference of the function evaluated at `val + stepsize` and `val - stepsize`,
+    //         * and scaling by the reciprocal of `stepsize * 6`. This method provides a more accurate approximation of the derivative
+    //         * than simple finite difference methods. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C.
+    //         Chapra,
+    //         * for details.
+    //         *
+    //         * @throws NumerixxError if stepsize is invalid.
+    //         */
+    //        inline auto operator()(IsFunction auto                  function,
+    //                               std::floating_point auto val,
+    //                               std::floating_point auto stepsize) const
+    //        {
+    //            using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
+    //            static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
+    //
+    //            validateStepSize(stepsize, std::sqrt(std::numeric_limits< RETURN_T >::epsilon()));
+    //
+    //            const auto diff1 = function(val + stepsize);
+    //            const auto diff2 = function(val + stepsize * 2);
+    //            const auto diff3 = function(val + stepsize * 3);
+    //            const auto diff4 = function(val + stepsize * 4);
+    //
+    //            return (22.0 * (diff4 - diff3) - 62.0 * (diff3 - diff2) + 52.0 * (diff2 - diff1)) / (stepsize * 12);
+    //        }
+    //    };
 
+    constexpr auto Order1ForwardRichardsonLambda =
+        [](IsFunction auto function, std::floating_point auto val, std::floating_point auto stepsize) {
             const auto diff1 = function(val + stepsize);
             const auto diff2 = function(val + stepsize * 2);
             const auto diff3 = function(val + stepsize * 3);
             const auto diff4 = function(val + stepsize * 4);
 
             return (22.0 * (diff4 - diff3) - 62.0 * (diff3 - diff2) + 52.0 * (diff2 - diff1)) / (stepsize * 12);
-        }
-    };
+        };
+
+    using Order1ForwardRichardson = SolverTemplate< decltype(Order1ForwardRichardsonLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a 2-point forward finite divided-difference method.
      */
-    class Order1Forward2Point
-    {
-    public:
-        /**
-         * @brief Function call operator.
-         *
-         * @param function The function for which to compute the derivative. The function can be any callable type taking a
-         * floating point type as an argument, and returns a value of the same type.
-         * @param val The value at which to compute the derivative.
-         * @param stepsize The finite difference used for computing the derivative.
-         *
-         * @return The derivative. The return type is the same as the return type of the provided function.
-         *
-         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
-         * or one of the convenience functions.
-         *
-         * @details This function uses the 2-point forward finite divided-difference method for computing the derivative.
-         * It approximates the derivative by taking the difference of the function evaluated at `val + stepsize` and `val`,
-         * and scaling by the reciprocal of `stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
-         * Steven C. Chapra, for details.
-         *
-         * @throws NumerixxError if stepsize is invalid.
-         */
-        inline auto operator()(IsFunction auto                  function,
-                               ReturnType< decltype(function) > val,
-                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
-        {
-            validateStepSize(stepsize, std::sqrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
+    //    class Order1Forward2Point
+    //    {
+    //    public:
+    //        /**
+    //         * @brief Function call operator.
+    //         *
+    //         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+    //         * floating point type as an argument, and returns a value of the same type.
+    //         * @param val The value at which to compute the derivative.
+    //         * @param stepsize The finite difference used for computing the derivative.
+    //         *
+    //         * @return The derivative. The return type is the same as the return type of the provided function.
+    //         *
+    //         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
+    //         * or one of the convenience functions.
+    //         *
+    //         * @details This function uses the 2-point forward finite divided-difference method for computing the derivative.
+    //         * It approximates the derivative by taking the difference of the function evaluated at `val + stepsize` and `val`,
+    //         * and scaling by the reciprocal of `stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+    //         * Steven C. Chapra, for details.
+    //         *
+    //         * @throws NumerixxError if stepsize is invalid.
+    //         */
+    //        inline auto operator()(IsFunction auto                  function,
+    //                               std::floating_point auto val,
+    //                               std::floating_point auto stepsize) const
+    //        {
+    //            using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
+    //            static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
+    //            validateStepSize(stepsize, std::sqrt(std::numeric_limits< RETURN_T >::epsilon()));
+    //            return (function(val + stepsize) - function(val)) / stepsize;
+    //        }
+    //    };
+
+    constexpr auto Order1Forward2PointLambda =
+        [](IsFunction auto function, std::floating_point auto val, std::floating_point auto stepsize) {
             return (function(val + stepsize) - function(val)) / stepsize;
-        }
-    };
+        };
+
+    using Order1Forward2Point = SolverTemplate< decltype(Order1Forward2PointLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a 3-point forward finite divided-difference method.
      */
-    class Order1Forward3Point
-    {
-    public:
-        /**
-         * @brief Function call operator.
-         *
-         * @param function The function for which to compute the derivative. The function can be any callable type taking a
-         * floating point type as an argument, and returns a value of the same type.
-         * @param val The value at which to compute the derivative.
-         * @param stepsize The finite difference used for computing the derivative.
-         *
-         * @return The derivative. The return type is the same as the return type of the provided function.
-         *
-         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
-         * or one of the convenience functions.
-         *
-         * @details This function uses the 3-point forward finite divided-difference method for computing the derivative.
-         * It approximates the derivative by taking the difference of the function evaluated at `val + 2 * stepsize` and `val`,
-         * and scaling by the reciprocal of `2 * stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
-         * Steven C. Chapra, for details.
-         *
-         * @throws NumerixxError if stepsize is invalid.
-         */
-        inline auto operator()(IsFunction auto                  function,
-                               ReturnType< decltype(function) > val,
-                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
-        {
-            validateStepSize(stepsize, std::sqrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
+    //    class Order1Forward3Point
+    //    {
+    //    public:
+    //        /**
+    //         * @brief Function call operator.
+    //         *
+    //         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+    //         * floating point type as an argument, and returns a value of the same type.
+    //         * @param val The value at which to compute the derivative.
+    //         * @param stepsize The finite difference used for computing the derivative.
+    //         *
+    //         * @return The derivative. The return type is the same as the return type of the provided function.
+    //         *
+    //         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
+    //         * or one of the convenience functions.
+    //         *
+    //         * @details This function uses the 3-point forward finite divided-difference method for computing the derivative.
+    //         * It approximates the derivative by taking the difference of the function evaluated at `val + 2 * stepsize` and `val`,
+    //         * and scaling by the reciprocal of `2 * stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+    //         * Steven C. Chapra, for details.
+    //         *
+    //         * @throws NumerixxError if stepsize is invalid.
+    //         */
+    //        inline auto operator()(IsFunction auto                  function,
+    //                               std::floating_point auto val,
+    //                               std::floating_point auto stepsize) const
+    //        {
+    //            using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
+    //            static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
+    //            validateStepSize(stepsize, std::sqrt(std::numeric_limits< RETURN_T >::epsilon()));
+    //            return (-function(val + 2 * stepsize) + 4 * function(val + stepsize) - 3 * function(val)) / (2 * stepsize);
+    //        }
+    //    };
+
+    constexpr auto Order1Forward3PointLambda =
+        [](IsFunction auto function, std::floating_point auto val, std::floating_point auto stepsize) {
             return (-function(val + 2 * stepsize) + 4 * function(val + stepsize) - 3 * function(val)) / (2 * stepsize);
-        }
-    };
+        };
+
+    using Order1Forward3Point = SolverTemplate< decltype(Order1Forward3PointLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
      * using a 3-point forward finite divided-difference method.
      */
-    class Order2Forward3Point
-    {
-    public:
-        /**
-         * @brief Function call operator.
-         *
-         * @param function The function for which to compute the derivative. The function can be any callable type taking a
-         * floating point type as an argument, and returns a value of the same type.
-         * @param val The value at which to compute the derivative.
-         * @param stepsize The finite difference used for computing the derivative.
-         *
-         * @return The derivative. The return type is the same as the return type of the provided function.
-         *
-         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
-         * or one of the convenience functions.
-         *
-         * @details This function uses the 3-point forward finite divided-difference method for computing the derivative.
-         * It approximates the derivative by taking the difference of the function evaluated at `val + 2 * stepsize` and `val`,
-         * and scaling by the reciprocal of `stepsize^2`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
-         * Steven C. Chapra, for details.
-         *
-         * @throws NumerixxError if stepsize is invalid.
-         */
-        inline auto operator()(IsFunction auto                  function,
-                               ReturnType< decltype(function) > val,
-                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
-        {
-            validateStepSize(stepsize, std::cbrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
+    //    class Order2Forward3Point
+    //    {
+    //    public:
+    //        /**
+    //         * @brief Function call operator.
+    //         *
+    //         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+    //         * floating point type as an argument, and returns a value of the same type.
+    //         * @param val The value at which to compute the derivative.
+    //         * @param stepsize The finite difference used for computing the derivative.
+    //         *
+    //         * @return The derivative. The return type is the same as the return type of the provided function.
+    //         *
+    //         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
+    //         * or one of the convenience functions.
+    //         *
+    //         * @details This function uses the 3-point forward finite divided-difference method for computing the derivative.
+    //         * It approximates the derivative by taking the difference of the function evaluated at `val + 2 * stepsize` and `val`,
+    //         * and scaling by the reciprocal of `stepsize^2`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+    //         * Steven C. Chapra, for details.
+    //         *
+    //         * @throws NumerixxError if stepsize is invalid.
+    //         */
+    //        inline auto operator()(IsFunction auto                  function,
+    //                               std::floating_point auto val,
+    //                               std::floating_point auto stepsize) const
+    //        {
+    //            using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
+    //            static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
+    //            validateStepSize(stepsize, std::cbrt(std::numeric_limits< RETURN_T >::epsilon()));
+    //            return (function(val + 2 * stepsize) - 2 * function(val + stepsize) + function(val)) / std::pow(stepsize, 2);
+    //        }
+    //    };
+
+    constexpr auto Order2Forward3PointLambda =
+        [](IsFunction auto function, std::floating_point auto val, std::floating_point auto stepsize) {
             return (function(val + 2 * stepsize) - 2 * function(val + stepsize) + function(val)) / std::pow(stepsize, 2);
-        }
-    };
+        };
+
+    using Order2Forward3Point = SolverTemplate< decltype(Order2Forward3PointLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
      * using a 4-point forward finite divided-difference method.
      */
-    class Order2Forward4Point
-    {
-    public:
-        /**
-         * @brief Function call operator.
-         *
-         * @param function The function for which to compute the derivative. The function can be any callable type taking a
-         * floating point type as an argument, and returns a value of the same type.
-         * @param val The value at which to compute the derivative.
-         * @param stepsize The finite difference used for computing the derivative.
-         *
-         * @return The derivative. The return type is the same as the return type of the provided function.
-         *
-         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
-         * or one of the convenience functions.
-         *
-         * @details This function uses the 4-point forward finite divided-difference method for computing the derivative.
-         * It approximates the derivative by taking the difference of the function evaluated at `val + 3 * stepsize` and `val`,
-         * and scaling by the reciprocal of `stepsize^2`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
-         * Steven C. Chapra, for details.
-         *
-         * @throws NumerixxError if stepsize is invalid.
-         */
-        inline auto operator()(IsFunction auto                  function,
-                               ReturnType< decltype(function) > val,
-                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
-        {
-            validateStepSize(stepsize, std::cbrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
+    //    class Order2Forward4Point
+    //    {
+    //    public:
+    //        /**
+    //         * @brief Function call operator.
+    //         *
+    //         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+    //         * floating point type as an argument, and returns a value of the same type.
+    //         * @param val The value at which to compute the derivative.
+    //         * @param stepsize The finite difference used for computing the derivative.
+    //         *
+    //         * @return The derivative. The return type is the same as the return type of the provided function.
+    //         *
+    //         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
+    //         * or one of the convenience functions.
+    //         *
+    //         * @details This function uses the 4-point forward finite divided-difference method for computing the derivative.
+    //         * It approximates the derivative by taking the difference of the function evaluated at `val + 3 * stepsize` and `val`,
+    //         * and scaling by the reciprocal of `stepsize^2`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+    //         * Steven C. Chapra, for details.
+    //         *
+    //         * @throws NumerixxError if stepsize is invalid.
+    //         */
+    //        inline auto operator()(IsFunction auto                  function,
+    //                               std::floating_point auto val,
+    //                               std::floating_point auto stepsize) const
+    //        {
+    //            using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
+    //            static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
+    //            validateStepSize(stepsize, std::cbrt(std::numeric_limits< RETURN_T >::epsilon()));
+    //            return (-function(val + 3 * stepsize) + 4 * function(val + 2 * stepsize) - 5 * function(val + stepsize) + 2 *
+    //            function(val)) /
+    //                   std::pow(stepsize, 2);
+    //        }
+    //    };
+
+    constexpr auto Order2Forward4PointLambda =
+        [](IsFunction auto function, std::floating_point auto val, std::floating_point auto stepsize) {
             return (-function(val + 3 * stepsize) + 4 * function(val + 2 * stepsize) - 5 * function(val + stepsize) + 2 * function(val)) /
                    std::pow(stepsize, 2);
-        }
-    };
+        };
+
+    using Order2Forward4Point = SolverTemplate< decltype(Order2Forward4PointLambda) >;
 
     // ====================================================================
     // Backward finite difference formulas
@@ -510,189 +617,245 @@ namespace nxx::deriv
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a backward Richardson extrapolation method.
      */
-    class Order1BackwardHighOrder
-    {
-    public:
-        /**
-         * @brief Function call operator.
-         *
-         * @param function The function for which to compute the derivative. The function can be any callable type taking a
-         * floating point type as an argument, and returns a value of the same type.
-         * @param val The value at which to compute the derivative.
-         * @param stepsize The finite difference used for computing the derivative.
-         *
-         * @return The derivative. The return type is the same as the return type of the provided function.
-         *
-         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
-         * or one of the convenience functions.
-         *
-         * @details This function uses the Richardson extrapolation method for computing the derivative.
-         * It approximates the derivative by taking the difference of the function evaluated at `val - stepsize` and `val - 4 * stepsize`,
-         * and scaling by the reciprocal of `-stepsize * 12`. This method provides a more accurate approximation of the derivative
-         * than simple finite difference methods. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C. Chapra,
-         * for details.
-         *
-         * @throws NumerixxError if stepsize is invalid.
-         */
-        inline auto operator()(IsFunction auto                  function,
-                               ReturnType< decltype(function) > val,
-                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
-        {
-            validateStepSize(stepsize, std::sqrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
+    //    class Order1BackwardHighOrder
+    //    {
+    //    public:
+    //        /**
+    //         * @brief Function call operator.
+    //         *
+    //         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+    //         * floating point type as an argument, and returns a value of the same type.
+    //         * @param val The value at which to compute the derivative.
+    //         * @param stepsize The finite difference used for computing the derivative.
+    //         *
+    //         * @return The derivative. The return type is the same as the return type of the provided function.
+    //         *
+    //         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
+    //         * or one of the convenience functions.
+    //         *
+    //         * @details This function uses the Richardson extrapolation method for computing the derivative.
+    //         * It approximates the derivative by taking the difference of the function evaluated at `val - stepsize` and `val - 4 *
+    //         stepsize`,
+    //         * and scaling by the reciprocal of `-stepsize * 12`. This method provides a more accurate approximation of the derivative
+    //         * than simple finite difference methods. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by Steven C.
+    //         Chapra,
+    //         * for details.
+    //         *
+    //         * @throws NumerixxError if stepsize is invalid.
+    //         */
+    //        inline auto operator()(IsFunction auto                  function,
+    //                               std::floating_point auto val,
+    //                               std::floating_point auto stepsize) const
+    //        {
+    //            using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
+    //            static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
+    //
+    //            validateStepSize(stepsize, std::sqrt(std::numeric_limits< RETURN_T >::epsilon()));
+    //
+    //            const auto diff1 = function(val - stepsize);
+    //            const auto diff2 = function(val - stepsize * 2);
+    //            const auto diff3 = function(val - stepsize * 3);
+    //            const auto diff4 = function(val - stepsize * 4);
+    //
+    //            return (22.0 * (diff4 - diff3) - 62.0 * (diff3 - diff2) + 52.0 * (diff2 - diff1)) / -(stepsize * 12);
+    //        }
+    //    };
 
+    constexpr auto Order1BackwardRichardsonLambda =
+        [](IsFunction auto function, std::floating_point auto val, std::floating_point auto stepsize) {
             const auto diff1 = function(val - stepsize);
             const auto diff2 = function(val - stepsize * 2);
             const auto diff3 = function(val - stepsize * 3);
             const auto diff4 = function(val - stepsize * 4);
 
             return (22.0 * (diff4 - diff3) - 62.0 * (diff3 - diff2) + 52.0 * (diff2 - diff1)) / -(stepsize * 12);
-        }
-    };
+        };
+
+    using Order1BackwardRichardson = SolverTemplate< decltype(Order1BackwardRichardsonLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a 2-point backward finite divided-difference method.
      */
-    class Order1Backward2Point
-    {
-    public:
-        /**
-         * @brief Function call operator.
-         *
-         * @param function The function for which to compute the derivative. The function can be any callable type taking a
-         * floating point type as an argument, and returns a value of the same type.
-         * @param val The value at which to compute the derivative.
-         * @param stepsize The finite difference used for computing the derivative.
-         *
-         * @return The derivative. The return type is the same as the return type of the provided function.
-         *
-         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
-         * or one of the convenience functions.
-         *
-         * @details This function uses the 2-point backward finite divided-difference method for computing the derivative.
-         * It approximates the derivative by taking the difference of the function evaluated at `val` and `val - stepsize`,
-         * and scaling by the reciprocal of `stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
-         * Steven C. Chapra, for details.
-         *
-         * @throws NumerixxError if stepsize is invalid.
-         */
-        inline auto operator()(IsFunction auto                  function,
-                               ReturnType< decltype(function) > val,
-                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
-        {
-            validateStepSize(stepsize, std::sqrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
+    //    class Order1Backward2Point
+    //    {
+    //    public:
+    //        /**
+    //         * @brief Function call operator.
+    //         *
+    //         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+    //         * floating point type as an argument, and returns a value of the same type.
+    //         * @param val The value at which to compute the derivative.
+    //         * @param stepsize The finite difference used for computing the derivative.
+    //         *
+    //         * @return The derivative. The return type is the same as the return type of the provided function.
+    //         *
+    //         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
+    //         * or one of the convenience functions.
+    //         *
+    //         * @details This function uses the 2-point backward finite divided-difference method for computing the derivative.
+    //         * It approximates the derivative by taking the difference of the function evaluated at `val` and `val - stepsize`,
+    //         * and scaling by the reciprocal of `stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+    //         * Steven C. Chapra, for details.
+    //         *
+    //         * @throws NumerixxError if stepsize is invalid.
+    //         */
+    //        inline auto operator()(IsFunction auto                  function,
+    //                               std::floating_point auto val,
+    //                               std::floating_point auto stepsize) const
+    //        {
+    //            using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
+    //            static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
+    //
+    //            validateStepSize(stepsize, std::sqrt(std::numeric_limits< RETURN_T >::epsilon()));
+    //            return (function(val) - function(val - stepsize)) / stepsize;
+    //        }
+    //    };
+
+    constexpr auto Order1Backward2PointLambda =
+        [](IsFunction auto function, std::floating_point auto val, std::floating_point auto stepsize) {
             return (function(val) - function(val - stepsize)) / stepsize;
-        }
-    };
+        };
+
+    using Order1Backward2Point = SolverTemplate< decltype(Order1Backward2PointLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a 3-point backward finite divided-difference method.
      */
-    class Order1Backward3Point
-    {
-    public:
-        /**
-         * @brief Function call operator.
-         *
-         * @param function The function for which to compute the derivative. The function can be any callable type taking a
-         * floating point type as an argument, and returns a value of the same type.
-         * @param val The value at which to compute the derivative.
-         * @param stepsize The finite difference used for computing the derivative.
-         *
-         * @return The derivative. The return type is the same as the return type of the provided function.
-         *
-         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
-         * or one of the convenience functions.
-         *
-         * @details This function uses the 3-point backward finite divided-difference method for computing the derivative.
-         * It approximates the derivative by taking the difference of the function evaluated at `val` and `val - 2 * stepsize`,
-         * and scaling by the reciprocal of `2 * stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
-         * Steven C. Chapra, for details.
-         *
-         * @throws NumerixxError if stepsize is invalid.
-         */
-        inline auto operator()(IsFunction auto                  function,
-                               ReturnType< decltype(function) > val,
-                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
-        {
-            validateStepSize(stepsize, std::sqrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
+    //    class Order1Backward3Point
+    //    {
+    //    public:
+    //        /**
+    //         * @brief Function call operator.
+    //         *
+    //         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+    //         * floating point type as an argument, and returns a value of the same type.
+    //         * @param val The value at which to compute the derivative.
+    //         * @param stepsize The finite difference used for computing the derivative.
+    //         *
+    //         * @return The derivative. The return type is the same as the return type of the provided function.
+    //         *
+    //         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
+    //         * or one of the convenience functions.
+    //         *
+    //         * @details This function uses the 3-point backward finite divided-difference method for computing the derivative.
+    //         * It approximates the derivative by taking the difference of the function evaluated at `val` and `val - 2 * stepsize`,
+    //         * and scaling by the reciprocal of `2 * stepsize`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+    //         * Steven C. Chapra, for details.
+    //         *
+    //         * @throws NumerixxError if stepsize is invalid.
+    //         */
+    //        inline auto operator()(IsFunction auto                  function,
+    //                               std::floating_point auto val,
+    //                               std::floating_point auto stepsize) const
+    //        {
+    //            using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
+    //            static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
+    //            validateStepSize(stepsize, std::sqrt(std::numeric_limits< RETURN_T >::epsilon()));
+    //            return (3 * function(val) - 4 * function(val - stepsize) + function(val - 2 * stepsize)) / (2 * stepsize);
+    //        }
+    //    };
+
+    constexpr auto Order1Backward3PointLambda =
+        [](IsFunction auto function, std::floating_point auto val, std::floating_point auto stepsize) {
             return (3 * function(val) - 4 * function(val - stepsize) + function(val - 2 * stepsize)) / (2 * stepsize);
-        }
-    };
+        };
+
+    using Order1Backward3Point = SolverTemplate< decltype(Order1Backward3PointLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
      * using a 3-point backward finite divided-difference method.
      */
-    class Order2Backward3Point
-    {
-    public:
-        /**
-         * @brief Function call operator.
-         *
-         * @param function The function for which to compute the derivative. The function can be any callable type taking a
-         * floating point type as an argument, and returns a value of the same type.
-         * @param val The value at which to compute the derivative.
-         * @param stepsize The finite difference used for computing the derivative.
-         *
-         * @return The derivative. The return type is the same as the return type of the provided function.
-         *
-         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
-         * or one of the convenience functions.
-         *
-         * @details This function uses the 3-point backward finite divided-difference method for computing the derivative.
-         * It approximates the derivative by taking the difference of the function evaluated at `val` and `val - 2 * stepsize`,
-         * and scaling by the reciprocal of `stepsize^2`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
-         * Steven C. Chapra, for details.
-         *
-         * @throws NumerixxError if stepsize is invalid.
-         */
-        inline auto operator()(IsFunction auto                  function,
-                               ReturnType< decltype(function) > val,
-                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
-        {
-            validateStepSize(stepsize, std::cbrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
+    //    class Order2Backward3Point
+    //    {
+    //    public:
+    //        /**
+    //         * @brief Function call operator.
+    //         *
+    //         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+    //         * floating point type as an argument, and returns a value of the same type.
+    //         * @param val The value at which to compute the derivative.
+    //         * @param stepsize The finite difference used for computing the derivative.
+    //         *
+    //         * @return The derivative. The return type is the same as the return type of the provided function.
+    //         *
+    //         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
+    //         * or one of the convenience functions.
+    //         *
+    //         * @details This function uses the 3-point backward finite divided-difference method for computing the derivative.
+    //         * It approximates the derivative by taking the difference of the function evaluated at `val` and `val - 2 * stepsize`,
+    //         * and scaling by the reciprocal of `stepsize^2`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+    //         * Steven C. Chapra, for details.
+    //         *
+    //         * @throws NumerixxError if stepsize is invalid.
+    //         */
+    //        inline auto operator()(IsFunction auto                  function,
+    //                               std::floating_point auto val,
+    //                               std::floating_point auto stepsize) const
+    //        {
+    //            using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
+    //            static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
+    //            validateStepSize(stepsize, std::cbrt(std::numeric_limits< RETURN_T >::epsilon()));
+    //            return (function(val) - 2 * function(val - stepsize) + function(val - 2 * stepsize)) / std::pow(stepsize, 2);
+    //        }
+    //    };
+
+    constexpr auto Order2Backward3PointLambda =
+        [](IsFunction auto function, std::floating_point auto val, std::floating_point auto stepsize) {
             return (function(val) - 2 * function(val - stepsize) + function(val - 2 * stepsize)) / std::pow(stepsize, 2);
-        }
-    };
+        };
+
+    using Order2Backward3Point = SolverTemplate< decltype(Order2Backward3PointLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
      * using a 4-point backward finite divided-difference method.
      */
-    class Order2Backward4Point
-    {
-    public:
-        /**
-         * @brief Function call operator.
-         *
-         * @param function The function for which to compute the derivative. The function can be any callable type taking a
-         * floating point type as an argument, and returns a value of the same type.
-         * @param val The value at which to compute the derivative.
-         * @param stepsize The finite difference used for computing the derivative.
-         *
-         * @return The derivative. The return type is the same as the return type of the provided function.
-         *
-         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
-         * or one of the convenience functions.
-         *
-         * @details This function uses the 4-point backward finite divided-difference method for computing the derivative.
-         * It approximates the derivative by taking the difference of the function evaluated at `val` and `val - 3 * stepsize`,
-         * and scaling by the reciprocal of `stepsize^2`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
-         * Steven C. Chapra, for details.
-         *
-         * @throws NumerixxError if stepsize is invalid.
-         */
-        inline auto operator()(IsFunction auto                  function,
-                               ReturnType< decltype(function) > val,
-                               ReturnType< decltype(function) > stepsize) const -> ReturnType< decltype(function) >
-        {
-            validateStepSize(stepsize, std::cbrt(std::numeric_limits< ReturnType< decltype(function) > >::epsilon()));
+    //    class Order2Backward4Point
+    //    {
+    //    public:
+    //        /**
+    //         * @brief Function call operator.
+    //         *
+    //         * @param function The function for which to compute the derivative. The function can be any callable type taking a
+    //         * floating point type as an argument, and returns a value of the same type.
+    //         * @param val The value at which to compute the derivative.
+    //         * @param stepsize The finite difference used for computing the derivative.
+    //         *
+    //         * @return The derivative. The return type is the same as the return type of the provided function.
+    //         *
+    //         * @note This function is not intended to be used directly. Instead, use the \c diff template function,
+    //         * or one of the convenience functions.
+    //         *
+    //         * @details This function uses the 4-point backward finite divided-difference method for computing the derivative.
+    //         * It approximates the derivative by taking the difference of the function evaluated at `val` and `val - 3 * stepsize`,
+    //         * and scaling by the reciprocal of `stepsize^2`. See chapter 23 in "Numerical Methods for Engineers", 8th Edition by
+    //         * Steven C. Chapra, for details.
+    //         *
+    //         * @throws NumerixxError if stepsize is invalid.
+    //         */
+    //        inline auto operator()(IsFunction auto                  function,
+    //                               std::floating_point auto val,
+    //                               std::floating_point auto stepsize) const
+    //        {
+    //            using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
+    //            static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
+    //            validateStepSize(stepsize, std::cbrt(std::numeric_limits< RETURN_T >::epsilon()));
+    //            return (2 * function(val) - 5 * function(val - stepsize) + 4 * function(val - 2 * stepsize) - function(val - 3 *
+    //            stepsize)) /
+    //                   std::pow(stepsize, 2);
+    //        }
+    //    };
+
+    constexpr auto Order2Backward4PointLambda =
+        [](IsFunction auto function, std::floating_point auto val, std::floating_point auto stepsize) {
             return (2 * function(val) - 5 * function(val - stepsize) + 4 * function(val - 2 * stepsize) - function(val - 3 * stepsize)) /
                    std::pow(stepsize, 2);
-        }
-    };
+        };
+
+    using Order2Backward4Point = SolverTemplate< decltype(Order2Backward4PointLambda) >;
 
     /**
      * @brief Compute the derivative of a function, using the specified algorithm. This function checks the result
@@ -713,13 +876,16 @@ namespace nxx::deriv
      */
     template< typename ALGO >
     inline auto diff(IsFunction auto                  function,
-                     ReturnType< decltype(function) > val,
-                     ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
+                     std::floating_point auto                                  val,
+                     std::invoke_result_t< decltype(function), decltype(val) > stepsize =
+                         StepSize< std::invoke_result_t< decltype(function), decltype(val) > >)
     {
         if (!function) throw NumerixxError("Function object is invalid.");
 
+        using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
+        static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
         using DerivError = Error< detail::DerivErrorData< decltype(val) > >;
-        using EXPECTED_T = tl::expected< ReturnType< decltype(function) >, DerivError >;
+        using EXPECTED_T = tl::expected< RETURN_T, DerivError >;
 
         auto deriv = ALGO {}(function, val, std::max(stepsize, stepsize * val));
 
@@ -745,8 +911,9 @@ namespace nxx::deriv
     template< typename FN >
     requires IsFunction< FN >
     inline auto central(FN                               function,
-                        ReturnType< decltype(function) > val,
-                        ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
+                        std::floating_point auto                                  val,
+                        std::invoke_result_t< decltype(function), decltype(val) > stepsize =
+                            StepSize< std::invoke_result_t< decltype(function), decltype(val) > >)
     {
         return diff< Order1CentralRichardson >(function, val, stepsize);
     }
@@ -765,10 +932,11 @@ namespace nxx::deriv
     template< typename FN >
     requires IsFunction< FN >
     inline auto forward(FN                               function,
-                        ReturnType< decltype(function) > val,
-                        ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
+                        std::floating_point auto                                  val,
+                        std::invoke_result_t< decltype(function), decltype(val) > stepsize =
+                            StepSize< std::invoke_result_t< decltype(function), decltype(val) > >)
     {
-        return diff< Order1ForwardHighOrder >(function, val, stepsize);
+        return diff< Order1ForwardRichardson >(function, val, stepsize);
     }
 
     /**
@@ -785,10 +953,11 @@ namespace nxx::deriv
     template< typename FN >
     requires IsFunction< FN >
     inline auto backward(FN                               function,
-                         ReturnType< decltype(function) > val,
-                         ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
+                         std::floating_point auto                                  val,
+                         std::invoke_result_t< decltype(function), decltype(val) > stepsize =
+                             StepSize< std::invoke_result_t< decltype(function), decltype(val) > >)
     {
-        return diff< Order1BackwardHighOrder >(function, val, stepsize);
+        return diff< Order1BackwardRichardson >(function, val, stepsize);
     }
 
     /**
@@ -812,13 +981,14 @@ namespace nxx::deriv
      */
     template< typename ALGO = Order1CentralRichardson >
     inline auto derivativeOf(IsFunction auto                  function,
-                             ReturnType< decltype(function) > stepsize = StepSize< ReturnType< decltype(function) > >)
+        std::invoke_result_t< decltype(function), double > stepsize = StepSize< std::invoke_result_t< decltype(function), double > >)
         requires(!poly::IsPolynomial< decltype(function) >)
     {
         if (!function) throw NumerixxError("Function object is invalid.");
 
-        using RT = ReturnType< decltype(function) >;
-        return [=](RT val) { return ALGO {}(function, val, stepsize); };
+        return [=](std::floating_point auto val) -> std::invoke_result_t< decltype(function), decltype(val) > {
+            return ALGO {}(function, val, stepsize);
+        };
     }
 
 }    // namespace nxx::deriv
