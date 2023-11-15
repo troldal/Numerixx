@@ -16,7 +16,7 @@ int main()
 {
     using namespace nxx::deriv;
     std::cout << std::fixed << std::setprecision(8);
-    auto func = [](double x) { return std::log(x) + 2 * x; };
+    auto func = [](std::floating_point auto x) { return std::log(x) + 2 * x; };
 
     // ============================================================================================
     // The most straightforward way of computing the numerical derivatives is to use the 'central'
@@ -100,6 +100,7 @@ int main()
                 0.5 * (function(val + 2 * stepsize) - function(val - 2 * stepsize))) /
                (stepsize * 6);
     };
+
     std::cout << "Custom algorithm:         "<< *diff<decltype(algo)>(func, std::numbers::e) << "\n\n";
 
     // ============================================================================================

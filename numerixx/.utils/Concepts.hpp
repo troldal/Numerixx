@@ -52,7 +52,16 @@ namespace nxx
                             } -> std::floating_point;
                         };
 
-
+    /**
+     * @brief Concept checking whether a type is a callable function object that returns a floating point type.
+     * @tparam FN The type to check.
+     */
+    template< typename Func >
+    concept IsFloatInvocable = requires(Func f) {
+                                   requires std::floating_point< std::invoke_result_t< Func, float > >;
+                                   requires std::floating_point< std::invoke_result_t< Func, double > >;
+                                   requires std::floating_point< std::invoke_result_t< Func, long double > >;
+                               };
 
 }    // namespace nxx
 
