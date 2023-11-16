@@ -123,8 +123,8 @@ namespace nxx::deriv
          *
          * @tparam FN The type of function object to use for computing the derivative.
          */
-        template< typename FN >
-        class SolverTemplate
+        template< typename ALGO >
+        class DiffSolverTemplate
         {
         public:
             static constexpr auto IsDiffSolver = true;
@@ -149,7 +149,7 @@ namespace nxx::deriv
                 using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
                 static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
                 detail::validateStepSize(stepsize, std::sqrt(std::numeric_limits< RETURN_T >::epsilon()));
-                return FN {}(function, val, stepsize);
+                return ALGO {}(function, val, stepsize);
             }
         };
 
@@ -616,31 +616,31 @@ namespace nxx::deriv
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a centered Richardson extrapolation method.
      */
-    using Order1CentralRichardson = detail::SolverTemplate< decltype(detail::Order1CentralRichardsonLambda) >;
+    using Order1CentralRichardson = detail::DiffSolverTemplate< decltype(detail::Order1CentralRichardsonLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a centered 3-point method.
      */
-    using Order1Central3Point = detail::SolverTemplate< decltype(detail::Order1Central3PointLambda) >;
+    using Order1Central3Point = detail::DiffSolverTemplate< decltype(detail::Order1Central3PointLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a centered 5-point method.
      */
-    using Order1Central5Point = detail::SolverTemplate< decltype(detail::Order1Central5PointLambda) >;
+    using Order1Central5Point = detail::DiffSolverTemplate< decltype(detail::Order1Central5PointLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
      * using a centered 3-point method.
      */
-    using Order2Central3Point = detail::SolverTemplate< decltype(detail::Order2Central3PointLambda) >;
+    using Order2Central3Point = detail::DiffSolverTemplate< decltype(detail::Order2Central3PointLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
      * using a centered 5-point method.
      */
-    using Order2Central5Point = detail::SolverTemplate< decltype(detail::Order2Central5PointLambda) >;
+    using Order2Central5Point = detail::DiffSolverTemplate< decltype(detail::Order2Central5PointLambda) >;
 
     // ====================================================================
     // Forward finite difference formulas
@@ -650,31 +650,31 @@ namespace nxx::deriv
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a forward Richardson extrapolation method.
      */
-    using Order1ForwardRichardson = detail::SolverTemplate< decltype(detail::Order1ForwardRichardsonLambda) >;
+    using Order1ForwardRichardson = detail::DiffSolverTemplate< decltype(detail::Order1ForwardRichardsonLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a forward 2-point method.
      */
-    using Order1Forward2Point = detail::SolverTemplate< decltype(detail::Order1Forward2PointLambda) >;
+    using Order1Forward2Point = detail::DiffSolverTemplate< decltype(detail::Order1Forward2PointLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a forward 3-point method.
      */
-    using Order1Forward3Point = detail::SolverTemplate< decltype(detail::Order1Forward3PointLambda) >;
+    using Order1Forward3Point = detail::DiffSolverTemplate< decltype(detail::Order1Forward3PointLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
      * using a forward 3-point method.
      */
-    using Order2Forward3Point = detail::SolverTemplate< decltype(detail::Order2Forward3PointLambda) >;
+    using Order2Forward3Point = detail::DiffSolverTemplate< decltype(detail::Order2Forward3PointLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
      * using a forward 4-point method.
      */
-    using Order2Forward4Point = detail::SolverTemplate< decltype(detail::Order2Forward4PointLambda) >;
+    using Order2Forward4Point = detail::DiffSolverTemplate< decltype(detail::Order2Forward4PointLambda) >;
 
     // ====================================================================
     // Backward finite difference formulas
@@ -684,31 +684,31 @@ namespace nxx::deriv
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a backward Richardson extrapolation method.
      */
-    using Order1BackwardRichardson = detail::SolverTemplate< decltype(detail::Order1BackwardRichardsonLambda) >;
+    using Order1BackwardRichardson = detail::DiffSolverTemplate< decltype(detail::Order1BackwardRichardsonLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a backward 2-point method.
      */
-    using Order1Backward2Point = detail::SolverTemplate< decltype(detail::Order1Backward2PointLambda) >;
+    using Order1Backward2Point = detail::DiffSolverTemplate< decltype(detail::Order1Backward2PointLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
      * using a backward 3-point method.
      */
-    using Order1Backward3Point = detail::SolverTemplate< decltype(detail::Order1Backward3PointLambda) >;
+    using Order1Backward3Point = detail::DiffSolverTemplate< decltype(detail::Order1Backward3PointLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
      * using a backward 3-point method.
      */
-    using Order2Backward3Point = detail::SolverTemplate< decltype(detail::Order2Backward3PointLambda) >;
+    using Order2Backward3Point = detail::DiffSolverTemplate< decltype(detail::Order2Backward3PointLambda) >;
 
     /**
      * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
      * using a backward 4-point method.
      */
-    using Order2Backward4Point = detail::SolverTemplate< decltype(detail::Order2Backward4PointLambda) >;
+    using Order2Backward4Point = detail::DiffSolverTemplate< decltype(detail::Order2Backward4PointLambda) >;
 
     /**
      * @brief Compute the derivative of a function, using the specified algorithm.
@@ -757,7 +757,7 @@ namespace nxx::deriv
                      std::invoke_result_t< decltype(function), decltype(val) > stepsize =
                          detail::StepSize< std::invoke_result_t< decltype(function), decltype(val) > >)
     {
-        return detail::diff_impl< detail::SolverTemplate< ALGO > >(function, val, stepsize);
+        return detail::diff_impl< detail::DiffSolverTemplate< ALGO > >(function, val, stepsize);
     }
 
     /**
