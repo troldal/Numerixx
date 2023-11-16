@@ -324,7 +324,7 @@ namespace nxx::integrate
         return ALGO{}(function, lower, upper, tolerance, maxIterations);
     }
 
-    template<typename ALGO = Romberg >
+    template<typename ALGO = Romberg>
     inline auto integralOf(IsFloatInvocable auto function)
     {
         // if (!function) throw std::runtime_error("Function object is invalid.");
