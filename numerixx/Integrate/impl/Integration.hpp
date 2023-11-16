@@ -30,16 +30,14 @@
 
 namespace nxx::integrate
 {
-
     namespace detail
     {
-
         /**
          * @brief Alias template for determining the step size for a given type when computing numerical derivatives.
          * @tparam T The type for which to compute the step size.
          */
-        template< typename T >
-        requires std::floating_point< T >
+        template<typename T>
+            requires std::floating_point< T >
         struct StepSizeHelper
         {
         private:
@@ -53,11 +51,11 @@ namespace nxx::integrate
          * @brief Constant expression for the step size used when computing numerical derivatives.
          * @tparam T The type for which to compute the step size.
          */
-        template< typename T >
-        requires std::floating_point< T >
+        template<typename T>
+            requires std::floating_point< T >
         inline constexpr T StepSize = StepSizeHelper< T >::value;
 
-        template< typename ALGO >
+        template<typename ALGO>
         class IntSolverTemplate
         {
         public:
@@ -78,17 +76,17 @@ namespace nxx::integrate
              *
              * @throws NumerixxError if stepsize is invalid.
              */
-            template< std::floating_point TOL_T = double, std::integral ITER_T = int >
+            template<std::floating_point TOL_T = double, std::integral ITER_T = int>
             inline auto operator()(IsFloatInvocable auto    function,
                                    std::floating_point auto lower,
                                    std::floating_point auto upper,
                                    TOL_T                    tolerance,
                                    ITER_T                   maxIterations) const
             {
-                using ARG_T    = std::common_type_t< decltype(lower), decltype(upper) >;
+                using ARG_T = std::common_type_t< decltype(lower), decltype(upper) >;
                 using RETURN_T = std::invoke_result_t< decltype(function), ARG_T >;
                 static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
-                return ALGO {}(function, lower, upper, tolerance, maxIterations);
+                return ALGO{}(function, lower, upper, tolerance, maxIterations);
             }
         };
 
@@ -115,7 +113,7 @@ namespace nxx::integrate
              * @return The computed integral of the function over [a, b].
              * @throws std::runtime_error If the method does not converge within the specified number of iterations.
              */
-            template< std::floating_point TOL_T = double, std::integral ITER_T = int >
+            template<std::floating_point TOL_T = double, std::integral ITER_T = int>
             auto operator()(IsFloatInvocable auto    function,
                             std::floating_point auto lower,
                             std::floating_point auto upper,
@@ -124,7 +122,7 @@ namespace nxx::integrate
             {
                 // Initial step size and initial trapezoidal estimate
 
-                using ARG_T    = std::common_type_t< decltype(lower), decltype(upper) >;
+                using ARG_T = std::common_type_t< decltype(lower), decltype(upper) >;
                 using RETURN_T = std::invoke_result_t< decltype(function), ARG_T >;
 
                 ARG_T    h    = (upper - lower);
@@ -132,26 +130,30 @@ namespace nxx::integrate
 
                 // Main loop for adaptive trapezoidal rule
                 for (ITER_T i = 1; i <= maxIterations; ++i) {
-                    h /= 2;                                        // Halve the step size in each iteration
-                    ITER_T numOfMidpoints = std::pow(2, i - 1);    // Calculate the number of midpoints for this iteration
+                    h /= 2;                                     // Halve the step size in each iteration
+                    ITER_T numOfMidpoints = std::pow(2, i - 1); // Calculate the number of midpoints for this iteration
 
                     // Create a vector of midpoints
                     std::vector< RETURN_T > midPoints(numOfMidpoints);
-                    std::generate(midPoints.begin(), midPoints.end(), [n = ITER_T { 1 }, lower, h]() mutable {
-                        return lower + (2 * n++ - 1) * h;
-                    });
+                    std::generate(midPoints.begin(),
+                                  midPoints.end(),
+                                  [n = ITER_T{ 1 }, lower, h]() mutable { return lower + (2 * n++ - 1) * h; });
 
                     // Calculate the sum of function values at the midpoints
                     RETURN_T sum =
-                        std::transform_reduce(midPoints.begin(), midPoints.end(), 0.0, std::plus<>(), [&](ARG_T x) { return function(x); });
+                        std::transform_reduce(midPoints.begin(),
+                                              midPoints.end(),
+                                              0.0,
+                                              std::plus< >(),
+                                              [&](ARG_T x) { return function(x); });
 
                     // Update the integral estimate
                     RETURN_T Inew = Iold / 2 + h * sum;
 
                     // Check for convergence
-                    if (i > 1 && std::abs(Inew - Iold) < tolerance) return Inew;    // Return the new estimate if converged
+                    if (i > 1 && std::abs(Inew - Iold) < tolerance) return Inew; // Return the new estimate if converged
 
-                    Iold = Inew;    // Update the old estimate for the next iteration
+                    Iold = Inew; // Update the old estimate for the next iteration
                 }
 
                 // Throw an exception if the method does not converge within the maximum number of iterations
@@ -182,7 +184,7 @@ namespace nxx::integrate
              * @param maxDepth The maximum recursion depth to prevent infinite recursion.
              * @return The computed integral of the function over [a, b].
              */
-            template< IsFloatInvocable FN, std::floating_point TOL_T = double, std::integral ITER_T = int >
+            template<IsFloatInvocable FN, std::floating_point TOL_T = double, std::integral ITER_T = int>
             auto operator()(FN                       function,
                             std::floating_point auto lower,
                             std::floating_point auto upper,
@@ -208,7 +210,7 @@ namespace nxx::integrate
              * @param depth The current depth of recursion.
              * @return The approximate integral over the interval [a, b].
              */
-            template< IsFloatInvocable FN, std::floating_point TOL_T = double, std::integral ITER_T = int >
+            template<IsFloatInvocable FN, std::floating_point TOL_T = double, std::integral ITER_T = int>
             auto adaptiveSimpson(FN                       function,
                                  std::floating_point auto lower,
                                  std::floating_point auto upper,
@@ -216,8 +218,8 @@ namespace nxx::integrate
                                  ITER_T                   maxDepth,
                                  ITER_T                   depth) const
             {
-                double m  = (lower + upper) / 2;    // Midpoint of the interval
-                double h  = (upper - lower) / 2;    // Half the interval length
+                double m  = (lower + upper) / 2; // Midpoint of the interval
+                double h  = (upper - lower) / 2; // Half the interval length
                 double fa = function(lower), fb = function(upper), fm = function(m);
 
                 // Standard Simpson's rule
@@ -281,7 +283,7 @@ namespace nxx::integrate
 
                 for (ITER_T i = 1; i < maxIterations; ++i) {
                     // Calculate the step size for this iteration
-                    TYPE_T h   = (upper - lower) / std::pow(2, i);
+                    TYPE_T h = (upper - lower) / std::pow(2, i);
 
                     // Trapezoidal rule: Calculate the sum of the function values at the midpoints
                     TYPE_T sum = 0.0;
@@ -305,11 +307,11 @@ namespace nxx::integrate
                 throw std::runtime_error("RombergMethod did not converge within the specified number of iterations.");
             }
         };
-    }    // namespace detail
+    } // namespace detail
 
-    using Romberg    = detail::IntSolverTemplate< detail::RombergFunctor >;
-    using Simpson    = detail::IntSolverTemplate< detail::SimpsonFunctor >;
-    using Trapezoid  = detail::IntSolverTemplate< detail::TrapezoidFunctor >;
+    using Romberg = detail::IntSolverTemplate< detail::RombergFunctor >;
+    using Simpson = detail::IntSolverTemplate< detail::SimpsonFunctor >;
+    using Trapezoid = detail::IntSolverTemplate< detail::TrapezoidFunctor >;
 
     template< typename ALGO = Romberg, IsFloatInvocable FN, std::floating_point TOL_T = double, std::integral ITER_T = int >
     auto integrate(FN                       function,
@@ -319,10 +321,10 @@ namespace nxx::integrate
                    ITER_T                   maxIterations = 100)
     {
         // if (!function) throw std::runtime_error("Function object is invalid.");
-        return ALGO {}(function, lower, upper, tolerance, maxIterations);
+        return ALGO{}(function, lower, upper, tolerance, maxIterations);
     }
 
-    template< typename ALGO = Romberg >
+    template<typename ALGO = Romberg >
     inline auto integralOf(IsFloatInvocable auto function)
     {
         // if (!function) throw std::runtime_error("Function object is invalid.");

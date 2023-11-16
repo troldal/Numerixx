@@ -123,7 +123,7 @@ namespace nxx::deriv
          *
          * @tparam FN The type of function object to use for computing the derivative.
          */
-        template< typename ALGO >
+        template<typename ALGO>
         class DiffSolverTemplate
         {
         public:
@@ -149,7 +149,7 @@ namespace nxx::deriv
                 using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
                 static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
                 detail::validateStepSize(stepsize, std::sqrt(std::numeric_limits< RETURN_T >::epsilon()));
-                return ALGO {}(function, val, stepsize);
+                return ALGO{}(function, val, stepsize);
             }
         };
 
