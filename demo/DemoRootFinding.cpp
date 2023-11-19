@@ -13,8 +13,8 @@
 
 struct Bounds
 {
-    double lower;
-    double upper;
+    float lower;
+    float upper;
 };
 
 int main()
@@ -22,23 +22,6 @@ int main()
     using namespace nxx::roots;
     std::cout << std::fixed << std::setprecision(8);
     auto func = [](std::floating_point auto x) { return x * x - 5.0f; };
-
-    Bounds                bounds1 = { 0, 2.5 };
-    std::vector< double > bounds2 = { 0.0, 2.5 };
-
-    auto xyz = *fsolve< RegulaFalsi >(func, { 0.0, 2.5 });
-    auto qwe = *fsolve< RegulaFalsi >(func, bounds1);
-    auto asd = *fsolve< RegulaFalsi >(func, bounds2);
-
-    auto q1 = RegulaFalsi(func);
-    auto q2 = RegulaFalsi(func, { 0.0, 2.5 });
-    auto q3 = RegulaFalsi(func, bounds1);
-    auto q4 = RegulaFalsi(func, bounds2);
-
-    auto e1 = q1.evaluate(1.25);
-    auto e2 = q2.evaluate(1.25);
-    auto e3 = q3.evaluate(1.25);
-    auto e4 = q4.evaluate(1.25);
 
     // ============================================================================================
     // The nxx::roots namespace contains a number of root-finding algorithms, for finding the roots
@@ -77,9 +60,9 @@ int main()
     std::cout << "Ridder's Method:          " << *fsolve< Ridder >(func, { 0.0, 2.5 }, 1.0E-15) << std::endl;
     std::cout << "Regula Falsi Method:      " << *fsolve< RegulaFalsi >(func, { 0.0, 2.5 }, 1.0E-15) << std::endl << std::endl;
 
-    // std::cout << "\nCompute the root of the polynomial f(x) = x^2 - 5 using polishing methods:\n";
-    // std::cout << "Discrete Newton's Method: " << *fdfsolve(DNewton(func), 1.25, 1.0E-15) << std::endl;
-    // std::cout << "Newton's Method:          " << *fdfsolve(Newton(func, derivativeOf(func)), 1.25, 1.0E-15) << std::endl << std::endl;
+    std::cout << "\nCompute the root of the polynomial f(x) = x^2 - 5 using polishing methods:\n";
+    std::cout << "Discrete Newton's Method: " << *fdfsolve(DNewton(func), 1.25, 1.0E-15) << std::endl;
+    std::cout << "Newton's Method:          " << *fdfsolve(Newton(func, derivativeOf(func)), 1.25, 1.0E-15) << std::endl << std::endl;
     // Note that the Discrete Newton's Method uses the numerical derivative of the function, while
     // Newton's Method requires a separate function for the derivative.
 

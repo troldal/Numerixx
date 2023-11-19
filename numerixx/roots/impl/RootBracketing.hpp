@@ -37,15 +37,26 @@
 #include <Deriv.hpp>
 
 // ===== Standard Library Includes
-#include <array>
 #include <algorithm>
+#include <array>
 #include <span>
 
 namespace nxx::roots
 {
-    // ========================================================================
-    // ROOT-FINDING WITHOUT DERIVATIVES (BRACKETING)
-    // ========================================================================
+    // =====================================================================================================================
+    //
+    //  88888888ba                                       88                             88
+    //  88      "8b                                      88                      ,d     ""
+    //  88      ,8P                                      88                      88
+    //  88aaaaaa8P'  8b,dPPYba,  ,adPPYYba,   ,adPPYba,  88   ,d8   ,adPPYba,  MM88MMM  88  8b,dPPYba,    ,adPPYb,d8
+    //  88""""""8b,  88P'   "Y8  ""     `Y8  a8"     ""  88 ,a8"   a8P_____88    88     88  88P'   `"8a  a8"    `Y88
+    //  88      `8b  88          ,adPPPPP88  8b          8888[     8PP"""""""    88     88  88       88  8b       88
+    //  88      a8P  88          88,    ,88  "8a,   ,aa  88`"Yba,  "8b,   ,aa    88,    88  88       88  "8a,   ,d88
+    //  88888888P"   88          `"8bbdP"Y8   `"Ybbd8"'  88   `Y8a  `"Ybbd8"'    "Y888  88  88       88   `"YbbdP"Y8
+    //                                                                                                    aa,    ,88
+    //                                                                                                     "Y8bbdP"
+    //
+    // =====================================================================================================================
 
     namespace impl
     {
@@ -55,22 +66,20 @@ namespace nxx::roots
          * This class provides a generic interface for bracketing root-finding algorithms. The actual algorithm
          * is implemented in a derived class, which is passed as a template argument (POLICY).
          *
-         * @tparam POLICY The derived class implementing the specific root-finding algorithm.
+         * @tparam DERIVED The derived class implementing the specific root-finding algorithm.
          * @requires POLICY must be invocable with a floating point type as its argument type.
          */
-        template<typename POLICY>
-            requires std::floating_point< typename BracketingTraits< POLICY >::RETURN_T >
+        template<typename DERIVED, typename FUNCTION_T, typename ARG_T>
+        // requires std::floating_point< typename BracketingTraits< POLICY >::RETURN_T >
         class BracketingBase
         {
             /*
              * Friend declarations.
              */
-            friend POLICY;
+            friend DERIVED;
 
         public:
-            using FUNCTION_T = typename BracketingTraits< POLICY >::FUNCTION_T;
-            using RESULT_T = typename BracketingTraits< POLICY >::RETURN_T;
-            using ARG_T = typename BracketingTraits< POLICY >::ARG_T;
+            using RESULT_T = std::invoke_result_t< FUNCTION_T, ARG_T >;
             using BOUNDS_T = std::pair< ARG_T, ARG_T >;
 
         protected:
@@ -79,7 +88,7 @@ namespace nxx::roots
              */
             ~BracketingBase() = default;
 
-        private:
+        public:
             FUNCTION_T m_func{};                 /**< The function object to find the root for. */
             BOUNDS_T   m_bounds{};               /**< Holds the current bounds around the root. */
             bool       m_isInitialized{ false }; /**< Indicates whether the solver has been initialized. */
@@ -102,7 +111,8 @@ namespace nxx::roots
              * upper bounds, respectively.
              * @note Constructor is private to avoid direct usage by clients.
              */
-            template<typename T> requires std::floating_point< T >
+            template<typename T>
+                requires std::floating_point< T >
             BracketingBase(FUNCTION_T objective, std::initializer_list< T > bounds)
                 : m_func{ std::move(objective) } { init(bounds); }
 
@@ -115,7 +125,8 @@ namespace nxx::roots
              * upper bounds, respectively.
              * @note Constructor is private to avoid direct usage by clients.
              */
-            template<IsContainer CONT_T> requires std::floating_point< typename CONT_T::value_type >
+            template<IsContainer CONT_T>
+                requires std::floating_point< typename CONT_T::value_type >
             BracketingBase(FUNCTION_T objective, CONT_T bounds)
                 : m_func{ std::move(objective) } { init(bounds); }
 
@@ -145,7 +156,6 @@ namespace nxx::roots
                 m_bounds = BOUNDS_T{ lower, upper };
             }
 
-        public:
             /**
              * @brief Copy constructor.
              *
@@ -183,7 +193,8 @@ namespace nxx::roots
              * inside these bounds. The list must contain exactly two elements, which will be interpreted as the lower and
              * upper bounds, respectively.
              */
-            template<typename T> requires std::floating_point< T >
+            template<typename T>
+                requires std::floating_point< T >
             void init(std::initializer_list< T > bounds)
             {
                 m_isInitialized = true;
@@ -199,7 +210,8 @@ namespace nxx::roots
              * inside these bounds. The container must contain exactly two elements, which will be interpreted as the lower and
              * upper bounds, respectively.
              */
-            template<IsContainer CONT_T> requires std::floating_point< typename CONT_T::value_type >
+            template<IsContainer CONT_T>
+                requires std::floating_point< typename CONT_T::value_type >
             void init(CONT_T bounds)
             {
                 m_isInitialized = true;
@@ -258,6 +270,20 @@ namespace nxx::roots
         };
     } // namespace impl
 
+
+    // =====================================================================================================================
+    //
+    //  88888888ba   88           88           88
+    //  88      "8b  ""           88           88
+    //  88      ,8P               88           88
+    //  88aaaaaa8P'  88   ,adPPYb,88   ,adPPYb,88   ,adPPYba,  8b,dPPYba,  ,adPPYba,
+    //  88""""88'    88  a8"    `Y88  a8"    `Y88  a8P_____88  88P'   "Y8  I8[    ""
+    //  88    `8b    88  8b       88  8b       88  8PP"""""""  88           `"Y8ba,
+    //  88     `8b   88  "8a,   ,d88  "8a,   ,d88  "8b,   ,aa  88          aa    ]8I
+    //  88      `8b  88   `"8bbdP"Y8   `"8bbdP"Y8   `"Ybbd8"'  88          `"YbbdP"'
+    //
+    // =====================================================================================================================
+
     /**
      * @brief Implements Ridder's method for root-finding.
      *
@@ -270,63 +296,15 @@ namespace nxx::roots
      */
     template<typename FN, typename ARG_T = double>
         requires IsFloatInvocable< FN >
-    class Ridder final : public impl::BracketingBase< Ridder< FN, ARG_T > >
+    class Ridder final : public impl::BracketingBase< Ridder< FN, ARG_T >, FN, ARG_T >
     {
         /*
          * Private alias declarations.
          */
-        using BASE = impl::BracketingBase< Ridder< FN, ARG_T > >;
+        using BASE = impl::BracketingBase< Ridder< FN, ARG_T >, FN, ARG_T >;
 
     public:
-        /*
-         * Public alias declarations.
-         */
-        using function_type = FN;
-
-        /**
-         * @brief Constructor, taking the function object as an argument.
-         *
-         * @param objective The function object for which to find the root.
-         * @note This constructor must call the BracketingBase constructor.
-         */
-        explicit Ridder(FN objective)
-            : BASE{ objective } {}
-
-        /**
-         * @brief Constructor, taking the function object and an std::initializer_list with the bounds as arguments.
-         *
-         * @param objective The function object for which to find the root.
-         * @param bounds An std::initializer_list object holding the initial bounds around the root. The root must be contained
-         * inside these bounds. The list must contain exactly two elements, which will be interpreted as the lower and
-         * upper bounds, respectively.
-         * @note This constructor must call the BracketingBase constructor.
-         */
-        Ridder(FN objective, std::initializer_list< ARG_T > bounds)
-            : BASE{ std::move(objective), bounds } {}
-
-        /**
-         * @brief Constructor, taking the function object and a container with the bounds as arguments.
-         *
-         * @param objective The function object for which to find the root.
-         * @param bounds A container holding the initial bounds around the root. The root must be contained
-         * inside these bounds. The container must contain exactly two elements, which will be interpreted as the lower and
-         * upper bounds, respectively.
-         * @note This constructor must call the BracketingBase constructor.
-         */
-        Ridder(FN objective, IsContainer auto bounds)
-            : BASE{ std::move(objective), bounds } {}
-
-        /**
-         * @brief Constructor, taking the function object and a struct with the bounds as arguments.
-         *
-         * @param objective The function object for which to find the root.
-         * @param bounds A struct holding the initial bounds around the root. The root must be contained
-         * inside these bounds. The struct must support structured bindings to provide two values: lower and upper bounds.
-         * Examples of supported types include pairs, tuples, or custom structs with structured bindings support.
-         * @note This constructor must call the BracketingBase constructor.
-         */
-        Ridder(FN objective, IsFloatStruct auto bounds) requires (!IsContainer< decltype(bounds) >)
-            : BASE{ std::move(objective), bounds } {}
+        using BASE::BASE;
 
         /**
          * @brief Perform one iteration of Ridder's method.
@@ -426,6 +404,20 @@ namespace nxx::roots
         requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
     Ridder(FN func, BOUNDS_T bounds) -> Ridder< decltype(func), StructCommonType_t< BOUNDS_T > >;
 
+
+    // =====================================================================================================================
+    //
+    //  88888888ba   88                                              88
+    //  88      "8b  ""                                       ,d     ""
+    //  88      ,8P                                           88
+    //  88aaaaaa8P'  88  ,adPPYba,   ,adPPYba,   ,adPPYba,  MM88MMM  88   ,adPPYba,   8b,dPPYba,
+    //  88""""""8b,  88  I8[    ""  a8P_____88  a8"     ""    88     88  a8"     "8a  88P'   `"8a
+    //  88      `8b  88   `"Y8ba,   8PP"""""""  8b            88     88  8b       d8  88       88
+    //  88      a8P  88  aa    ]8I  "8b,   ,aa  "8a,   ,aa    88,    88  "8a,   ,a8"  88       88
+    //  88888888P"   88  `"YbbdP"'   `"Ybbd8"'   `"Ybbd8"'    "Y888  88   `"YbbdP"'   88       88
+    //
+    // =====================================================================================================================
+
     /**
      * @brief Implements the bisection method for root-finding.
      *
@@ -438,63 +430,15 @@ namespace nxx::roots
      */
     template<typename FN, typename ARG_T = double>
         requires IsFloatInvocable< FN >
-    class Bisection final : public impl::BracketingBase< Bisection< FN, ARG_T > >
+    class Bisection final : public impl::BracketingBase< Bisection< FN, ARG_T >, FN, ARG_T >
     {
         /*
          * Private alias declarations.
          */
-        using BASE = impl::BracketingBase< Bisection< FN, ARG_T > >;
+        using BASE = impl::BracketingBase< Bisection< FN, ARG_T >, FN, ARG_T >;
 
     public:
-        /*
-         * Public alias declarations.
-         */
-        using function_type = FN;
-
-        /**
-         * @brief Constructor, taking the function object as an argument.
-         *
-         * @param objective The function object for which to find the root.
-         * @note This constructor must call the BracketingBase constructor.
-         */
-        explicit Bisection(FN objective)
-            : BASE{ std::move(objective) } {}
-
-        /**
-         * @brief Constructor, taking the function object and an std::initializer_list with the bounds as arguments.
-         *
-         * @param objective The function object for which to find the root.
-         * @param bounds An std::initializer_list object holding the initial bounds around the root. The root must be contained
-         * inside these bounds. The list must contain exactly two elements, which will be interpreted as the lower and
-         * upper bounds, respectively.
-         * @note This constructor must call the BracketingBase constructor.
-         */
-        Bisection(FN objective, std::initializer_list< ARG_T > bounds)
-            : BASE{ std::move(objective), bounds } {}
-
-        /**
-         * @brief Constructor, taking the function object and a container with the bounds as arguments.
-         *
-         * @param objective The function object for which to find the root.
-         * @param bounds A container holding the initial bounds around the root. The root must be contained
-         * inside these bounds. The container must contain exactly two elements, which will be interpreted as the lower and
-         * upper bounds, respectively.
-         * @note This constructor must call the BracketingBase constructor.
-         */
-        Bisection(FN objective, IsContainer auto bounds)
-            : BASE{ std::move(objective), bounds } {}
-
-        /**
-         * @brief Constructor, taking the function object and a struct with the bounds as arguments.
-         *
-         * @param objective The function object for which to find the root.
-         * @param bounds A struct holding the initial bounds around the root. The root must be contained
-         * inside these bounds. The struct must support structured bindings to provide two values: lower and upper bounds.
-         * Examples of supported types include pairs, tuples, or custom structs with structured bindings support.
-         * @note This constructor must call the BracketingBase constructor.
-         */
-        Bisection(FN objective, IsFloatStruct auto bounds) requires (!IsContainer< decltype(bounds) >)
-            : BASE{ std::move(objective), bounds } {}
+        using BASE::BASE;
 
         /**
          * @brief Perform one iteration of the bisection method.
@@ -555,6 +499,22 @@ namespace nxx::roots
         requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
     Bisection(FN func, BOUNDS_T bounds) -> Bisection< decltype(func), StructCommonType_t< BOUNDS_T > >;
 
+
+    // =====================================================================================================================
+    //
+    //  88888888ba                                        88              88888888888          88             88
+    //  88      "8b                                       88              88                   88             ""
+    //  88      ,8P                                       88              88                   88
+    //  88aaaaaa8P'  ,adPPYba,   ,adPPYb,d8  88       88  88  ,adPPYYba,  88aaaaa  ,adPPYYba,  88  ,adPPYba,  88
+    //  88""""88'   a8P_____88  a8"    `Y88  88       88  88  ""     `Y8  88"""""  ""     `Y8  88  I8[    ""  88
+    //  88    `8b   8PP"""""""  8b       88  88       88  88  ,adPPPPP88  88       ,adPPPPP88  88   `"Y8ba,   88
+    //  88     `8b  "8b,   ,aa  "8a,   ,d88  "8a,   ,a88  88  88,    ,88  88       88,    ,88  88  aa    ]8I  88
+    //  88      `8b  `"Ybbd8"'   `"YbbdP"Y8   `"YbbdP'Y8  88  `"8bbdP"Y8  88       `"8bbdP"Y8  88  `"YbbdP"'  88
+    //                           aa,    ,88
+    //                            "Y8bbdP"
+    //
+    // =====================================================================================================================
+
     /**
      * @brief Regula Falsi (False Position) method for root-finding.
      *
@@ -567,63 +527,15 @@ namespace nxx::roots
      */
     template<typename FN, typename ARG_T = double>
         requires IsFloatInvocable< FN >
-    class RegulaFalsi final : public impl::BracketingBase< RegulaFalsi< FN, ARG_T > >
+    class RegulaFalsi final : public impl::BracketingBase< RegulaFalsi< FN, ARG_T >, FN, ARG_T >
     {
         /*
          * Private alias declarations.
          */
-        using BASE = impl::BracketingBase< RegulaFalsi< FN, ARG_T > >;
+        using BASE = impl::BracketingBase< RegulaFalsi< FN, ARG_T >, FN, ARG_T >;
 
     public:
-        /*
-         * Public alias declarations.
-         */
-        using function_type = FN;
-
-        /**
-         * @brief Constructor, taking the function object as an argument.
-         *
-         * @param objective The function object for which to find the root.
-         * @note This constructor must call the BracketingBase constructor.
-         */
-        explicit RegulaFalsi(FN objective)
-            : BASE{ std::move(objective) } {}
-
-        /**
-         * @brief Constructor, taking the function object and an std::initializer_list with the bounds as arguments.
-         *
-         * @param objective The function object for which to find the root.
-         * @param bounds An std::initializer_list object holding the initial bounds around the root. The root must be contained
-         * inside these bounds. The list must contain exactly two elements, which will be interpreted as the lower and
-         * upper bounds, respectively.
-         * @note This constructor must call the BracketingBase constructor.
-         */
-        RegulaFalsi(FN objective, std::initializer_list< ARG_T > bounds)
-            : BASE{ std::move(objective), bounds } {}
-
-        /**
-         * @brief Constructor, taking the function object and a container with the bounds as arguments.
-         *
-         * @param objective The function object for which to find the root.
-         * @param bounds A container holding the initial bounds around the root. The root must be contained
-         * inside these bounds. The container must contain exactly two elements, which will be interpreted as the lower and
-         * upper bounds, respectively.
-         * @note This constructor must call the BracketingBase constructor.
-         */
-        RegulaFalsi(FN objective, IsContainer auto bounds)
-            : BASE{ std::move(objective), bounds } {}
-
-        /**
-         * @brief Constructor, taking the function object and a struct with the bounds as arguments.
-         *
-         * @param objective The function object for which to find the root.
-         * @param bounds A struct holding the initial bounds around the root. The root must be contained
-         * inside these bounds. The struct must support structured bindings to provide two values: lower and upper bounds.
-         * Examples of supported types include pairs, tuples, or custom structs with structured bindings support.
-         * @note This constructor must call the BracketingBase constructor.
-         */
-        RegulaFalsi(FN objective, IsFloatStruct auto bounds) requires (!IsContainer< decltype(bounds) >)
-            : BASE{ std::move(objective), bounds } {}
+        using BASE::BASE;
 
         /**
          * @brief Perform one iteration of the Regula Falsi algorithm.
@@ -688,6 +600,19 @@ namespace nxx::roots
     RegulaFalsi(FN func, BOUNDS_T bounds) -> RegulaFalsi< decltype(func), StructCommonType_t< BOUNDS_T > >;
 
 
+    // =====================================================================================================================
+    //
+    //     ad88                          88
+    //    d8"                            88
+    //    88                             88
+    //  MM88MMM  ,adPPYba,   ,adPPYba,   88  8b       d8   ,adPPYba,
+    //    88     I8[    ""  a8"     "8a  88  `8b     d8'  a8P_____88
+    //    88      `"Y8ba,   8b       d8  88   `8b   d8'   8PP"""""""
+    //    88     aa    ]8I  "8a,   ,a8"  88    `8b,d8'    "8b,   ,aa
+    //    88     `"YbbdP"'   `"YbbdP"'   88      "8"       `"Ybbd8"'
+    //
+    // =====================================================================================================================
+
     namespace impl
     {
         /**
@@ -706,7 +631,7 @@ namespace nxx::roots
          * @note The solver must implement a compatible interface with the required member functions,
          *       such as evaluate(), init(), and iterate().
          */
-        template<typename SOLVER>
+        template<typename SOLVER, typename EPS_T, typename ITER_T>
             requires requires(SOLVER solver, std::pair< typename SOLVER::RESULT_T, typename SOLVER::RESULT_T > bounds)
             {
                 // clang-format off
@@ -714,11 +639,11 @@ namespace nxx::roots
                 { solver.init(bounds) };
                 { solver.iterate() };
                 // clang-format on
-            }
+            } && std::floating_point< typename SOLVER::RESULT_T > && std::convertible_to< EPS_T, typename SOLVER::RESULT_T >
         auto fsolve_impl(SOLVER                                                            solver,
                          std::pair< typename SOLVER::RESULT_T, typename SOLVER::RESULT_T > bounds,
-                         typename SOLVER::RESULT_T                                         eps     = nxx::EPS,
-                         int                                                               maxiter = nxx::MAXITER)
+                         EPS_T                                                             eps     = nxx::EPS,
+                         ITER_T                                                            maxiter = nxx::MAXITER)
         {
             using ET = RootErrorImpl< typename SOLVER::RESULT_T >;
             using RT = tl::expected< typename SOLVER::RESULT_T, ET >;
@@ -778,7 +703,6 @@ namespace nxx::roots
         }
     } // namespace impl
 
-
     /**
      * @brief Overload of fsolve function that accepts a struct-like object for bounds, e.g., a pair or tuple.
      *
@@ -793,7 +717,7 @@ namespace nxx::roots
      * @param maxiter The maximum number of iterations allowed.
      * @return tl::expected object containing either the root of the function or an error.
      */
-    template<template <typename, typename> class SOLVER_T,
+    template<template< typename, typename > class SOLVER_T,
         IsFloatInvocable FN_T,
         IsFloatStruct STRUCT_T,
         std::floating_point EPS_T = double,
@@ -823,7 +747,7 @@ namespace nxx::roots
      * @return tl::expected object containing either the root of the function or an error.
      * @throws NumerixxError if the initializer list does not contain exactly two elements.
      */
-    template<template <typename, typename> class SOLVER_T,
+    template<template< typename, typename > class SOLVER_T,
         IsFloatInvocable FN_T,
         std::floating_point ARG_T,
         std::floating_point EPS_T = double,
@@ -851,15 +775,15 @@ namespace nxx::roots
      * @return tl::expected object containing either the root of the function or an error.
      * @throws NumerixxError if the container does not contain exactly two elements.
      */
-    template<template <typename, typename> class SOLVER_T,
+    template<template< typename, typename > class SOLVER_T,
         IsFloatInvocable FN_T,
         IsContainer CONT_T,
         std::floating_point EPS_T = double,
-        std::integral ITER_T = int> requires std::floating_point< typename CONT_T::value_type >
+        std::integral ITER_T = int>
+        requires std::floating_point< typename CONT_T::value_type >
     auto fsolve(FN_T function, const CONT_T& bounds, EPS_T eps = nxx::EPS, ITER_T maxiter = nxx::MAXITER)
     {
-        if (bounds.size() != 2)
-            throw NumerixxError("Container must contain exactly two elements!");
+        if (bounds.size() != 2) throw NumerixxError("Container must contain exactly two elements!");
 
         using ARG_T = typename CONT_T::value_type;
 
