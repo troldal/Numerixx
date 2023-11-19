@@ -33,7 +33,7 @@
 
 // ===== External Includes
 #include <boost/stacktrace.hpp>
-#include <hwinfo/hwinfo.hpp>
+// #include <hwinfo/hwinfo.hpp>
 
 // ===== Standard Library Includes
 #include <optional>
@@ -44,7 +44,7 @@
 
 namespace nxx
 {
-    enum class NumerixxErrorType { General, Poly, Polyroots, Roots, MultiRoots, Deriv, Func };
+    enum class NumerixxErrorType { General, Poly, Polyroots, Roots, MultiRoots, Deriv, Integral, Func };
 
     class NumerixxError : public std::runtime_error
     {
@@ -56,10 +56,10 @@ namespace nxx
             : std::runtime_error { str },
               m_type { type },
               m_location { loc },
-              m_backtrace { std::move(trace) },
-              m_os { hwinfo::getOSInfo() },
-              m_cpu { hwinfo::getCpuInfo() },
-              m_ram { hwinfo::getRamInfo() }
+              m_backtrace { std::move(trace) }
+              // m_os { hwinfo::getOSInfo() },
+              // m_cpu { hwinfo::getCpuInfo() },
+              // m_ram { hwinfo::getRamInfo() }
 
         {}
 
@@ -94,9 +94,9 @@ namespace nxx
             logStream << "Line: " << m_location.line() << "\n\t";
             logStream << "Column: " << m_location.column() << "\n\n";
             logStream << "Stacktrace:\n" << boost::stacktrace::to_string(m_backtrace) << "\n";
-            logStream << "OS:\n" << m_os << "\n";
-            logStream << "CPU:\n" << m_cpu << "\n";
-            logStream << "RAM:\n" << m_ram << "\n";
+            // logStream << "OS:\n" << m_os << "\n";
+            // logStream << "CPU:\n" << m_cpu << "\n";
+            // logStream << "RAM:\n" << m_ram << "\n";
             return logStream.str();
         }
 
@@ -104,9 +104,9 @@ namespace nxx
         NumerixxErrorType             m_type { NumerixxErrorType::General };
         std::source_location          m_location;
         boost::stacktrace::stacktrace m_backtrace;
-        hwinfo::OS                    m_os;
-        hwinfo::CPU                   m_cpu;
-        hwinfo::RAM                   m_ram;
+        // hwinfo::OS                    m_os;
+        // hwinfo::CPU                   m_cpu;
+        // hwinfo::RAM                   m_ram;
     };
 
     template< typename T >

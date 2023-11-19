@@ -40,6 +40,7 @@
 
 // ===== Standard Library Includes
 #include <algorithm>
+#include <cmath>
 #include <complex>
 #include <functional>
 #include <iterator>
@@ -413,7 +414,7 @@ namespace nxx::poly
                 const auto& coeff = *coeff_it;
 
                 // Skip zero coefficients
-                if (coeff == T {}) continue;
+                if (std::abs(coeff) < std::abs(std::sqrt(std::numeric_limits<T>::epsilon()))) continue;
 
                 // Use different logic for non-complex and complex types
                 if constexpr (!IsComplex< T >) {

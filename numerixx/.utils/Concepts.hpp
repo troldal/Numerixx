@@ -63,6 +63,57 @@ namespace nxx
                                    requires std::floating_point< std::invoke_result_t< Func, long double > >;
                                };
 
+    template<typename T>
+    concept IsContainer = requires(T a)
+    {
+        typename T::value_type;
+        typename T::iterator;
+        typename T::const_iterator;
+        { a.begin() } -> std::same_as< typename T::iterator >;
+        { a.end() } -> std::same_as< typename T::iterator >;
+        { a.size() } -> std::convertible_to< std::size_t >;
+    };
+
+    template<typename S>
+        requires (!IsContainer< S >)
+    struct StructTraits
+    {
+    private:
+        static constexpr auto commonType = [](S s) {
+            auto [first, second] = s;
+            using RT = std::common_type_t< decltype(first), decltype(second) >;
+            return RT{ (first + second) };
+        };
+
+        static constexpr auto firstType = [](S s) {
+            auto [first, second] = s;
+            return first;
+        };
+
+        static constexpr auto secondType = [](S s) {
+            auto [first, second] = s;
+            return second;
+        };
+
+    public:
+        using common_type = std::invoke_result_t< decltype(commonType), S >;
+        using first_type = std::invoke_result_t< decltype(firstType), S >;
+        using second_type = std::invoke_result_t< decltype(secondType), S >;
+    };
+
+    template<typename S>
+    using StructCommonType_t = typename StructTraits< S >::common_type;
+
+    template<typename S>
+    using StructFirstType_t = typename StructTraits< S >::first_type;
+
+    template<typename S>
+    using StructSecondType_t = typename StructTraits< S >::second_type;
+
+    template<typename S>
+    concept IsFloatStruct =
+        std::floating_point< typename StructTraits< S >::first_type > &&
+        std::floating_point< typename StructTraits< S >::second_type >;
 }    // namespace nxx
 
 namespace nxx::poly {

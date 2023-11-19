@@ -16,22 +16,35 @@
 
 // ===== Standard Library Includes
 #include <algorithm>
-#include <cassert>
 #include <cmath>
 #include <functional>
-#include <iostream>
 #include <limits>
 #include <numeric>
 #include <random>
 #include <stdexcept>
-#include <tuple>
 #include <type_traits>
-#include <utility>
 
 namespace nxx::integrate
 {
     namespace detail
     {
+        template<typename T, typename ITER_T>
+        struct IntErrorData
+        {
+            T value;
+            T error;
+            ITER_T iterations;
+
+            friend std::ostream& operator<<(std::ostream& os, const IntErrorData& data)
+            {
+                os << "Value: " << data.value << "\n"
+                   << "Error: " << data.error << "\n"
+                   << "Iterations: " << data.iterations << "\n";
+                return os;
+            }
+
+        };
+
         /**
          * @brief Alias template for determining the step size for a given type when computing numerical derivatives.
          * @tparam T The type for which to compute the step size.
@@ -55,29 +68,20 @@ namespace nxx::integrate
             requires std::floating_point< T >
         inline constexpr T StepSize = StepSizeHelper< T >::value;
 
+        void validateRange(std::floating_point auto lower, std::floating_point auto upper)
+        {
+            if (lower >= upper) throw NumerixxError("The lower bound must be less than the upper bound.");
+        }
+
+
         template<typename ALGO>
         class IntSolverTemplate
         {
         public:
             static constexpr auto IsIntSolver = true;
 
-            /**
-             * @brief Function call operator.
-             *
-             * @param function The function for which to compute the derivative. The function can be any callable type taking a
-             * floating point type as an argument, and returns a value of the same type.
-             * @param val The value at which to compute the derivative.
-             * @param stepsize The finite difference used for computing the derivative.
-             *
-             * @return The derivative. The return type is the same as the return type of the provided function.
-             *
-             * @note This function is not intended to be used directly. Instead, use the \c diff template function,
-             * or one of the convenience functions.
-             *
-             * @throws NumerixxError if stepsize is invalid.
-             */
             template<std::floating_point TOL_T = double, std::integral ITER_T = int>
-            inline auto operator()(IsFloatInvocable auto    function,
+            auto operator()(IsFloatInvocable auto    function,
                                    std::floating_point auto lower,
                                    std::floating_point auto upper,
                                    TOL_T                    tolerance,
@@ -86,6 +90,9 @@ namespace nxx::integrate
                 using ARG_T = std::common_type_t< decltype(lower), decltype(upper) >;
                 using RETURN_T = std::invoke_result_t< decltype(function), ARG_T >;
                 static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
+
+                validateRange(lower, upper);
+
                 return ALGO{}(function, lower, upper, tolerance, maxIterations);
             }
         };
@@ -104,10 +111,9 @@ namespace nxx::integrate
              * This function calculates the integral of a provided function over a specified interval [a, b],
              * using the Trapezoid integration method with adaptive step sizing.
              *
-             * @tparam Function Type of the function to integrate.
              * @param function The function to integrate.
-             * @param a The lower limit of integration.
-             * @param b The upper limit of integration.
+             * @param lower The lower limit of integration.
+             * @param upper The upper limit of integration.
              * @param tolerance The tolerance for convergence of the method.
              * @param maxIterations The maximum number of iterations allowed for convergence.
              * @return The computed integral of the function over [a, b].
@@ -123,41 +129,51 @@ namespace nxx::integrate
                 // Initial step size and initial trapezoidal estimate
 
                 using ARG_T = std::common_type_t< decltype(lower), decltype(upper) >;
-                using RETURN_T = std::invoke_result_t< decltype(function), ARG_T >;
+                using RESULT_T = std::invoke_result_t< decltype(function), ARG_T >;
+                using ERROR_T = Error< IntErrorData< RESULT_T , ITER_T> >;
+                using RETURN_T = tl::expected<std::common_type_t< RESULT_T, ARG_T >, ERROR_T>;
 
-                ARG_T    h    = (upper - lower);
-                RETURN_T Iold = h * (function(lower) + function(upper)) / 2;
+                RESULT_T    h    = upper - lower;
+                RESULT_T Iold = h * (function(lower) + function(upper)) / 2;
 
                 // Main loop for adaptive trapezoidal rule
                 for (ITER_T i = 1; i <= maxIterations; ++i) {
                     h /= 2;                                     // Halve the step size in each iteration
-                    ITER_T numOfMidpoints = std::pow(2, i - 1); // Calculate the number of midpoints for this iteration
+                    const ITER_T numOfMidpoints = std::pow(2, i - 1); // Calculate the number of midpoints for this iteration
 
                     // Create a vector of midpoints
-                    std::vector< RETURN_T > midPoints(numOfMidpoints);
+                    std::vector< RESULT_T > midPoints(numOfMidpoints);
                     std::generate(midPoints.begin(),
                                   midPoints.end(),
                                   [n = ITER_T{ 1 }, lower, h]() mutable { return lower + (2 * n++ - 1) * h; });
 
                     // Calculate the sum of function values at the midpoints
-                    RETURN_T sum =
+                    const RESULT_T sum =
                         std::transform_reduce(midPoints.begin(),
                                               midPoints.end(),
                                               0.0,
-                                              std::plus< >(),
-                                              [&](ARG_T x) { return function(x); });
+                                              std::plus(),
+                                              [&](RESULT_T x) { return function(x); });
 
                     // Update the integral estimate
-                    RETURN_T Inew = Iold / 2 + h * sum;
+                    const RESULT_T Inew = Iold / 2 + h * sum;
 
                     // Check for convergence
-                    if (i > 1 && std::abs(Inew - Iold) < tolerance) return Inew; // Return the new estimate if converged
+                    if (i > 1 && std::abs(Inew - Iold) < tolerance)
+                        return RETURN_T(Inew); // Return the new estimate if converged
 
                     Iold = Inew; // Update the old estimate for the next iteration
                 }
 
                 // Throw an exception if the method does not converge within the maximum number of iterations
-                throw std::runtime_error("AdaptiveTrapezoidMethod did not converge within the specified number of iterations.");
+                // throw std::runtime_error("AdaptiveTrapezoidMethod did not converge within the specified number of iterations.");
+                return RETURN_T(tl::make_unexpected(ERROR_T(
+                    "AdaptiveTrapezoidMethod did not converge within the specified number of iterations.",
+                    NumerixxErrorType::Integral,
+                    { .value = Iold,
+                      .error = Iold - Iold,
+                      .iterations = maxIterations
+                    })));
             }
         };
 
@@ -176,16 +192,15 @@ namespace nxx::integrate
              * This function calculates the integral of a provided function over a specified interval [a, b],
              * using an adaptive approach to improve the accuracy of Simpson's method.
              *
-             * @tparam Function Type of the function to integrate.
              * @param function The function to integrate.
-             * @param a The lower limit of integration.
-             * @param b The upper limit of integration.
+             * @param lower The lower limit of integration.
+             * @param upper The upper limit of integration.
              * @param tolerance The tolerance for convergence of the method.
              * @param maxDepth The maximum recursion depth to prevent infinite recursion.
              * @return The computed integral of the function over [a, b].
              */
-            template<IsFloatInvocable FN, std::floating_point TOL_T = double, std::integral ITER_T = int>
-            auto operator()(FN                       function,
+            template<std::floating_point TOL_T = double, std::integral ITER_T = int>
+            auto operator()(IsFloatInvocable auto function,
                             std::floating_point auto lower,
                             std::floating_point auto upper,
                             TOL_T                    tolerance = 1e-6,
@@ -201,41 +216,76 @@ namespace nxx::integrate
              *
              * This function recursively applies Simpson's method to smaller and smaller intervals until the desired tolerance is achieved.
              *
-             * @tparam Function Type of the function to integrate.
              * @param function The function to integrate.
-             * @param a The lower limit of the current interval.
-             * @param b The upper limit of the current interval.
+             * @param lower The lower limit of the current interval.
+             * @param upper The upper limit of the current interval.
              * @param tolerance The tolerance for convergence in the current recursive call.
              * @param maxDepth The maximum allowed recursion depth.
              * @param depth The current depth of recursion.
              * @return The approximate integral over the interval [a, b].
              */
-            template<IsFloatInvocable FN, std::floating_point TOL_T = double, std::integral ITER_T = int>
-            auto adaptiveSimpson(FN                       function,
+            template<std::floating_point TOL_T = double, std::integral ITER_T = int>
+            auto adaptiveSimpson(IsFloatInvocable auto function,
                                  std::floating_point auto lower,
                                  std::floating_point auto upper,
                                  TOL_T                    tolerance,
                                  ITER_T                   maxDepth,
                                  ITER_T                   depth) const
             {
-                double m  = (lower + upper) / 2; // Midpoint of the interval
-                double h  = (upper - lower) / 2; // Half the interval length
-                double fa = function(lower), fb = function(upper), fm = function(m);
+
+                using ARG_T = std::common_type_t< decltype(lower), decltype(upper) >;
+                using RESULT_T = std::invoke_result_t< decltype(function), ARG_T >;
+                using ERROR_T = Error< IntErrorData< RESULT_T , ITER_T> >;
+                using RETURN_T = tl::expected<std::common_type_t< RESULT_T, ARG_T >, ERROR_T>;
+
+                const RESULT_T m  = (lower + upper) / 2; // Midpoint of the interval
+                const RESULT_T h  = (upper - lower) / 2; // Half the interval length
+                const RESULT_T fa = function(lower), fb = function(upper), fm = function(m);
 
                 // Standard Simpson's rule
-                double S = (h / 3) * (fa + 4 * fm + fb);
+                const RESULT_T S = h / 3 * (fa + 4 * fm + fb);
 
                 // Simpson's rule on the left and right subintervals
-                double Sleft  = (h / 6) * (fa + 4 * function(lower + h / 2) + fm);
-                double Sright = (h / 6) * (fm + 4 * function(m + h / 2) + fb);
-                double S2     = Sleft + Sright;
+                const RESULT_T Sleft  = h / 6 * (fa + 4 * function(lower + h / 2) + fm);
+                const RESULT_T Sright = h / 6 * (fm + 4 * function(m + h / 2) + fb);
+                const RESULT_T S2     = Sleft + Sright;
+
+                // Check if the maximum recursion depth has been reached
+                if (depth >= maxDepth)
+                    return RETURN_T(tl::make_unexpected(ERROR_T(
+                        "AdaptiveSimpsonMethod did not converge within the specified number of iterations.",
+                        NumerixxErrorType::Integral,
+                        { .value = S2,
+                          .error = S2 - S,
+                          .iterations = maxDepth
+                        })));
 
                 // Check if the current approximation is within the tolerance
-                if (depth >= maxDepth || std::abs(S2 - S) < 15 * tolerance) return S2;
+                if (std::abs(S2 - S) < 15 * tolerance)
+                    return RETURN_T(S2);
 
                 // Recursively apply the method to each half
-                return adaptiveSimpson(function, lower, m, tolerance / 2, maxDepth, depth + 1) +
-                       adaptiveSimpson(function, m, upper, tolerance / 2, maxDepth, depth + 1);
+                auto left = adaptiveSimpson(function, lower, m, tolerance / 2, maxDepth, depth + 1);
+                auto right = adaptiveSimpson(function, m, upper, tolerance / 2, maxDepth, depth + 1);
+
+                if (!left) return left;
+                if (!right) return right;
+
+                return RETURN_T(*left + *right);
+
+                // if (left && right)
+                //     return RETURN_T(*left + *right);
+                // else
+                //     return RETURN_T(tl::make_unexpected(ERROR_T(
+                //         "AdaptiveSimpsonMethod did not converge within the specified number of iterations.",
+                //         NumerixxErrorType::Integral,
+                //         { .value = S2,
+                //           .error = S2 - S,
+                //           .iterations = maxDepth
+                //         })));
+
+                // return adaptiveSimpson(function, lower, m, tolerance / 2, maxDepth, depth + 1) +
+                //        adaptiveSimpson(function, m, upper, tolerance / 2, maxDepth, depth + 1);
             }
         };
 
@@ -259,8 +309,8 @@ namespace nxx::integrate
              * @param upper The upper limit of integration.
              * @param tolerance The tolerance for convergence of the method.
              * @param maxIterations The maximum number of iterations allowed for convergence.
-             * @return The computed integral of the function over [a, b].
-             * @throws std::runtime_error If the method does not converge within the specified number of iterations.
+             * @return The computed integral of the function over [lower, upper].
+             * @throws NumerixxError If the method does not converge within the specified number of iterations.
              */
             template<std::floating_point TOL_T = double, std::integral ITER_T = int>
             auto operator()(IsFloatInvocable auto    function,
@@ -270,23 +320,24 @@ namespace nxx::integrate
                             ITER_T                   maxIterations = 1000) const
             {
                 using ARG_T = std::common_type_t< decltype(lower), decltype(upper) >;
-                using RETURN_T = std::invoke_result_t< decltype(function), ARG_T >;
-                using TYPE_T = std::common_type_t< RETURN_T, ARG_T >;
+                using RESULT_T = std::invoke_result_t< decltype(function), ARG_T >;
+                using ERROR_T = Error< IntErrorData< RESULT_T , ITER_T> >;
+                using RETURN_T = tl::expected<std::common_type_t< RESULT_T, ARG_T >, ERROR_T>;
 
                 using boost::extents;
                 using boost::multi_array;
 
-                multi_array< TYPE_T, 2 > R(extents[maxIterations][maxIterations]);
+                multi_array< RESULT_T, 2 > R(extents[maxIterations][maxIterations]);
 
                 // Initialize the first element with the basic trapezoidal rule
                 R[0][0] = (upper - lower) * (function(lower) + function(upper)) / 2;
 
                 for (ITER_T i = 1; i < maxIterations; ++i) {
                     // Calculate the step size for this iteration
-                    TYPE_T h = (upper - lower) / std::pow(2, i);
+                    const RESULT_T h = (upper - lower) / std::pow(2, i);
 
                     // Trapezoidal rule: Calculate the sum of the function values at the midpoints
-                    TYPE_T sum = 0.0;
+                    RESULT_T sum = 0.0;
                     for (ITER_T k = 1; k <= std::pow(2, i - 1); ++k)
                         sum += function(lower + (2 * k - 1) * h);
 
@@ -300,11 +351,17 @@ namespace nxx::integrate
 
                     // Check for convergence: if the difference between the last two diagonal elements is within tolerance
                     if (i > 1 && std::abs(R[i][i] - R[i - 1][i - 1]) < tolerance)
-                        return R[i][i]; // Return the converged value
+                        return RETURN_T(R[i][i]); // Return the converged value
                 }
 
                 // If max iterations are reached without converging, throw an exception
-                throw std::runtime_error("RombergMethod did not converge within the specified number of iterations.");
+                return RETURN_T(tl::make_unexpected(ERROR_T(
+                    "RombergMethod did not converge within the specified number of iterations.",
+                    NumerixxErrorType::Integral,
+                    { .value = R[maxIterations - 1][maxIterations - 1],
+                      .error = R[maxIterations - 1][maxIterations - 1] - R[maxIterations - 2][maxIterations - 2],
+                      .iterations = maxIterations
+                    })));
             }
         };
     } // namespace detail
@@ -325,7 +382,7 @@ namespace nxx::integrate
     }
 
     template<typename ALGO = Romberg>
-    inline auto integralOf(IsFloatInvocable auto function)
+    auto integralOf(IsFloatInvocable auto function)
     {
         // if (!function) throw std::runtime_error("Function object is invalid.");
         return [=](std::floating_point auto a, std::floating_point auto b) { return ALGO {}(function, a, b); };

@@ -283,7 +283,7 @@ namespace nxx::roots
      * @tparam FN The objective function type.
      */
     template< typename FN >
-    requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires IsFloatInvocable< FN >
     class BracketSearchUp final : public impl::SearchBase< BracketSearchUp< FN > >
     {
         using BASE = impl::SearchBase< BracketSearchUp< FN > >;
@@ -335,7 +335,7 @@ namespace nxx::roots
      * @tparam FN The objective function type.
      */
     template< typename FN >
-    requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires IsFloatInvocable< FN >
     class BracketSearchDown final : public impl::SearchBase< BracketSearchDown< FN > >
     {
         using BASE = impl::SearchBase< BracketSearchDown< FN > >;
@@ -387,7 +387,7 @@ namespace nxx::roots
      * @tparam FN The objective function type.
      */
     template< typename FN >
-    requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires IsFloatInvocable< FN >
     class BracketExpandUp final : public impl::SearchBase< BracketExpandUp< FN > >
     {
         using BASE = impl::SearchBase< BracketExpandUp< FN > >;
@@ -438,7 +438,7 @@ namespace nxx::roots
      * @tparam FN The objective function type.
      */
     template< typename FN >
-    requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires IsFloatInvocable< FN >
     class BracketExpandDown final : public impl::SearchBase< BracketExpandDown< FN > >
     {
         using BASE = impl::SearchBase< BracketExpandDown< FN > >;
@@ -479,7 +479,7 @@ namespace nxx::roots
     };
 
     template< typename FN >
-    requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires IsFloatInvocable< FN >
     class BracketExpandOut final : public impl::SearchBase< BracketExpandOut< FN > >
     {
         using BASE = impl::SearchBase< BracketExpandOut< FN > >;
@@ -532,7 +532,7 @@ namespace nxx::roots
      *            function must have a signature compatible with `double function(double)`.
      */
     template< typename FN >
-    requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires IsFloatInvocable< FN >
     class BracketSubdivide final : public impl::SearchBase< BracketSubdivide< FN > >
     {
         using BASE = impl::SearchBase< BracketSubdivide< FN > >;

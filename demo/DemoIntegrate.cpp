@@ -1,34 +1,6 @@
 ////
 //// Created by kenne on 12/11/2023.
 ////
-//
-//#include <Integration.hpp>
-//#include <cmath>
-//#include <fmt/format.h>
-//#include <iomanip>
-//#include <iostream>
-//#include <numbers>
-//
-//int main()
-//{
-//    using namespace nxx::integrate;
-//
-//    double a = 0.0;
-//    float  b = 10.0;
-//
-//    auto f      = [](double x) { return std::exp(x); };
-////    auto result = integrate< Romberg >(f, a, b);
-//
-//    auto f_int = integralOf< Trapezoid >(f);
-//
-//     auto result = f_int(a, b);
-//    auto check = std::exp(b) - std::exp(a);
-//
-//    std::cout << "Result: " << result << std::endl;
-//    std::cout << "Check:  " << check << std::endl;
-//
-//    return 0;
-//}
 
 #include <Integ.hpp>
 #include <cmath>
@@ -39,7 +11,7 @@
 int main()
 {
     using namespace nxx::integrate;
-    std::cout << std::fixed << std::setprecision(10);
+    std::cout << std::fixed << std::setprecision(16);
 
     // Define some test functions
     auto f1 = [](std::floating_point auto x) { return x * x; };       // Integral from 0 to 1 is 1/3
@@ -48,17 +20,17 @@ int main()
     // Integral from -inf to inf is sqrt(pi), but we'll approximate with a large interval
 
     // Compute the integrals using the different methods
-    double integral_f1_romberg   = integrate< Romberg >(f1, 0.0, 2.0);
-    double integral_f1_simpson   = integrate< Simpson >(f1, 0.0, 2.0);
-    double integral_f1_trapezoid = integrate< Trapezoid >(f1, 0.0, 2.0);
+    const auto integral_f1_romberg   = *integrate< Romberg >(f1, 0.0, 2.0);
+    const auto integral_f1_simpson   = *integrate< Simpson >(f1, 0.0, 2.0);
+    const auto integral_f1_trapezoid = *integrate< Trapezoid >(f1, 0.0, 2.0);
 
-    double integral_f2_romberg   = integrate< Romberg >(f2, 0.0, std::numbers::pi);
-    double integral_f2_simpson   = integrate< Simpson >(f2, 0.0, std::numbers::pi);
-    double integral_f2_trapezoid = integrate< Trapezoid >(f2, 0.0, std::numbers::pi);
+    const auto integral_f2_romberg   = *integrate< Romberg >(f2, 0.0, std::numbers::pi);
+    const auto integral_f2_simpson   = *integrate< Simpson >(f2, 0.0, std::numbers::pi);
+    const auto integral_f2_trapezoid = *integrate< Trapezoid >(f2, 0.0, std::numbers::pi);
 
-    double integral_f3_romberg   = integrate< Romberg >(f3, -10.0, 10.0);
-    double integral_f3_simpson   = integrate< Simpson >(f3, -10.0, 10.0);
-    double integral_f3_trapezoid = integrate< Trapezoid >(f3, -10.0, 10.0);
+    const auto integral_f3_romberg   = *integrate< Romberg >(f3, -10.0, 10.0);
+    const auto integral_f3_simpson   = *integrate< Simpson >(f3, -10.0, 10.0);
+    const auto integral_f3_trapezoid = *integrate< Trapezoid >(f3, -10.0, 10.0);
 
     // Print the results
     std::cout << "Integral of x^2 from 0 to 1:\n";

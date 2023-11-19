@@ -40,12 +40,8 @@
 #include <tl/expected.hpp>
 
 // ===== Standard Library Includes
-#include <cassert>
 #include <cmath>
-#include <functional>
 #include <limits>
-#include <stdexcept>
-#include <tuple>
 #include <type_traits>
 #include <utility>
 
@@ -597,12 +593,10 @@ namespace nxx::deriv
 
             using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
             static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
-            using DerivError = Error< detail::DerivErrorData< decltype(val) > >;
+            using DerivError = Error< DerivErrorData< decltype(val) > >;
             using EXPECTED_T = tl::expected< RETURN_T, DerivError >;
 
-            auto deriv = ALGO {}(function, val, std::max(stepsize, stepsize * val));
-
-            if (std::isfinite(deriv))
+            if (auto deriv = ALGO {}(function, val, std::max(stepsize, stepsize * val)); std::isfinite(deriv))
                 return EXPECTED_T(deriv);
             else
                 return EXPECTED_T(tl::make_unexpected(DerivError("Computation of derivative gave non-finite result.",

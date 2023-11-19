@@ -148,22 +148,22 @@ namespace nxx::roots
     /*
      * Forward declaration of the Ridders class.
      */
-    template< typename FN >
-    requires std::floating_point< std::invoke_result_t< FN, double > >
+    template< typename FN, typename ARG_T >
+    requires IsFloatInvocable< FN >
     class Ridder;
 
     /*
      * Forward declaration of the Bisection class.
      */
-    template< typename FN >
-    requires std::floating_point< std::invoke_result_t< FN, double > >
+    template< typename FN, typename ARG_T >
+    requires IsFloatInvocable< FN >
     class Bisection;
 
     /*
      * Forward declaration of the RegulaFalsi class.
      */
-    template< typename FN >
-    requires std::floating_point< std::invoke_result_t< FN, double > >
+    template< typename FN, typename ARG_T >
+    requires IsFloatInvocable< FN >
     class RegulaFalsi;
 
     /*
@@ -180,31 +180,34 @@ namespace nxx::roots
         /*
          * Specialization of the BracketingTraits class for Ridders<FN>
          */
-        template< typename FN >
-        struct BracketingTraits< Ridder< FN > >
+        template< typename FN, typename T >
+        struct BracketingTraits< Ridder< FN, T > >
         {
             using FUNCTION_T = FN;
-            using RETURN_T   = std::invoke_result_t< FN, double >;
+            using ARG_T      = T;
+            using RETURN_T   = std::invoke_result_t< FN, ARG_T >;
         };
 
         /*
          * Specialization of the BracketingTraits class for Bisection<FN>
          */
-        template< typename FN >
-        struct BracketingTraits< Bisection< FN > >
+        template< typename FN, typename T >
+        struct BracketingTraits< Bisection< FN, T > >
         {
             using FUNCTION_T = FN;
-            using RETURN_T   = std::invoke_result_t< FN, double >;
+            using ARG_T      = T;
+            using RETURN_T   = std::invoke_result_t< FN, ARG_T >;
         };
 
         /*
          * Specialization of the BracketingTraits class for RegulaFalsi<FN>
          */
-        template< typename FN >
-        struct BracketingTraits< RegulaFalsi< FN > >
+        template< typename FN, typename T >
+        struct BracketingTraits< RegulaFalsi< FN, T > >
         {
             using FUNCTION_T = FN;
-            using RETURN_T   = std::invoke_result_t< FN, double >;
+            using ARG_T      = T;
+            using RETURN_T   = std::invoke_result_t< FN, ARG_T >;
         };
 
     }    // namespace impl
@@ -217,14 +220,14 @@ namespace nxx::roots
      * Forward declaration of the DNewton class.
      */
     template< typename FN, typename DFN >
-    requires std::floating_point< std::invoke_result_t< FN, double > > && std::floating_point< std::invoke_result_t< DFN, double > >
+    requires IsFloatInvocable< FN > && IsFloatInvocable< DFN >
     class DNewton;
 
     /*
      * Forward declaration of the Newton class.
      */
     template< typename FN, typename DFN >
-    requires(std::floating_point< std::invoke_result_t< FN, double > > && std::floating_point< std::invoke_result_t< DFN, double > >) ||
+    requires(IsFloatInvocable< FN > && IsFloatInvocable< DFN >) ||
             (IsComplex< std::invoke_result_t< FN, double > > && IsComplex< std::invoke_result_t< DFN, double > >)
     class Newton;
 
@@ -263,27 +266,27 @@ namespace nxx::roots
     }    // namespace impl
 
     template< typename FN >
-    requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires IsFloatInvocable< FN >
     class BracketSearchUp;
 
     template< typename FN >
-    requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires IsFloatInvocable< FN >
     class BracketSearchDown;
 
     template< typename FN >
-    requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires IsFloatInvocable< FN >
     class BracketExpandUp;
 
     template< typename FN >
-    requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires IsFloatInvocable< FN >
     class BracketExpandDown;
 
     template< typename FN >
-    requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires IsFloatInvocable< FN >
     class BracketExpandOut;
 
     template< typename FN >
-    requires std::floating_point< std::invoke_result_t< FN, double > >
+    requires IsFloatInvocable< FN >
     class BracketSubdivide;
 
     /*

@@ -31,6 +31,26 @@
 #ifndef NUMERIXX_ROOTS_HPP
 #define NUMERIXX_ROOTS_HPP
 
+#include <Constants.hpp>
+
+namespace nxx::roots
+{
+    template<typename SOLVER>
+        requires requires(SOLVER solver, typename SOLVER::FUNCTION_RETURN_T guess)
+        {
+            // clang-format off
+            { solver.evaluate(0.0) } -> std::same_as< typename SOLVER::FUNCTION_RETURN_T >;
+            { solver.init(guess) };
+            { solver.iterate() };
+            // clang-format on
+        }
+    auto fdfsolve(SOLVER                             solver,
+                  typename SOLVER::FUNCTION_RETURN_T guess,
+                  std::floating_point auto           eps     = nxx::EPS,
+                  int                                maxiter = nxx::MAXITER);
+}
+
+
 #include "impl/RootBracketing.hpp"
 #include "impl/RootPolishing.hpp"
 #include "impl/RootSearching.hpp"

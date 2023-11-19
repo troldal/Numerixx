@@ -150,7 +150,7 @@ namespace nxx::poly
     inline auto linear(IsPolynomial auto poly, typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance = nxx::EPS)
     {
         impl::validateTolerance(tolerance);
-        impl::validatePolynomialOrder(poly.order(), 1);
+        impl::validatePolynomialOrder(poly.order(), 1ull);
 
         // Define type aliases for readability
         using POLY_T    = PolynomialTraits< decltype(poly) >;
@@ -200,7 +200,7 @@ namespace nxx::poly
     inline auto quadratic(IsPolynomial auto poly, typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance = nxx::EPS)
     {
         impl::validateTolerance(tolerance);
-        impl::validatePolynomialOrder(poly.order(), 2);
+        impl::validatePolynomialOrder(poly.order(), 2ull);
 
         // Define type aliases for readability
         using POLY_T     = PolynomialTraits< decltype(poly) >;
@@ -261,7 +261,7 @@ namespace nxx::poly
     inline auto cubic(IsPolynomial auto poly, typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance = nxx::EPS)
     {
         impl::validateTolerance(tolerance);
-        impl::validatePolynomialOrder(poly.order(), 3);
+        impl::validatePolynomialOrder(poly.order(), 3ull);
 
         using POLY_T     = PolynomialTraits< decltype(poly) >;
         using VALUE_T    = typename POLY_T::value_type;
@@ -326,7 +326,7 @@ namespace nxx::poly
     {
         impl::validateTolerance(tolerance);
         impl::validateMaxIterations(max_iterations);
-        impl::validatePolynomialOrder(poly.order(), 4);
+        impl::validatePolynomialOrder(poly.order(), 4ull);
 
         // Define type aliases for readability
         using POLY_T     = PolynomialTraits< decltype(poly) >;
@@ -335,7 +335,7 @@ namespace nxx::poly
         using EXPECTED_T = tl::expected< std::vector< COMPLEX_T >, NumerixxError >;
         using OPTIONAL_T = std::optional< COMPLEX_T >;
 
-        const COMPLEX_T& order = poly.order();
+        const COMPLEX_T order = static_cast<FLOAT_T>(poly.order());
 
         // Define a lambda function for computing the Laguerre step.
         auto laguerrestep = [&](COMPLEX_T g_param, COMPLEX_T h_param) -> OPTIONAL_T {
@@ -432,7 +432,7 @@ namespace nxx::poly
         // Validate input parameters: tolerance, max_iterations, and polynomial order.
         impl::validateTolerance(tolerance);
         impl::validateMaxIterations(max_iterations);
-        impl::validatePolynomialOrder(poly.order(), 1);
+        impl::validatePolynomialOrder(poly.order(), 1ull);
 
         // Define types for readability and flexibility.
         using POLY_T     = PolynomialTraits< decltype(poly) >;                             // Traits of the input polynomial.
@@ -462,7 +462,7 @@ namespace nxx::poly
         };
 
         // Loop to solve and deflate the polynomial until its order is reduced to 3 or less.
-        int order;
+        size_t order;
         do {
             order                  = polynomial.order();       // Current order of the polynomial.
             const auto roots_found = findRoots(polynomial);    // Find roots.

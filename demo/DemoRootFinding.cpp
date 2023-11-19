@@ -3,6 +3,7 @@
 // ================================================================================================
 
 #include <algorithm>
+#include <deque>
 #include <array>
 #include <fmt/format.h>
 #include <iomanip>
@@ -10,11 +11,34 @@
 //#include <numerixx.hpp>
 #include <Roots.hpp>
 
+struct Bounds {
+    double lower;
+    double upper;
+};
+
 int main()
 {
     using namespace nxx::roots;
     std::cout << std::fixed << std::setprecision(8);
-    auto func = [](double x) { return x * x - 5.0; };
+    auto func = [](std::floating_point auto x) { return x * x - 5.0f; };
+
+    Bounds bounds1 = { 0, 2.5 };
+    std::vector<double> bounds2 = { 0.0, 2.5 };
+
+    auto xyz = *fsolve<RegulaFalsi>(func, { 0.0, 2.5 });
+    auto qwe = *fsolve<RegulaFalsi>(func, bounds1);
+    auto asd = *fsolve<RegulaFalsi>(func, bounds2);
+
+
+    auto q1 = RegulaFalsi(func);
+    auto q2 = RegulaFalsi(func, { 0.0, 2.5 });
+    auto q3 = RegulaFalsi(func, bounds1);
+    auto q4 = RegulaFalsi(func, bounds2);
+
+    auto e1 = q1.evaluate(1.25);
+    auto e2 = q2.evaluate(1.25);
+    auto e3 = q3.evaluate(1.25);
+    auto e4 = q4.evaluate(1.25);
 
     // ============================================================================================
     // The nxx::roots namespace contains a number of root-finding algorithms, for finding the roots
@@ -49,13 +73,13 @@ int main()
     // contain a value, the result of using the * operator is undefined.
     // ============================================================================================
     std::cout << "\nCompute the root of the polynomial f(x) = x^2 - 5 using bracketing methods:\n";
-    std::cout << "Bisection Method:         " << *fsolve(Bisection(func), { 0.0, 2.5 }, 1.0E-15) << std::endl;
-    std::cout << "Ridder's Method:          " << *fsolve(Ridder(func), { 0.0, 2.5 }, 1.0E-15) << std::endl;
-    std::cout << "Regula Falsi Method:      " << *fsolve(RegulaFalsi(func), { 0.0, 2.5 }, 1.0E-15) << std::endl << std::endl;
+    std::cout << "Bisection Method:         " << *fsolve<Bisection>(func, { 0.0, 2.5 }, 1.0E-15) << std::endl;
+    std::cout << "Ridder's Method:          " << *fsolve<Ridder>(func, { 0.0, 2.5 }, 1.0E-15) << std::endl;
+    std::cout << "Regula Falsi Method:      " << *fsolve<RegulaFalsi>(func, { 0.0, 2.5 }, 1.0E-15) << std::endl << std::endl;
 
-    std::cout << "\nCompute the root of the polynomial f(x) = x^2 - 5 using polishing methods:\n";
-    std::cout << "Discrete Newton's Method: " << *fdfsolve(DNewton(func), 1.25, 1.0E-15) << std::endl;
-    std::cout << "Newton's Method:          " << *fdfsolve(Newton(func, derivativeOf(func)), 1.25, 1.0E-15) << std::endl << std::endl;
+    // std::cout << "\nCompute the root of the polynomial f(x) = x^2 - 5 using polishing methods:\n";
+    // std::cout << "Discrete Newton's Method: " << *fdfsolve(DNewton(func), 1.25, 1.0E-15) << std::endl;
+    // std::cout << "Newton's Method:          " << *fdfsolve(Newton(func, derivativeOf(func)), 1.25, 1.0E-15) << std::endl << std::endl;
     // Note that the Discrete Newton's Method uses the numerical derivative of the function, while
     // Newton's Method requires a separate function for the derivative.
 
@@ -75,35 +99,35 @@ int main()
     };
 
     std::cout << "Initial Bracket:   [5.0, 10.0]\n";    // This bracket does not contain a root
-    auto root = fsolve(Bisection([](double x) { return std::log(x); }), { 5.0, 10.0 }, 1.0E-15);
+    auto root = fsolve<Bisection>([](double x) { return std::log(x); }, { 5.0, 10.0 }, 1.0E-15);
     if (!root) print_error(root.error());
 
     std::cout << "Initial Bracket:   [-5.0, 10.0]\n";    // The function is undefined at x <= 0
-    root = fsolve(Bisection([](double x) { return std::log(x); }), { -5.0, 10.0 }, 1.0E-15);
+    root = fsolve<Bisection>([](double x) { return std::log(x); }, { -5.0, 10.0 }, 1.0E-15);
     if (!root) print_error(root.error());
 
     std::cout << "Initial Bracket:   [0.1, 200.0]\n";    // This bracket contains a root, but will require many iterations
-    root = fsolve(Bisection([](double x) { return std::log(x); }), { 0.1, 200.0 }, 1.0E-15, 5);
+    root = fsolve<Bisection>([](double x) { return std::log(x); }, { 0.1, 200.0 }, 1.0E-15, 5);
     if (!root) print_error(root.error());
 
     // The error object is a subclass of the RootError class, which is a subclass of the std::runtime_error
     // class. This means that the error object can be used in a try-catch block, as shown below.
-    try {
-        throw root.error();
-    }
-    catch (const RootError& e) {
-        std::cout << "Exception caught: " << e.what() << std::endl << std::endl;
-    }
-
-    // The error object from the fdfsolve() function works in the same way.
-    std::cout << "Compute the root of the function f(x) = log(x) using the DNewton method:\n\n";
-    std::cout << "Initial Guess = 0.0:\n";    // The function is undefined at x <= 0
-    root = fdfsolve(DNewton([](double x) { return std::log(x); }), 0.0, 1.0E-15);
-    if (!root.has_value()) print_error(root.error());
-
-    std::cout << "Initial Guess = 1E-3:\n";    // This guess is close to the root, but will require many iterations
-    root = fdfsolve(DNewton([](double x) { return std::log(x); }), 1E-3, 1.0E-15, 5);
-    if (!root.has_value()) print_error(root.error());
+    // try {
+    //     throw root.error();
+    // }
+    // catch (const RootError& e) {
+    //     std::cout << "Exception caught: " << e.what() << std::endl << std::endl;
+    // }
+    //
+    // // The error object from the fdfsolve() function works in the same way.
+    // std::cout << "Compute the root of the function f(x) = log(x) using the DNewton method:\n\n";
+    // std::cout << "Initial Guess = 0.0:\n";    // The function is undefined at x <= 0
+    // root = fdfsolve(DNewton([](double x) { return std::log(x); }), 0.0, 1.0E-15);
+    // if (!root.has_value()) print_error(root.error());
+    //
+    // std::cout << "Initial Guess = 1E-3:\n";    // This guess is close to the root, but will require many iterations
+    // root = fdfsolve(DNewton([](double x) { return std::log(x); }), 1E-3, 1.0E-15, 5);
+    // if (!root.has_value()) print_error(root.error());
 
     // ============================================================================================
     // If more fine-grained control is needed, the algorithms can be used directly. Both the bracketing
@@ -117,18 +141,18 @@ int main()
     // ============================================================================================
 
     // Lambda function for printing the results of the bracketing solvers:
-    auto bracket_root = [](auto solver, std::pair< double, double > bounds) {
+    auto bracket_root = [](auto solver){//, std::pair< double, double > bounds) {
         // Print the header:
         std::cout << "----------------------------------------------------------------------------------\n";
         std::cout << fmt::format("{:>10} | {:>15} | {:>15} | {:>15} | {:>15} ", "Iter", "Upper", "Lower", "Root", "Error") << std::endl;
         std::cout << "----------------------------------------------------------------------------------\n";
 
         // Create variables for the iterations.
-        std::array< decltype(bounds), 2 > guesses;    // Stores the endpoints of the bracketing interval
+        std::array< std::pair< double, double >, 2 > guesses;    // Stores the endpoints of the bracketing interval
         decltype(guesses.begin())         min;        // Stores the endpoint with the smallest absolute value
 
         // Initialize the solver:
-        solver.init(bounds);
+        // solver.init(bounds);
 
         // Iterate until convergence (or until 100 iterations have been performed):
         for (int i = 0; i <= 100; ++i) {
@@ -163,13 +187,13 @@ int main()
     };
 
     std::cout << "Manual root-finding using Ridder's method:" << std::endl;
-    bracket_root(Ridder(func), { 0.0, 2.5 });
+    bracket_root(Ridder(func, { 0.0, 2.5 }));
 
     std::cout << "Manual root-finding using the bisection method:" << std::endl;
-    bracket_root(Bisection(func), { 0.0, 2.5 });
+    bracket_root(Bisection(func, { 0.0, 2.5 }));
 
     std::cout << "Manual root-finding using the regula falsi method:" << std::endl;
-    bracket_root(RegulaFalsi(func), { 0.0, 2.5 });
+    bracket_root(RegulaFalsi(func, { 0.0, 2.5 }));
 
     // Lambda function for printing the results of the polishing solvers:
     auto polish_root = [](auto solver, double guess) {
@@ -204,11 +228,11 @@ int main()
         std::cout << "------------------------------------------------------------------\n\n";
     };
 
-    std::cout << "Manual root-finding using the Discrete Newton's method:" << std::endl;
-    polish_root(DNewton(func), 3.0);
-
-    std::cout << "Manual root-finding using Newton's method:" << std::endl;
-    polish_root(Newton(func, derivativeOf(func)), 1.25);
+    // std::cout << "Manual root-finding using the Discrete Newton's method:" << std::endl;
+    // polish_root(DNewton(func), 3.0);
+    //
+    // std::cout << "Manual root-finding using Newton's method:" << std::endl;
+    // polish_root(Newton(func, derivativeOf(func)), 1.25);
 
     return 0;
 }
