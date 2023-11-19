@@ -11,7 +11,8 @@
 //#include <numerixx.hpp>
 #include <Roots.hpp>
 
-struct Bounds {
+struct Bounds
+{
     double lower;
     double upper;
 };
@@ -22,13 +23,12 @@ int main()
     std::cout << std::fixed << std::setprecision(8);
     auto func = [](std::floating_point auto x) { return x * x - 5.0f; };
 
-    Bounds bounds1 = { 0, 2.5 };
-    std::vector<double> bounds2 = { 0.0, 2.5 };
+    Bounds                bounds1 = { 0, 2.5 };
+    std::vector< double > bounds2 = { 0.0, 2.5 };
 
-    auto xyz = *fsolve<RegulaFalsi>(func, { 0.0, 2.5 });
-    auto qwe = *fsolve<RegulaFalsi>(func, bounds1);
-    auto asd = *fsolve<RegulaFalsi>(func, bounds2);
-
+    auto xyz = *fsolve< RegulaFalsi >(func, { 0.0, 2.5 });
+    auto qwe = *fsolve< RegulaFalsi >(func, bounds1);
+    auto asd = *fsolve< RegulaFalsi >(func, bounds2);
 
     auto q1 = RegulaFalsi(func);
     auto q2 = RegulaFalsi(func, { 0.0, 2.5 });
@@ -73,9 +73,9 @@ int main()
     // contain a value, the result of using the * operator is undefined.
     // ============================================================================================
     std::cout << "\nCompute the root of the polynomial f(x) = x^2 - 5 using bracketing methods:\n";
-    std::cout << "Bisection Method:         " << *fsolve<Bisection>(func, { 0.0, 2.5 }, 1.0E-15) << std::endl;
-    std::cout << "Ridder's Method:          " << *fsolve<Ridder>(func, { 0.0, 2.5 }, 1.0E-15) << std::endl;
-    std::cout << "Regula Falsi Method:      " << *fsolve<RegulaFalsi>(func, { 0.0, 2.5 }, 1.0E-15) << std::endl << std::endl;
+    std::cout << "Bisection Method:         " << *fsolve< Bisection >(func, { 0.0, 2.5 }, 1.0E-15) << std::endl;
+    std::cout << "Ridder's Method:          " << *fsolve< Ridder >(func, { 0.0, 2.5 }, 1.0E-15) << std::endl;
+    std::cout << "Regula Falsi Method:      " << *fsolve< RegulaFalsi >(func, { 0.0, 2.5 }, 1.0E-15) << std::endl << std::endl;
 
     // std::cout << "\nCompute the root of the polynomial f(x) = x^2 - 5 using polishing methods:\n";
     // std::cout << "Discrete Newton's Method: " << *fdfsolve(DNewton(func), 1.25, 1.0E-15) << std::endl;
@@ -99,15 +99,15 @@ int main()
     };
 
     std::cout << "Initial Bracket:   [5.0, 10.0]\n";    // This bracket does not contain a root
-    auto root = fsolve<Bisection>([](double x) { return std::log(x); }, { 5.0, 10.0 }, 1.0E-15);
+    auto root = fsolve< Bisection >([](double x) { return std::log(x); }, { 5.0, 10.0 }, 1.0E-15);
     if (!root) print_error(root.error());
 
     std::cout << "Initial Bracket:   [-5.0, 10.0]\n";    // The function is undefined at x <= 0
-    root = fsolve<Bisection>([](double x) { return std::log(x); }, { -5.0, 10.0 }, 1.0E-15);
+    root = fsolve< Bisection >([](double x) { return std::log(x); }, { -5.0, 10.0 }, 1.0E-15);
     if (!root) print_error(root.error());
 
     std::cout << "Initial Bracket:   [0.1, 200.0]\n";    // This bracket contains a root, but will require many iterations
-    root = fsolve<Bisection>([](double x) { return std::log(x); }, { 0.1, 200.0 }, 1.0E-15, 5);
+    root = fsolve< Bisection >([](double x) { return std::log(x); }, { 0.1, 200.0 }, 1.0E-15, 5);
     if (!root) print_error(root.error());
 
     // The error object is a subclass of the RootError class, which is a subclass of the std::runtime_error
@@ -141,15 +141,16 @@ int main()
     // ============================================================================================
 
     // Lambda function for printing the results of the bracketing solvers:
-    auto bracket_root = [](auto solver){//, std::pair< double, double > bounds) {
+    auto bracket_root = [](auto solver) {
+        //, std::pair< double, double > bounds) {
         // Print the header:
         std::cout << "----------------------------------------------------------------------------------\n";
         std::cout << fmt::format("{:>10} | {:>15} | {:>15} | {:>15} | {:>15} ", "Iter", "Upper", "Lower", "Root", "Error") << std::endl;
         std::cout << "----------------------------------------------------------------------------------\n";
 
         // Create variables for the iterations.
-        std::array< std::pair< double, double >, 2 > guesses;    // Stores the endpoints of the bracketing interval
-        decltype(guesses.begin())         min;        // Stores the endpoint with the smallest absolute value
+        std::array< std::pair< double, double >, 2 > guesses; // Stores the endpoints of the bracketing interval
+        decltype(guesses.begin())                    min;     // Stores the endpoint with the smallest absolute value
 
         // Initialize the solver:
         // solver.init(bounds);

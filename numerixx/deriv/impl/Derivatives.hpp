@@ -596,7 +596,7 @@ namespace nxx::deriv
             using DerivError = Error< DerivErrorData< decltype(val) > >;
             using EXPECTED_T = tl::expected< RETURN_T, DerivError >;
 
-            if (auto deriv = ALGO {}(function, val, std::max(stepsize, stepsize * val)); std::isfinite(deriv))
+            if (auto deriv = ALGO{}(function, val, std::max(stepsize, stepsize * val)); std::isfinite(deriv))
                 return EXPECTED_T(deriv);
             else
                 return EXPECTED_T(tl::make_unexpected(DerivError("Computation of derivative gave non-finite result.",
