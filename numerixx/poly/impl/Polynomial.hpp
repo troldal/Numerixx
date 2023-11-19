@@ -414,7 +414,7 @@ namespace nxx::poly
                 const auto& coeff = *coeff_it;
 
                 // Skip zero coefficients
-                if (std::abs(coeff) < std::abs(std::sqrt(std::numeric_limits<T>::epsilon()))) continue;
+                if (std::abs(coeff) < std::abs(std::sqrt(std::numeric_limits< T >::epsilon()))) continue;
 
                 // Use different logic for non-complex and complex types
                 if constexpr (!IsComplex< T >) {

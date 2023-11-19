@@ -31,18 +31,17 @@ namespace nxx::integrate
         template<typename T, typename ITER_T>
         struct IntErrorData
         {
-            T value;
-            T error;
+            T      value;
+            T      error;
             ITER_T iterations;
 
             friend std::ostream& operator<<(std::ostream& os, const IntErrorData& data)
             {
                 os << "Value: " << data.value << "\n"
-                   << "Error: " << data.error << "\n"
-                   << "Iterations: " << data.iterations << "\n";
+                    << "Error: " << data.error << "\n"
+                    << "Iterations: " << data.iterations << "\n";
                 return os;
             }
-
         };
 
         /**
@@ -82,10 +81,10 @@ namespace nxx::integrate
 
             template<std::floating_point TOL_T = double, std::integral ITER_T = int>
             auto operator()(IsFloatInvocable auto    function,
-                                   std::floating_point auto lower,
-                                   std::floating_point auto upper,
-                                   TOL_T                    tolerance,
-                                   ITER_T                   maxIterations) const
+                            std::floating_point auto lower,
+                            std::floating_point auto upper,
+                            TOL_T                    tolerance,
+                            ITER_T                   maxIterations) const
             {
                 using ARG_T = std::common_type_t< decltype(lower), decltype(upper) >;
                 using RETURN_T = std::invoke_result_t< decltype(function), ARG_T >;
@@ -130,15 +129,15 @@ namespace nxx::integrate
 
                 using ARG_T = std::common_type_t< decltype(lower), decltype(upper) >;
                 using RESULT_T = std::invoke_result_t< decltype(function), ARG_T >;
-                using ERROR_T = Error< IntErrorData< RESULT_T , ITER_T> >;
-                using RETURN_T = tl::expected<std::common_type_t< RESULT_T, ARG_T >, ERROR_T>;
+                using ERROR_T = Error< IntErrorData< RESULT_T, ITER_T > >;
+                using RETURN_T = tl::expected< std::common_type_t< RESULT_T, ARG_T >, ERROR_T >;
 
-                RESULT_T    h    = upper - lower;
+                RESULT_T h    = upper - lower;
                 RESULT_T Iold = h * (function(lower) + function(upper)) / 2;
 
                 // Main loop for adaptive trapezoidal rule
                 for (ITER_T i = 1; i <= maxIterations; ++i) {
-                    h /= 2;                                     // Halve the step size in each iteration
+                    h /= 2;                                           // Halve the step size in each iteration
                     const ITER_T numOfMidpoints = std::pow(2, i - 1); // Calculate the number of midpoints for this iteration
 
                     // Create a vector of midpoints
@@ -200,7 +199,7 @@ namespace nxx::integrate
              * @return The computed integral of the function over [a, b].
              */
             template<std::floating_point TOL_T = double, std::integral ITER_T = int>
-            auto operator()(IsFloatInvocable auto function,
+            auto operator()(IsFloatInvocable auto    function,
                             std::floating_point auto lower,
                             std::floating_point auto upper,
                             TOL_T                    tolerance = 1e-6,
@@ -225,18 +224,17 @@ namespace nxx::integrate
              * @return The approximate integral over the interval [a, b].
              */
             template<std::floating_point TOL_T = double, std::integral ITER_T = int>
-            auto adaptiveSimpson(IsFloatInvocable auto function,
+            auto adaptiveSimpson(IsFloatInvocable auto    function,
                                  std::floating_point auto lower,
                                  std::floating_point auto upper,
                                  TOL_T                    tolerance,
                                  ITER_T                   maxDepth,
                                  ITER_T                   depth) const
             {
-
                 using ARG_T = std::common_type_t< decltype(lower), decltype(upper) >;
                 using RESULT_T = std::invoke_result_t< decltype(function), ARG_T >;
-                using ERROR_T = Error< IntErrorData< RESULT_T , ITER_T> >;
-                using RETURN_T = tl::expected<std::common_type_t< RESULT_T, ARG_T >, ERROR_T>;
+                using ERROR_T = Error< IntErrorData< RESULT_T, ITER_T > >;
+                using RETURN_T = tl::expected< std::common_type_t< RESULT_T, ARG_T >, ERROR_T >;
 
                 const RESULT_T m  = (lower + upper) / 2; // Midpoint of the interval
                 const RESULT_T h  = (upper - lower) / 2; // Half the interval length
@@ -265,7 +263,7 @@ namespace nxx::integrate
                     return RETURN_T(S2);
 
                 // Recursively apply the method to each half
-                auto left = adaptiveSimpson(function, lower, m, tolerance / 2, maxDepth, depth + 1);
+                auto left  = adaptiveSimpson(function, lower, m, tolerance / 2, maxDepth, depth + 1);
                 auto right = adaptiveSimpson(function, m, upper, tolerance / 2, maxDepth, depth + 1);
 
                 if (!left) return left;
@@ -321,8 +319,8 @@ namespace nxx::integrate
             {
                 using ARG_T = std::common_type_t< decltype(lower), decltype(upper) >;
                 using RESULT_T = std::invoke_result_t< decltype(function), ARG_T >;
-                using ERROR_T = Error< IntErrorData< RESULT_T , ITER_T> >;
-                using RETURN_T = tl::expected<std::common_type_t< RESULT_T, ARG_T >, ERROR_T>;
+                using ERROR_T = Error< IntErrorData< RESULT_T, ITER_T > >;
+                using RETURN_T = tl::expected< std::common_type_t< RESULT_T, ARG_T >, ERROR_T >;
 
                 using boost::extents;
                 using boost::multi_array;

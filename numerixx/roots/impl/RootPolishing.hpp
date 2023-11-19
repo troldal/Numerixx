@@ -211,7 +211,7 @@ namespace nxx::roots
      * @requires FN and DFN should be callable with double and return a floating point type.
      */
     template< typename FN, typename DFN >
-    requires IsFloatInvocable< FN > && IsFloatInvocable< DFN >
+        requires IsFloatInvocable< FN > && IsFloatInvocable< DFN >
     class DNewton final : public impl::PolishingBase< DNewton< FN, DFN > >
     {
         /*
@@ -257,9 +257,9 @@ namespace nxx::roots
      * @tparam DFN The type of the derivative function object.
      * @requires FN and DFN should be callable with double and return a floating point type.
      */
-    template< typename FN, typename DFN >
-    requires(IsFloatInvocable< FN > && IsFloatInvocable< DFN >) ||
-            (IsComplex< std::invoke_result_t< FN, double > > && IsComplex< std::invoke_result_t< DFN, double > >)
+    template< typename FN, typename DFN>
+        requires(IsFloatInvocable< FN > && IsFloatInvocable< DFN >) ||
+                (IsComplex< std::invoke_result_t< FN, double > > && IsComplex< std::invoke_result_t< DFN, double > >)
     class Newton final : public impl::PolishingBase< Newton< FN, DFN > >
     {
         /*
@@ -312,11 +312,12 @@ namespace nxx::roots
                  { solver.init(guess) };
                  { solver.iterate() };
                  // clang-format on
-             }
+    }
     auto fdfsolve(SOLVER                             solver,
-                         typename SOLVER::FUNCTION_RETURN_T guess,
-                         std::floating_point auto           eps,//     = nxx::EPS,
-                         int                                maxiter)// = nxx::MAXITER)
+                  typename SOLVER::FUNCTION_RETURN_T guess,
+                  std::floating_point auto           eps,
+                  //     = nxx::EPS,
+                  int maxiter) // = nxx::MAXITER)
     {
         using EXPECTED_T = impl::RootErrorImpl< typename SOLVER::FUNCTION_RETURN_T >;
         using RETURN_T   = tl::expected< typename SOLVER::FUNCTION_RETURN_T, EXPECTED_T >;

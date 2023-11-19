@@ -335,7 +335,7 @@ namespace nxx::poly
         using EXPECTED_T = tl::expected< std::vector< COMPLEX_T >, NumerixxError >;
         using OPTIONAL_T = std::optional< COMPLEX_T >;
 
-        const COMPLEX_T order = static_cast<FLOAT_T>(poly.order());
+        const COMPLEX_T order = static_cast< FLOAT_T >(poly.order());
 
         // Define a lambda function for computing the Laguerre step.
         auto laguerrestep = [&](COMPLEX_T g_param, COMPLEX_T h_param) -> OPTIONAL_T {

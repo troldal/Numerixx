@@ -148,22 +148,22 @@ namespace nxx::roots
     /*
      * Forward declaration of the Ridders class.
      */
-    template< typename FN, typename ARG_T >
-    requires IsFloatInvocable< FN >
+    template<typename FN, typename ARG_T>
+        requires IsFloatInvocable< FN >
     class Ridder;
 
     /*
      * Forward declaration of the Bisection class.
      */
-    template< typename FN, typename ARG_T >
-    requires IsFloatInvocable< FN >
+    template<typename FN, typename ARG_T>
+        requires IsFloatInvocable< FN >
     class Bisection;
 
     /*
      * Forward declaration of the RegulaFalsi class.
      */
-    template< typename FN, typename ARG_T >
-    requires IsFloatInvocable< FN >
+    template<typename FN, typename ARG_T>
+        requires IsFloatInvocable< FN >
     class RegulaFalsi;
 
     /*
@@ -180,37 +180,36 @@ namespace nxx::roots
         /*
          * Specialization of the BracketingTraits class for Ridders<FN>
          */
-        template< typename FN, typename T >
+        template<typename FN, typename T>
         struct BracketingTraits< Ridder< FN, T > >
         {
             using FUNCTION_T = FN;
-            using ARG_T      = T;
-            using RETURN_T   = std::invoke_result_t< FN, ARG_T >;
+            using ARG_T = T;
+            using RETURN_T = std::invoke_result_t< FN, ARG_T >;
         };
 
         /*
          * Specialization of the BracketingTraits class for Bisection<FN>
          */
-        template< typename FN, typename T >
+        template<typename FN, typename T>
         struct BracketingTraits< Bisection< FN, T > >
         {
             using FUNCTION_T = FN;
-            using ARG_T      = T;
-            using RETURN_T   = std::invoke_result_t< FN, ARG_T >;
+            using ARG_T = T;
+            using RETURN_T = std::invoke_result_t< FN, ARG_T >;
         };
 
         /*
          * Specialization of the BracketingTraits class for RegulaFalsi<FN>
          */
-        template< typename FN, typename T >
+        template<typename FN, typename T>
         struct BracketingTraits< RegulaFalsi< FN, T > >
         {
             using FUNCTION_T = FN;
-            using ARG_T      = T;
-            using RETURN_T   = std::invoke_result_t< FN, ARG_T >;
+            using ARG_T = T;
+            using RETURN_T = std::invoke_result_t< FN, ARG_T >;
         };
-
-    }    // namespace impl
+    } // namespace impl
 
     // ========================================================================
     // TRAITS CLASSES FOR ROOT-FINDING WITH DERIVATIVES
