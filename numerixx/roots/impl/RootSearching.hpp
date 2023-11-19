@@ -334,7 +334,7 @@ namespace nxx::roots
      *
      * @tparam FN The objective function type.
      */
-    template< typename FN>
+    template<typename FN>
         requires IsFloatInvocable< FN >
     class BracketSearchDown final : public impl::SearchBase< BracketSearchDown< FN > >
     {
@@ -386,7 +386,7 @@ namespace nxx::roots
      *
      * @tparam FN The objective function type.
      */
-    template< typename FN>
+    template<typename FN>
         requires IsFloatInvocable< FN >
     class BracketExpandUp final : public impl::SearchBase< BracketExpandUp< FN > >
     {
@@ -437,7 +437,7 @@ namespace nxx::roots
      *
      * @tparam FN The objective function type.
      */
-    template< typename FN>
+    template<typename FN>
         requires IsFloatInvocable< FN >
     class BracketExpandDown final : public impl::SearchBase< BracketExpandDown< FN > >
     {
@@ -478,7 +478,7 @@ namespace nxx::roots
         }
     };
 
-    template< typename FN>
+    template<typename FN>
         requires IsFloatInvocable< FN >
     class BracketExpandOut final : public impl::SearchBase< BracketExpandOut< FN > >
     {

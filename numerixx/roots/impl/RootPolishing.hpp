@@ -257,7 +257,7 @@ namespace nxx::roots
      * @tparam DFN The type of the derivative function object.
      * @requires FN and DFN should be callable with double and return a floating point type.
      */
-    template< typename FN, typename DFN>
+    template<typename FN, typename DFN>
         requires(IsFloatInvocable< FN > && IsFloatInvocable< DFN >) ||
                 (IsComplex< std::invoke_result_t< FN, double > > && IsComplex< std::invoke_result_t< DFN, double > >)
     class Newton final : public impl::PolishingBase< Newton< FN, DFN > >

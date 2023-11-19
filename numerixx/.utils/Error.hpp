@@ -109,7 +109,7 @@ namespace nxx
         // hwinfo::RAM                   m_ram;
     };
 
-    template<typename T >
+    template<typename T>
     class Error : public NumerixxError
     {
     public:
