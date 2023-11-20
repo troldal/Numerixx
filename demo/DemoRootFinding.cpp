@@ -90,20 +90,16 @@ int main()
 
     // The error object is a subclass of the RootError class, which is a subclass of the std::runtime_error
     // class. This means that the error object can be used in a try-catch block, as shown below.
-    try {
-        throw root.error();
-    }
-    catch (const RootError& e) {
-        std::cout << "Exception caught: " << e.what() << std::endl << std::endl;
-    }
+    try { throw root.error(); }
+    catch (const RootError& e) { std::cout << "Exception caught: " << e.what() << std::endl << std::endl; }
 
     // The error object from the fdfsolve() function works in the same way.
     std::cout << "Compute the root of the function f(x) = log(x) using the DNewton method:\n\n";
-    std::cout << "Initial Guess = 0.0:\n";    // The function is undefined at x <= 0
+    std::cout << "Initial Guess = 0.0:\n"; // The function is undefined at x <= 0
     root = fdfsolve(DNewton([](std::floating_point auto x) { return std::log(x); }), 0.0, 1.0E-15);
     if (!root.has_value()) print_error(root.error());
 
-    std::cout << "Initial Guess = 1E-3:\n";    // This guess is close to the root, but will require many iterations
+    std::cout << "Initial Guess = 1E-3:\n"; // This guess is close to the root, but will require many iterations
     root = fdfsolve(DNewton([](std::floating_point auto x) { return std::log(x); }), 1E-3, 1.0E-15, 5);
     if (!root.has_value()) print_error(root.error());
 
@@ -146,7 +142,8 @@ int main()
 
             // Print the current iteration:
             std::cout << std::format("{:10} | {:15.10f} | {:15.10f} | {:15.10f} | {:15.10f} ",
-                                     i,                         // Iteration number
+                                     i,
+                                     // Iteration number
                                      solver.bounds().first,     // Upper endpoint
                                      solver.bounds().second,    // Lower endpoint
                                      min->first,                // Root
@@ -190,7 +187,8 @@ int main()
 
             // Print the current iteration:
             std::cout << std::format("{:10} | {:25.20f} | {:25.20f} ",
-                                     i,                                        // Iteration number
+                                     i,
+                                     // Iteration number
                                      solver.result(),                          // Current guess
                                      abs(solver.evaluate(solver.result())))    // Error
                       << std::endl;
