@@ -10,8 +10,8 @@ project(numerixx.samples)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_subdirectory(fmt)
-set_target_properties(fmt PROPERTIES SYSTEM ON)
+#add_subdirectory(fmt)
+#set_target_properties(fmt PROPERTIES SYSTEM ON)
 
 #=================================================================================================================
 # Define targets
@@ -24,7 +24,7 @@ target_sources(DemoRootFinding
         DemoRootFinding.cpp
         )
 
-target_link_libraries(DemoRootFinding PRIVATE fmt numerixx::roots)
+target_link_libraries(DemoRootFinding PRIVATE numerixx::roots)
 
 # Target: Root searching
 add_executable(DemoRootSearching)
@@ -33,7 +33,7 @@ target_sources(DemoRootSearching
         DemoRootSearching.cpp
         )
 
-target_link_libraries(DemoRootSearching PRIVATE fmt numerixx::roots)
+target_link_libraries(DemoRootSearching PRIVATE numerixx::roots)
 
 # Target: Function
 add_executable(DemoFunction)
@@ -42,7 +42,7 @@ target_sources(DemoFunction
         DemoFunction.cpp
         )
 
-target_link_libraries(DemoFunction PRIVATE fmt numerixx::func)
+target_link_libraries(DemoFunction PRIVATE numerixx::func)
 
 
 # Target: Polynomials
@@ -52,7 +52,7 @@ target_sources(DemoPoly
         DemoPoly.cpp
         )
 
-target_link_libraries(DemoPoly PRIVATE fmt numerixx::poly)
+target_link_libraries(DemoPoly PRIVATE numerixx::poly)
 
 # Target: Numerical derivatives
 add_executable(DemoDeriv)
@@ -61,7 +61,7 @@ target_sources(DemoDeriv
         DemoDeriv.cpp
         )
 
-target_link_libraries(DemoDeriv PRIVATE fmt numerixx::deriv)
+target_link_libraries(DemoDeriv PRIVATE numerixx::deriv)
 
 # Target: Numerical integration
 add_executable(DemoIntegrate)
@@ -70,7 +70,7 @@ target_sources(DemoIntegrate
         DemoIntegrate.cpp
 )
 
-target_link_libraries(DemoIntegrate PRIVATE fmt numerixx::integrate)
+target_link_libraries(DemoIntegrate PRIVATE numerixx::integrate)
 
 # Target: Numerical interpolation
 add_executable(DemoInterpolate)
@@ -79,7 +79,7 @@ target_sources(DemoInterpolate
         DemoInterpolate.cpp
 )
 
-target_link_libraries(DemoInterpolate PRIVATE fmt numerixx::interpolate)
+target_link_libraries(DemoInterpolate PRIVATE numerixx::interpolate)
 
 # Target: Numerical optimization
 add_executable(DemoOptimize)
@@ -88,7 +88,7 @@ target_sources(DemoOptimize
         DemoOptimize.cpp
 )
 
-target_link_libraries(DemoOptimize PRIVATE fmt numerixx::optimize)
+target_link_libraries(DemoOptimize PRIVATE numerixx::optimize)
 
 
 # Target: Multiple root-finding

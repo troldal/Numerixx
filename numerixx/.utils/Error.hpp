@@ -63,7 +63,7 @@ namespace nxx
 
         {}
 
-        ~NumerixxError() override = default;
+        //~NumerixxError() override = default;
 
         [[nodiscard]]
         virtual NumerixxErrorType type() const noexcept

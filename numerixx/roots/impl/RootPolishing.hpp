@@ -47,16 +47,25 @@ namespace nxx::roots
     using nxx::deriv::derivativeOf;
     using nxx::poly::derivativeOf;
 
-    // ========================================================================
-    // ROOT-FINDING WITH DERIVATIVES
-    // ========================================================================
+    // =================================================================================================================
+    //
+    //  88888888ba               88  88             88           88
+    //  88      "8b              88  ""             88           ""
+    //  88      ,8P              88                 88
+    //  88aaaaaa8P'  ,adPPYba,   88  88  ,adPPYba,  88,dPPYba,   88  8b,dPPYba,    ,adPPYb,d8
+    //  88""""""'   a8"     "8a  88  88  I8[    ""  88P'    "8a  88  88P'   `"8a  a8"    `Y88
+    //  88          8b       d8  88  88   `"Y8ba,   88       88  88  88       88  8b       88
+    //  88          "8a,   ,a8"  88  88  aa    ]8I  88       88  88  88       88  "8a,   ,d88
+    //  88           `"YbbdP"'   88  88  `"YbbdP"'  88       88  88  88       88   `"YbbdP"Y8
+    //                                                                             aa,    ,88
+    //                                                                              "Y8bbdP"
+    // =================================================================================================================
 
     /*
      * Private implementation details.
      */
     namespace impl
     {
-
         /**
          * @brief A base class for root polishing methods.
          *
@@ -67,11 +76,11 @@ namespace nxx::roots
          * @requires The POLICY class should have a specialization of PolishingTraits that defines:
          *           function_type, deriv_type, function_return_type, and deriv_return_type.
          */
-        template< typename POLICY >
-        requires(std::floating_point< typename PolishingTraits< POLICY >::FUNCTION_RETURN_T > &&
-                 std::floating_point< typename PolishingTraits< POLICY >::DERIV_RETURN_T >) ||
-                (IsComplex< typename PolishingTraits< POLICY >::FUNCTION_RETURN_T > &&
-                 IsComplex< typename PolishingTraits< POLICY >::DERIV_RETURN_T >)
+        template<typename POLICY>
+            requires(std::floating_point< typename PolishingTraits< POLICY >::FUNCTION_RETURN_T > &&
+                     std::floating_point< typename PolishingTraits< POLICY >::DERIV_RETURN_T >) ||
+                    (IsComplex< typename PolishingTraits< POLICY >::FUNCTION_RETURN_T > &&
+                     IsComplex< typename PolishingTraits< POLICY >::DERIV_RETURN_T >)
         class PolishingBase
         {
             /*
@@ -81,13 +90,13 @@ namespace nxx::roots
 
         public:
             using FUNCTION_T = /**< The type of the function object. */
-                typename impl::PolishingTraits< POLICY >::FUNCTION_T;
+            typename impl::PolishingTraits< POLICY >::FUNCTION_T;
             using DERIV_T = /**< The type of the derivative function object. */
-                typename impl::PolishingTraits< POLICY >::DERIV_T;
+            typename impl::PolishingTraits< POLICY >::DERIV_T;
             using FUNCTION_RETURN_T = /**< The return type of the function object. */
-                typename impl::PolishingTraits< POLICY >::FUNCTION_RETURN_T;
+            typename impl::PolishingTraits< POLICY >::FUNCTION_RETURN_T;
             using DERIV_RETURN_T = /**< The return type of the derivative function object. */
-                typename impl::PolishingTraits< POLICY >::DERIV_RETURN_T;
+            typename impl::PolishingTraits< POLICY >::DERIV_RETURN_T;
 
         protected:
             /**
@@ -96,10 +105,10 @@ namespace nxx::roots
             ~PolishingBase() = default;
 
         private:
-            FUNCTION_T        m_func {};               /**< The function object to find the root for. */
-            DERIV_T           m_deriv {};              /**< The function object for the derivative. */
-            FUNCTION_RETURN_T m_guess;                 /**< The current root estimate. */
-            bool              m_initialized { false }; /**< Flag indicating whether the object has been initialized. */
+            FUNCTION_T        m_func{};               /**< The function object to find the root for. */
+            DERIV_T           m_deriv{};              /**< The function object for the derivative. */
+            FUNCTION_RETURN_T m_guess;                /**< The current root estimate. */
+            bool              m_initialized{ false }; /**< Flag indicating whether the object has been initialized. */
 
             /**
              * @brief Constructor, taking function objects for the function and its derivative as arguments.
@@ -108,9 +117,8 @@ namespace nxx::roots
              * @note Constructor is private to avoid direct usage by clients.
              */
             explicit PolishingBase(FUNCTION_T objective, DERIV_T derivative)
-                : m_func { objective },
-                  m_deriv { derivative }
-            {}
+                : m_func{ objective },
+                  m_deriv{ derivative } {}
 
         public:
             /**
@@ -148,8 +156,8 @@ namespace nxx::roots
              * @tparam T The type of the root estimate.
              * @param guess The root estimate.
              */
-            template< typename T >
-            requires std::convertible_to< T, FUNCTION_RETURN_T >
+            template<typename T>
+                requires std::convertible_to< T, FUNCTION_RETURN_T >
             void init(T guess)
             {
                 m_initialized = true;
@@ -167,12 +175,9 @@ namespace nxx::roots
              * @param value The value at which to evaluate the function.
              * @return The result of the evaluation.
              */
-            template< typename T >
-            requires std::convertible_to< T, FUNCTION_RETURN_T >
-            auto evaluate(T value)
-            {
-                return m_func(value);
-            }
+            template<typename T>
+                requires std::convertible_to< T, FUNCTION_RETURN_T >
+            auto evaluate(T value) { return m_func(value); }
 
             /**
              * @brief Evaluate the derivative at a given point.
@@ -180,12 +185,9 @@ namespace nxx::roots
              * @param value The value at which to evaluate the derivative.
              * @return The result of the evaluation.
              */
-            template< typename T >
-            requires std::convertible_to< T, FUNCTION_RETURN_T >
-            auto derivative(T value)
-            {
-                return m_deriv(value);
-            }
+            template<typename T>
+                requires std::convertible_to< T, FUNCTION_RETURN_T >
+            auto derivative(T value) { return std::invoke(m_deriv, value); }
 
             /**
              * @brief Get the current estimate of the root.
@@ -197,7 +199,22 @@ namespace nxx::roots
                 return m_guess;
             }
         };
-    }    // namespace impl
+    } // namespace impl
+
+
+    // =================================================================================================================
+    //
+    //  88888888ba,    888b      88
+    //  88      `"8b   8888b     88                                    ,d
+    //  88        `8b  88 `8b    88                                    88
+    //  88         88  88  `8b   88   ,adPPYba,  8b      db      d8  MM88MMM  ,adPPYba,   8b,dPPYba,
+    //  88         88  88   `8b  88  a8P_____88  `8b    d88b    d8'    88    a8"     "8a  88P'   `"8a
+    //  88         8P  88    `8b 88  8PP"""""""   `8b  d8'`8b  d8'     88    8b       d8  88       88
+    //  88      .a8P   88     `8888  "8b,   ,aa    `8bd8'  `8bd8'      88,   "8a,   ,a8"  88       88
+    //  88888888Y"'    88      `888   `"Ybbd8"'      YP      YP        "Y888  `"YbbdP"'   88       88
+    //
+    // =================================================================================================================
+
 
     /**
      * @brief A class implementing the Discrete Newton method for root finding.
@@ -210,7 +227,7 @@ namespace nxx::roots
      * @tparam DFN The type of the derivative function object.
      * @requires FN and DFN should be callable with double and return a floating point type.
      */
-    template< typename FN, typename DFN >
+    template<typename FN, typename DFN>
         requires IsFloatInvocable< FN > && IsFloatInvocable< DFN >
     class DNewton final : public impl::PolishingBase< DNewton< FN, DFN > >
     {
@@ -224,15 +241,14 @@ namespace nxx::roots
          * Public alias declarations.
          */
         using function_type = FN;
-        using deriv_type    = DFN;
+        using deriv_type = DFN;
 
         /**
          * @brief Constructor, taking the function object as an argument.
          * @param objective The function object for which to find the root.
          */
         explicit DNewton(FN objective)
-            : BASE(objective, derivativeOf(objective))
-        {}
+            : BASE(objective, derivativeOf(objective)) {}
 
         /**
          * @brief Perform one iteration. This is the main algorithm of the DNewton method.
@@ -243,8 +259,21 @@ namespace nxx::roots
     /**
      * @brief Deduction guide for the DNewton algorithm
      */
-    template< typename FN >
+    template<typename FN>
     DNewton(FN objective) -> DNewton< FN, std::function< decltype(objective(0.0))(decltype(objective(0.0))) > >;
+
+    // =================================================================================================================
+    //
+    //  888b      88
+    //  8888b     88                                    ,d
+    //  88 `8b    88                                    88
+    //  88  `8b   88   ,adPPYba,  8b      db      d8  MM88MMM  ,adPPYba,   8b,dPPYba,
+    //  88   `8b  88  a8P_____88  `8b    d88b    d8'    88    a8"     "8a  88P'   `"8a
+    //  88    `8b 88  8PP"""""""   `8b  d8'`8b  d8'     88    8b       d8  88       88
+    //  88     `8888  "8b,   ,aa    `8bd8'  `8bd8'      88,   "8a,   ,a8"  88       88
+    //  88      `888   `"Ybbd8"'      YP      YP        "Y888  `"YbbdP"'   88       88
+    //
+    // =================================================================================================================
 
     /**
      * @brief A class implementing the Newton-Raphson method for root finding.
@@ -272,7 +301,7 @@ namespace nxx::roots
          * Public alias declarations
          */
         using function_type = FN;
-        using deriv_type    = DFN;
+        using deriv_type = DFN;
 
         /**
          * @brief Constructor, taking function objects for the function and its derivative.
@@ -280,8 +309,7 @@ namespace nxx::roots
          * @param deriv The function object for the derivative.
          */
         explicit Newton(FN objective, DFN deriv)
-            : BASE(objective, deriv)
-        {}
+            : BASE(objective, deriv) {}
 
         /**
          * @brief Perform one iteration. This is the main algorithm of the Newton method.
@@ -289,9 +317,23 @@ namespace nxx::roots
         void iterate() { BASE::m_guess = BASE::m_guess - BASE::evaluate(BASE::m_guess) / BASE::derivative(BASE::m_guess); }
     };
 
-    template< typename FN, typename DERIV >
-    requires std::invocable< FN, double > && std::invocable< DERIV, double >
+    template<typename FN, typename DERIV>
+        requires std::invocable< FN, double > && std::invocable< DERIV, double >
     Newton(FN func, DERIV deriv) -> Newton< decltype(func), decltype(deriv) >;
+
+    // =================================================================================================================
+    //
+    //    ad88          88     ad88                          88
+    //   d8"            88    d8"                            88
+    //   88             88    88                             88
+    // MM88MMM  ,adPPYb,88  MM88MMM  ,adPPYba,   ,adPPYba,   88  8b       d8   ,adPPYba,
+    //   88    a8"    `Y88    88     I8[    ""  a8"     "8a  88  `8b     d8'  a8P_____88
+    //   88    8b       88    88      `"Y8ba,   8b       d8  88   `8b   d8'   8PP"""""""
+    //   88    "8a,   ,d88    88     aa    ]8I  "8a,   ,a8"  88    `8b,d8'    "8b,   ,aa
+    //   88     `"8bbdP"Y8    88     `"YbbdP"'   `"YbbdP"'   88      "8"       `"Ybbd8"'
+    //
+    // =================================================================================================================
+
 
     /**
      * @brief The fdfsolve function is a convenience function for running a polishing solver (i.e. with derivative),
@@ -305,14 +347,15 @@ namespace nxx::roots
      * @param maxiter The max. number of allowed iterations.
      * @return The root estimate.
      */
-    template< typename SOLVER >
-    requires requires(SOLVER solver, typename SOLVER::FUNCTION_RETURN_T guess) {
-                 // clang-format off
-                 { solver.evaluate(0.0) } -> std::same_as< typename SOLVER::FUNCTION_RETURN_T >;
-                 { solver.init(guess) };
-                 { solver.iterate() };
-                 // clang-format on
-    }
+    template<typename SOLVER>
+        requires requires(SOLVER solver, typename SOLVER::FUNCTION_RETURN_T guess)
+        {
+            // clang-format off
+            { solver.evaluate(0.0) } -> std::same_as< typename SOLVER::FUNCTION_RETURN_T >;
+            { solver.init(guess) };
+            { solver.iterate() };
+            // clang-format on
+        }
     auto fdfsolve(SOLVER                             solver,
                   typename SOLVER::FUNCTION_RETURN_T guess,
                   std::floating_point auto           eps,
@@ -320,7 +363,7 @@ namespace nxx::roots
                   int maxiter) // = nxx::MAXITER)
     {
         using EXPECTED_T = impl::RootErrorImpl< typename SOLVER::FUNCTION_RETURN_T >;
-        using RETURN_T   = tl::expected< typename SOLVER::FUNCTION_RETURN_T, EXPECTED_T >;
+        using RETURN_T = tl::expected< typename SOLVER::FUNCTION_RETURN_T, EXPECTED_T >;
 
         solver.init(guess);
         RETURN_T result = solver.result();
@@ -359,6 +402,6 @@ namespace nxx::roots
 
         return result;
     }
-}    // namespace nxx::roots
+} // namespace nxx::roots
 
 #endif    // NUMERIXX_ROOTPOLISHING_HPP

@@ -19,13 +19,13 @@ find_package(blaze REQUIRED)
 find_package(LAPACK)
 find_package(Boost REQUIRED)
 
-set(FETCHCONTENT_SOURCE_DIR_HWINFO ${CMAKE_CURRENT_LIST_DIR}/../../hwinfo)
-include(FetchContent)
-FetchContent_Declare(hwinfo
-        GIT_REPOSITORY https://github.com/troldal/hwinfo.git
-        GIT_TAG        header_only_dev
-)
-FetchContent_MakeAvailable(hwinfo)
+#set(FETCHCONTENT_SOURCE_DIR_HWINFO ${CMAKE_CURRENT_LIST_DIR}/../../hwinfo)
+#include(FetchContent)
+#FetchContent_Declare(hwinfo
+#        GIT_REPOSITORY https://github.com/troldal/hwinfo.git
+#        GIT_TAG        header_only_dev
+#)
+#FetchContent_MakeAvailable(hwinfo)
 
 #==============================================================================
 # Define utility interface library
@@ -98,7 +98,7 @@ add_library(numerixx::all ALIAS nxx_all)
 #==============================================================================
 # Link libraries
 #==============================================================================
-target_link_libraries(nxx_utility INTERFACE HWinfo)
+#target_link_libraries(nxx_utility INTERFACE HWinfo)
 target_link_libraries(nxx_func INTERFACE nxx_utility gcem tl::expected)
 target_link_libraries(nxx_deriv INTERFACE nxx_utility gcem tl::expected)
 target_link_libraries(nxx_integrate INTERFACE nxx_utility gcem tl::expected)

@@ -43,7 +43,7 @@
 
 namespace nxx::roots
 {
-    // =====================================================================================================================
+    // =================================================================================================================
     //
     //  88888888ba                                       88                             88
     //  88      "8b                                      88                      ,d     ""
@@ -56,7 +56,7 @@ namespace nxx::roots
     //                                                                                                    aa,    ,88
     //                                                                                                     "Y8bbdP"
     //
-    // =====================================================================================================================
+    // =================================================================================================================
 
     namespace impl
     {
@@ -70,7 +70,10 @@ namespace nxx::roots
          * @requires POLICY must be invocable with a floating point type as its argument type.
          */
         template<typename DERIVED, typename FUNCTION_T, typename ARG_T>
-        // requires std::floating_point< typename BracketingTraits< POLICY >::RETURN_T >
+            requires std::same_as< typename BracketingTraits< DERIVED >::FUNCTION_T, FUNCTION_T > &&
+                     IsFloatInvocable< FUNCTION_T > &&
+                     std::floating_point< ARG_T > &&
+                     std::floating_point< typename BracketingTraits< DERIVED >::RETURN_T >
         class BracketingBase
         {
             /*
@@ -271,7 +274,7 @@ namespace nxx::roots
     } // namespace impl
 
 
-    // =====================================================================================================================
+    // =================================================================================================================
     //
     //  88888888ba   88           88           88
     //  88      "8b  ""           88           88
@@ -282,7 +285,7 @@ namespace nxx::roots
     //  88     `8b   88  "8a,   ,d88  "8a,   ,d88  "8b,   ,aa  88          aa    ]8I
     //  88      `8b  88   `"8bbdP"Y8   `"8bbdP"Y8   `"Ybbd8"'  88          `"YbbdP"'
     //
-    // =====================================================================================================================
+    // =================================================================================================================
 
     /**
      * @brief Implements Ridder's method for root-finding.
@@ -294,8 +297,7 @@ namespace nxx::roots
      * @tparam FN The function object type for which to find the root.
      * @requires FN must be invocable with a double as its argument type.
      */
-    template<typename FN, typename ARG_T = double>
-        requires IsFloatInvocable< FN >
+    template<IsFloatInvocable FN, std::floating_point ARG_T = double>
     class Ridder final : public impl::BracketingBase< Ridder< FN, ARG_T >, FN, ARG_T >
     {
         /*
@@ -369,8 +371,7 @@ namespace nxx::roots
      * @tparam FN The type of the function object for which to find the root. The function must be invocable
      * with a double argument.
      */
-    template<typename FN>
-        requires IsFloatInvocable< FN >
+    template<IsFloatInvocable FN>
     Ridder(FN func) -> Ridder< decltype(func) >;
 
     /**
@@ -379,8 +380,7 @@ namespace nxx::roots
      * with a double argument.
      * @tparam ARG_T The type of the bounds. Must be a floating point type.
      */
-    template<typename FN, typename ARG_T>
-        requires IsFloatInvocable< FN >
+    template<IsFloatInvocable FN, std::floating_point ARG_T>
     Ridder(FN func, std::initializer_list< ARG_T > bounds) -> Ridder< decltype(func), ARG_T >;
 
     /**
@@ -389,8 +389,7 @@ namespace nxx::roots
      * with a double argument.
      * @tparam CONT_T The type of the container holding the bounds. Must be a container of floating point types.
      */
-    template<typename FN, typename CONT_T>
-        requires IsFloatInvocable< FN > && IsContainer< CONT_T >
+    template<IsFloatInvocable FN, IsContainer CONT_T>
     Ridder(FN func, CONT_T bounds) -> Ridder< decltype(func), typename CONT_T::value_type >;
 
     /**
@@ -400,12 +399,11 @@ namespace nxx::roots
      * @tparam BOUNDS_T The type of the struct holding the bounds. Must be a struct with structured bindings support
      * and with floating point types as its members.
      */
-    template<typename FN, typename BOUNDS_T>
-        requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
+    template<IsFloatInvocable FN, IsFloatStruct BOUNDS_T>
     Ridder(FN func, BOUNDS_T bounds) -> Ridder< decltype(func), StructCommonType_t< BOUNDS_T > >;
 
 
-    // =====================================================================================================================
+    // =================================================================================================================
     //
     //  88888888ba   88                                              88
     //  88      "8b  ""                                       ,d     ""
@@ -416,7 +414,7 @@ namespace nxx::roots
     //  88      a8P  88  aa    ]8I  "8b,   ,aa  "8a,   ,aa    88,    88  "8a,   ,a8"  88       88
     //  88888888P"   88  `"YbbdP"'   `"Ybbd8"'   `"Ybbd8"'    "Y888  88   `"YbbdP"'   88       88
     //
-    // =====================================================================================================================
+    // =================================================================================================================
 
     /**
      * @brief Implements the bisection method for root-finding.
@@ -428,8 +426,7 @@ namespace nxx::roots
      * @tparam FN The function object type for which to find the root.
      * @requires FN must be invocable with a double as its argument type.
      */
-    template<typename FN, typename ARG_T = double>
-        requires IsFloatInvocable< FN >
+    template<IsFloatInvocable FN, std::floating_point ARG_T = double>
     class Bisection final : public impl::BracketingBase< Bisection< FN, ARG_T >, FN, ARG_T >
     {
         /*
@@ -464,8 +461,7 @@ namespace nxx::roots
      * @tparam FN The type of the function object for which to find the root. The function must be invocable
      * with a double argument.
      */
-    template<typename FN>
-        requires IsFloatInvocable< FN >
+    template<IsFloatInvocable FN>
     Bisection(FN func) -> Bisection< decltype(func) >;
 
     /**
@@ -474,8 +470,7 @@ namespace nxx::roots
      * with a double argument.
      * @tparam ARG_T The type of the bounds. Must be a floating point type.
      */
-    template<typename FN, typename ARG_T>
-        requires IsFloatInvocable< FN >
+    template<IsFloatInvocable FN, std::floating_point ARG_T>
     Bisection(FN func, std::initializer_list< ARG_T > bounds) -> Bisection< decltype(func), ARG_T >;
 
     /**
@@ -484,8 +479,7 @@ namespace nxx::roots
      * with a double argument.
      * @tparam CONT_T The type of the container holding the bounds. Must be a container of floating point types.
      */
-    template<typename FN, typename CONT_T>
-        requires IsFloatInvocable< FN > && IsContainer< CONT_T >
+    template<IsFloatInvocable FN, IsContainer CONT_T>
     Bisection(FN func, CONT_T bounds) -> Bisection< decltype(func), typename CONT_T::value_type >;
 
     /**
@@ -495,12 +489,11 @@ namespace nxx::roots
      * @tparam BOUNDS_T The type of the struct holding the bounds. Must be a struct with structured bindings support
      * and with floating point types as its members.
      */
-    template<typename FN, typename BOUNDS_T>
-        requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
+    template<IsFloatInvocable FN, IsFloatStruct BOUNDS_T>
     Bisection(FN func, BOUNDS_T bounds) -> Bisection< decltype(func), StructCommonType_t< BOUNDS_T > >;
 
 
-    // =====================================================================================================================
+    // =================================================================================================================
     //
     //  88888888ba                                        88              88888888888          88             88
     //  88      "8b                                       88              88                   88             ""
@@ -513,7 +506,7 @@ namespace nxx::roots
     //                           aa,    ,88
     //                            "Y8bbdP"
     //
-    // =====================================================================================================================
+    // =================================================================================================================
 
     /**
      * @brief Regula Falsi (False Position) method for root-finding.
@@ -525,8 +518,7 @@ namespace nxx::roots
      * @tparam FN The type of the function object for which to find the root. The function must be invocable
      * with a double argument.
      */
-    template<typename FN, typename ARG_T = double>
-        requires IsFloatInvocable< FN >
+    template<IsFloatInvocable FN, std::floating_point ARG_T = double>
     class RegulaFalsi final : public impl::BracketingBase< RegulaFalsi< FN, ARG_T >, FN, ARG_T >
     {
         /*
@@ -564,8 +556,7 @@ namespace nxx::roots
      * @tparam FN The type of the function object for which to find the root. The function must be invocable
      * with a double argument.
      */
-    template<typename FN>
-        requires IsFloatInvocable< FN >
+    template<IsFloatInvocable FN>
     RegulaFalsi(FN func) -> RegulaFalsi< decltype(func) >;
 
     /**
@@ -574,8 +565,7 @@ namespace nxx::roots
      * with a double argument.
      * @tparam ARG_T The type of the bounds. Must be a floating point type.
      */
-    template<typename FN, typename ARG_T>
-        requires IsFloatInvocable< FN >
+    template<IsFloatInvocable FN, std::floating_point ARG_T>
     RegulaFalsi(FN func, std::initializer_list< ARG_T > bounds) -> RegulaFalsi< decltype(func), ARG_T >;
 
     /**
@@ -584,8 +574,7 @@ namespace nxx::roots
      * with a double argument.
      * @tparam CONT_T The type of the container holding the bounds. Must be a container of floating point types.
      */
-    template<typename FN, typename CONT_T>
-        requires IsFloatInvocable< FN > && IsContainer< CONT_T >
+    template<IsFloatInvocable FN, IsContainer CONT_T>
     RegulaFalsi(FN func, CONT_T bounds) -> RegulaFalsi< decltype(func), typename CONT_T::value_type >;
 
     /**
@@ -595,12 +584,11 @@ namespace nxx::roots
      * @tparam BOUNDS_T The type of the struct holding the bounds. Must be a struct with structured bindings support
      * and with floating point types as its members.
      */
-    template<typename FN, typename BOUNDS_T>
-        requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
+    template<IsFloatInvocable FN, IsFloatStruct BOUNDS_T>
     RegulaFalsi(FN func, BOUNDS_T bounds) -> RegulaFalsi< decltype(func), StructCommonType_t< BOUNDS_T > >;
 
 
-    // =====================================================================================================================
+    // =================================================================================================================
     //
     //     ad88                          88
     //    d8"                            88
@@ -611,7 +599,7 @@ namespace nxx::roots
     //    88     aa    ]8I  "8a,   ,a8"  88    `8b,d8'    "8b,   ,aa
     //    88     `"YbbdP"'   `"YbbdP"'   88      "8"       `"Ybbd8"'
     //
-    // =====================================================================================================================
+    // =================================================================================================================
 
     namespace impl
     {
@@ -632,14 +620,14 @@ namespace nxx::roots
          *       such as evaluate(), init(), and iterate().
          */
         template<typename SOLVER, typename EPS_T, typename ITER_T>
-            requires requires(SOLVER solver, std::pair< typename SOLVER::RESULT_T, typename SOLVER::RESULT_T > bounds)
-            {
-                // clang-format off
-                { solver.evaluate(std::declval< double >()) } -> std::floating_point;
-                { solver.init(bounds) };
-                { solver.iterate() };
-                // clang-format on
-            } && std::floating_point< typename SOLVER::RESULT_T > && std::convertible_to< EPS_T, typename SOLVER::RESULT_T >
+            requires std::floating_point< typename SOLVER::RESULT_T > &&
+                     std::convertible_to< EPS_T, typename SOLVER::RESULT_T > &&
+                     requires(SOLVER solver, std::pair< typename SOLVER::RESULT_T, typename SOLVER::RESULT_T > bounds)
+                     {
+                         { solver.evaluate(std::declval< double >()) } -> std::floating_point;
+                         { solver.init(bounds) };
+                         { solver.iterate() };
+                     }
         auto fsolve_impl(SOLVER                                                            solver,
                          std::pair< typename SOLVER::RESULT_T, typename SOLVER::RESULT_T > bounds,
                          EPS_T                                                             eps     = nxx::EPS,

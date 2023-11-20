@@ -5,23 +5,18 @@
 #include <algorithm>
 #include <deque>
 #include <array>
-#include <fmt/format.h>
+// #include <fmt/format.h>
+#include <format>
 #include <iomanip>
 #include <iostream>
 //#include <numerixx.hpp>
 #include <Roots.hpp>
 
-struct Bounds
-{
-    float lower;
-    float upper;
-};
-
 int main()
 {
     using namespace nxx::roots;
     std::cout << std::fixed << std::setprecision(8);
-    auto func = [](std::floating_point auto x) { return x * x - 5.0f; };
+    auto func = [](std::floating_point auto x) { return x * x - decltype(x)(5.0); };
 
     // ============================================================================================
     // The nxx::roots namespace contains a number of root-finding algorithms, for finding the roots
@@ -82,35 +77,35 @@ int main()
     };
 
     std::cout << "Initial Bracket:   [5.0, 10.0]\n";    // This bracket does not contain a root
-    auto root = fsolve< Bisection >([](double x) { return std::log(x); }, { 5.0, 10.0 }, 1.0E-15);
+    auto root = fsolve< Bisection >([](std::floating_point auto x) { return std::log(x); }, { 5.0, 10.0 }, 1.0E-15);
     if (!root) print_error(root.error());
 
     std::cout << "Initial Bracket:   [-5.0, 10.0]\n";    // The function is undefined at x <= 0
-    root = fsolve< Bisection >([](double x) { return std::log(x); }, { -5.0, 10.0 }, 1.0E-15);
+    root = fsolve< Bisection >([](std::floating_point auto x) { return std::log(x); }, { -5.0, 10.0 }, 1.0E-15);
     if (!root) print_error(root.error());
 
     std::cout << "Initial Bracket:   [0.1, 200.0]\n";    // This bracket contains a root, but will require many iterations
-    root = fsolve< Bisection >([](double x) { return std::log(x); }, { 0.1, 200.0 }, 1.0E-15, 5);
+    root = fsolve< Bisection >([](std::floating_point auto x) { return std::log(x); }, { 0.1, 200.0 }, 1.0E-15, 5);
     if (!root) print_error(root.error());
 
     // The error object is a subclass of the RootError class, which is a subclass of the std::runtime_error
     // class. This means that the error object can be used in a try-catch block, as shown below.
-    // try {
-    //     throw root.error();
-    // }
-    // catch (const RootError& e) {
-    //     std::cout << "Exception caught: " << e.what() << std::endl << std::endl;
-    // }
-    //
-    // // The error object from the fdfsolve() function works in the same way.
-    // std::cout << "Compute the root of the function f(x) = log(x) using the DNewton method:\n\n";
-    // std::cout << "Initial Guess = 0.0:\n";    // The function is undefined at x <= 0
-    // root = fdfsolve(DNewton([](double x) { return std::log(x); }), 0.0, 1.0E-15);
-    // if (!root.has_value()) print_error(root.error());
-    //
-    // std::cout << "Initial Guess = 1E-3:\n";    // This guess is close to the root, but will require many iterations
-    // root = fdfsolve(DNewton([](double x) { return std::log(x); }), 1E-3, 1.0E-15, 5);
-    // if (!root.has_value()) print_error(root.error());
+    try {
+        throw root.error();
+    }
+    catch (const RootError& e) {
+        std::cout << "Exception caught: " << e.what() << std::endl << std::endl;
+    }
+
+    // The error object from the fdfsolve() function works in the same way.
+    std::cout << "Compute the root of the function f(x) = log(x) using the DNewton method:\n\n";
+    std::cout << "Initial Guess = 0.0:\n";    // The function is undefined at x <= 0
+    root = fdfsolve(DNewton([](std::floating_point auto x) { return std::log(x); }), 0.0, 1.0E-15);
+    if (!root.has_value()) print_error(root.error());
+
+    std::cout << "Initial Guess = 1E-3:\n";    // This guess is close to the root, but will require many iterations
+    root = fdfsolve(DNewton([](std::floating_point auto x) { return std::log(x); }), 1E-3, 1.0E-15, 5);
+    if (!root.has_value()) print_error(root.error());
 
     // ============================================================================================
     // If more fine-grained control is needed, the algorithms can be used directly. Both the bracketing
@@ -128,7 +123,7 @@ int main()
         //, std::pair< double, double > bounds) {
         // Print the header:
         std::cout << "----------------------------------------------------------------------------------\n";
-        std::cout << fmt::format("{:>10} | {:>15} | {:>15} | {:>15} | {:>15} ", "Iter", "Upper", "Lower", "Root", "Error") << std::endl;
+        std::cout << std::format("{:>10} | {:>15} | {:>15} | {:>15} | {:>15} ", "Iter", "Upper", "Lower", "Root", "Error") << std::endl;
         std::cout << "----------------------------------------------------------------------------------\n";
 
         // Create variables for the iterations.
@@ -150,7 +145,7 @@ int main()
             });
 
             // Print the current iteration:
-            std::cout << fmt::format("{:10} | {:15.10f} | {:15.10f} | {:15.10f} | {:15.10f} ",
+            std::cout << std::format("{:10} | {:15.10f} | {:15.10f} | {:15.10f} | {:15.10f} ",
                                      i,                         // Iteration number
                                      solver.bounds().first,     // Upper endpoint
                                      solver.bounds().second,    // Lower endpoint
@@ -183,7 +178,7 @@ int main()
     auto polish_root = [](auto solver, double guess) {
         // Print the header:
         std::cout << "------------------------------------------------------------------\n";
-        std::cout << fmt::format("{:>10} | {:>25} | {:>25} ", "Iter", "Root", "Error") << std::endl;
+        std::cout << std::format("{:>10} | {:>25} | {:>25} ", "Iter", "Root", "Error") << std::endl;
         std::cout << "------------------------------------------------------------------\n";
 
         // Initialize the solver:
@@ -194,7 +189,7 @@ int main()
             std::cout << std::fixed << std::setprecision(10);
 
             // Print the current iteration:
-            std::cout << fmt::format("{:10} | {:25.20f} | {:25.20f} ",
+            std::cout << std::format("{:10} | {:25.20f} | {:25.20f} ",
                                      i,                                        // Iteration number
                                      solver.result(),                          // Current guess
                                      abs(solver.evaluate(solver.result())))    // Error
@@ -212,11 +207,11 @@ int main()
         std::cout << "------------------------------------------------------------------\n\n";
     };
 
-    // std::cout << "Manual root-finding using the Discrete Newton's method:" << std::endl;
-    // polish_root(DNewton(func), 3.0);
-    //
-    // std::cout << "Manual root-finding using Newton's method:" << std::endl;
-    // polish_root(Newton(func, derivativeOf(func)), 1.25);
+    std::cout << "Manual root-finding using the Discrete Newton's method:" << std::endl;
+    polish_root(DNewton(func), 3.0);
+
+    std::cout << "Manual root-finding using Newton's method:" << std::endl;
+    polish_root(Newton(func, derivativeOf(func)), 1.25);
 
     return 0;
 }
