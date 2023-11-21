@@ -43,6 +43,7 @@
 
 namespace nxx::roots
 {
+
     // =================================================================================================================
     //
     //  88888888ba                                       88                             88
@@ -71,9 +72,9 @@ namespace nxx::roots
          */
         template<typename DERIVED, typename FUNCTION_T, typename ARG_T>
             requires std::same_as< typename BracketingTraits< DERIVED >::FUNCTION_T, FUNCTION_T > &&
-                     IsFloatInvocable< FUNCTION_T > &&
-                     std::floating_point< ARG_T > &&
-                     std::floating_point< typename BracketingTraits< DERIVED >::RETURN_T >
+                     nxx::IsFloatInvocable< FUNCTION_T > &&
+                     nxx::FloatingPoint< ARG_T > &&
+                     nxx::FloatingPoint< typename BracketingTraits< DERIVED >::RETURN_T >
         class BracketingBase
         {
             /*
@@ -115,7 +116,7 @@ namespace nxx::roots
              * @note Constructor is private to avoid direct usage by clients.
              */
             template<typename T>
-                requires std::floating_point< T >
+                requires nxx::FloatingPoint< T >
             BracketingBase(FUNCTION_T objective, std::initializer_list< T > bounds)
                 : m_func{ std::move(objective) } { init(bounds); }
 
@@ -129,7 +130,7 @@ namespace nxx::roots
              * @note Constructor is private to avoid direct usage by clients.
              */
             template<IsContainer CONT_T>
-                requires std::floating_point< typename CONT_T::value_type >
+                requires nxx::FloatingPoint< typename CONT_T::value_type >
             BracketingBase(FUNCTION_T objective, CONT_T bounds)
                 : m_func{ std::move(objective) } { init(bounds); }
 
@@ -155,7 +156,7 @@ namespace nxx::roots
             {
                 if (!m_isInitialized) throw NumerixxError("Solver has not been initialized!");
                 auto [lower, upper] = bounds;
-                static_assert(std::floating_point< decltype(lower) >);
+                static_assert(nxx::FloatingPoint< decltype(lower) >);
                 m_bounds = BOUNDS_T{ lower, upper };
             }
 
@@ -197,7 +198,7 @@ namespace nxx::roots
              * upper bounds, respectively.
              */
             template<typename T>
-                requires std::floating_point< T >
+                requires nxx::FloatingPoint< T >
             void init(std::initializer_list< T > bounds)
             {
                 m_isInitialized = true;
@@ -214,7 +215,7 @@ namespace nxx::roots
              * upper bounds, respectively.
              */
             template<IsContainer CONT_T>
-                requires std::floating_point< typename CONT_T::value_type >
+                requires nxx::FloatingPoint< typename CONT_T::value_type >
             void init(CONT_T bounds)
             {
                 m_isInitialized = true;
@@ -297,7 +298,7 @@ namespace nxx::roots
      * @tparam FN The function object type for which to find the root.
      * @requires FN must be invocable with a double as its argument type.
      */
-    template<IsFloatInvocable FN, std::floating_point ARG_T = double>
+    template<IsFloatInvocable FN, FloatingPoint ARG_T = double>
     class Ridder final : public impl::BracketingBase< Ridder< FN, ARG_T >, FN, ARG_T >
     {
         /*
@@ -380,7 +381,7 @@ namespace nxx::roots
      * with a double argument.
      * @tparam ARG_T The type of the bounds. Must be a floating point type.
      */
-    template<IsFloatInvocable FN, std::floating_point ARG_T>
+    template<IsFloatInvocable FN, FloatingPoint ARG_T>
     Ridder(FN func, std::initializer_list< ARG_T > bounds) -> Ridder< decltype(func), ARG_T >;
 
     /**
@@ -426,7 +427,7 @@ namespace nxx::roots
      * @tparam FN The function object type for which to find the root.
      * @requires FN must be invocable with a double as its argument type.
      */
-    template<IsFloatInvocable FN, std::floating_point ARG_T = double>
+    template<IsFloatInvocable FN, FloatingPoint ARG_T = double>
     class Bisection final : public impl::BracketingBase< Bisection< FN, ARG_T >, FN, ARG_T >
     {
         /*
@@ -470,7 +471,7 @@ namespace nxx::roots
      * with a double argument.
      * @tparam ARG_T The type of the bounds. Must be a floating point type.
      */
-    template<IsFloatInvocable FN, std::floating_point ARG_T>
+    template<IsFloatInvocable FN, FloatingPoint ARG_T>
     Bisection(FN func, std::initializer_list< ARG_T > bounds) -> Bisection< decltype(func), ARG_T >;
 
     /**
@@ -518,7 +519,7 @@ namespace nxx::roots
      * @tparam FN The type of the function object for which to find the root. The function must be invocable
      * with a double argument.
      */
-    template<IsFloatInvocable FN, std::floating_point ARG_T = double>
+    template<IsFloatInvocable FN, FloatingPoint ARG_T = double>
     class RegulaFalsi final : public impl::BracketingBase< RegulaFalsi< FN, ARG_T >, FN, ARG_T >
     {
         /*
@@ -565,7 +566,7 @@ namespace nxx::roots
      * with a double argument.
      * @tparam ARG_T The type of the bounds. Must be a floating point type.
      */
-    template<IsFloatInvocable FN, std::floating_point ARG_T>
+    template<IsFloatInvocable FN, FloatingPoint ARG_T>
     RegulaFalsi(FN func, std::initializer_list< ARG_T > bounds) -> RegulaFalsi< decltype(func), ARG_T >;
 
     /**
@@ -620,21 +621,22 @@ namespace nxx::roots
          *       such as evaluate(), init(), and iterate().
          */
         template<typename SOLVER, typename EPS_T, typename ITER_T>
-            requires std::floating_point< typename SOLVER::RESULT_T > &&
+            requires nxx::FloatingPoint< typename SOLVER::RESULT_T > &&
                      std::convertible_to< EPS_T, typename SOLVER::RESULT_T > &&
                      requires(SOLVER solver, std::pair< typename SOLVER::RESULT_T, typename SOLVER::RESULT_T > bounds)
                      {
-                         { solver.evaluate(std::declval< double >()) } -> std::floating_point;
+                         { solver.evaluate(std::declval< double >()) } -> nxx::FloatingPoint;
                          { solver.init(bounds) };
                          { solver.iterate() };
                      }
         auto fsolve_impl(SOLVER                                                            solver,
                          std::pair< typename SOLVER::RESULT_T, typename SOLVER::RESULT_T > bounds,
-                         EPS_T                                                             eps     = nxx::EPS,
-                         ITER_T                                                            maxiter = nxx::MAXITER)
+                         EPS_T                                                             eps,
+                         ITER_T                                                            maxiter)
         {
             using ET = RootErrorImpl< typename SOLVER::RESULT_T >;
             using RT = tl::expected< typename SOLVER::RESULT_T, ET >;
+            using std::isfinite;
 
             solver.init(bounds);
 
@@ -645,7 +647,7 @@ namespace nxx::roots
             decltype(roots.begin()) min;
 
             // Check for NaN or Inf.
-            if (!std::isfinite(solver.evaluate(curBounds.first)) || !std::isfinite(solver.evaluate(curBounds.second))) {
+            if (!isfinite(solver.evaluate(curBounds.first)) || !isfinite(solver.evaluate(curBounds.second))) {
                 result = tl::make_unexpected(ET("Invalid initial brackets!", RootErrorType::NumericalError, result.value()));
                 return result;
             }
@@ -664,7 +666,7 @@ namespace nxx::roots
                               std::make_pair(curBounds.second, abs(solver.evaluate(curBounds.second))) };
 
                 // Check for NaN or Inf.
-                if (std::any_of(roots.begin(), roots.end(), [](const auto& r) { return !std::isfinite(r.second); })) {
+                if (std::any_of(roots.begin(), roots.end(), [](const auto& r) { return !isfinite(r.second); })) {
                     result = tl::make_unexpected(ET("Non-finite result!", RootErrorType::NumericalError, result.value(), iter));
                     break;
                 }
@@ -708,9 +710,12 @@ namespace nxx::roots
     template<template< typename, typename > class SOLVER_T,
         IsFloatInvocable FN_T,
         IsFloatStruct STRUCT_T,
-        std::floating_point EPS_T = double,
+        FloatingPoint EPS_T = StructCommonType_t< STRUCT_T >,
         std::integral ITER_T = int>
-    auto fsolve(FN_T function, STRUCT_T bounds, EPS_T eps = nxx::EPS, ITER_T maxiter = nxx::MAXITER)
+    auto fsolve(FN_T     function,
+                STRUCT_T bounds,
+                EPS_T    eps     = epsilon< StructCommonType_t< STRUCT_T > >(),
+                ITER_T   maxiter = iterations< StructCommonType_t< STRUCT_T > >())
     {
         auto [lo, hi] = bounds;
 
@@ -737,10 +742,13 @@ namespace nxx::roots
      */
     template<template< typename, typename > class SOLVER_T,
         IsFloatInvocable FN_T,
-        std::floating_point ARG_T,
-        std::floating_point EPS_T = double,
+        FloatingPoint ARG_T,
+        FloatingPoint EPS_T = ARG_T,
         std::integral ITER_T = int>
-    auto fsolve(FN_T function, std::initializer_list< ARG_T > bounds, EPS_T eps = nxx::EPS, ITER_T maxiter = nxx::MAXITER)
+    auto fsolve(FN_T                           function,
+                std::initializer_list< ARG_T > bounds,
+                EPS_T                          eps     = epsilon< ARG_T >(),
+                ITER_T                         maxiter = iterations< ARG_T >())
     {
         if (bounds.size() != 2) throw NumerixxError("Initializer list must contain exactly two elements!");
         auto solver = SOLVER_T< FN_T, ARG_T >(function);
@@ -766,10 +774,13 @@ namespace nxx::roots
     template<template< typename, typename > class SOLVER_T,
         IsFloatInvocable FN_T,
         IsContainer CONT_T,
-        std::floating_point EPS_T = double,
+        FloatingPoint EPS_T = typename CONT_T::value_type,
         std::integral ITER_T = int>
-        requires std::floating_point< typename CONT_T::value_type >
-    auto fsolve(FN_T function, const CONT_T& bounds, EPS_T eps = nxx::EPS, ITER_T maxiter = nxx::MAXITER)
+        requires nxx::FloatingPoint< typename CONT_T::value_type >
+    auto fsolve(FN_T          function,
+                const CONT_T& bounds,
+                EPS_T         eps     = epsilon< typename CONT_T::value_type >(),
+                ITER_T        maxiter = iterations< typename CONT_T::value_type >())
     {
         if (bounds.size() != 2) throw NumerixxError("Container must contain exactly two elements!");
 

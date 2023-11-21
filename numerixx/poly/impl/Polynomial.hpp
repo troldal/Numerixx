@@ -112,7 +112,7 @@ namespace nxx::poly
             {
                 end(a)
             } -> std::forward_iterator;    // Check if 'end' gives a forward iterator
-        } && (std::floating_point< typename CONTAINER::value_type > ||
+        } && (nxx::FloatingPoint< typename CONTAINER::value_type > ||
               IsComplex< typename CONTAINER::value_type >)&&(std::bidirectional_iterator< typename CONTAINER::iterator >);
 
     /*
@@ -125,7 +125,7 @@ namespace nxx::poly
      * Specialization of the PolynomialTraits class for Polynomial objects with floating point coefficients.
      */
     template< typename T >
-    requires std::floating_point< T >
+    requires nxx::FloatingPoint< T >
     struct PolynomialTraits< Polynomial< T > >
     {
         using value_type       = T;
@@ -136,7 +136,7 @@ namespace nxx::poly
      * Specialization of the PolynomialTraits class for Polynomial objects with complex coefficients.
      */
     template< typename T >
-    requires std::floating_point< T >
+    requires nxx::FloatingPoint< T >
     struct PolynomialTraits< Polynomial< std::complex< T > > >
     {
         using value_type       = std::complex< T >;
@@ -155,7 +155,7 @@ namespace nxx::poly
      * point type or a type that satisfies the `utils::IsComplex` concept.
      */
     template< typename T = double >
-    requires std::floating_point< T > || IsComplex< T >
+    requires nxx::FloatingPoint< T > || IsComplex< T >
     class Polynomial final
     {
         std::vector< T > m_coefficients; /**< The internal store of polynomial coefficients. */
@@ -322,7 +322,7 @@ namespace nxx::poly
          *            the argument or result of the evaluation is non-finite.
          */
         template< typename U >
-        requires std::convertible_to< U, T > || std::floating_point< U > || IsComplex< U >
+        requires std::convertible_to< U, T > || nxx::FloatingPoint< U > || IsComplex< U >
         [[nodiscard]]
         inline auto evaluate(U value) const
             -> tl::expected< std::common_type_t< T, U >, Error< detail::PolyErrorData< std::common_type_t< T, U > > > >
@@ -512,7 +512,7 @@ namespace nxx::poly
          * @return The sum of the two polynomials.
          */
         template< typename U >
-        requires std::floating_point< U > || (IsComplex< T > && IsComplex< U >)
+        requires nxx::FloatingPoint< U > || (IsComplex< T > && IsComplex< U >)
         Polynomial< T >& operator+=(Polynomial< U > const& rhs)
         {
             auto temp = *this + rhs;
@@ -531,7 +531,7 @@ namespace nxx::poly
          * @return The difference between the two polynomials.
          */
         template< typename U >
-        requires std::floating_point< U > || (IsComplex< T > && IsComplex< U >)
+        requires nxx::FloatingPoint< U > || (IsComplex< T > && IsComplex< U >)
         Polynomial< T >& operator-=(Polynomial< U > const& rhs)
         {
             auto temp = *this - rhs;
@@ -550,7 +550,7 @@ namespace nxx::poly
          * @return A reference to the modified polynomial object.
          */
         template< typename U >
-        requires std::floating_point< U > || (IsComplex< T > && IsComplex< U >)
+        requires nxx::FloatingPoint< U > || (IsComplex< T > && IsComplex< U >)
         Polynomial< T >& operator*=(Polynomial< U > const& rhs)
         {
             auto temp = *this * rhs;
@@ -568,7 +568,7 @@ namespace nxx::poly
          * @return A reference to the modified polynomial object.
          */
         template< typename U >
-        requires std::floating_point< U > || (IsComplex< T > && IsComplex< U >)
+        requires nxx::FloatingPoint< U > || (IsComplex< T > && IsComplex< U >)
         Polynomial< T >& operator/=(Polynomial< U > const& rhs)
         {
             auto temp = *this / rhs;
@@ -587,7 +587,7 @@ namespace nxx::poly
          * @return True if the two polynomials are equal, false otherwise.
          */
         template< typename U >
-        requires(std::floating_point< T > && std::floating_point< U >) || (IsComplex< T > && IsComplex< U >)
+        requires(nxx::FloatingPoint< T > && nxx::FloatingPoint< U >) || (IsComplex< T > && IsComplex< U >)
         bool operator==(Polynomial< U > const& rhs) const
         {
             return m_coefficients == rhs.m_coefficients;
@@ -634,11 +634,11 @@ namespace nxx::poly
     Polynomial(CONTAINER coefficients, FUNC f) -> Polynomial< typename CONTAINER::value_type >;
 
     template< typename T >
-    requires std::floating_point< T > || IsComplex< T >
+    requires nxx::FloatingPoint< T > || IsComplex< T >
     Polynomial(std::initializer_list< T > coefficients) -> Polynomial< T >;
 
     template< typename T, typename FUNC >
-    requires std::floating_point< T > || IsComplex< T >
+    requires nxx::FloatingPoint< T > || IsComplex< T >
     Polynomial(std::initializer_list< T > coefficients, FUNC f) -> Polynomial< T >;
 
     /**
@@ -700,7 +700,7 @@ namespace nxx::poly
      * @return A Polynomial object with coefficients calculated based on the provided roots.
      */
     template< typename T >
-    requires std::floating_point< T > || IsComplex< T >
+    requires nxx::FloatingPoint< T > || IsComplex< T >
     Polynomial< T > createPolynomialFromRoots(const std::initializer_list< T >& roots)
     {
         // Convert initializer_list to a vector
@@ -790,7 +790,7 @@ namespace nxx::poly
      * @returns An object of type Polynomial that represents the sum of lhs and rhs.
      */
     template< typename T, typename U >
-    requires(std::floating_point< T > || IsComplex< T >) && (std::floating_point< U > || IsComplex< U >)
+    requires(nxx::FloatingPoint< T > || IsComplex< T >) && (nxx::FloatingPoint< U > || IsComplex< U >)
     auto operator+(Polynomial< T > const& lhs, Polynomial< U > const& rhs)
     {
         // Determine the common type between T and U
@@ -834,7 +834,7 @@ namespace nxx::poly
      * @returns An object of type Polynomial that represents the difference of lhs and rhs.
      */
     template< typename T, typename U >
-    requires(std::floating_point< T > || IsComplex< T >) && (std::floating_point< U > || IsComplex< U >)
+    requires(nxx::FloatingPoint< T > || IsComplex< T >) && (nxx::FloatingPoint< U > || IsComplex< U >)
     auto operator-(Polynomial< T > const& lhs, Polynomial< U > const& rhs)
     {
         // Determine the common type between T and U
@@ -882,7 +882,7 @@ namespace nxx::poly
      * @returns An object of type Polynomial that represents the product of lhs and rhs.
      */
     template< typename T, typename U >
-    requires(std::floating_point< T > || IsComplex< T >) && (std::floating_point< U > || IsComplex< U >)
+    requires(nxx::FloatingPoint< T > || IsComplex< T >) && (nxx::FloatingPoint< U > || IsComplex< U >)
     auto operator*(Polynomial< T > const& lhs, Polynomial< U > const& rhs)
     {
         // Determine the common type between T and U
@@ -933,7 +933,7 @@ namespace nxx::poly
      * the divisor doesn't have coefficients or the polynomial order of divisor is larger than the dividend.
      */
     template< typename T, typename U >
-    requires(std::floating_point< T > || IsComplex< T >) && (std::floating_point< U > || IsComplex< U >)
+    requires(nxx::FloatingPoint< T > || IsComplex< T >) && (nxx::FloatingPoint< U > || IsComplex< U >)
     auto divide(Polynomial< T > const& lhs, Polynomial< U > const& rhs)
     {
         // Determine the type of polynomial which is common between T and U

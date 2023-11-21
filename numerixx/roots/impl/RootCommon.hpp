@@ -148,19 +148,19 @@ namespace nxx::roots
     /*
      * Forward declaration of the Ridders class.
      */
-    template<IsFloatInvocable FN, std::floating_point ARG_T>
+    template<IsFloatInvocable FN, nxx::FloatingPoint ARG_T>
     class Ridder;
 
     /*
      * Forward declaration of the Bisection class.
      */
-    template<IsFloatInvocable FN, std::floating_point ARG_T>
+    template<IsFloatInvocable FN, nxx::FloatingPoint ARG_T>
     class Bisection;
 
     /*
      * Forward declaration of the RegulaFalsi class.
      */
-    template<IsFloatInvocable FN, std::floating_point ARG_T>
+    template<IsFloatInvocable FN, nxx::FloatingPoint ARG_T>
     class RegulaFalsi;
 
     /*

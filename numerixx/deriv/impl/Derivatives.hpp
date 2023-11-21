@@ -70,30 +70,37 @@ namespace nxx::deriv
          * @brief Alias template for determining the step size for a given type when computing numerical derivatives.
          * @tparam T The type for which to compute the step size.
          */
-        template< typename T >
-        requires std::floating_point< T >
-        struct StepSizeHelper
+        // template< typename T >
+        // requires nxx::FloatingPoint< T >
+        // struct StepSizeHelper
+        // {
+        // private:
+        //     static constexpr T exponent = T(1.0 / 3.0);
+        //
+        // public:
+        //     static constexpr T value = gcem::pow(std::numeric_limits< T >::epsilon(), exponent);
+        // };
+        //
+        // /**
+        //  * @brief Constant expression for the step size used when computing numerical derivatives.
+        //  * @tparam T The type for which to compute the step size.
+        //  */
+        // template< typename T >
+        // requires nxx::FloatingPoint< T >
+        // inline constexpr T StepSize = StepSizeHelper< T >::value;
+
+        template<typename T>
+        T stepsize()
         {
-        private:
-            static constexpr T exponent = T(1.0 / 3.0);
-
-        public:
-            static constexpr T value = gcem::pow(std::numeric_limits< T >::epsilon(), exponent);
-        };
-
-        /**
-         * @brief Constant expression for the step size used when computing numerical derivatives.
-         * @tparam T The type for which to compute the step size.
-         */
-        template< typename T >
-        requires std::floating_point< T >
-        inline constexpr T StepSize = StepSizeHelper< T >::value;
+            using std::pow;
+            return pow(std::numeric_limits< T >::epsilon(), 1.0 / 3.0);
+        }
 
         // ====================================================================
         // Central finite difference formulas
         // ====================================================================
 
-        template< std::floating_point T >
+        template< nxx::FloatingPoint T >
         void validateStepSize(T stepsize, T minStepSize)
         {
             if (stepsize < minStepSize) throw NumerixxError("Step size is too low.");
@@ -106,8 +113,8 @@ namespace nxx::deriv
             FN   m_function {};
 
         public:
-            auto operator()(std::floating_point auto val,
-                            decltype(val) stepsize = detail::StepSize< std::invoke_result_t< decltype(m_function), decltype(val) > >)
+            auto operator()(nxx::FloatingPoint auto val,
+                            decltype(val) stepsize = detail::stepsize< std::invoke_result_t< decltype(m_function), decltype(val) > >())
                 -> std::invoke_result_t< decltype(m_function), decltype(val) >
             {
                 return m_algorithm(m_function, val, stepsize);
@@ -140,11 +147,12 @@ namespace nxx::deriv
              *
              * @throws NumerixxError if stepsize is invalid.
              */
-            inline auto operator()(IsFloatInvocable auto function, std::floating_point auto val, std::floating_point auto stepsize) const
+            inline auto operator()(IsFloatInvocable auto function, nxx::FloatingPoint auto val, nxx::FloatingPoint auto stepsize) const
             {
                 using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
-                static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
-                detail::validateStepSize(stepsize, std::sqrt(std::numeric_limits< RETURN_T >::epsilon()));
+                using std::sqrt;
+                static_assert(nxx::FloatingPoint< RETURN_T >, "The return type of the provided function must be a floating point type.");
+                detail::validateStepSize(stepsize, sqrt(std::numeric_limits< RETURN_T >::epsilon()));
                 return ALGO{}(function, val, stepsize);
             }
         };
@@ -172,7 +180,7 @@ namespace nxx::deriv
          * @throws NumerixxError if stepsize is invalid.
          */
         constexpr auto Order1CentralRichardsonLambda =
-            [](IsFloatInvocable auto function, std::floating_point auto val, std::floating_point auto stepsize) {
+            [](IsFloatInvocable auto function, nxx::FloatingPoint auto val, nxx::FloatingPoint auto stepsize) {
                 return (8 * (function(val + stepsize) - function(val - stepsize)) -
                         1 * (function(val + 2 * stepsize) - function(val - 2 * stepsize))) /
                        (stepsize * 12);
@@ -200,7 +208,7 @@ namespace nxx::deriv
          * @throws NumerixxError if stepsize is invalid.
          */
         constexpr auto Order1Central3PointLambda =
-            [](IsFloatInvocable auto function, std::floating_point auto val, std::floating_point auto stepsize) {
+            [](IsFloatInvocable auto function, nxx::FloatingPoint auto val, nxx::FloatingPoint auto stepsize) {
                 return (function(val + stepsize) - function(val - stepsize)) / (2 * stepsize);
             };
 
@@ -227,7 +235,7 @@ namespace nxx::deriv
          * @throws NumerixxError if stepsize is invalid.
          */
         constexpr auto Order1Central5PointLambda =
-            [](IsFloatInvocable auto function, std::floating_point auto val, std::floating_point auto stepsize) {
+            [](IsFloatInvocable auto function, nxx::FloatingPoint auto val, nxx::FloatingPoint auto stepsize) {
                 return (-function(val + 2 * stepsize) + 8 * function(val + stepsize) - 8 * function(val - stepsize) +
                         function(val - 2 * stepsize)) /
                        (12 * stepsize);
@@ -255,7 +263,7 @@ namespace nxx::deriv
          * @throws NumerixxError if stepsize is invalid.
          */
         constexpr auto Order2Central3PointLambda =
-            [](IsFloatInvocable auto function, std::floating_point auto val, std::floating_point auto stepsize) {
+            [](IsFloatInvocable auto function, nxx::FloatingPoint auto val, nxx::FloatingPoint auto stepsize) {
                 return (function(val + stepsize) - 2 * function(val) + function(val - stepsize)) / (stepsize * stepsize);
             };
 
@@ -282,7 +290,7 @@ namespace nxx::deriv
          * @throws NumerixxError if stepsize is invalid.
          */
         constexpr auto Order2Central5PointLambda =
-            [](IsFloatInvocable auto function, std::floating_point auto val, std::floating_point auto stepsize) {
+            [](IsFloatInvocable auto function, nxx::FloatingPoint auto val, nxx::FloatingPoint auto stepsize) {
                 return (-function(val + 2 * stepsize) + 16 * function(val + stepsize) - 30 * function(val) + 16 * function(val - stepsize) -
                         function(val - 2 * stepsize)) /
                        (12 * (stepsize * stepsize));
@@ -311,7 +319,7 @@ namespace nxx::deriv
          * @throws NumerixxError if stepsize is invalid.
          */
         constexpr auto Order1ForwardRichardsonLambda =
-            [](IsFloatInvocable auto function, std::floating_point auto val, std::floating_point auto stepsize) {
+            [](IsFloatInvocable auto function, nxx::FloatingPoint auto val, nxx::FloatingPoint auto stepsize) {
                 const auto diff1 = function(val + stepsize);
                 const auto diff2 = function(val + stepsize * 2);
                 const auto diff3 = function(val + stepsize * 3);
@@ -342,7 +350,7 @@ namespace nxx::deriv
          * @throws NumerixxError if stepsize is invalid.
          */
         constexpr auto Order1Forward2PointLambda =
-            [](IsFloatInvocable auto function, std::floating_point auto val, std::floating_point auto stepsize) {
+            [](IsFloatInvocable auto function, nxx::FloatingPoint auto val, nxx::FloatingPoint auto stepsize) {
                 return (function(val + stepsize) - function(val)) / stepsize;
             };
 
@@ -368,7 +376,7 @@ namespace nxx::deriv
          * @throws NumerixxError if stepsize is invalid.
          */
         constexpr auto Order1Forward3PointLambda =
-            [](IsFloatInvocable auto function, std::floating_point auto val, std::floating_point auto stepsize) {
+            [](IsFloatInvocable auto function, nxx::FloatingPoint auto val, nxx::FloatingPoint auto stepsize) {
                 return (-function(val + 2 * stepsize) + 4 * function(val + stepsize) - 3 * function(val)) / (2 * stepsize);
             };
 
@@ -394,7 +402,7 @@ namespace nxx::deriv
          * @throws NumerixxError if stepsize is invalid.
          */
         constexpr auto Order2Forward3PointLambda =
-            [](IsFloatInvocable auto function, std::floating_point auto val, std::floating_point auto stepsize) {
+            [](IsFloatInvocable auto function, nxx::FloatingPoint auto val, nxx::FloatingPoint auto stepsize) {
                 return (function(val + 2 * stepsize) - 2 * function(val + stepsize) + function(val)) / (stepsize * stepsize);
             };
 
@@ -420,8 +428,8 @@ namespace nxx::deriv
          * @throws NumerixxError if stepsize is invalid.
          */
         constexpr auto Order2Forward4PointLambda = [](IsFloatInvocable auto    function,
-                                                      std::floating_point auto val,
-                                                      std::floating_point auto stepsize) {
+                                                      nxx::FloatingPoint auto val,
+                                                      nxx::FloatingPoint auto stepsize) {
             return (-function(val + 3 * stepsize) + 4 * function(val + 2 * stepsize) - 5 * function(val + stepsize) + 2 * function(val)) /
                    (stepsize * stepsize);
         };
@@ -451,7 +459,7 @@ namespace nxx::deriv
          * @throws NumerixxError if stepsize is invalid.
          */
         constexpr auto Order1BackwardRichardsonLambda =
-            [](IsFloatInvocable auto function, std::floating_point auto val, std::floating_point auto stepsize) {
+            [](IsFloatInvocable auto function, nxx::FloatingPoint auto val, nxx::FloatingPoint auto stepsize) {
                 const auto diff1 = function(val - stepsize);
                 const auto diff2 = function(val - stepsize * 2);
                 const auto diff3 = function(val - stepsize * 3);
@@ -482,7 +490,7 @@ namespace nxx::deriv
          * @throws NumerixxError if stepsize is invalid.
          */
         constexpr auto Order1Backward2PointLambda =
-            [](IsFloatInvocable auto function, std::floating_point auto val, std::floating_point auto stepsize) {
+            [](IsFloatInvocable auto function, nxx::FloatingPoint auto val, nxx::FloatingPoint auto stepsize) {
                 return (function(val) - function(val - stepsize)) / stepsize;
             };
 
@@ -508,7 +516,7 @@ namespace nxx::deriv
          * @throws NumerixxError if stepsize is invalid.
          */
         constexpr auto Order1Backward3PointLambda =
-            [](IsFloatInvocable auto function, std::floating_point auto val, std::floating_point auto stepsize) {
+            [](IsFloatInvocable auto function, nxx::FloatingPoint auto val, nxx::FloatingPoint auto stepsize) {
                 return (3 * function(val) - 4 * function(val - stepsize) + function(val - 2 * stepsize)) / (2 * stepsize);
             };
 
@@ -534,7 +542,7 @@ namespace nxx::deriv
          * @throws NumerixxError if stepsize is invalid.
          */
         constexpr auto Order2Backward3PointLambda =
-            [](IsFloatInvocable auto function, std::floating_point auto val, std::floating_point auto stepsize) {
+            [](IsFloatInvocable auto function, nxx::FloatingPoint auto val, nxx::FloatingPoint auto stepsize) {
                 return (function(val) - 2 * function(val - stepsize) + function(val - 2 * stepsize)) / (stepsize * stepsize);
             };
 
@@ -560,8 +568,8 @@ namespace nxx::deriv
          * @throws NumerixxError if stepsize is invalid.
          */
         constexpr auto Order2Backward4PointLambda = [](IsFloatInvocable auto    function,
-                                                       std::floating_point auto val,
-                                                       std::floating_point auto stepsize) {
+                                                       nxx::FloatingPoint auto val,
+                                                       nxx::FloatingPoint auto stepsize) {
             return (2 * function(val) - 5 * function(val - stepsize) + 4 * function(val - 2 * stepsize) - function(val - 3 * stepsize)) /
                    (stepsize * stepsize);
         };
@@ -585,18 +593,19 @@ namespace nxx::deriv
          */
         template< typename ALGO >
         inline auto diff_impl(IsFloatInvocable auto                                     function,
-                              std::floating_point auto                                  val,
+                              nxx::FloatingPoint auto                                  val,
                               std::invoke_result_t< decltype(function), decltype(val) > stepsize =
-                                  detail::StepSize< std::invoke_result_t< decltype(function), decltype(val) > >)
+                                  detail::stepsize< std::invoke_result_t< decltype(function), decltype(val) > >())
         {
             //        if (!function) throw NumerixxError("Function object is invalid.");
 
             using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
-            static_assert(std::floating_point< RETURN_T >, "The return type of the provided function must be a floating point type.");
+            static_assert(nxx::FloatingPoint< RETURN_T >, "The return type of the provided function must be a floating point type.");
             using DerivError = Error< DerivErrorData< decltype(val) > >;
             using EXPECTED_T = tl::expected< RETURN_T, DerivError >;
 
-            if (auto deriv = ALGO{}(function, val, std::max(stepsize, stepsize * val)); std::isfinite(deriv))
+            using std::isfinite;
+            if (auto deriv = ALGO{}(function, val, std::max(stepsize, stepsize * val)); isfinite(deriv))
                 return EXPECTED_T(deriv);
             else
                 return EXPECTED_T(tl::make_unexpected(DerivError("Computation of derivative gave non-finite result.",
@@ -722,9 +731,9 @@ namespace nxx::deriv
     template< typename ALGO >
     requires ALGO::IsDiffSolver
     inline auto diff(IsFloatInvocable auto                                     function,
-                     std::floating_point auto                                  val,
+                     nxx::FloatingPoint auto                                  val,
                      std::invoke_result_t< decltype(function), decltype(val) > stepsize =
-                         detail::StepSize< std::invoke_result_t< decltype(function), decltype(val) > >)
+                         detail::stepsize< std::invoke_result_t< decltype(function), decltype(val) > >())
     {
         return detail::diff_impl< ALGO >(function, val, stepsize);
     }
@@ -747,9 +756,9 @@ namespace nxx::deriv
      */
     template< typename ALGO >
     inline auto diff(IsFloatInvocable auto                                     function,
-                     std::floating_point auto                                  val,
+                     nxx::FloatingPoint auto                                  val,
                      std::invoke_result_t< decltype(function), decltype(val) > stepsize =
-                         detail::StepSize< std::invoke_result_t< decltype(function), decltype(val) > >)
+                         detail::stepsize< std::invoke_result_t< decltype(function), decltype(val) > >())
     {
         return detail::diff_impl< detail::DiffSolverTemplate< ALGO > >(function, val, stepsize);
     }
@@ -768,9 +777,9 @@ namespace nxx::deriv
     template< typename FN >
     requires IsFloatInvocable< FN >
     inline auto central(FN                                                        function,
-                        std::floating_point auto                                  val,
+                        nxx::FloatingPoint auto                                  val,
                         std::invoke_result_t< decltype(function), decltype(val) > stepsize =
-                            detail::StepSize< std::invoke_result_t< decltype(function), decltype(val) > >)
+                            detail::stepsize< std::invoke_result_t< decltype(function), decltype(val) > >())
     {
         return diff< Order1CentralRichardson >(function, val, stepsize);
     }
@@ -789,9 +798,9 @@ namespace nxx::deriv
     template< typename FN >
     requires IsFloatInvocable< FN >
     inline auto forward(FN                                                        function,
-                        std::floating_point auto                                  val,
+                        nxx::FloatingPoint auto                                  val,
                         std::invoke_result_t< decltype(function), decltype(val) > stepsize =
-                            detail::StepSize< std::invoke_result_t< decltype(function), decltype(val) > >)
+                            detail::stepsize< std::invoke_result_t< decltype(function), decltype(val) > >())
     {
         return diff< Order1ForwardRichardson >(function, val, stepsize);
     }
@@ -810,9 +819,9 @@ namespace nxx::deriv
     template< typename FN >
     requires IsFloatInvocable< FN >
     inline auto backward(FN                                                        function,
-                         std::floating_point auto                                  val,
+                         nxx::FloatingPoint auto                                  val,
                          std::invoke_result_t< decltype(function), decltype(val) > stepsize =
-                             detail::StepSize< std::invoke_result_t< decltype(function), decltype(val) > >)
+                             detail::stepsize< std::invoke_result_t< decltype(function), decltype(val) > >())
     {
         return diff< Order1BackwardRichardson >(function, val, stepsize);
     }

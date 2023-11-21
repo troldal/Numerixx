@@ -33,9 +33,12 @@
 
 // ===== Standard Library Includes
 #include <complex>
+#include <boost/multiprecision/cpp_bin_float.hpp>
 
 namespace nxx
 {
+    template<typename T>
+    concept FloatingPoint = std::floating_point< T > || boost::multiprecision::is_number< T >::value;
 
     /**
      * @brief Concept to check if a type is a complex number.
@@ -46,10 +49,10 @@ namespace nxx
                             typename T::value_type;
                             {
                                 std::real(x)
-                            } -> std::floating_point;
+                            } -> nxx::FloatingPoint;
                             {
                                 std::imag(x)
-                            } -> std::floating_point;
+                            } -> nxx::FloatingPoint;
                         };
 
     /**
@@ -58,9 +61,9 @@ namespace nxx
      */
     template< typename Func >
     concept IsFloatInvocable = requires(Func f) {
-                                   requires std::floating_point< std::invoke_result_t< Func, float > >;
-                                   requires std::floating_point< std::invoke_result_t< Func, double > >;
-                                   requires std::floating_point< std::invoke_result_t< Func, long double > >;
+                                   requires nxx::FloatingPoint< std::invoke_result_t< Func, float > >;
+                                   requires nxx::FloatingPoint< std::invoke_result_t< Func, double > >;
+                                   requires nxx::FloatingPoint< std::invoke_result_t< Func, long double > >;
                                };
 
     template<typename T>
@@ -112,13 +115,13 @@ namespace nxx
 
     template<typename S>
     concept IsFloatStruct =
-        std::floating_point< typename StructTraits< S >::first_type > &&
-        std::floating_point< typename StructTraits< S >::second_type >;
+        nxx::FloatingPoint< typename StructTraits< S >::first_type > &&
+        nxx::FloatingPoint< typename StructTraits< S >::second_type >;
 }    // namespace nxx
 
 namespace nxx::poly {
     template< typename T >
-    requires std::floating_point< T > || IsComplex< T >
+    requires nxx::FloatingPoint< T > || IsComplex< T >
     class Polynomial;
 
     template< typename POLY >
