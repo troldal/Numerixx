@@ -85,7 +85,7 @@ int main()
 
     std::cout << "Order1BackwardRichardson:  " << *diff< Order1BackwardRichardson >(func, NXX_FLOAT{ std::numbers::e }) << std::endl;
     std::cout << "Order1Backward2Point:      " << *diff< Order1Backward2Point >(func, NXX_FLOAT{ std::numbers::e }) << std::endl;
-    std::cout << "Order1Backward3Point:      " << *diff< Order1Backward3Point >(func, NXX_FLOAT{std::numbers::e}) << "\n\n";
+    std::cout << "Order1Backward3Point:      " << *diff< Order1Backward3Point >(func, NXX_FLOAT{ std::numbers::e }) << "\n\n";
 
     // ============================================================================================
     // Similarly, algorithms for computing the 2nd derivatives are also provided:
@@ -99,7 +99,7 @@ int main()
     std::cout << "Order2Forward4Point:      " << *diff< Order2Forward4Point >(func, NXX_FLOAT{ std::numbers::e }) << "\n\n";
 
     std::cout << "Order2Backward3Point:     " << *diff< Order2Backward3Point >(func, NXX_FLOAT{ std::numbers::e }) << std::endl;
-    std::cout << "Order2Backward4Point:     " << *diff< Order2Backward4Point>(func, NXX_FLOAT{std::numbers::e}) << "\n\n";
+    std::cout << "Order2Backward4Point:     " << *diff< Order2Backward4Point >(func, NXX_FLOAT{ std::numbers::e }) << "\n\n";
 
     // ============================================================================================
     // Finally, it is also possible to provide a custom algorithm, as long as it has the correct
@@ -114,7 +114,7 @@ int main()
                (stepsize * 6);
     };
 
-    std::cout << "Custom algorithm:         " << *diff<decltype(algo)>(func, NXX_FLOAT{std::numbers::e}) << "\n\n";
+    std::cout << "Custom algorithm:         " << *diff< decltype(algo) >(func, NXX_FLOAT{ std::numbers::e }) << "\n\n";
 
     // ============================================================================================
     // As a convenience function, the derivativeOf() template function can be used to create a
@@ -204,8 +204,8 @@ int main()
     test2.emplace_back(s5, v5, r5, [&](NXX_FLOAT val) { return *forward(f5, val); });
     test2.emplace_back(s6, v6, r6, [&](NXX_FLOAT val) { return *forward(f6, val); });
     test2.emplace_back(s7, v7, r7, [&](NXX_FLOAT val) { return *forward(f7, val); });
-    test2.emplace_back(s8, v8, r8, [&](NXX_FLOAT val) { return *forward(f8, val);});
-    test2.emplace_back(s9, v9, r9, [&](NXX_FLOAT val){return *forward(f9, val); });
+    test2.emplace_back(s8, v8, r8, [&](NXX_FLOAT val) { return *forward(f8, val); });
+    test2.emplace_back(s9, v9, r9, [&](NXX_FLOAT val) { return *forward(f9, val); });
     print(test2);
 
     std::cout << "BACKWARD DERIVATIVE USING RICHARDSON EXTRAPOLATION" << std::endl;

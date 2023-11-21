@@ -135,7 +135,7 @@ namespace nxx::poly
     /*
      * Specialization of the PolynomialTraits class for Polynomial objects with complex coefficients.
      */
-    template< typename T>
+    template<typename T>
         requires nxx::FloatingPoint< T >
     struct PolynomialTraits< Polynomial< std::complex< T > > >
     {
@@ -154,7 +154,7 @@ namespace nxx::poly
      * @tparam T The type of the polynomial coefficients. This must be a floating
      * point type or a type that satisfies the `utils::IsComplex` concept.
      */
-    template< typename T = double>
+    template<typename T = double>
         requires nxx::FloatingPoint< T > || IsComplex< T >
     class Polynomial final
     {
@@ -321,7 +321,7 @@ namespace nxx::poly
          * @exception nxx::NumerixxError Thrown if the polynomial has no coefficients, or if
          *            the argument or result of the evaluation is non-finite.
          */
-        template< typename U>
+        template<typename U>
             requires std::convertible_to< U, T > || nxx::FloatingPoint< U > || IsComplex< U >
         [[nodiscard]]
         inline auto evaluate(U value) const
@@ -637,7 +637,7 @@ namespace nxx::poly
         requires nxx::FloatingPoint< T > || IsComplex< T >
     Polynomial(std::initializer_list< T > coefficients) -> Polynomial< T >;
 
-    template< typename T, typename FUNC>
+    template<typename T, typename FUNC>
         requires nxx::FloatingPoint< T > || IsComplex< T >
     Polynomial(std::initializer_list< T > coefficients, FUNC f) -> Polynomial< T >;
 

@@ -184,7 +184,7 @@ namespace nxx::deriv
             return (8 * (function(val + stepsize) - function(val - stepsize)) -
                     1 * (function(val + 2 * stepsize) - function(val - 2 * stepsize))) /
                    (stepsize * 12);
-            };
+        };
 
         /**
          * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
@@ -210,7 +210,7 @@ namespace nxx::deriv
         constexpr auto               Order1Central3PointLambda =
             [](IsFloatInvocable auto function, nxx::FloatingPoint auto val, nxx::FloatingPoint auto stepsize) {
             return (function(val + stepsize) - function(val - stepsize)) / (2 * stepsize);
-            };
+        };
 
         /**
          * @brief A class defining a function object for computing the 1st order derivative of an arbitrary function,
@@ -239,7 +239,7 @@ namespace nxx::deriv
             return (-function(val + 2 * stepsize) + 8 * function(val + stepsize) - 8 * function(val - stepsize) +
                     function(val - 2 * stepsize)) /
                    (12 * stepsize);
-            };
+        };
 
         /**
          * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
@@ -265,7 +265,7 @@ namespace nxx::deriv
         constexpr auto               Order2Central3PointLambda =
             [](IsFloatInvocable auto function, nxx::FloatingPoint auto val, nxx::FloatingPoint auto stepsize) {
             return (function(val + stepsize) - 2 * function(val) + function(val - stepsize)) / (stepsize * stepsize);
-            };
+        };
 
         /**
          * @brief A class defining a function object for computing the 2nd order derivative of an arbitrary function,
