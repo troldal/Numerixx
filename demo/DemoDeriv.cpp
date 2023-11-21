@@ -14,10 +14,11 @@
 using NXX_FLOAT = boost::multiprecision::cpp_bin_float_100;
 
 template<>
-struct fmt::formatter<NXX_FLOAT> : fmt::formatter<double> {
+struct fmt::formatter< NXX_FLOAT > : fmt::formatter< double >
+{
     auto format(const NXX_FLOAT& d, fmt::format_context& ctx) const
     {
-        return fmt::formatter<double>::format(static_cast<double>(d), ctx);
+        return fmt::formatter< double >::format(static_cast< double >(d), ctx);
     }
 };
 
@@ -49,18 +50,18 @@ int main()
     // ============================================================================================
     std::cout << "\nCompute the numerical derivative of the function ln(x) + 2x at the value 'e'\n";
     std::cout << "using central, forward, and backward difference calculation methods:\n";
-    std::cout << "Central difference:  " << *central(func, NXX_FLOAT{std::numbers::e}) << std::endl;
-    std::cout << "Forward difference:  " << *forward(func, NXX_FLOAT{std::numbers::e}) << std::endl;
-    std::cout << "Backward difference: " << *backward(func, NXX_FLOAT{std::numbers::e}) << std::endl;
+    std::cout << "Central difference:  " << *central(func, NXX_FLOAT{ std::numbers::e }) << std::endl;
+    std::cout << "Forward difference:  " << *forward(func, NXX_FLOAT{ std::numbers::e }) << std::endl;
+    std::cout << "Backward difference: " << *backward(func, NXX_FLOAT{ std::numbers::e }) << std::endl;
 
     // ============================================================================================
     // The following code does the same as the previous, but the optional step size argument is also
     // provided:
     // ============================================================================================
     std::cout << "\nSame as above, but the optional 'stepsize' argument is provided:\n";
-    std::cout << "Central difference:  " << *central(func, NXX_FLOAT{std::numbers::e}, 1E-2) << std::endl;
-    std::cout << "Forward difference:  " << *forward(func, NXX_FLOAT{std::numbers::e}, 1E-2) << std::endl;
-    std::cout << "Backward difference: " << *backward(func, NXX_FLOAT{std::numbers::e}, 1E-2) << "\n\n";
+    std::cout << "Central difference:  " << *central(func, NXX_FLOAT{ std::numbers::e }, 1E-2) << std::endl;
+    std::cout << "Forward difference:  " << *forward(func, NXX_FLOAT{ std::numbers::e }, 1E-2) << std::endl;
+    std::cout << "Backward difference: " << *backward(func, NXX_FLOAT{ std::numbers::e }, 1E-2) << "\n\n";
 
     // ============================================================================================
     // If more fine-grained control is required, the 'derivative' template function can be used.
@@ -74,31 +75,31 @@ int main()
     // ============================================================================================
     std::cout << "The following examples show how to use the nxx::deriv::derivative template function\n";
     std::cout << "to manually specify the algorithm used to compute the 1st derivative.\n";
-    std::cout << "Order1CentralRichardson:   " << *diff<Order1CentralRichardson>(func, NXX_FLOAT{std::numbers::e}) << std::endl;
-    std::cout << "Order1Central3Point:       " << *diff<Order1Central3Point>(func, NXX_FLOAT{std::numbers::e}) << std::endl;
-    std::cout << "Order1Central5Point:       " << *diff<Order1Central5Point>(func, NXX_FLOAT{std::numbers::e}) << "\n\n";
+    std::cout << "Order1CentralRichardson:   " << *diff< Order1CentralRichardson >(func, NXX_FLOAT{ std::numbers::e }) << std::endl;
+    std::cout << "Order1Central3Point:       " << *diff< Order1Central3Point >(func, NXX_FLOAT{ std::numbers::e }) << std::endl;
+    std::cout << "Order1Central5Point:       " << *diff< Order1Central5Point >(func, NXX_FLOAT{ std::numbers::e }) << "\n\n";
 
-    std::cout << "Order1ForwardRichardson:   " << *diff< Order1ForwardRichardson >(func, NXX_FLOAT{std::numbers::e}) << std::endl;
-    std::cout << "Order1Forward2Point:       " << *diff<Order1Forward2Point>(func, NXX_FLOAT{std::numbers::e}) << std::endl;
-    std::cout << "Order1Forward3Point:       " << *diff<Order1Forward3Point>(func, NXX_FLOAT{std::numbers::e}) << "\n\n";
+    std::cout << "Order1ForwardRichardson:   " << *diff< Order1ForwardRichardson >(func, NXX_FLOAT{ std::numbers::e }) << std::endl;
+    std::cout << "Order1Forward2Point:       " << *diff< Order1Forward2Point >(func, NXX_FLOAT{ std::numbers::e }) << std::endl;
+    std::cout << "Order1Forward3Point:       " << *diff< Order1Forward3Point >(func, NXX_FLOAT{ std::numbers::e }) << "\n\n";
 
-    std::cout << "Order1BackwardRichardson:  " << *diff< Order1BackwardRichardson >(func, NXX_FLOAT{std::numbers::e}) << std::endl;
-    std::cout << "Order1Backward2Point:      " << *diff<Order1Backward2Point>(func, NXX_FLOAT{std::numbers::e}) << std::endl;
-    std::cout << "Order1Backward3Point:      " << *diff<Order1Backward3Point>(func, NXX_FLOAT{std::numbers::e}) << "\n\n";
+    std::cout << "Order1BackwardRichardson:  " << *diff< Order1BackwardRichardson >(func, NXX_FLOAT{ std::numbers::e }) << std::endl;
+    std::cout << "Order1Backward2Point:      " << *diff< Order1Backward2Point >(func, NXX_FLOAT{ std::numbers::e }) << std::endl;
+    std::cout << "Order1Backward3Point:      " << *diff< Order1Backward3Point >(func, NXX_FLOAT{std::numbers::e}) << "\n\n";
 
     // ============================================================================================
     // Similarly, algorithms for computing the 2nd derivatives are also provided:
     // ============================================================================================
     std::cout << "Similarly, the following examples show how to use the nxx::deriv::derivative template function\n";
     std::cout << "to manually specify the algorithm used to compute the 2nd derivative.\n";
-    std::cout << "Order2Central3Point:      " << *diff<Order2Central3Point>(func, NXX_FLOAT{std::numbers::e}) << std::endl;
-    std::cout << "Order2Central5Point:      " << *diff<Order2Central5Point>(func, NXX_FLOAT{std::numbers::e}) << "\n\n";
+    std::cout << "Order2Central3Point:      " << *diff< Order2Central3Point >(func, NXX_FLOAT{ std::numbers::e }) << std::endl;
+    std::cout << "Order2Central5Point:      " << *diff< Order2Central5Point >(func, NXX_FLOAT{ std::numbers::e }) << "\n\n";
 
-    std::cout << "Order2Forward3Point:      " << *diff<Order2Forward3Point>(func, NXX_FLOAT{std::numbers::e}) << std::endl;
-    std::cout << "Order2Forward4Point:      " << *diff<Order2Forward4Point>(func, NXX_FLOAT{std::numbers::e}) << "\n\n";
+    std::cout << "Order2Forward3Point:      " << *diff< Order2Forward3Point >(func, NXX_FLOAT{ std::numbers::e }) << std::endl;
+    std::cout << "Order2Forward4Point:      " << *diff< Order2Forward4Point >(func, NXX_FLOAT{ std::numbers::e }) << "\n\n";
 
-    std::cout << "Order2Backward3Point:     " << *diff<Order2Backward3Point>(func, NXX_FLOAT{std::numbers::e}) << std::endl;
-    std::cout << "Order2Backward4Point:     " << *diff<Order2Backward4Point>(func, NXX_FLOAT{std::numbers::e}) << "\n\n";
+    std::cout << "Order2Backward3Point:     " << *diff< Order2Backward3Point >(func, NXX_FLOAT{ std::numbers::e }) << std::endl;
+    std::cout << "Order2Backward4Point:     " << *diff< Order2Backward4Point>(func, NXX_FLOAT{std::numbers::e}) << "\n\n";
 
     // ============================================================================================
     // Finally, it is also possible to provide a custom algorithm, as long as it has the correct
@@ -113,7 +114,7 @@ int main()
                (stepsize * 6);
     };
 
-    std::cout << "Custom algorithm:         "<< *diff<decltype(algo)>(func, NXX_FLOAT{std::numbers::e}) << "\n\n";
+    std::cout << "Custom algorithm:         " << *diff<decltype(algo)>(func, NXX_FLOAT{std::numbers::e}) << "\n\n";
 
     // ============================================================================================
     // As a convenience function, the derivativeOf() template function can be used to create a
@@ -128,7 +129,7 @@ int main()
     auto d1func = derivativeOf(func);
     auto d2func = derivativeOf<Order2Central5Point>(func);
     std::cout << "Derivative function objects using the .derivativeOf() function:\n";
-    std::cout << "d1func:                   " << d1func(NXX_FLOAT{std::numbers::e}) << "\n";
+    std::cout << "d1func:                   " << d1func(NXX_FLOAT{ std::numbers::e }) << "\n";
     std::cout << "d2func:                  " <<  d2func(NXX_FLOAT{std::numbers::e}) << "\n\n";
 
     // ============================================================================================
@@ -180,43 +181,43 @@ int main()
     NXX_FLOAT r9 = -1.0;
 
     std::cout << "CENTER DERIVATIVE USING RICHARDSON EXTRAPOLATION" << std::endl;
-    std::vector< std::tuple< std::string, NXX_FLOAT, NXX_FLOAT, std::function<NXX_FLOAT(NXX_FLOAT)> > > test1;
-    test1.emplace_back(s0, v0, r0, [&](NXX_FLOAT val){return *central(f0, val);});
-    test1.emplace_back(s1, v1, r1, [&](NXX_FLOAT val){return *central(f1, val);});
-    test1.emplace_back(s2, v2, r2, [&](NXX_FLOAT val){return *central(f2, val);});
-    test1.emplace_back(s3, v3, r3, [&](NXX_FLOAT val){return *central(f3, val);});
-    test1.emplace_back(s4, v4, r4, [&](NXX_FLOAT val){return *central(f4, val);});
-    test1.emplace_back(s5, v5, r5, [&](NXX_FLOAT val){return *central(f5, val);});
-    test1.emplace_back(s6, v6, r6, [&](NXX_FLOAT val){return *central(f6, val);});
-    test1.emplace_back(s7, v7, r7, [&](NXX_FLOAT val){return *central(f7, val);});
-    test1.emplace_back(s8, v8, r8, [&](NXX_FLOAT val){return *central(f8, val);});
+    std::vector< std::tuple< std::string, NXX_FLOAT, NXX_FLOAT, std::function< NXX_FLOAT(NXX_FLOAT) > > > test1;
+    test1.emplace_back(s0, v0, r0, [&](NXX_FLOAT val) { return *central(f0, val); });
+    test1.emplace_back(s1, v1, r1, [&](NXX_FLOAT val) { return *central(f1, val); });
+    test1.emplace_back(s2, v2, r2, [&](NXX_FLOAT val) { return *central(f2, val); });
+    test1.emplace_back(s3, v3, r3, [&](NXX_FLOAT val) { return *central(f3, val); });
+    test1.emplace_back(s4, v4, r4, [&](NXX_FLOAT val) { return *central(f4, val); });
+    test1.emplace_back(s5, v5, r5, [&](NXX_FLOAT val) { return *central(f5, val); });
+    test1.emplace_back(s6, v6, r6, [&](NXX_FLOAT val) { return *central(f6, val); });
+    test1.emplace_back(s7, v7, r7, [&](NXX_FLOAT val) { return *central(f7, val); });
+    test1.emplace_back(s8, v8, r8, [&](NXX_FLOAT val) { return *central(f8, val); });
     test1.emplace_back(s9, v9, r9, [&](NXX_FLOAT val){return *central(f9, val);});
     print(test1);
 
     std::cout << "FORWARD DERIVATIVE USING RICHARDSON EXTRAPOLATION" << std::endl;
-    std::vector< std::tuple< std::string, NXX_FLOAT, NXX_FLOAT, std::function<NXX_FLOAT(NXX_FLOAT)> > > test2;
-    test2.emplace_back(s0, v0, r0, [&](NXX_FLOAT val){return *forward(f0, val);});
-    test2.emplace_back(s1, v1, r1, [&](NXX_FLOAT val){return *forward(f1, val);});
-    test2.emplace_back(s2, v2, r2, [&](NXX_FLOAT val){return *forward(f2, val);});
-    test2.emplace_back(s3, v3, r3, [&](NXX_FLOAT val){return *forward(f3, val);});
-    test2.emplace_back(s4, v4, r4, [&](NXX_FLOAT val){return *forward(f4, val);});
-    test2.emplace_back(s5, v5, r5, [&](NXX_FLOAT val){return *forward(f5, val);});
-    test2.emplace_back(s6, v6, r6, [&](NXX_FLOAT val){return *forward(f6, val);});
-    test2.emplace_back(s7, v7, r7, [&](NXX_FLOAT val){return *forward(f7, val);});
-    test2.emplace_back(s8, v8, r8, [&](NXX_FLOAT val){return *forward(f8, val);});
-    test2.emplace_back(s9, v9, r9, [&](NXX_FLOAT val){return *forward(f9, val);});
+    std::vector< std::tuple< std::string, NXX_FLOAT, NXX_FLOAT, std::function< NXX_FLOAT(NXX_FLOAT) > > > test2;
+    test2.emplace_back(s0, v0, r0, [&](NXX_FLOAT val) { return *forward(f0, val); });
+    test2.emplace_back(s1, v1, r1, [&](NXX_FLOAT val) { return *forward(f1, val); });
+    test2.emplace_back(s2, v2, r2, [&](NXX_FLOAT val) { return *forward(f2, val); });
+    test2.emplace_back(s3, v3, r3, [&](NXX_FLOAT val) { return *forward(f3, val); });
+    test2.emplace_back(s4, v4, r4, [&](NXX_FLOAT val) { return *forward(f4, val); });
+    test2.emplace_back(s5, v5, r5, [&](NXX_FLOAT val) { return *forward(f5, val); });
+    test2.emplace_back(s6, v6, r6, [&](NXX_FLOAT val) { return *forward(f6, val); });
+    test2.emplace_back(s7, v7, r7, [&](NXX_FLOAT val) { return *forward(f7, val); });
+    test2.emplace_back(s8, v8, r8, [&](NXX_FLOAT val) { return *forward(f8, val);});
+    test2.emplace_back(s9, v9, r9, [&](NXX_FLOAT val){return *forward(f9, val); });
     print(test2);
 
     std::cout << "BACKWARD DERIVATIVE USING RICHARDSON EXTRAPOLATION" << std::endl;
-    std::vector< std::tuple< std::string, NXX_FLOAT, NXX_FLOAT, std::function<NXX_FLOAT(NXX_FLOAT)> > > test3;
-    test3.emplace_back(s0, v0, r0, [&](NXX_FLOAT val){return *backward(f0, val);});
-    test3.emplace_back(s1, v1, r1, [&](NXX_FLOAT val){return *backward(f1, val);});
-    test3.emplace_back(s2, v2, r2, [&](NXX_FLOAT val){return *backward(f2, val);});
-    test3.emplace_back(s3, v3, r3, [&](NXX_FLOAT val){return *backward(f3, val);});
-    test3.emplace_back(s4, v4, r4, [&](NXX_FLOAT val){return *backward(f4, val);});
-    test3.emplace_back(s5, v5, r5, [&](NXX_FLOAT val){return *backward(f5, val);});
-    test3.emplace_back(s6, v6, r6, [&](NXX_FLOAT val){return *backward(f6, val);});
-    test3.emplace_back(s7, v7, r7, [&](NXX_FLOAT val){return *backward(f7, val);});
+    std::vector< std::tuple< std::string, NXX_FLOAT, NXX_FLOAT, std::function< NXX_FLOAT(NXX_FLOAT) > > > test3;
+    test3.emplace_back(s0, v0, r0, [&](NXX_FLOAT val) { return *backward(f0, val); });
+    test3.emplace_back(s1, v1, r1, [&](NXX_FLOAT val) { return *backward(f1, val); });
+    test3.emplace_back(s2, v2, r2, [&](NXX_FLOAT val) { return *backward(f2, val); });
+    test3.emplace_back(s3, v3, r3, [&](NXX_FLOAT val) { return *backward(f3, val); });
+    test3.emplace_back(s4, v4, r4, [&](NXX_FLOAT val) { return *backward(f4, val); });
+    test3.emplace_back(s5, v5, r5, [&](NXX_FLOAT val) { return *backward(f5, val); });
+    test3.emplace_back(s6, v6, r6, [&](NXX_FLOAT val) { return *backward(f6, val); });
+    test3.emplace_back(s7, v7, r7, [&](NXX_FLOAT val) { return *backward(f7, val); });
     test3.emplace_back(s8, v8, r8, [&](NXX_FLOAT val){return *backward(f8, val);});
     test3.emplace_back(s9, v9, r9, [&](NXX_FLOAT val){return *backward(f9, val);});
     print(test3);

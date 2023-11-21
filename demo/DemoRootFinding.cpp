@@ -15,10 +15,11 @@
 using NXX_FLOAT = boost::multiprecision::cpp_bin_float_100;
 
 template<>
-struct fmt::formatter<NXX_FLOAT> : fmt::formatter<double> {
+struct fmt::formatter< NXX_FLOAT > : fmt::formatter< double >
+{
     auto format(const NXX_FLOAT& d, fmt::format_context& ctx) const
     {
-        return fmt::formatter<double>::format(static_cast<double>(d), ctx);
+        return fmt::formatter< double >::format(static_cast< double >(d), ctx);
     }
 };
 
@@ -27,8 +28,8 @@ int main()
     using namespace nxx::roots;
     using namespace boost::multiprecision;
     std::cout << std::fixed << std::setprecision(8);
-    auto func = [](nxx::FloatingPoint auto x) { return x * x - decltype(x)(5.0); };
-    const std::pair<NXX_FLOAT, NXX_FLOAT > bounds = { 0.0, 2.5 };
+    auto                                    func   = [](nxx::FloatingPoint auto x) { return x * x - decltype(x)(5.0); };
+    const std::pair< NXX_FLOAT, NXX_FLOAT > bounds = { 0.0, 2.5 };
 
     auto xyz = *fsolve< Bisection >(func, bounds, 1.0E-15, 10000);
 
@@ -90,11 +91,11 @@ int main()
         std::cout << "Iterations:        " << error.iterations() << std::endl << std::endl;
     };
 
-    std::cout << "Initial Bracket:   [5.0, 10.0]\n";    // This bracket does not contain a root
+    std::cout << "Initial Bracket:   [5.0, 10.0]\n"; // This bracket does not contain a root
     auto root = fsolve< Bisection >([](std::floating_point auto x) { return std::log(x); }, { 5.0, 10.0 });
     if (!root) print_error(root.error());
 
-    std::cout << "Initial Bracket:   [-5.0, 10.0]\n";    // The function is undefined at x <= 0
+    std::cout << "Initial Bracket:   [-5.0, 10.0]\n"; // The function is undefined at x <= 0
     root = fsolve< Bisection >([](std::floating_point auto x) { return std::log(x); }, { -5.0, 10.0 });
     if (!root) print_error(root.error());
 
@@ -139,7 +140,7 @@ int main()
 
         // Create variables for the iterations.
         std::array< std::pair< NXX_FLOAT, NXX_FLOAT >, 2 > guesses; // Stores the endpoints of the bracketing interval
-        decltype(guesses.begin())                    min;     // Stores the endpoint with the smallest absolute value
+        decltype(guesses.begin())                          min;     // Stores the endpoint with the smallest absolute value
 
         // Initialize the solver:
         // solver.init(bounds);
@@ -157,12 +158,13 @@ int main()
 
             // Print the current iteration:
             std::cout << fmt::format("{:10} | {:15.10f} | {:15.10f} | {:15.10f} | {:15.10f} ",
-                                     i, // Iteration number
+                                     i,
+                                     // Iteration number
                                      solver.bounds().first,     // Upper endpoint
                                      solver.bounds().second,    // Lower endpoint
                                      min->first,                // Root
                                      min->second)               // Error
-                      << std::endl;
+                << std::endl;
 
             // Check if convergence has been reached:
             if (min->second < nxx::epsilon<NXX_FLOAT>()) break;

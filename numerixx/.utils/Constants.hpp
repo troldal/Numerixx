@@ -35,8 +35,7 @@
 
 namespace nxx
 {
-
-    constexpr int    MAXITER = 10000;    // Maximum number of iterations
+    constexpr int    MAXITER = 10000;  // Maximum number of iterations
     constexpr double EPS     = 1.0E-8; // Tolerance for convergence
 
     template<typename T>
@@ -44,7 +43,7 @@ namespace nxx
     {
         using boost::multiprecision::pow; // TODO: This should only be enabled if Boost.Multiprecision is used
         using std::pow;
-        return pow(std::numeric_limits<T>::epsilon(), 2.0/3.0);
+        return pow(std::numeric_limits< T >::epsilon(), 2.0 / 3.0);
     }
 
     template<typename T>
@@ -52,9 +51,8 @@ namespace nxx
     {
         using boost::multiprecision::pow; // TODO: This should only be enabled if Boost.Multiprecision is used
         using std::pow;
-        return static_cast<decltype(std::numeric_limits<T>::digits10)>(pow(std::numeric_limits<T>::digits10, 2));
+        return static_cast< decltype(std::numeric_limits< T >::digits10) >(pow(std::numeric_limits< T >::digits10, 2));
     }
-
-}    // namespace nxx
+} // namespace nxx
 
 #endif    // NUMERIXX_CONSTANTS_HPP

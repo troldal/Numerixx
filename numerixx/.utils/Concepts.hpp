@@ -53,7 +53,7 @@ namespace nxx
                             {
                                 std::imag(x)
                             } -> nxx::FloatingPoint;
-                        };
+    };
 
     /**
      * @brief Concept checking whether a type is a callable function object that returns a floating point type.
@@ -61,10 +61,10 @@ namespace nxx
      */
     template< typename Func >
     concept IsFloatInvocable = requires(Func f) {
-                                   requires nxx::FloatingPoint< std::invoke_result_t< Func, float > >;
-                                   requires nxx::FloatingPoint< std::invoke_result_t< Func, double > >;
-                                   requires nxx::FloatingPoint< std::invoke_result_t< Func, long double > >;
-                               };
+        requires nxx::FloatingPoint< std::invoke_result_t< Func, float > >;
+        requires nxx::FloatingPoint< std::invoke_result_t< Func, double > >;
+        requires nxx::FloatingPoint< std::invoke_result_t< Func, long double > >;
+    };
 
     template<typename T>
     concept IsContainer = requires(T a)
@@ -117,11 +117,12 @@ namespace nxx
     concept IsFloatStruct =
         nxx::FloatingPoint< typename StructTraits< S >::first_type > &&
         nxx::FloatingPoint< typename StructTraits< S >::second_type >;
-}    // namespace nxx
+} // namespace nxx
 
-namespace nxx::poly {
-    template< typename T >
-    requires nxx::FloatingPoint< T > || IsComplex< T >
+namespace nxx::poly
+{
+    template<typename T>
+        requires nxx::FloatingPoint< T > || IsComplex< T >
     class Polynomial;
 
     template< typename POLY >
