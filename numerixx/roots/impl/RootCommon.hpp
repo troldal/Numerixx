@@ -213,13 +213,6 @@ namespace nxx::roots
     // ========================================================================
 
     /*
-     * Forward declaration of the DNewton class.
-     */
-    template< typename FN, typename DFN >
-    requires IsFloatInvocable< FN > && IsFloatInvocable< DFN >
-    class DNewton;
-
-    /*
      * Forward declaration of the Newton class.
      */
     template< typename FN, typename DFN >
@@ -240,18 +233,6 @@ namespace nxx::roots
          */
         template< typename FN, typename DFN >
         struct PolishingTraits< Newton< FN, DFN > >
-        {
-            using FUNCTION_T        = FN;
-            using DERIV_T           = DFN;
-            using FUNCTION_RETURN_T = std::invoke_result_t< FN, double >;
-            using DERIV_RETURN_T    = std::invoke_result_t< DFN, double >;
-        };
-
-        /*
-         * Specialization of the PolishingTraits class for DNewton<FN, DFN>
-         */
-        template< typename FN, typename DFN >
-        struct PolishingTraits< DNewton< FN, DFN > >
         {
             using FUNCTION_T        = FN;
             using DERIV_T           = DFN;

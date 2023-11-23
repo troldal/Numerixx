@@ -31,8 +31,6 @@ int main()
     auto                                    func   = [](nxx::FloatingPoint auto x) { return x * x - decltype(x)(5.0); };
     const std::pair< NXX_FLOAT, NXX_FLOAT > bounds = { 0.0, 2.5 };
 
-    auto xyz = *fsolve< Bisection >(func, bounds, 1.0E-15, 10000);
-
     // ============================================================================================
     // The nxx::roots namespace contains a number of root-finding algorithms, for finding the roots
     // of arbitrary functions. The algorithms are implemented as objects that can be used to iterate
@@ -71,8 +69,9 @@ int main()
     std::cout << "Regula Falsi Method:      " << *fsolve< RegulaFalsi >(func, bounds) << std::endl << std::endl;
 
     std::cout << "\nCompute the root of the polynomial f(x) = x^2 - 5 using polishing methods:\n";
-    std::cout << "Discrete Newton's Method: " << *fdfsolve(DNewton(func), 1.25, 1.0E-15) << std::endl;
-    std::cout << "Newton's Method:          " << *fdfsolve(Newton(func, derivativeOf(func)), 1.25, 1.0E-15) << std::endl << std::endl;
+    // std::cout << "Discrete Newton's Method: " << *fdfsolve(DNewton(func), 1.25, 1.0E-15) << std::endl;
+    std::cout << "Newton's Method:          " << *fdfsolve<Newton>(func, derivativeOf(func), 1.25, 1.0E-15) << std::endl << std::endl;
+
     // Note that the Discrete Newton's Method uses the numerical derivative of the function, while
     // Newton's Method requires a separate function for the derivative.
 
@@ -91,16 +90,18 @@ int main()
         std::cout << "Iterations:        " << error.iterations() << std::endl << std::endl;
     };
 
+    auto log_func = [](std::floating_point auto x) { return std::log(x); };
+
     std::cout << "Initial Bracket:   [5.0, 10.0]\n"; // This bracket does not contain a root
-    auto root = fsolve< Bisection >([](std::floating_point auto x) { return std::log(x); }, { 5.0, 10.0 });
+    auto root = fsolve< Bisection >(log_func, { 5.0, 10.0 });
     if (!root) print_error(root.error());
 
     std::cout << "Initial Bracket:   [-5.0, 10.0]\n"; // The function is undefined at x <= 0
-    root = fsolve< Bisection >([](std::floating_point auto x) { return std::log(x); }, { -5.0, 10.0 });
+    root = fsolve< Bisection >(log_func, { -5.0, 10.0 });
     if (!root) print_error(root.error());
 
     std::cout << "Initial Bracket:   [0.1, 200.0]\n";    // This bracket contains a root, but will require many iterations
-    root = fsolve< Bisection >([](std::floating_point auto x) { return std::log(x); }, { 0.1, 200.0 }, 1.0E-15, 5);
+    root = fsolve< Bisection >(log_func, { 0.1, 200.0 }, 1.0E-15, 5);
     if (!root) print_error(root.error());
 
     // The error object is a subclass of the RootError class, which is a subclass of the std::runtime_error
@@ -111,11 +112,11 @@ int main()
     // The error object from the fdfsolve() function works in the same way.
     std::cout << "Compute the root of the function f(x) = log(x) using the DNewton method:\n\n";
     std::cout << "Initial Guess = 0.0:\n"; // The function is undefined at x <= 0
-    root = fdfsolve(DNewton([](std::floating_point auto x) { return std::log(x); }), 0.0, 1.0E-15);
+    root = fdfsolve<Newton>(log_func, derivativeOf(log_func), 0.0, 1.0E-15);
     if (!root.has_value()) print_error(root.error());
 
     std::cout << "Initial Guess = 1E-3:\n"; // This guess is close to the root, but will require many iterations
-    root = fdfsolve(DNewton([](std::floating_point auto x) { return std::log(x); }), 1E-3, 1.0E-15, 5);
+    root = fdfsolve<Newton>(log_func, derivativeOf(log_func), 1E-3, 1.0E-15, 5);
     if (!root.has_value()) print_error(root.error());
 
     // ============================================================================================
@@ -221,8 +222,8 @@ int main()
         std::cout << "------------------------------------------------------------------\n\n";
     };
 
-    std::cout << "Manual root-finding using the Discrete Newton's method:" << std::endl;
-    polish_root(DNewton(func), 3.0);
+    // std::cout << "Manual root-finding using the Discrete Newton's method:" << std::endl;
+    // polish_root(DNewton(func), 3.0);
 
     std::cout << "Manual root-finding using Newton's method:" << std::endl;
     polish_root(Newton(func, derivativeOf(func)), 1.25);

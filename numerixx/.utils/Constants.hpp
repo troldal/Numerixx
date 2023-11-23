@@ -53,6 +53,15 @@ namespace nxx
         using std::pow;
         return static_cast< decltype(std::numeric_limits< T >::digits10) >(pow(std::numeric_limits< T >::digits10, 2));
     }
+
+    template<typename T>
+    T StepSize()
+    {
+        using boost::multiprecision::pow; // TODO: This should only be enabled if Boost.Multiprecision is used
+        using std::pow;
+        return pow(std::numeric_limits< T >::epsilon(), 1.0 / 3.0);
+    }
+
 } // namespace nxx
 
 #endif    // NUMERIXX_CONSTANTS_HPP
