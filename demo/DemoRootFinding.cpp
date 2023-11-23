@@ -70,7 +70,7 @@ int main()
 
     std::cout << "\nCompute the root of the polynomial f(x) = x^2 - 5 using polishing methods:\n";
     // std::cout << "Discrete Newton's Method: " << *fdfsolve(DNewton(func), 1.25, 1.0E-15) << std::endl;
-    std::cout << "Newton's Method:          " << *fdfsolve<Newton>(func, derivativeOf(func), 1.25, 1.0E-15) << std::endl << std::endl;
+    std::cout << "Newton's Method:          " << *fdfsolve< Newton >(func, derivativeOf(func), 1.25, 1.0E-15) << std::endl << std::endl;
 
     // Note that the Discrete Newton's Method uses the numerical derivative of the function, while
     // Newton's Method requires a separate function for the derivative.
@@ -112,11 +112,11 @@ int main()
     // The error object from the fdfsolve() function works in the same way.
     std::cout << "Compute the root of the function f(x) = log(x) using the DNewton method:\n\n";
     std::cout << "Initial Guess = 0.0:\n"; // The function is undefined at x <= 0
-    root = fdfsolve<Newton>(log_func, derivativeOf(log_func), 0.0, 1.0E-15);
+    root = fdfsolve< Newton >(log_func, derivativeOf(log_func), 0.0, 1.0E-15);
     if (!root.has_value()) print_error(root.error());
 
     std::cout << "Initial Guess = 1E-3:\n"; // This guess is close to the root, but will require many iterations
-    root = fdfsolve<Newton>(log_func, derivativeOf(log_func), 1E-3, 1.0E-15, 5);
+    root = fdfsolve< Newton >(log_func, derivativeOf(log_func), 1E-3, 1.0E-15, 5);
     if (!root.has_value()) print_error(root.error());
 
     // ============================================================================================

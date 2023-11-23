@@ -98,13 +98,13 @@ namespace nxx::roots
             using DERIV_RETURN_T = /**< The return type of the derivative function object. */
             typename impl::PolishingTraits< POLICY >::DERIV_RETURN_T;
 
-        // protected:
+            // protected:
             /**
              * @brief Default constructor.
              */
             ~PolishingBase() = default;
 
-        // private:
+            // private:
             FUNCTION_T        m_func{};               /**< The function object to find the root for. */
             DERIV_T           m_deriv{};              /**< The function object for the derivative. */
             FUNCTION_RETURN_T m_guess;                /**< The current root estimate. */
@@ -290,10 +290,10 @@ namespace nxx::roots
             // clang-format on
         }
     auto fdfsolve_impl(SOLVER                             solver,
-                  typename SOLVER::FUNCTION_RETURN_T guess,
-                  FloatingPoint auto           eps,
-                  //     = nxx::EPS,
-                  int maxiter) // = nxx::MAXITER)
+                       typename SOLVER::FUNCTION_RETURN_T guess,
+                       FloatingPoint auto                 eps,
+                       //     = nxx::EPS,
+                       int maxiter) // = nxx::MAXITER)
     {
         using EXPECTED_T = impl::RootErrorImpl< typename SOLVER::FUNCTION_RETURN_T >;
         using RETURN_T = tl::expected< typename SOLVER::FUNCTION_RETURN_T, EXPECTED_T >;
@@ -343,10 +343,10 @@ namespace nxx::roots
         FloatingPoint EPS_T = GUESS_T,
         std::integral ITER_T = int>
     auto fdfsolve(FN_T    function,
-                   DERIV_T derivative,
-                   GUESS_T guess,
-                   EPS_T   eps     = epsilon< GUESS_T >(),
-                   ITER_T  maxiter = iterations< GUESS_T >())
+                  DERIV_T derivative,
+                  GUESS_T guess,
+                  EPS_T   eps     = epsilon< GUESS_T >(),
+                  ITER_T  maxiter = iterations< GUESS_T >())
     {
         auto solver = SOLVER_T(function, derivative);
         return fdfsolve_impl(solver, guess, eps, maxiter);

@@ -61,7 +61,6 @@ namespace nxx
         using std::pow;
         return pow(std::numeric_limits< T >::epsilon(), 1.0 / 3.0);
     }
-
 } // namespace nxx
 
 #endif    // NUMERIXX_CONSTANTS_HPP
