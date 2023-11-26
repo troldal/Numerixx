@@ -268,72 +268,75 @@ namespace nxx::roots
     // =================================================================================================================
 
 
-    /**
-     * @brief The fdfsolve function is a convenience function for running a polishing solver (i.e. with derivative),
-     * without dealing with low level details. If fine grained control is needed, such as advanced search stopping
-     * criteria or running each iteration manually, please see the documentation for the solver classes.
-     * @tparam SOLVER The type of the solver. This could be the Newton or DNewton solvers, but any solver with the
-     * correct interface can be used.
-     * @param solver The actual solver object.
-     * @param guess The initial guess of the root. The guess must be reasonably close to the actual root.
-     * @param eps The max. allowed error.
-     * @param maxiter The max. number of allowed iterations.
-     * @return The root estimate.
-     */
-    template<typename SOLVER>
-        requires requires(SOLVER solver, typename SOLVER::FUNCTION_RETURN_T guess)
-        {
-            // clang-format off
-            { solver.evaluate(0.0) } -> std::same_as< typename SOLVER::FUNCTION_RETURN_T >;
-            { solver.init(guess) };
-            { solver.iterate() };
-            // clang-format on
-        }
-    auto fdfsolve_impl(SOLVER                             solver,
-                       typename SOLVER::FUNCTION_RETURN_T guess,
-                       FloatingPoint auto                 eps,
-                       //     = nxx::EPS,
-                       int maxiter) // = nxx::MAXITER)
+    namespace detail
     {
-        using EXPECTED_T = impl::RootErrorImpl< typename SOLVER::FUNCTION_RETURN_T >;
-        using RETURN_T = tl::expected< typename SOLVER::FUNCTION_RETURN_T, EXPECTED_T >;
+        /**
+         * @brief The fdfsolve function is a convenience function for running a polishing solver (i.e. with derivative),
+         * without dealing with low level details. If fine grained control is needed, such as advanced search stopping
+         * criteria or running each iteration manually, please see the documentation for the solver classes.
+         * @tparam SOLVER The type of the solver. This could be the Newton or DNewton solvers, but any solver with the
+         * correct interface can be used.
+         * @param solver The actual solver object.
+         * @param guess The initial guess of the root. The guess must be reasonably close to the actual root.
+         * @param eps The max. allowed error.
+         * @param maxiter The max. number of allowed iterations.
+         * @return The root estimate.
+         */
+        template<typename SOLVER>
+            requires requires(SOLVER solver, typename SOLVER::FUNCTION_RETURN_T guess)
+            {
+                // clang-format off
+                { solver.evaluate(0.0) } -> std::same_as< typename SOLVER::FUNCTION_RETURN_T >;
+                { solver.init(guess) };
+                { solver.iterate() };
+                // clang-format on
+            }
+        auto fdfsolve_impl(SOLVER                             solver,
+                           typename SOLVER::FUNCTION_RETURN_T guess,
+                           FloatingPoint auto                 eps,
+                           //     = nxx::EPS,
+                           int maxiter) // = nxx::MAXITER)
+        {
+            using EXPECTED_T = impl::RootErrorImpl< typename SOLVER::FUNCTION_RETURN_T >;
+            using RETURN_T = tl::expected< typename SOLVER::FUNCTION_RETURN_T, EXPECTED_T >;
 
-        solver.init(guess);
-        RETURN_T result = solver.result();
+            solver.init(guess);
+            RETURN_T result = solver.result();
 
-        // Check for NaN or Inf.
-        if (!std::isfinite(abs(solver.evaluate(result.value())))) {
-            result = tl::make_unexpected(EXPECTED_T("Invalid initial guess!", RootErrorType::NumericalError, result.value()));
+            // Check for NaN or Inf.
+            if (!std::isfinite(abs(solver.evaluate(result.value())))) {
+                result = tl::make_unexpected(EXPECTED_T("Invalid initial guess!", RootErrorType::NumericalError, result.value()));
+                return result;
+            }
+
+            // Begin iteration loop.
+            int iter = 1;
+            while (true) {
+                result = solver.result();
+
+                // Check for NaN or Inf
+                if (!std::isfinite(abs(result.value()))) {
+                    result = tl::make_unexpected(EXPECTED_T("Non-finite result!", RootErrorType::NumericalError, result.value(), iter));
+                    break;
+                }
+
+                // Check for convergence
+                if (abs(solver.evaluate(solver.result())) < eps) break;
+
+                // Check for max. iterations
+                if (iter >= maxiter) {
+                    result = tl::make_unexpected(
+                        EXPECTED_T("Maximum number of iterations exceeded!", RootErrorType::MaxIterationsExceeded, result.value(), iter));
+                    break;
+                }
+
+                // Perform one iteration
+                ++iter;
+                solver.iterate();
+            }
+
             return result;
         }
-
-        // Begin iteration loop.
-        int iter = 1;
-        while (true) {
-            result = solver.result();
-
-            // Check for NaN or Inf
-            if (!std::isfinite(abs(result.value()))) {
-                result = tl::make_unexpected(EXPECTED_T("Non-finite result!", RootErrorType::NumericalError, result.value(), iter));
-                break;
-            }
-
-            // Check for convergence
-            if (abs(solver.evaluate(solver.result())) < eps) break;
-
-            // Check for max. iterations
-            if (iter >= maxiter) {
-                result = tl::make_unexpected(
-                    EXPECTED_T("Maximum number of iterations exceeded!", RootErrorType::MaxIterationsExceeded, result.value(), iter));
-                break;
-            }
-
-            // Perform one iteration
-            ++iter;
-            solver.iterate();
-        }
-
-        return result;
     }
 
     template<template< typename, typename > class SOLVER_T,
@@ -349,10 +352,8 @@ namespace nxx::roots
                   ITER_T  maxiter = iterations< GUESS_T >())
     {
         auto solver = SOLVER_T(function, derivative);
-        return fdfsolve_impl(solver, guess, eps, maxiter);
+        return detail::fdfsolve_impl(solver, guess, eps, maxiter);
     }
-
-
 } // namespace nxx::roots
 
 #endif    // NUMERIXX_ROOTPOLISHING_HPP
