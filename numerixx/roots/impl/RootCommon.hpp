@@ -229,7 +229,7 @@ namespace nxx::roots
         /*
          * Specialization of the PolishingTraits class for Newton<FN, DFN>
          */
-        template< typename FN, typename DFN, typename T >
+        template<typename FN, typename DFN, typename T>
         struct PolishingTraits< Newton< FN, DFN, T > >
         {
             using FUNCTION_T        = FN;

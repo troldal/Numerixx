@@ -69,14 +69,15 @@ namespace nxx
         requires nxx::IsFloatOrComplex< std::invoke_result_t< Func, long double > >;
     };
 
-    template< typename Func>
-    concept IsComplexInvocable = requires(Func f) {
+    template<typename Func>
+    concept IsComplexInvocable = requires(Func f)
+    {
         requires nxx::IsComplex< std::invoke_result_t< Func, std::complex< float > > >;
         requires nxx::IsComplex< std::invoke_result_t< Func, std::complex< double > > >;
         requires nxx::IsComplex< std::invoke_result_t< Func, std::complex< long double > > >;
     };
 
-    template <typename Func>
+    template<typename Func>
     concept IsFloatOrComplexInvocable = IsFloatInvocable< Func > || IsComplexInvocable< Func >;
 
     template<typename T>

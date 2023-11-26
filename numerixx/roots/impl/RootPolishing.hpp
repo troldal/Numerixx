@@ -337,8 +337,9 @@ namespace nxx::roots
     auto fdfsolve(FN_T    function,
                   DERIV_T derivative,
                   GUESS_T guess,
-                  EPS_T   eps,     /**< Default epsilon value based on the type of the guess. */
-                  ITER_T  maxiter) /**< Default maximum iterations based on the type of the guess. */
+                  EPS_T   eps,
+                  /**< Default epsilon value based on the type of the guess. */
+                  ITER_T maxiter) /**< Default maximum iterations based on the type of the guess. */
     {
         // Instantiates the solver with the given function, its derivative, and types.
         auto solver = SOLVER_T< FN_T, DERIV_T, GUESS_T >(function, derivative);

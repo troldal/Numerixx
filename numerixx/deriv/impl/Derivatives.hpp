@@ -392,8 +392,8 @@ namespace nxx::deriv
          * @throws NumerixxError if stepsize is invalid.
          */
         constexpr auto              Order2Forward4PointLambda = [](IsFloatInvocable auto function,
-            nxx::IsFloat auto val,
-            nxx::IsFloat auto stepsize) {
+                                                                   nxx::IsFloat auto val,
+                                                                   nxx::IsFloat auto stepsize) {
             return (-function(val + 3 * stepsize) + 4 * function(val + 2 * stepsize) - 5 * function(val + stepsize) + 2 * function(val)) /
                    (stepsize * stepsize);
         };
@@ -531,7 +531,7 @@ namespace nxx::deriv
          *
          * @throws NumerixxError if stepsize is invalid.
          */
-        constexpr auto Order2Backward4PointLambda = [](IsFloatInvocable auto function,
+        constexpr auto                                                   Order2Backward4PointLambda = [](IsFloatInvocable auto function,
                                                        nxx::IsFloat auto val,
                                                        nxx::IsFloat auto stepsize) {
             return (2 * function(val) - 5 * function(val - stepsize) + 4 * function(val - 2 * stepsize) - function(val - 3 * stepsize)) /
@@ -557,7 +557,7 @@ namespace nxx::deriv
          */
         template<typename ALGO>
         inline auto diff_impl(IsFloatInvocable auto                                     function,
-                              nxx::IsFloat auto                                   val,
+                              nxx::IsFloat auto                                         val,
                               std::invoke_result_t< decltype(function), decltype(val) > stepsize =
                                   nxx::StepSize< std::invoke_result_t< decltype(function), decltype(val) > >())
         {
@@ -694,7 +694,7 @@ namespace nxx::deriv
     template<typename ALGO>
         requires ALGO::IsDiffSolver
     inline auto diff(IsFloatInvocable auto                                     function,
-                     nxx::IsFloat auto                                   val,
+                     nxx::IsFloat auto                                         val,
                      std::invoke_result_t< decltype(function), decltype(val) > stepsize =
                          nxx::StepSize< std::invoke_result_t< decltype(function), decltype(val) > >())
     {
@@ -719,7 +719,7 @@ namespace nxx::deriv
      */
     template<typename ALGO>
     inline auto diff(IsFloatInvocable auto                                     function,
-                     nxx::IsFloat auto                                   val,
+                     nxx::IsFloat auto                                         val,
                      std::invoke_result_t< decltype(function), decltype(val) > stepsize =
                          nxx::StepSize< std::invoke_result_t< decltype(function), decltype(val) > >())
     {
@@ -740,7 +740,7 @@ namespace nxx::deriv
     template<typename FN>
         requires IsFloatInvocable< FN >
     inline auto central(FN                                                        function,
-                        nxx::IsFloat auto                                   val,
+                        nxx::IsFloat auto                                         val,
                         std::invoke_result_t< decltype(function), decltype(val) > stepsize =
                             nxx::StepSize< std::invoke_result_t< decltype(function), decltype(val) > >())
     {
@@ -782,7 +782,7 @@ namespace nxx::deriv
     template<typename FN>
         requires IsFloatInvocable< FN >
     inline auto backward(FN                                                        function,
-                         nxx::IsFloat auto                                   val,
+                         nxx::IsFloat auto                                         val,
                          std::invoke_result_t< decltype(function), decltype(val) > stepsize =
                              nxx::StepSize< std::invoke_result_t< decltype(function), decltype(val) > >())
     {

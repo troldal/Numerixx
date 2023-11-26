@@ -70,7 +70,8 @@ int main()
     std::cout << "Regula Falsi Method:      " << *fsolve< RegulaFalsi >(func, bounds) << std::endl << std::endl;
 
     std::cout << "\nCompute the root of the polynomial f(x) = x^2 - 5 using polishing methods:\n";
-    std::cout << "Newton's Method:          " << *fdfsolve< Newton >(func, nxx::deriv::derivativeOf(func), NXX_FLOAT(1.25)) << std::endl << std::endl;
+    std::cout << "Newton's Method:          " << *fdfsolve< Newton >(func, nxx::deriv::derivativeOf(func), NXX_FLOAT(1.25)) << std::endl <<
+        std::endl;
 
     // Note that the Discrete Newton's Method uses the numerical derivative of the function, while
     // Newton's Method requires a separate function for the derivative.
@@ -161,8 +162,10 @@ int main()
             std::cout << fmt::format("{:10} | {:15.10f} | {:15.10f} | {:15.10f} | {:15.10f} ",
                                      i,
                                      // Iteration number
-                                     solver.current().first,     // Upper endpoint
-                                     solver.current().second,    // Lower endpoint
+                                     solver.current().first,
+                                     // Upper endpoint
+                                     solver.current().second,
+                                     // Lower endpoint
                                      min->first,                // Root
                                      min->second)               // Error
                 << std::endl;
@@ -207,9 +210,10 @@ int main()
             std::cout << fmt::format("{:10} | {:25.20f} | {:25.20f} ",
                                      i,
                                      // Iteration number
-                                     solver.current(),                          // Current guess
+                                     solver.current(),
+                                     // Current guess
                                      abs(solver.evaluate(solver.current())))    // Error
-                      << std::endl;
+                << std::endl;
 
             // Check if convergence has been reached:
             if (abs(solver.evaluate(solver.current())) < nxx::epsilon<NXX_FLOAT>()) break;

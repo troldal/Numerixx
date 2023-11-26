@@ -586,8 +586,10 @@ namespace nxx::roots
         std::integral ITER_T = int>
     auto fsolve(FN_T     function,
                 STRUCT_T bounds,
-                EPS_T    eps = epsilon< StructCommonType_t< STRUCT_T > >(),        /**< Default epsilon value based on the type of bounds. */
-                ITER_T   maxiter = iterations< StructCommonType_t< STRUCT_T > >()) /**< Default max. iterations based on the type of bounds. */
+                EPS_T    eps = epsilon< StructCommonType_t< STRUCT_T > >(),
+                /**< Default epsilon value based on the type of bounds. */
+                ITER_T maxiter = iterations< StructCommonType_t< STRUCT_T > >())
+    /**< Default max. iterations based on the type of bounds. */
     {
         auto [lo, hi] = bounds; /**< Extract lower and upper bounds from the struct. */
 
@@ -626,8 +628,9 @@ namespace nxx::roots
         std::integral ITER_T = int>
     auto fsolve(FN_T                           function,
                 std::initializer_list< ARG_T > bounds,
-                EPS_T                          eps = epsilon< ARG_T >(),        /**< Default epsilon value based on ARG_T. */
-                ITER_T                         maxiter = iterations< ARG_T >()) /**< Default maximum iterations based on ARG_T. */
+                EPS_T                          eps = epsilon< ARG_T >(),
+                /**< Default epsilon value based on ARG_T. */
+                ITER_T maxiter = iterations< ARG_T >()) /**< Default maximum iterations based on ARG_T. */
     {
         // Check for correct number of elements in the initializer list.
         if (bounds.size() != 2) throw NumerixxError("Initializer list must contain exactly two elements!");
@@ -668,8 +671,10 @@ namespace nxx::roots
         requires nxx::IsFloat< typename CONT_T::value_type >
     auto fsolve(FN_T          function,
                 const CONT_T& bounds,
-                EPS_T         eps = epsilon< typename CONT_T::value_type >(),        /**< Default epsilon value based on the container's value type. */
-                ITER_T        maxiter = iterations< typename CONT_T::value_type >()) /**< Default maximum iterations based on the container's value type. */
+                EPS_T         eps = epsilon< typename CONT_T::value_type >(),
+                /**< Default epsilon value based on the container's value type. */
+                ITER_T maxiter = iterations< typename CONT_T::value_type >())
+    /**< Default maximum iterations based on the container's value type. */
     {
         // Ensure the container has exactly two elements representing the bounds.
         if (bounds.size() != 2) throw NumerixxError("Container must contain exactly two elements!");
