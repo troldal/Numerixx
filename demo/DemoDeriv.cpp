@@ -29,7 +29,7 @@ int main()
     using namespace nxx::deriv;
     using namespace boost::multiprecision;
     std::cout << std::fixed << std::setprecision(50);
-    auto func = [](nxx::FloatingPoint auto x) { return log(x) + 2 * x; };
+    auto func = [](nxx::IsFloat auto x) { return log(x) + 2 * x; };
 
     // ============================================================================================
     // The most straightforward way of computing the numerical derivatives is to use the 'central'

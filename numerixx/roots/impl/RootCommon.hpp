@@ -63,7 +63,7 @@ namespace nxx::roots
         {}
     };
 
-    namespace impl
+    namespace detail
     { /**
        * @brief The RootErrorImpl class is a template class for root-finding errors.
        * @tparam T The type of the root value.
@@ -148,25 +148,25 @@ namespace nxx::roots
     /*
      * Forward declaration of the Ridders class.
      */
-    template<IsFloatInvocable FN, nxx::FloatingPoint ARG_T>
+    template<IsFloatInvocable FN, nxx::IsFloat ARG_T>
     class Ridder;
 
     /*
      * Forward declaration of the Bisection class.
      */
-    template<IsFloatInvocable FN, nxx::FloatingPoint ARG_T>
+    template<IsFloatInvocable FN, nxx::IsFloat ARG_T>
     class Bisection;
 
     /*
      * Forward declaration of the RegulaFalsi class.
      */
-    template<IsFloatInvocable FN, nxx::FloatingPoint ARG_T>
+    template<IsFloatInvocable FN, nxx::IsFloat ARG_T>
     class RegulaFalsi;
 
     /*
      * Private implementation details.
      */
-    namespace impl
+    namespace detail
     {
         /*
          * Forward declaration of the BracketingTraits class.
@@ -215,12 +215,10 @@ namespace nxx::roots
     /*
      * Forward declaration of the Newton class.
      */
-    template< typename FN, typename DFN >
-    requires(IsFloatInvocable< FN > && IsFloatInvocable< DFN >) ||
-            (IsComplex< std::invoke_result_t< FN, double > > && IsComplex< std::invoke_result_t< DFN, double > >)
+    template<IsFloatOrComplexInvocable FN, IsFloatOrComplexInvocable DFN, IsFloatOrComplex ARG_T>
     class Newton;
 
-    namespace impl
+    namespace detail
     {
         /*
          * Forward declaration of the PolishingTraits class.
@@ -231,8 +229,8 @@ namespace nxx::roots
         /*
          * Specialization of the PolishingTraits class for Newton<FN, DFN>
          */
-        template< typename FN, typename DFN >
-        struct PolishingTraits< Newton< FN, DFN > >
+        template< typename FN, typename DFN, typename T >
+        struct PolishingTraits< Newton< FN, DFN, T > >
         {
             using FUNCTION_T        = FN;
             using DERIV_T           = DFN;
@@ -269,7 +267,7 @@ namespace nxx::roots
     /*
      * Private implementation details.
      */
-    namespace impl
+    namespace detail
     {
         /*
          * Forward declaration of the BracketingTraits class.

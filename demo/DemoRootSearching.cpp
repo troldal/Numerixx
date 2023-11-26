@@ -127,21 +127,21 @@ int main()
             // Print the current iteration:
             std::cout << fmt::format("{:10} | {:15.10f} | {:15.10f} | {:15.10f} ",
                                      i,                         // Iteration number
-                                     solver.bounds().first,     // Lower bound
-                                     solver.bounds().second,    // Upper bound
+                                     solver.current().first,     // Lower bound
+                                     solver.current().second,    // Upper bound
                                      solver.factor())           // Expansion factor
                       << std::endl;
 
             // Check if a root is in the current interval:
-            if (solver.evaluate(solver.bounds().first) * solver.evaluate(solver.bounds().second) < 0.0) break;
+            if (solver.evaluate(solver.current().first) * solver.evaluate(solver.current().second) < 0.0) break;
 
             // Perform one iteration:
             solver.iterate();
         }
 
         // Print the final result:
-        std::cout << std::fixed << std::setprecision(10) << "SUCCESS! Bounds found at: (" << solver.bounds().first << ", "
-                  << solver.bounds().second << ")\n";
+        std::cout << std::fixed << std::setprecision(10) << "SUCCESS! Bounds found at: (" << solver.current().first << ", "
+                  << solver.current().second << ")\n";
         std::cout << "----------------------------------------------------------------\n\n";
     };
 

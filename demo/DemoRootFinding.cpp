@@ -7,12 +7,13 @@
 #include <array>
 #include <iomanip>
 #include <iostream>
+#include <Deriv.hpp>
 #include <Roots.hpp>
 #include <concepts>
 #include <fmt/format.h>
 #include <boost/multiprecision/cpp_bin_float.hpp>
 
-using NXX_FLOAT = boost::multiprecision::cpp_bin_float_100;
+using NXX_FLOAT = boost::multiprecision::cpp_bin_float_50;
 
 template<>
 struct fmt::formatter< NXX_FLOAT > : fmt::formatter< double >
@@ -28,7 +29,7 @@ int main()
     using namespace nxx::roots;
     using namespace boost::multiprecision;
     std::cout << std::fixed << std::setprecision(8);
-    auto                                    func   = [](nxx::FloatingPoint auto x) { return x * x - decltype(x)(5.0); };
+    auto                                    func   = [](nxx::IsFloat auto x) { return x * x - decltype(x)(5.0); };
     const std::pair< NXX_FLOAT, NXX_FLOAT > bounds = { 0.0, 2.5 };
 
     // ============================================================================================
@@ -69,8 +70,7 @@ int main()
     std::cout << "Regula Falsi Method:      " << *fsolve< RegulaFalsi >(func, bounds) << std::endl << std::endl;
 
     std::cout << "\nCompute the root of the polynomial f(x) = x^2 - 5 using polishing methods:\n";
-    // std::cout << "Discrete Newton's Method: " << *fdfsolve(DNewton(func), 1.25, 1.0E-15) << std::endl;
-    std::cout << "Newton's Method:          " << *fdfsolve< Newton >(func, derivativeOf(func), 1.25, 1.0E-15) << std::endl << std::endl;
+    std::cout << "Newton's Method:          " << *fdfsolve< Newton >(func, nxx::deriv::derivativeOf(func), NXX_FLOAT(1.25)) << std::endl << std::endl;
 
     // Note that the Discrete Newton's Method uses the numerical derivative of the function, while
     // Newton's Method requires a separate function for the derivative.
@@ -112,11 +112,11 @@ int main()
     // The error object from the fdfsolve() function works in the same way.
     std::cout << "Compute the root of the function f(x) = log(x) using the DNewton method:\n\n";
     std::cout << "Initial Guess = 0.0:\n"; // The function is undefined at x <= 0
-    root = fdfsolve< Newton >(log_func, derivativeOf(log_func), 0.0, 1.0E-15);
+    root = fdfsolve< Newton >(log_func, nxx::deriv::derivativeOf(log_func), 0.0, 1.0E-15);
     if (!root.has_value()) print_error(root.error());
 
     std::cout << "Initial Guess = 1E-3:\n"; // This guess is close to the root, but will require many iterations
-    root = fdfsolve< Newton >(log_func, derivativeOf(log_func), 1E-3, 1.0E-15, 5);
+    root = fdfsolve< Newton >(log_func, nxx::deriv::derivativeOf(log_func), 1E-3, 1.0E-15, 5);
     if (!root.has_value()) print_error(root.error());
 
     // ============================================================================================
@@ -149,8 +149,8 @@ int main()
         // Iterate until convergence (or until 100 iterations have been performed):
         for (auto i = 0; i <= nxx::iterations<NXX_FLOAT>(); ++i) {
             // Retrieve the current bracketing interval, and evaluate the function at the endpoints:
-            guesses = { std::make_pair(solver.bounds().first, abs(solver.evaluate(solver.bounds().first))),
-                        std::make_pair(solver.bounds().second, abs(solver.evaluate(solver.bounds().second))) };
+            guesses = { std::make_pair(solver.current().first, abs(solver.evaluate(solver.current().first))),
+                        std::make_pair(solver.current().second, abs(solver.evaluate(solver.current().second))) };
 
             // Find the endpoint which has the smallest error:
             min = std::min_element(guesses.begin(), guesses.end(), [](const auto& a, const auto& b) {
@@ -161,8 +161,8 @@ int main()
             std::cout << fmt::format("{:10} | {:15.10f} | {:15.10f} | {:15.10f} | {:15.10f} ",
                                      i,
                                      // Iteration number
-                                     solver.bounds().first,     // Upper endpoint
-                                     solver.bounds().second,    // Lower endpoint
+                                     solver.current().first,     // Upper endpoint
+                                     solver.current().second,    // Lower endpoint
                                      min->first,                // Root
                                      min->second)               // Error
                 << std::endl;
@@ -175,7 +175,8 @@ int main()
         }
 
         // Print the final result:
-        std::cout << std::fixed << std::setprecision(20) << "CONVERGED! Root found at: " << min->first << "\n";
+        std::cout << std::fixed << std::setprecision(50) << "CONVERGED! Root found at: " << min->first << "\n";
+        std::cout << std::fixed << std::setprecision(50) << "Function value at root:   " << solver.evaluate(min->first) << "\n";
         std::cout << "----------------------------------------------------------------------------------\n\n";
     };
 
@@ -189,7 +190,7 @@ int main()
     bracket_root(RegulaFalsi(func, bounds));
 
     // Lambda function for printing the results of the polishing solvers:
-    auto polish_root = [](auto solver, double guess) {
+    auto polish_root = [](auto solver, NXX_FLOAT guess) {
         // Print the header:
         std::cout << "------------------------------------------------------------------\n";
         std::cout << fmt::format("{:>10} | {:>25} | {:>25} ", "Iter", "Root", "Error") << std::endl;
@@ -206,27 +207,25 @@ int main()
             std::cout << fmt::format("{:10} | {:25.20f} | {:25.20f} ",
                                      i,
                                      // Iteration number
-                                     solver.result(),                          // Current guess
-                                     abs(solver.evaluate(solver.result())))    // Error
+                                     solver.current(),                          // Current guess
+                                     abs(solver.evaluate(solver.current())))    // Error
                       << std::endl;
 
             // Check if convergence has been reached:
-            if (abs(solver.evaluate(solver.result())) < 1.0E-15) break;
+            if (abs(solver.evaluate(solver.current())) < nxx::epsilon<NXX_FLOAT>()) break;
 
             // Perform one iteration:
             solver.iterate();
         }
 
         // Print the final result:
-        std::cout << std::fixed << std::setprecision(20) << "CONVERGED! Root found at: " << solver.result() << "\n";
+        std::cout << std::fixed << std::setprecision(50) << "CONVERGED! Root found at: " << solver.current() << "\n";
+        std::cout << std::fixed << std::setprecision(50) << "Function value at root:   " << solver.evaluate(solver.current()) << "\n";
         std::cout << "------------------------------------------------------------------\n\n";
     };
 
-    // std::cout << "Manual root-finding using the Discrete Newton's method:" << std::endl;
-    // polish_root(DNewton(func), 3.0);
-
     std::cout << "Manual root-finding using Newton's method:" << std::endl;
-    polish_root(Newton(func, derivativeOf(func)), 1.25);
+    polish_root(Newton(func, nxx::deriv::derivativeOf(func), NXX_FLOAT(1.25)), NXX_FLOAT(1.25));
 
     return 0;
 }

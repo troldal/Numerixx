@@ -47,7 +47,7 @@ namespace nxx::roots
     // ========================================================================
     // BRACKET SEARCHING
     // ========================================================================
-    namespace impl
+    namespace detail
     {
         /**
          * @brief A template base class for search algorithms.
@@ -284,9 +284,9 @@ namespace nxx::roots
      */
     template< typename FN >
         requires IsFloatInvocable< FN >
-    class BracketSearchUp final : public impl::SearchBase< BracketSearchUp< FN > >
+    class BracketSearchUp final : public detail::SearchBase< BracketSearchUp< FN > >
     {
-        using BASE = impl::SearchBase< BracketSearchUp< FN > >;
+        using BASE = detail::SearchBase< BracketSearchUp< FN > >;
 
     public:
         using function_type = FN;
@@ -313,7 +313,7 @@ namespace nxx::roots
          */
         void iterate()
         {
-            const auto& bounds = BASE::bounds();
+            const auto& bounds = BASE::current();
 
             if (BASE::evaluate(bounds.first) * BASE::evaluate(bounds.second) < 0.0) return;
 
@@ -336,9 +336,9 @@ namespace nxx::roots
      */
     template<typename FN>
         requires IsFloatInvocable< FN >
-    class BracketSearchDown final : public impl::SearchBase< BracketSearchDown< FN > >
+    class BracketSearchDown final : public detail::SearchBase< BracketSearchDown< FN > >
     {
-        using BASE = impl::SearchBase< BracketSearchDown< FN > >;
+        using BASE = detail::SearchBase< BracketSearchDown< FN > >;
 
     public:
         using function_type = FN;
@@ -365,7 +365,7 @@ namespace nxx::roots
          */
         void iterate()
         {
-            const auto& bounds = BASE::bounds();
+            const auto& bounds = BASE::current();
 
             if (BASE::evaluate(bounds.first) * BASE::evaluate(bounds.second) < 0.0) return;
 
@@ -388,9 +388,9 @@ namespace nxx::roots
      */
     template<typename FN>
         requires IsFloatInvocable< FN >
-    class BracketExpandUp final : public impl::SearchBase< BracketExpandUp< FN > >
+    class BracketExpandUp final : public detail::SearchBase< BracketExpandUp< FN > >
     {
-        using BASE = impl::SearchBase< BracketExpandUp< FN > >;
+        using BASE = detail::SearchBase< BracketExpandUp< FN > >;
 
     public:
         using function_type = FN;
@@ -417,7 +417,7 @@ namespace nxx::roots
          */
         void iterate()
         {
-            const auto& bounds = BASE::bounds();
+            const auto& bounds = BASE::current();
 
             if (BASE::evaluate(bounds.first) * BASE::evaluate(bounds.second) < 0.0) return;
 
@@ -439,9 +439,9 @@ namespace nxx::roots
      */
     template<typename FN>
         requires IsFloatInvocable< FN >
-    class BracketExpandDown final : public impl::SearchBase< BracketExpandDown< FN > >
+    class BracketExpandDown final : public detail::SearchBase< BracketExpandDown< FN > >
     {
-        using BASE = impl::SearchBase< BracketExpandDown< FN > >;
+        using BASE = detail::SearchBase< BracketExpandDown< FN > >;
 
     public:
         using function_type = FN;
@@ -468,7 +468,7 @@ namespace nxx::roots
          */
         void iterate()
         {
-            const auto& bounds = BASE::bounds();
+            const auto& bounds = BASE::current();
 
             if (BASE::evaluate(bounds.first) * BASE::evaluate(bounds.second) < 0.0) return;
 
@@ -480,9 +480,9 @@ namespace nxx::roots
 
     template<typename FN>
         requires IsFloatInvocable< FN >
-    class BracketExpandOut final : public impl::SearchBase< BracketExpandOut< FN > >
+    class BracketExpandOut final : public detail::SearchBase< BracketExpandOut< FN > >
     {
-        using BASE = impl::SearchBase< BracketExpandOut< FN > >;
+        using BASE = detail::SearchBase< BracketExpandOut< FN > >;
 
     public:
         using function_type = FN;
@@ -509,7 +509,7 @@ namespace nxx::roots
          */
         void iterate()
         {
-            const auto& bounds = BASE::bounds();
+            const auto& bounds = BASE::current();
 
             if (BASE::evaluate(bounds.first) * BASE::evaluate(bounds.second) < 0.0) return;
 
@@ -533,9 +533,9 @@ namespace nxx::roots
      */
     template<typename FN>
         requires IsFloatInvocable< FN >
-    class BracketSubdivide final : public impl::SearchBase< BracketSubdivide< FN > >
+    class BracketSubdivide final : public detail::SearchBase< BracketSubdivide< FN > >
     {
-        using BASE = impl::SearchBase< BracketSubdivide< FN > >;
+        using BASE = detail::SearchBase< BracketSubdivide< FN > >;
 
     public:
         using function_type = FN;
@@ -564,7 +564,7 @@ namespace nxx::roots
          */
         void iterate()
         {
-            const auto& bounds = BASE::bounds();
+            const auto& bounds = BASE::current();
             if (BASE::evaluate(bounds.first) * BASE::evaluate(bounds.second) < 0.0) return;
 
             size_t factor = std::ceil(BASE::factor());
@@ -584,7 +584,7 @@ namespace nxx::roots
         }
     };
 
-    namespace impl
+    namespace detail
     {
         /**
          * @brief The main search implementation function.
@@ -605,7 +605,7 @@ namespace nxx::roots
                      { solver.evaluate(0.0) } -> std::floating_point;
                      { solver.init(bounds) };
                      { solver.iterate() };
-                     { solver.bounds() };
+                     { solver.current() };
                      { solver.factor() };
                      // clang-format on
                  }
@@ -618,7 +618,7 @@ namespace nxx::roots
             using RT = tl::expected< decltype(bounds), ET >;
 
             solver.init(bounds, searchFactor);
-            auto                         curBounds = solver.bounds();
+            auto                         curBounds = solver.current();
             RT                           result    = curBounds;
             typename SOLVER::return_type eval_lower;
             typename SOLVER::return_type eval_upper;
@@ -631,7 +631,7 @@ namespace nxx::roots
 
             int iter = 1;
             while (true) {
-                curBounds  = solver.bounds();
+                curBounds  = solver.current();
                 eval_lower = solver.evaluate(curBounds.first);
                 eval_upper = solver.evaluate(curBounds.second);
 

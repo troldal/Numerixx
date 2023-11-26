@@ -58,146 +58,112 @@ namespace nxx::roots
     //
     // =================================================================================================================
 
-    namespace impl
+    namespace detail
     {
         /**
-         * @brief A base class for bracketing root-finding algorithms.
+         * @brief Provides a base class template for root bracketing algorithms.
          *
-         * This class provides a generic interface for bracketing root-finding algorithms. The actual algorithm
-         * is implemented in a derived class, which is passed as a template argument (POLICY).
+         * The BracketingBase class template serves as a foundational component for
+         * algorithms that bracket roots of a given function. It encapsulates common
+         * functionalities such as storing the objective function and maintaining the
+         * current bounds around the root. This class enforces certain type constraints
+         * on the template parameters to ensure compatibility with root bracketing algorithms.
          *
-         * @tparam DERIVED The derived class implementing the specific root-finding algorithm.
-         * @requires POLICY must be invocable with a floating point type as its argument type.
+         * @tparam DERIVED The subclass inheriting from BracketingBase.
+         * @tparam FUNCTION_T The type of the function for which the root is being bracketed.
+         * @tparam ARG_T The type of the argument to the function.
          */
+
         template<typename DERIVED, typename FUNCTION_T, typename ARG_T>
             requires std::same_as< typename BracketingTraits< DERIVED >::FUNCTION_T, FUNCTION_T > &&
                      nxx::IsFloatInvocable< FUNCTION_T > &&
-                     nxx::FloatingPoint< ARG_T > &&
-                     nxx::FloatingPoint< typename BracketingTraits< DERIVED >::RETURN_T >
+                     nxx::IsFloat< ARG_T > &&
+                     nxx::IsFloat< typename BracketingTraits< DERIVED >::RETURN_T >
         class BracketingBase
         {
-            /*
-             * Friend declarations.
-             */
             friend DERIVED;
 
         public:
-            using RESULT_T = std::invoke_result_t< FUNCTION_T, ARG_T >;
-            using BOUNDS_T = std::pair< ARG_T, ARG_T >;
+            static constexpr bool IsBracketingSolver = true; /**< Flag indicating the class is a bracketing solver. */
+
+            using RESULT_T = std::invoke_result_t< FUNCTION_T, ARG_T >; /**< Result type of the function. */
+            using BOUNDS_T = std::pair< ARG_T, ARG_T >;                 /**< Type for representing the bounds around the root. */
 
         protected:
-            /**
-             * @brief Default destructor.
-             */
-            ~BracketingBase() = default;
+            ~BracketingBase() = default; /**< Protected destructor to prevent direct instantiation. */
 
-        public:
+        private:
             FUNCTION_T m_func{};                 /**< The function object to find the root for. */
             BOUNDS_T   m_bounds{};               /**< Holds the current bounds around the root. */
             bool       m_isInitialized{ false }; /**< Indicates whether the solver has been initialized. */
 
+        public:
             /**
-             * @brief Constructor, taking a function object as an argument.
-             *
-             * @param objective The function object to find the root for.
-             * @note Constructor is private to avoid direct usage by clients.
+             * @brief Constructs the BracketingBase with a function.
+             * @param objective The function for which the root is being bracketed.
              */
             explicit BracketingBase(FUNCTION_T objective)
                 : m_func{ std::move(objective) } {}
 
             /**
-             * @brief Constructor, taking a function object and std::initialilzer_list with the bounds as arguments.
-             *
-             * @param objective The function object to find the root for.
-             * @param bounds An std::initializer_list object holding the initial bounds around the root. The root must be contained
-             * inside these bounds. The list must contain exactly two elements, which will be interpreted as the lower and
-             * upper bounds, respectively.
-             * @note Constructor is private to avoid direct usage by clients.
+             * @brief Constructs the BracketingBase with a function and initial bounds.
+             * @tparam T The type of the bounds, must be a float type.
+             * @param objective The function for which the root is being bracketed.
+             * @param bounds Initial bounds for the root.
              */
             template<typename T>
-                requires nxx::FloatingPoint< T >
+                requires nxx::IsFloat< T >
             BracketingBase(FUNCTION_T objective, std::initializer_list< T > bounds)
                 : m_func{ std::move(objective) } { init(bounds); }
 
             /**
-             * @brief Constructor, taking a function object and a container with the bounds as arguments.
-             *
-             * @param objective The function object to find the root for.
-             * @param bounds A container holding the initial bounds around the root. The root must be contained
-             * inside these bounds. The container must contain exactly two elements, which will be interpreted as the lower and
-             * upper bounds, respectively.
-             * @note Constructor is private to avoid direct usage by clients.
+             * @brief Constructs the BracketingBase with a function and bounds from a container.
+             * @tparam CONT_T The container type holding the bounds.
+             * @param objective The function for which the root is being bracketed.
+             * @param bounds Container with the initial bounds.
              */
             template<IsContainer CONT_T>
-                requires nxx::FloatingPoint< typename CONT_T::value_type >
+                requires nxx::IsFloat< typename CONT_T::value_type >
             BracketingBase(FUNCTION_T objective, CONT_T bounds)
                 : m_func{ std::move(objective) } { init(bounds); }
 
             /**
-             * @brief Constructor, taking a function object and a struct with the bounds as arguments.
-             *
-             * @param objective The function object to find the root for.
-             * @param bounds A struct holding the initial bounds around the root. The root must be contained
-             * inside these bounds. The struct must support structured bindings to provide two values: lower and upper bounds.
-             * Examples of supported types include pairs, tuples, or custom structs with structured bindings support.
-             * @note Constructor is private to avoid direct usage by clients.
+             * @brief Constructs the BracketingBase with a function and bounds from a float struct.
+             * @tparam STRUCT_T The struct type holding the bounds.
+             * @param objective The function for which the root is being bracketed.
+             * @param bounds Struct with the initial bounds.
              */
             template<IsFloatStruct STRUCT_T>
             BracketingBase(FUNCTION_T objective, STRUCT_T bounds)
                 : m_func{ std::move(objective) } { init(bounds); }
 
             /**
-             * @brief Sets the current bounds around the root.
-             *
-             * @param bounds A std::pair object holding the lower and upper bounds, respectively.
+             * @brief Sets the bounds for the bracketing solver.
+             * @param bounds The new bounds to be set, represented as a pair of values.
+             * @throws NumerixxError If the solver has not been initialized.
+             * @note This method assumes that the bounds are provided in the correct order (lower, upper).
              */
             void setBounds(const BOUNDS_T& bounds)
             {
                 if (!m_isInitialized) throw NumerixxError("Solver has not been initialized!");
                 auto [lower, upper] = bounds;
-                static_assert(nxx::FloatingPoint< decltype(lower) >);
+                static_assert(nxx::IsFloat< decltype(lower) >);
                 m_bounds = BOUNDS_T{ lower, upper };
             }
 
-            /**
-             * @brief Copy constructor.
-             *
-             * @param other Another BracketingBase object to be copied.
-             */
-            BracketingBase(const BracketingBase& other) = default;
+            BracketingBase(const BracketingBase& other)                = default; /**< Default copy constructor. */
+            BracketingBase(BracketingBase&& other) noexcept            = default; /**< Default move constructor. */
+            BracketingBase& operator=(const BracketingBase& other)     = default; /**< Default copy assignment operator. */
+            BracketingBase& operator=(BracketingBase&& other) noexcept = default; /**< Default move assignment operator. */
 
             /**
-             * @brief Move constructor.
-             *
-             * @param other Another BracketingBase object to be moved.
-             */
-            BracketingBase(BracketingBase&& other) noexcept = default;
-
-            /**
-             * @brief Copy assignment operator.
-             *
-             * @param other Another BracketingBase object to be copied.
-             * @return A reference to the assigned object.
-             */
-            BracketingBase& operator=(const BracketingBase& other) = default;
-
-            /**
-             * @brief Move assignment operator.
-             *
-             * @param other Another BracketingBase object to be moved.
-             * @return A reference to the assigned object.
-             */
-            BracketingBase& operator=(BracketingBase&& other) noexcept = default;
-
-            /**
-             * @brief Initializes the solver with the initial bounds.
-             *
-             * @param bounds An std::initializer_list object holding the initial bounds around the root. The root must be contained
-             * inside these bounds. The list must contain exactly two elements, which will be interpreted as the lower and
-             * upper bounds, respectively.
+             * @brief Initializes the solver with bounds from an initializer list.
+             * @tparam T The type of the elements in the list, must be a float type.
+             * @param bounds Initializer list with exactly two elements representing the bounds.
+             * @throws NumerixxError If the initializer list does not contain exactly two elements.
              */
             template<typename T>
-                requires nxx::FloatingPoint< T >
+                requires nxx::IsFloat< T >
             void init(std::initializer_list< T > bounds)
             {
                 m_isInitialized = true;
@@ -207,14 +173,13 @@ namespace nxx::roots
             }
 
             /**
-             * @brief Initializes the solver with the initial bounds.
-             *
-             * @param bounds A container holding the initial bounds around the root. The root must be contained
-             * inside these bounds. The container must contain exactly two elements, which will be interpreted as the lower and
-             * upper bounds, respectively.
+             * @brief Initializes the solver with bounds from a container.
+             * @tparam CONT_T The container type holding the bounds.
+             * @param bounds Container with exactly two elements representing the bounds.
+             * @throws NumerixxError If the container does not contain exactly two elements.
              */
             template<IsContainer CONT_T>
-                requires nxx::FloatingPoint< typename CONT_T::value_type >
+                requires nxx::IsFloat< typename CONT_T::value_type >
             void init(CONT_T bounds)
             {
                 m_isInitialized = true;
@@ -223,11 +188,9 @@ namespace nxx::roots
             }
 
             /**
-             * @brief Initializes the solver with the initial bounds.
-             *
-             * @param bounds A struct holding the initial bounds around the root. The root must be contained
-             * inside these bounds. The struct must support structured bindings to provide two values: lower and upper bounds.
-             * Examples of supported types include pairs, tuples, or custom structs with structured bindings support.
+             * @brief Initializes the solver with bounds from a float struct.
+             * @tparam STRUCT_T The struct type holding the bounds.
+             * @param bounds Struct with exactly two members representing the bounds.
              */
             template<IsFloatStruct STRUCT_T>
             void init(STRUCT_T bounds)
@@ -238,34 +201,25 @@ namespace nxx::roots
             }
 
             /**
-             * @brief Resets the solver to its initial state. To be called before reusing the solver.
-             *
-             * @note After calling this function, the solver must be initialized again before it can be used.
-             * @warning If the solver is used without initializing, the behavior is undefined.
+             * @brief Resets the solver to an uninitialized state.
              */
             void reset() { m_isInitialized = false; }
 
             /**
-             * @brief Evaluates the function to solve at a given point.
-             *
-             * Passes the given argument to the function object to solve and returns the result of the evaluation.
-             * The return type will be the same as the return type of the given function object.
-             *
-             * @param value The value at which to evaluate the function.
-             * @return The result of the evaluation.
+             * @brief Evaluates the function at a given value.
+             * @param value The value at which the function is to be evaluated.
+             * @return The result of evaluating the function at the specified value.
              */
             RESULT_T evaluate(ARG_T value) { return m_func(value); }
 
             /**
-             * @brief Returns the current bounds around the root.
-             *
-             * Every time an iteration is executed, the bounds will narrow. This function returns a const reference
-             * to the current bounds as a std::pair. The value type of the bounds is the same as the return type
-             * of the function object.
-             *
-             * @return A const reference to the current bounds.
+             * @brief Returns the current bounds of the solver.
+             * @details This method returns the current bounds being used by the solver.
+             *          It throws an exception if the solver has not been initialized.
+             * @throws NumerixxError If the solver has not been initialized.
+             * @return The current bounds of the solver.
              */
-            const BOUNDS_T& bounds() const
+            const BOUNDS_T& current() const
             {
                 if (!m_isInitialized) throw NumerixxError("Solver has not been initialized!");
                 return m_bounds;
@@ -288,119 +242,76 @@ namespace nxx::roots
     // =================================================================================================================
 
     /**
-     * @brief Implements Ridder's method for root-finding.
+     * @brief Defines the Ridder class for performing Ridder's method of root bracketing.
      *
-     * This class implements Ridder's method, a bracketing root-finding algorithm, as a derived class of
-     * impl::BracketingBase. It inherits the base functionality from impl::BracketingBase and adds the
-     * specific algorithm implementation for Ridder's method.
+     * Ridder's method is a root-finding algorithm that provides a more robust and often faster
+     * convergence than simple bisection. This class template, `Ridder`, inherits from a base class
+     * that provides common functionalities for root bracketing algorithms, and adds the specific
+     * iteration logic for Ridder's method. It is templated to accept a function and an optional
+     * argument type.
      *
-     * @tparam FN The function object type for which to find the root.
-     * @requires FN must be invocable with a double as its argument type.
+     * @tparam FN The type of the function for which the root is being bracketed.
+     * @tparam ARG_T The type of the argument to the function, defaults to double.
      */
-    template<IsFloatInvocable FN, FloatingPoint ARG_T = double>
-    class Ridder final : public impl::BracketingBase< Ridder< FN, ARG_T >, FN, ARG_T >
+    template<IsFloatInvocable FN, IsFloat ARG_T = double>
+    class Ridder final : public detail::BracketingBase< Ridder< FN, ARG_T >, FN, ARG_T >
     {
-        /*
-         * Private alias declarations.
-         */
-        using BASE = impl::BracketingBase< Ridder< FN, ARG_T >, FN, ARG_T >;
+        using BASE = detail::BracketingBase< Ridder< FN, ARG_T >, FN, ARG_T >; /**< Base class alias for readability. */
 
     public:
-        using BASE::BASE;
+        using BASE::BASE; /**< Inherits constructors from BracketingBase. */
 
         /**
-         * @brief Perform one iteration of Ridder's method.
-         *
-         * This function implements the main algorithm of Ridder's method for root-finding. It updates the
-         * bounds around the root during each iteration, gradually narrowing the search interval.
+         * @brief Performs a single iteration of Ridder's method.
+         * @details This method updates the bounds using Ridder's algorithm. It calculates
+         *          a new estimate for the root and adjusts the bounds accordingly.
          */
         void iterate()
         {
-            const auto& bounds = BASE::bounds();
+            const auto& bounds = BASE::current();
             using RT = std::invoke_result_t< FN, decltype(bounds.first) >;
-
-            using std::abs;
-            using std::pow;
-            using std::sqrt;
 
             const RT& x_lo = bounds.first;
             const RT& x_hi = bounds.second;
             RT        f_lo = BASE::evaluate(x_lo);
             RT        f_hi = BASE::evaluate(x_hi);
 
-            RT x_mid;
-            RT f_mid;
+            RT x_mid = (x_lo + x_hi) / 2.0;
+            RT f_mid = BASE::evaluate(x_mid);
 
-            RT x_new;
-            RT f_new;
+            int sign  = ((f_lo - f_hi) < 0.0 ? -1 : 1);
+            RT  x_new = x_mid + (x_mid - x_lo) * ((sign * f_mid) / sqrt(f_mid * f_mid - f_lo * f_hi));
+            RT  f_new = BASE::evaluate(x_new);
 
-            // ===== Calculate new bounds
-            x_mid    = (x_lo + x_hi) / 2.0;
-            f_mid    = BASE::evaluate(x_mid);
-            int sign = ((f_lo - f_hi) < 0.0 ? -1 : 1);
-            x_new    = x_mid + (x_mid - x_lo) * ((sign * f_mid) / sqrt(f_mid * f_mid - f_lo * f_hi));
-            f_new    = BASE::evaluate(x_new);
-
-            // ===== General case: The root is between x_mid and x_new
-            if (f_mid * f_new < 0.0) {
-                if (x_mid < x_new)
-                    BASE::setBounds({ x_mid, x_new });
-                else
-                    BASE::setBounds({ x_new, x_mid });
-            }
-
-            // ===== Degenerate cases: The root is between x_new and either x_lo or x_hi
-            if (f_hi * f_new < 0.0) {
-                if (x_hi < x_new)
-                    BASE::setBounds({ x_hi, x_new });
-                else
-                    BASE::setBounds({ x_new, x_hi });
-            }
-
-            else {
-                if (x_lo < x_new)
-                    BASE::setBounds({ x_lo, x_new });
-                else
-                    BASE::setBounds({ x_new, x_lo });
-            }
+            // Update bounds based on the results of Ridder's method.
+            if (f_mid * f_new < 0.0)
+                BASE::setBounds(x_mid < x_new ? std::make_pair(x_mid, x_new) : std::make_pair(x_new, x_mid));
+            else if (f_hi * f_new < 0.0)
+                BASE::setBounds(x_hi < x_new ? std::make_pair(x_hi, x_new) : std::make_pair(x_new, x_hi));
+            else
+                BASE::setBounds(x_lo < x_new ? std::make_pair(x_lo, x_new) : std::make_pair(x_new, x_lo));
         }
     };
 
     /**
-     * @brief Deduction guide for the Ridder class.
-     * @tparam FN The type of the function object for which to find the root. The function must be invocable
-     * with a double argument.
+     * @brief Deduction guides for Ridder class.
+     * Allows the type of Ridder class to be deduced from the constructor parameters.
      */
-    template<IsFloatInvocable FN>
-    Ridder(FN func) -> Ridder< decltype(func) >;
+    template<typename FN>
+        requires IsFloatInvocable< FN >
+    Ridder(FN) -> Ridder< FN >;
 
-    /**
-     * @brief Deduction guide for the Ridder class.
-     * @tparam FN The type of the function object for which to find the root. The function must be invocable
-     * with a double argument.
-     * @tparam ARG_T The type of the bounds. Must be a floating point type.
-     */
-    template<IsFloatInvocable FN, FloatingPoint ARG_T>
-    Ridder(FN func, std::initializer_list< ARG_T > bounds) -> Ridder< decltype(func), ARG_T >;
+    template<typename FN, typename ARG_T>
+        requires IsFloatInvocable< FN > && IsFloat< ARG_T >
+    Ridder(FN, std::initializer_list< ARG_T >) -> Ridder< FN, ARG_T >;
 
-    /**
-     * @brief Deduction guide for the Ridder class.
-     * @tparam FN The type of the function object for which to find the root. The function must be invocable
-     * with a double argument.
-     * @tparam CONT_T The type of the container holding the bounds. Must be a container of floating point types.
-     */
     template<IsFloatInvocable FN, IsContainer CONT_T>
-    Ridder(FN func, CONT_T bounds) -> Ridder< decltype(func), typename CONT_T::value_type >;
+        requires IsFloatInvocable< FN > && IsFloat< typename CONT_T::value_type >
+    Ridder(FN, CONT_T) -> Ridder< FN, typename CONT_T::value_type >;
 
-    /**
-     * @brief Deduction guide for the Ridder class.
-     * @tparam FN The type of the function object for which to find the root. The function must be invocable
-     * with a double argument.
-     * @tparam BOUNDS_T The type of the struct holding the bounds. Must be a struct with structured bindings support
-     * and with floating point types as its members.
-     */
     template<IsFloatInvocable FN, IsFloatStruct BOUNDS_T>
-    Ridder(FN func, BOUNDS_T bounds) -> Ridder< decltype(func), StructCommonType_t< BOUNDS_T > >;
+        requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
+    Ridder(FN, BOUNDS_T) -> Ridder< FN, StructCommonType_t< BOUNDS_T > >;
 
 
     // =================================================================================================================
@@ -416,37 +327,35 @@ namespace nxx::roots
     //
     // =================================================================================================================
 
+
     /**
-     * @brief Implements the bisection method for root-finding.
+     * @brief Defines the Bisection class for performing the bisection method of root bracketing.
      *
-     * This class implements the bisection method, a bracketing root-finding algorithm, as a derived
-     * class of impl::BracketingBase. It inherits the base functionality from impl::BracketingBase and
-     * adds the specific algorithm implementation for the bisection method.
+     * The Bisection class template is an implementation of the classic bisection method for root finding.
+     * This method is a bracketing algorithm that repeatedly bisects an interval and then selects a subinterval
+     * in which a root must lie for further processing. It inherits from a base class that provides common
+     * functionalities for root bracketing algorithms, and adds the specific iteration logic for the bisection method.
+     * The class is templated to accept a function and an optional argument type.
      *
-     * @tparam FN The function object type for which to find the root.
-     * @requires FN must be invocable with a double as its argument type.
+     * @tparam FN The type of the function for which the root is being bracketed.
+     * @tparam ARG_T The type of the argument to the function, defaults to double.
      */
-    template<IsFloatInvocable FN, FloatingPoint ARG_T = double>
-    class Bisection final : public impl::BracketingBase< Bisection< FN, ARG_T >, FN, ARG_T >
+    template<IsFloatInvocable FN, IsFloat ARG_T = double>
+    class Bisection final : public detail::BracketingBase< Bisection< FN, ARG_T >, FN, ARG_T >
     {
-        /*
-         * Private alias declarations.
-         */
-        using BASE = impl::BracketingBase< Bisection< FN, ARG_T >, FN, ARG_T >;
+        using BASE = detail::BracketingBase< Bisection< FN, ARG_T >, FN, ARG_T >; /**< Base class alias for readability. */
 
     public:
-        using BASE::BASE;
+        using BASE::BASE; /**< Inherits constructors from BracketingBase. */
 
         /**
-         * @brief Perform one iteration of the bisection method.
-         *
-         * This function implements the main algorithm of the bisection method for root-finding. It
-         * updates the bounds around the root during each iteration, gradually narrowing the search
-         * interval.
+         * @brief Performs a single iteration of the bisection method.
+         * @details This method updates the bounds by bisecting the current interval and
+         *          choosing the subinterval where the sign of the function changes.
          */
         void iterate()
         {
-            const auto& bounds = BASE::bounds();
+            const auto& bounds = BASE::current();
             using RT = std::invoke_result_t< FN, decltype(bounds.first) >;
 
             if (RT root = (bounds.first + bounds.second) / 2.0; BASE::evaluate(bounds.first) * BASE::evaluate(root) < 0.0)
@@ -457,40 +366,24 @@ namespace nxx::roots
     };
 
     /**
-     * @brief Deduction guide for the Bisection class.
-     * @tparam FN The type of the function object for which to find the root. The function must be invocable
-     * with a double argument.
+     * @brief Deduction guides for Bisection class.
+     * Allows the type of Bisection class to be deduced from the constructor parameters.
      */
-    template<IsFloatInvocable FN>
-    Bisection(FN func) -> Bisection< decltype(func) >;
+    template<typename FN>
+        requires IsFloatInvocable< FN >
+    Bisection(FN) -> Bisection< FN >;
 
-    /**
-     * @brief Deduction guide for the Bisection class.
-     * @tparam FN The type of the function object for which to find the root. The function must be invocable
-     * with a double argument.
-     * @tparam ARG_T The type of the bounds. Must be a floating point type.
-     */
-    template<IsFloatInvocable FN, FloatingPoint ARG_T>
-    Bisection(FN func, std::initializer_list< ARG_T > bounds) -> Bisection< decltype(func), ARG_T >;
+    template<typename FN, typename ARG_T>
+        requires IsFloatInvocable< FN > && IsFloat< ARG_T >
+    Bisection(FN, std::initializer_list< ARG_T >) -> Bisection< FN, ARG_T >;
 
-    /**
-     * @brief Deduction guide for the Bisection class.
-     * @tparam FN The type of the function object for which to find the root. The function must be invocable
-     * with a double argument.
-     * @tparam CONT_T The type of the container holding the bounds. Must be a container of floating point types.
-     */
     template<IsFloatInvocable FN, IsContainer CONT_T>
-    Bisection(FN func, CONT_T bounds) -> Bisection< decltype(func), typename CONT_T::value_type >;
+        requires IsFloatInvocable< FN > && IsFloat< typename CONT_T::value_type >
+    Bisection(FN, CONT_T) -> Bisection< FN, typename CONT_T::value_type >;
 
-    /**
-     * @brief Deduction guide for the Bisection class.
-     * @tparam FN The type of the function object for which to find the root. The function must be invocable
-     * with a double argument.
-     * @tparam BOUNDS_T The type of the struct holding the bounds. Must be a struct with structured bindings support
-     * and with floating point types as its members.
-     */
     template<IsFloatInvocable FN, IsFloatStruct BOUNDS_T>
-    Bisection(FN func, BOUNDS_T bounds) -> Bisection< decltype(func), StructCommonType_t< BOUNDS_T > >;
+        requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
+    Bisection(FN, BOUNDS_T) -> Bisection< FN, StructCommonType_t< BOUNDS_T > >;
 
 
     // =================================================================================================================
@@ -509,35 +402,33 @@ namespace nxx::roots
     // =================================================================================================================
 
     /**
-     * @brief Regula Falsi (False Position) method for root-finding.
+     * @brief Defines the RegulaFalsi class for performing the regula falsi (false position) method of root bracketing.
      *
-     * This class implements the Regula Falsi algorithm, also known as the False Position method, for
-     * finding the root of a given function. It inherits from the BracketingBase class and provides
-     * the specific implementation for the Regula Falsi method.
+     * The RegulaFalsi class template implements the regula falsi method, also known as the false position method,
+     * for root finding. This method is a bracketing algorithm similar to the bisection method but, instead of bisecting
+     * the interval, it uses a linear approximation to guess the root. This class inherits from a base class that provides
+     * common functionalities for root bracketing algorithms and adds the specific iteration logic for the regula falsi method.
+     * It is templated to accept a function and an optional argument type.
      *
-     * @tparam FN The type of the function object for which to find the root. The function must be invocable
-     * with a double argument.
+     * @tparam FN The type of the function for which the root is being bracketed.
+     * @tparam ARG_T The type of the argument to the function, defaults to double.
      */
-    template<IsFloatInvocable FN, FloatingPoint ARG_T = double>
-    class RegulaFalsi final : public impl::BracketingBase< RegulaFalsi< FN, ARG_T >, FN, ARG_T >
+    template<IsFloatInvocable FN, IsFloat ARG_T = double>
+    class RegulaFalsi final : public detail::BracketingBase< RegulaFalsi< FN, ARG_T >, FN, ARG_T >
     {
-        /*
-         * Private alias declarations.
-         */
-        using BASE = impl::BracketingBase< RegulaFalsi< FN, ARG_T >, FN, ARG_T >;
+        using BASE = detail::BracketingBase< RegulaFalsi< FN, ARG_T >, FN, ARG_T >; /**< Base class alias for readability. */
 
     public:
-        using BASE::BASE;
+        using BASE::BASE; /**< Inherits constructors from BracketingBase. */
 
         /**
-         * @brief Perform one iteration of the Regula Falsi algorithm.
-         *
-         * This function implements the main algorithm of the Regula Falsi method for root-finding.
-         * It updates the bounds around the root during each iteration, refining the search interval.
+         * @brief Performs a single iteration of the regula falsi method.
+         * @details This method updates the bounds by applying the regula falsi formula
+         *          to find a new estimate for the root, then adjusts the bounds accordingly.
          */
         void iterate()
         {
-            const auto& bounds = BASE::bounds();
+            const auto& bounds = BASE::current();
             using RT = std::invoke_result_t< FN, decltype(bounds.first) >;
 
             RT f_lo = BASE::evaluate(bounds.first);
@@ -546,46 +437,30 @@ namespace nxx::roots
             RT root   = (bounds.first * f_hi - bounds.second * f_lo) / (f_hi - f_lo);
             RT f_root = BASE::evaluate(root);
 
-            if (f_lo * f_root < 0.0) { BASE::setBounds({ bounds.first, root }); }
-            else { BASE::setBounds({ root, bounds.second }); }
+            if (f_lo * f_root < 0.0) BASE::setBounds({ bounds.first, root });
+            else BASE::setBounds({ root, bounds.second });
         }
     };
 
     /**
-     * @brief Deduction guide for the RegulaFalsi class.
-     * @tparam FN The type of the function object for which to find the root. The function must be invocable
-     * with a double argument.
+     * @brief Deduction guides for RegulaFalsi class.
+     * Allows the type of RegulaFalsi class to be deduced from the constructor parameters.
      */
-    template<IsFloatInvocable FN>
-    RegulaFalsi(FN func) -> RegulaFalsi< decltype(func) >;
+    template<typename FN>
+        requires IsFloatInvocable< FN >
+    RegulaFalsi(FN) -> RegulaFalsi< FN >;
 
-    /**
-     * @brief Deduction guide for the RegulaFalsi class.
-     * @tparam FN The type of the function object for which to find the root. The function must be invocable
-     * with a double argument.
-     * @tparam ARG_T The type of the bounds. Must be a floating point type.
-     */
-    template<IsFloatInvocable FN, FloatingPoint ARG_T>
-    RegulaFalsi(FN func, std::initializer_list< ARG_T > bounds) -> RegulaFalsi< decltype(func), ARG_T >;
+    template<typename FN, typename ARG_T>
+        requires IsFloatInvocable< FN > && IsFloat< ARG_T >
+    RegulaFalsi(FN, std::initializer_list< ARG_T >) -> RegulaFalsi< FN, ARG_T >;
 
-    /**
-     * @brief Deduction guide for the RegulaFalsi class.
-     * @tparam FN The type of the function object for which to find the root. The function must be invocable
-     * with a double argument.
-     * @tparam CONT_T The type of the container holding the bounds. Must be a container of floating point types.
-     */
     template<IsFloatInvocable FN, IsContainer CONT_T>
-    RegulaFalsi(FN func, CONT_T bounds) -> RegulaFalsi< decltype(func), typename CONT_T::value_type >;
+        requires IsFloatInvocable< FN > && IsFloat< typename CONT_T::value_type >
+    RegulaFalsi(FN, CONT_T) -> RegulaFalsi< FN, typename CONT_T::value_type >;
 
-    /**
-     * @brief Deduction guide for the RegulaFalsi class.
-     * @tparam FN The type of the function object for which to find the root. The function must be invocable
-     * with a double argument.
-     * @tparam BOUNDS_T The type of the struct holding the bounds. Must be a struct with structured bindings support
-     * and with floating point types as its members.
-     */
     template<IsFloatInvocable FN, IsFloatStruct BOUNDS_T>
-    RegulaFalsi(FN func, BOUNDS_T bounds) -> RegulaFalsi< decltype(func), StructCommonType_t< BOUNDS_T > >;
+        requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
+    RegulaFalsi(FN, BOUNDS_T) -> RegulaFalsi< FN, StructCommonType_t< BOUNDS_T > >;
 
 
     // =================================================================================================================
@@ -601,51 +476,41 @@ namespace nxx::roots
     //
     // =================================================================================================================
 
-    namespace impl
+    namespace detail
     {
         /**
-         * @brief Implementation function for the fsolve functions.
+         * @brief Implements a generic root finding solver function template for bracketing solvers.
          *
-         * This function template takes a solver object, initial bounds, an optional convergence
-         * tolerance (epsilon), and an optional maximum number of iterations. It attempts to find the
-         * root of the function within the given bounds using the solver's algorithm.
+         * This function template, `fsolve_impl`, provides a generic implementation for root finding
+         * using various bracketing solver algorithms. It is designed to work with solvers that conform
+         * to the requirements of bracketing solvers, such as having a defined `IsBracketingSolver` static member,
+         * initialization, and iteration methods. The function handles initialization, iteration, and
+         * convergence checking, returning the result along with any potential errors encountered during
+         * the solving process.
          *
-         * @tparam SOLVER The solver type, which must implement the required interface (e.g., evaluate(), init(), iterate()).
-         * @param solver The solver object configured with the function for which to find the root.
-         * @param bounds A std::pair containing the initial lower and upper bounds for the search interval.
-         * @param eps The convergence tolerance (optional, default is 1.0E-6).
-         * @param maxiter The maximum number of iterations allowed (optional, default is 100).
-         * @return A tl::expected<double, RootError> object, which contains the root on success, or a RootError on failure.
-         * @note The solver must implement a compatible interface with the required member functions,
-         *       such as evaluate(), init(), and iterate().
+         * @tparam SOLVER The type of the solver to be used in root finding. Must conform to the bracketing solver concept.
          */
-        template<typename SOLVER, typename EPS_T, typename ITER_T>
-            requires nxx::FloatingPoint< typename SOLVER::RESULT_T > &&
-                     std::convertible_to< EPS_T, typename SOLVER::RESULT_T > &&
-                     requires(SOLVER solver, std::pair< typename SOLVER::RESULT_T, typename SOLVER::RESULT_T > bounds)
-                     {
-                         { solver.evaluate(std::declval< double >()) } -> nxx::FloatingPoint;
-                         { solver.init(bounds) };
-                         { solver.iterate() };
-                     }
-        auto fsolve_impl(SOLVER                                                            solver,
-                         std::pair< typename SOLVER::RESULT_T, typename SOLVER::RESULT_T > bounds,
-                         EPS_T                                                             eps,
-                         ITER_T                                                            maxiter)
+
+        template<typename SOLVER>
+            requires SOLVER::IsBracketingSolver
+        auto fsolve_impl(SOLVER             solver,
+                         IsFloatStruct auto bounds,
+                         IsFloat auto       eps,
+                         std::integral auto maxiter)
         {
-            using ET = RootErrorImpl< typename SOLVER::RESULT_T >;
-            using RT = tl::expected< typename SOLVER::RESULT_T, ET >;
+            using ET = RootErrorImpl< typename SOLVER::RESULT_T >;    /**< Type for error handling. */
+            using RT = tl::expected< typename SOLVER::RESULT_T, ET >; /**< Type for the function return value. */
             using std::isfinite;
 
             solver.init(bounds);
 
             // Declare variables for use in the iteration loop.
-            auto curBounds = solver.bounds();
+            auto curBounds = solver.current();
             RT result = (curBounds.first + curBounds.second) / 2.0;
             std::array< std::pair< typename SOLVER::RESULT_T, typename SOLVER::RESULT_T >, 2 > roots{};
             decltype(roots.begin()) min;
 
-            // Check for NaN or Inf.
+            // Check for NaN or Inf in the initial bounds.
             if (!isfinite(solver.evaluate(curBounds.first)) || !isfinite(solver.evaluate(curBounds.second))) {
                 result = tl::make_unexpected(ET("Invalid initial brackets!", RootErrorType::NumericalError, result.value()));
                 return result;
@@ -660,7 +525,7 @@ namespace nxx::roots
             // Begin the iteration loop.
             int iter = 1;
             while (true) {
-                curBounds = solver.bounds();
+                curBounds = solver.current();
                 roots     = { std::make_pair(curBounds.first, abs(solver.evaluate(curBounds.first))),
                               std::make_pair(curBounds.second, abs(solver.evaluate(curBounds.second))) };
 
@@ -693,101 +558,130 @@ namespace nxx::roots
     } // namespace impl
 
     /**
-     * @brief Overload of fsolve function that accepts a struct-like object for bounds, e.g., a pair or tuple.
+     * @brief Defines a high-level root finding function template `fsolve` using bracketing solvers.
      *
-     * @tparam SOLVER_T The solver type used to find the root of the function.
-     * @tparam FN_T The type of the function object for which to find the root.
-     * @tparam STRUCT_T The type of the bounds object.
-     * @tparam EPS_T The type of the tolerance for stopping the algorithm.
-     * @tparam ITER_T The type of the maximum number of iterations allowed.
+     * The `fsolve` function template provides a convenient interface for performing root finding
+     * using various bracketing solver algorithms. It abstracts the creation and configuration of the
+     * solver instance and then delegates the actual root finding process to `fsolve_impl`. This
+     * function is templated to accept a solver type, the function, bounds for the root, a tolerance
+     * for convergence, and a maximum number of iterations. It supports different types of bracketing
+     * solvers, making it versatile for various root finding needs.
+     *
+     * @tparam SOLVER_T The template class of the solver to be used. Must be a valid bracketing solver type.
+     * @tparam FN_T The type of the function for which the root is being bracketed.
+     * @tparam STRUCT_T The struct type holding the bounds for the root.
+     * @tparam EPS_T The type of the epsilon value for convergence check, defaulted based on STRUCT_T.
+     * @tparam ITER_T The type of the maximum iterations count, defaulted to int.
+     *
      * @param function The function object for which to find the root.
-     * @param bounds Any object that supports structured bindings and provides two values for the lower and upper bounds.
+     * @param bounds A struct with two members representing the lower and upper bounds.
      * @param eps The tolerance for stopping the algorithm.
      * @param maxiter The maximum number of iterations allowed.
-     * @return tl::expected object containing either the root of the function or an error.
      */
+
     template<template< typename, typename > class SOLVER_T,
         IsFloatInvocable FN_T,
         IsFloatStruct STRUCT_T,
-        FloatingPoint EPS_T = StructCommonType_t< STRUCT_T >,
+        IsFloat EPS_T = StructCommonType_t< STRUCT_T >,
         std::integral ITER_T = int>
     auto fsolve(FN_T     function,
                 STRUCT_T bounds,
-                EPS_T    eps     = epsilon< StructCommonType_t< STRUCT_T > >(),
-                ITER_T   maxiter = iterations< StructCommonType_t< STRUCT_T > >())
+                EPS_T    eps = epsilon< StructCommonType_t< STRUCT_T > >(),        /**< Default epsilon value based on the type of bounds. */
+                ITER_T   maxiter = iterations< StructCommonType_t< STRUCT_T > >()) /**< Default max. iterations based on the type of bounds. */
     {
-        auto [lo, hi] = bounds;
+        auto [lo, hi] = bounds; /**< Extract lower and upper bounds from the struct. */
 
-        using ARG_T = std::common_type_t< decltype(lo), decltype(hi) >;
-        auto solver = SOLVER_T< FN_T, ARG_T >(function);
+        using ARG_T = std::common_type_t< decltype(lo), decltype(hi) >; /**< Common type for the bounds. */
+        auto solver = SOLVER_T< FN_T, ARG_T >(function);                /**< Instantiates the solver with the given function. */
 
-        return impl::fsolve_impl(solver, std::pair< ARG_T, ARG_T >{ lo, hi }, eps, maxiter);
+        // Delegates the solving process to fsolve_impl, passing in the solver and other parameters.
+        return detail::fsolve_impl(solver, std::pair< ARG_T, ARG_T >{ lo, hi }, eps, maxiter);
     }
 
+
     /**
-     * @brief Overload of fsolve function that accepts an initializer list for bounds.
+     * @brief Extends the high-level root finding function template `fsolve` for initializer list bounds.
      *
-     * @tparam SOLVER_T The solver type used to find the root of the function.
-     * @tparam FN_T The type of the function object for which to find the root.
-     * @tparam ARG_T The type of the argument to the function object.
-     * @tparam EPS_T The type of the tolerance for stopping the algorithm.
-     * @tparam ITER_T The type of the maximum number of iterations allowed.
+     * This version of `fsolve` function template allows for specifying the bounds using an initializer list.
+     * It is particularly useful when the bounds are known at compile time or for concise inline specifications.
+     * The function checks the size of the initializer list to ensure exactly two elements are provided for the
+     * bounds. It then creates a solver instance and delegates the root finding process to `fsolve_impl`.
+     *
+     * @tparam SOLVER_T The template class of the solver to be used. Must be a valid bracketing solver type.
+     * @tparam FN_T The type of the function for which the root is being bracketed.
+     * @tparam ARG_T The type of the bounds and the argument to the function.
+     * @tparam EPS_T The type of the epsilon value for convergence check, defaulted based on ARG_T.
+     * @tparam ITER_T The type of the maximum iterations count, defaulted to int.
+     *
      * @param function The function object for which to find the root.
-     * @param bounds An initializer list containing exactly two elements representing the lower and upper bounds.
+     * @param bounds An initializer list with exactly two elements representing the lower and upper bounds.
      * @param eps The tolerance for stopping the algorithm.
      * @param maxiter The maximum number of iterations allowed.
-     * @return tl::expected object containing either the root of the function or an error.
-     * @throws NumerixxError if the initializer list does not contain exactly two elements.
      */
+
     template<template< typename, typename > class SOLVER_T,
         IsFloatInvocable FN_T,
-        FloatingPoint ARG_T,
-        FloatingPoint EPS_T = ARG_T,
+        IsFloat ARG_T,
+        IsFloat EPS_T = ARG_T,
         std::integral ITER_T = int>
     auto fsolve(FN_T                           function,
                 std::initializer_list< ARG_T > bounds,
-                EPS_T                          eps     = epsilon< ARG_T >(),
-                ITER_T                         maxiter = iterations< ARG_T >())
+                EPS_T                          eps = epsilon< ARG_T >(),        /**< Default epsilon value based on ARG_T. */
+                ITER_T                         maxiter = iterations< ARG_T >()) /**< Default maximum iterations based on ARG_T. */
     {
+        // Check for correct number of elements in the initializer list.
         if (bounds.size() != 2) throw NumerixxError("Initializer list must contain exactly two elements!");
-        auto solver = SOLVER_T< FN_T, ARG_T >(function);
-        auto bnds   = std::span(bounds.begin(), bounds.end());
-        return impl::fsolve_impl(solver, { bnds.front(), bnds.back() }, eps, maxiter);
+
+        auto solver = SOLVER_T< FN_T, ARG_T >(function);       /**< Instantiates the solver with the given function. */
+        auto bnds   = std::span(bounds.begin(), bounds.end()); /**< Create a span for bounds extraction. */
+
+        // Delegates the solving process to fsolve_impl, passing in the solver and other parameters.
+        return detail::fsolve_impl(solver, std::pair{ bnds.front(), bnds.back() }, eps, maxiter);
     }
 
+
     /**
-     * @brief Overload of fsolve function that accepts a container for bounds.
+     * @brief Extends the high-level root finding function template `fsolve` for container-based bounds.
      *
-     * @tparam SOLVER_T The solver type used to find the root of the function.
-     * @tparam FN_T The type of the function object for which to find the root.
-     * @tparam CONT_T The type of the container for the bounds.
-     * @tparam EPS_T The type of the tolerance for stopping the algorithm.
-     * @tparam ITER_T The type of the maximum number of iterations allowed.
+     * This version of `fsolve` function template is designed to accept bounds specified in a container
+     * such as a vector or an array. It verifies the container size to ensure exactly two elements are provided
+     * for the bounds, which are necessary for the bracketing methods. The function then creates a solver instance
+     * and delegates the root finding process to `fsolve_impl`. This overload is particularly useful when the bounds
+     * are dynamically determined or retrieved from a data structure.
+     *
+     * @tparam SOLVER_T The template class of the solver to be used. Must be a valid bracketing solver type.
+     * @tparam FN_T The type of the function for which the root is being bracketed.
+     * @tparam CONT_T The container type holding the bounds for the root.
+     * @tparam EPS_T The type of the epsilon value for convergence check, defaulted based on CONT_T.
+     * @tparam ITER_T The type of the maximum iterations count, defaulted to int.
+     *
      * @param function The function object for which to find the root.
-     * @param bounds A container containing exactly two elements representing the lower and upper bounds.
+     * @param bounds A container with exactly two elements representing the lower and upper bounds.
      * @param eps The tolerance for stopping the algorithm.
      * @param maxiter The maximum number of iterations allowed.
-     * @return tl::expected object containing either the root of the function or an error.
-     * @throws NumerixxError if the container does not contain exactly two elements.
      */
     template<template< typename, typename > class SOLVER_T,
         IsFloatInvocable FN_T,
         IsContainer CONT_T,
-        FloatingPoint EPS_T = typename CONT_T::value_type,
+        IsFloat EPS_T = typename CONT_T::value_type,
         std::integral ITER_T = int>
-        requires nxx::FloatingPoint< typename CONT_T::value_type >
+        requires nxx::IsFloat< typename CONT_T::value_type >
     auto fsolve(FN_T          function,
                 const CONT_T& bounds,
-                EPS_T         eps     = epsilon< typename CONT_T::value_type >(),
-                ITER_T        maxiter = iterations< typename CONT_T::value_type >())
+                EPS_T         eps = epsilon< typename CONT_T::value_type >(),        /**< Default epsilon value based on the container's value type. */
+                ITER_T        maxiter = iterations< typename CONT_T::value_type >()) /**< Default maximum iterations based on the container's value type. */
     {
+        // Ensure the container has exactly two elements representing the bounds.
         if (bounds.size() != 2) throw NumerixxError("Container must contain exactly two elements!");
 
-        using ARG_T = typename CONT_T::value_type;
+        using ARG_T = typename CONT_T::value_type; /**< Type of the argument derived from the container's value type. */
 
-        auto solver = SOLVER_T< FN_T, ARG_T >(function);
-        return impl::fsolve_impl(solver, { bounds.front(), bounds.back() }, eps, maxiter);
+        auto solver = SOLVER_T< FN_T, ARG_T >(function); /**< Instantiates the solver with the given function. */
+
+        // Delegates the solving process to fsolve_impl, passing in the solver and other parameters.
+        return detail::fsolve_impl(solver, std::pair{ bounds.front(), bounds.back() }, eps, maxiter);
     }
+
 } // namespace nxx::roots
 
 #endif    // NUMERIXX_ROOTBRACKETING_HPP

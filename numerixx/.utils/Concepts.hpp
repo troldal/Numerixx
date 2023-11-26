@@ -38,7 +38,7 @@
 namespace nxx
 {
     template<typename T>
-    concept FloatingPoint = std::floating_point< T > || boost::multiprecision::is_number< T >::value;
+    concept IsFloat = std::floating_point< T > || boost::multiprecision::is_number< T >::value;
 
     /**
      * @brief Concept to check if a type is a complex number.
@@ -49,11 +49,14 @@ namespace nxx
                             typename T::value_type;
                             {
                                 std::real(x)
-                            } -> nxx::FloatingPoint;
+                            } -> nxx::IsFloat;
                             {
                                 std::imag(x)
-                            } -> nxx::FloatingPoint;
+                            } -> nxx::IsFloat;
     };
+
+    template<typename T>
+    concept IsFloatOrComplex = IsComplex< T > || nxx::IsFloat< T >;
 
     /**
      * @brief Concept checking whether a type is a callable function object that returns a floating point type.
@@ -61,10 +64,20 @@ namespace nxx
      */
     template< typename Func >
     concept IsFloatInvocable = requires(Func f) {
-        requires nxx::FloatingPoint< std::invoke_result_t< Func, float > >;
-        requires nxx::FloatingPoint< std::invoke_result_t< Func, double > >;
-        requires nxx::FloatingPoint< std::invoke_result_t< Func, long double > >;
+        requires nxx::IsFloatOrComplex< std::invoke_result_t< Func, float > >;
+        requires nxx::IsFloatOrComplex< std::invoke_result_t< Func, double > >;
+        requires nxx::IsFloatOrComplex< std::invoke_result_t< Func, long double > >;
     };
+
+    template< typename Func>
+    concept IsComplexInvocable = requires(Func f) {
+        requires nxx::IsComplex< std::invoke_result_t< Func, std::complex< float > > >;
+        requires nxx::IsComplex< std::invoke_result_t< Func, std::complex< double > > >;
+        requires nxx::IsComplex< std::invoke_result_t< Func, std::complex< long double > > >;
+    };
+
+    template <typename Func>
+    concept IsFloatOrComplexInvocable = IsFloatInvocable< Func > || IsComplexInvocable< Func >;
 
     template<typename T>
     concept IsContainer = requires(T a)
@@ -115,14 +128,14 @@ namespace nxx
 
     template<typename S>
     concept IsFloatStruct =
-        nxx::FloatingPoint< typename StructTraits< S >::first_type > &&
-        nxx::FloatingPoint< typename StructTraits< S >::second_type >;
+        nxx::IsFloat< typename StructTraits< S >::first_type > &&
+        nxx::IsFloat< typename StructTraits< S >::second_type >;
 } // namespace nxx
 
 namespace nxx::poly
 {
     template<typename T>
-        requires nxx::FloatingPoint< T > || IsComplex< T >
+        requires nxx::IsFloat< T > || IsComplex< T >
     class Polynomial;
 
     template< typename POLY >

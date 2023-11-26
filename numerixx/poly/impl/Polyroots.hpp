@@ -390,7 +390,7 @@ namespace nxx::poly
         }
 
         // ===== Polish the root on the original polynomial using Newton's method
-        const auto polished_root = nxx::roots::fdfsolve(nxx::roots::Newton(poly, derivativeOf(poly)), root, tolerance / 10, max_iterations);
+        const auto polished_root = roots::fdfsolve<roots::Newton>(poly, derivativeOf(poly), root, tolerance / 10, max_iterations);
         if (polished_root) root = *polished_root;
 
         // Return the root
@@ -476,7 +476,7 @@ namespace nxx::poly
 
             // If its order is greater than 3, polish the root an deflate the polynomial.
             if (polynomial.order() > 3) {
-                const auto polished_root = nxx::roots::fdfsolve(nxx::roots::Newton(original, derivativeOf(original)),
+                const auto polished_root = nxx::roots::fdfsolve<roots::Newton>(original, derivativeOf(original),
                                                                 roots.back(),
                                                                 tolerance / 10,
                                                                 max_iterations);

@@ -33,20 +33,12 @@
 
 // ===== Numerixx Includes
 #include "RootCommon.hpp"
-#include <Constants.hpp>
-#include <Deriv.hpp>
 #include <Poly.hpp>
 
 // ===== Standard Library Includes
-#include <functional>
-#include <stdexcept>
-#include <utility>
 
 namespace nxx::roots
 {
-    using nxx::deriv::derivativeOf;
-    using nxx::poly::derivativeOf;
-
     // =================================================================================================================
     //
     //  88888888ba               88  88             88           88
@@ -64,100 +56,82 @@ namespace nxx::roots
     /*
      * Private implementation details.
      */
-    namespace impl
+    namespace detail
     {
         /**
-         * @brief A base class for root polishing methods.
+         * @brief Provides a base class template for root polishing algorithms.
          *
-         * This class serves as a base for various root polishing methods, providing common functionality
-         * and interface. The POLICY template parameter should provide specific algorithm implementation.
+         * The PolishingBase class template serves as a foundational component for
+         * algorithms that refine or 'polish' roots of a given function. It encapsulates
+         * common functionalities such as storing the objective function, its derivative,
+         * and the current guess of the root. This class enforces certain type constraints
+         * on the template parameters to ensure compatibility with root polishing algorithms.
          *
-         * @tparam POLICY The policy class defining the specific root polishing method.
-         * @requires The POLICY class should have a specialization of PolishingTraits that defines:
-         *           function_type, deriv_type, function_return_type, and deriv_return_type.
+         * @tparam SUBCLASS The subclass inheriting from PolishingBase.
+         * @tparam FUNCTION_T The type of the function for which the root is being polished.
+         * @tparam DERIV_T The type of the derivative function of FUNCTION_T.
+         * @tparam ARG_T The type of the argument to the function and its derivative.
          */
-        template<typename POLICY>
-            requires(FloatingPoint< typename PolishingTraits< POLICY >::FUNCTION_RETURN_T > &&
-                     FloatingPoint< typename PolishingTraits< POLICY >::DERIV_RETURN_T >) ||
-                    (IsComplex< typename PolishingTraits< POLICY >::FUNCTION_RETURN_T > &&
-                     IsComplex< typename PolishingTraits< POLICY >::DERIV_RETURN_T >)
+        template<typename SUBCLASS, typename FUNCTION_T, typename DERIV_T, typename ARG_T>
+            requires std::same_as< typename PolishingTraits< SUBCLASS >::FUNCTION_T, FUNCTION_T > &&
+                     std::same_as< typename PolishingTraits< SUBCLASS >::DERIV_T, DERIV_T > &&
+                     IsFloatOrComplexInvocable< FUNCTION_T > &&
+                     IsFloatOrComplexInvocable< DERIV_T > &&
+                     IsFloatOrComplex< ARG_T >
         class PolishingBase
         {
-            /*
-             * Friend declarations.
-             */
-            friend POLICY;
+            friend SUBCLASS;
 
         public:
-            using FUNCTION_T = /**< The type of the function object. */
-            typename impl::PolishingTraits< POLICY >::FUNCTION_T;
-            using DERIV_T = /**< The type of the derivative function object. */
-            typename impl::PolishingTraits< POLICY >::DERIV_T;
-            using FUNCTION_RETURN_T = /**< The return type of the function object. */
-            typename impl::PolishingTraits< POLICY >::FUNCTION_RETURN_T;
-            using DERIV_RETURN_T = /**< The return type of the derivative function object. */
-            typename impl::PolishingTraits< POLICY >::DERIV_RETURN_T;
+            static constexpr bool IsPolishingSolver = true; /**< Flag indicating the class is a polishing solver. */
 
-            // protected:
+            using FUNCT_RES_T = std::invoke_result_t< FUNCTION_T, ARG_T >;   /**< Result type of the function. */
+            using DERIV_RES_T = std::invoke_result_t< DERIV_T, ARG_T >;      /**< Result type of the derivative function. */
+            using RESULT_T = std::common_type_t< FUNCT_RES_T, DERIV_RES_T >; /**< Common type for results of function and derivative. */
+
+        protected:
+            ~PolishingBase() = default; /**< Protected destructor to prevent direct instantiation. */
+
+        private:
+            FUNCTION_T m_func{};               /**< The function object to find the root for. */
+            DERIV_T    m_deriv{};              /**< The function object for the derivative. */
+            RESULT_T   m_guess;                /**< The current root estimate. */
+            bool       m_initialized{ false }; /**< Flag indicating whether the object has been initialized. */
+
+        public:
             /**
-             * @brief Default constructor.
+             * @brief Constructs the PolishingBase with a function and its derivative.
+             * @param objective The function for which the root is being refined.
+             * @param derivative The derivative of the objective function.
              */
-            ~PolishingBase() = default;
-
-            // private:
-            FUNCTION_T        m_func{};               /**< The function object to find the root for. */
-            DERIV_T           m_deriv{};              /**< The function object for the derivative. */
-            FUNCTION_RETURN_T m_guess;                /**< The current root estimate. */
-            bool              m_initialized{ false }; /**< Flag indicating whether the object has been initialized. */
-
-            /**
-             * @brief Constructor, taking function objects for the function and its derivative as arguments.
-             * @param objective The function object to find the root for.
-             * @param derivative The function object for the derivative
-             * @note Constructor is private to avoid direct usage by clients.
-             */
-            explicit PolishingBase(FUNCTION_T objective, DERIV_T derivative)
+            PolishingBase(FUNCTION_T objective, DERIV_T derivative)
                 : m_func{ objective },
                   m_deriv{ derivative } {}
 
-        public:
             /**
-             * @brief Copy constructor.
-             *
-             * @param other Another PolishingBase object to be copied.
+             * @brief Constructs the PolishingBase with a function, its derivative, and an initial guess.
+             * @param objective The function for which the root is being refined.
+             * @param derivative The derivative of the objective function.
+             * @param guess Initial guess for the root.
              */
-            PolishingBase(const PolishingBase& other) = default;
+            PolishingBase(FUNCTION_T objective, DERIV_T derivative, ARG_T guess)
+                : m_func{ objective },
+                  m_deriv{ derivative },
+                  m_guess{ guess },
+                  m_initialized{ true } {}
+
+            PolishingBase(const PolishingBase& other)                = default; /**< Default copy constructor. */
+            PolishingBase(PolishingBase&& other) noexcept            = default; /**< Default move constructor. */
+            PolishingBase& operator=(const PolishingBase& other)     = default; /**< Default copy assignment operator. */
+            PolishingBase& operator=(PolishingBase&& other) noexcept = default; /**< Default move assignment operator. */
 
             /**
-             * @brief Move constructor.
-             *
-             * @param other Another PolishingBase object to be moved.
-             */
-            PolishingBase(PolishingBase&& other) noexcept = default;
-
-            /**
-             * @brief Copy assignment operator.
-             *
-             * @param other Another PolishingBase object to be copied.
-             * @return A reference to the assigned object.
-             */
-            PolishingBase& operator=(const PolishingBase& other) = default;
-
-            /**
-             * @brief Move assignment operator.
-             *
-             * @param other Another PolishingBase object to be moved.
-             * @return A reference to the assigned object.
-             */
-            PolishingBase& operator=(PolishingBase&& other) noexcept = default;
-
-            /**
-             * @brief Initialize the solver by setting the initial bounds around the root.
-             * @tparam T The type of the root estimate.
-             * @param guess The root estimate.
+             * @brief Initializes the solver with a new guess.
+             * @tparam T Type of the guess, must be a float or complex type.
+             * @param guess The new initial guess for the root.
              */
             template<typename T>
-                requires std::convertible_to< T, FUNCTION_RETURN_T >
+                requires nxx::IsFloatOrComplex< T >
             void init(T guess)
             {
                 m_initialized = true;
@@ -165,37 +139,40 @@ namespace nxx::roots
             }
 
             /**
-             * @brief Reset the solver to its initial state.
+             * @brief Resets the solver, marking it as uninitialized.
              */
             void reset() { m_initialized = false; }
 
             /**
-             * @brief Evaluate the function object at a given point.
-             * @tparam T The type of the argument (must be floating point type)
-             * @param value The value at which to evaluate the function.
-             * @return The result of the evaluation.
+             * @brief Evaluates the function with the given value.
+             * @tparam T Type of the value, must be a float or complex type.
+             * @param value The value to evaluate the function at.
+             * @return The result of the function evaluation.
              */
             template<typename T>
-                requires std::convertible_to< T, FUNCTION_RETURN_T >
+                requires nxx::IsFloatOrComplex< T >
             auto evaluate(T value) { return m_func(value); }
 
             /**
-             * @brief Evaluate the derivative at a given point.
-             * @tparam T The type of the argument (must be floating point type)
-             * @param value The value at which to evaluate the derivative.
-             * @return The result of the evaluation.
+             * @brief Evaluates the derivative function with the given value.
+             * @tparam T Type of the value, must be a float or complex type.
+             * @param value The value to evaluate the derivative at.
+             * @return The result of the derivative function evaluation.
              */
             template<typename T>
-                requires std::convertible_to< T, FUNCTION_RETURN_T >
+                requires nxx::IsFloatOrComplex< T >
             auto derivative(T value) { return std::invoke(m_deriv, value); }
 
             /**
-             * @brief Get the current estimate of the root.
-             * @return A const reference to the root.
+             * @brief Returns the current result of the solver.
+             * @details This function returns the current root estimate.
+             *          It throws an exception if the solver has not been initialized.
+             * @throws NumerixxError If the solver has not been initialized.
+             * @return The current root estimate.
              */
-            auto result() const
+            RESULT_T current() const
             {
-                if (!m_initialized) throw std::runtime_error("Solver has not been initialized.");
+                if (!m_initialized) throw NumerixxError("Solver has not been initialized.");
                 return m_guess;
             }
         };
@@ -214,45 +191,48 @@ namespace nxx::roots
     //
     // =================================================================================================================
 
+
     /**
-     * @brief A class implementing the Newton-Raphson method for root finding.
+     * @brief Defines the Newton class for performing Newton's method root polishing.
      *
-     * This class is derived from the PolishingBase class and implements the Newton-Raphson method
-     * for finding the roots of a given function. The function and its derivative are provided
-     * as template arguments.
+     * The Newton class template is a specialized implementation of the root polishing
+     * algorithm known as Newton's method (or the Newton-Raphson method). It inherits
+     * from a base class that provides common functionalities for root polishing algorithms,
+     * and adds the specific iteration logic for Newton's method. This class is templated
+     * to accept a function, its derivative, and an optional argument type.
      *
-     * @tparam FN The type of the function object for which to find the root.
-     * @tparam DFN The type of the derivative function object.
-     * @requires FN and DFN should be callable with double and return a floating point type.
+     * @tparam FN Type of the function for which the root is being refined.
+     * @tparam DFN Type of the derivative function of FN.
+     * @tparam ARG_T Type of the argument to the function and its derivative, defaults to double.
      */
-    template<typename FN, typename DFN>
-        requires(IsFloatInvocable< FN > && IsFloatInvocable< DFN >) ||
-                (IsComplex< std::invoke_result_t< FN, double > > && IsComplex< std::invoke_result_t< DFN, double > >)
-    class Newton final : public impl::PolishingBase< Newton< FN, DFN > >
+    template<IsFloatOrComplexInvocable FN, IsFloatOrComplexInvocable DFN, IsFloatOrComplex ARG_T = double>
+    class Newton final : public detail::PolishingBase< Newton< FN, DFN, ARG_T >, FN, DFN, ARG_T >
     {
-        /*
-         * Private alias declarations.
-         */
-        using BASE = impl::PolishingBase< Newton< FN, DFN > >;
+        using BASE = detail::PolishingBase< Newton< FN, DFN, ARG_T >, FN, DFN, ARG_T >; /**< Base class alias for readability. */
 
     public:
-        /*
-         * Public alias declarations
-         */
-        using function_type = FN;
-        using deriv_type = DFN;
-
-        using BASE::BASE;
+        using BASE::BASE; /**< Inherits constructors from PolishingBase. */
 
         /**
-         * @brief Perform one iteration. This is the main algorithm of the Newton method.
+         * @brief Performs a single iteration of Newton's method.
+         * @details This method updates the root estimate using the Newton-Raphson formula.
+         *          It assumes the class has been properly initialized.
          */
         void iterate() { BASE::m_guess = BASE::m_guess - BASE::evaluate(BASE::m_guess) / BASE::derivative(BASE::m_guess); }
     };
 
+    /**
+     * @brief Deduction guides for Newton class.
+     * Allows the type of Newton class to be deduced from the constructor parameters.
+     */
     template<typename FN, typename DERIV>
-        requires std::invocable< FN, double > && std::invocable< DERIV, double >
-    Newton(FN func, DERIV deriv) -> Newton< decltype(func), decltype(deriv) >;
+        requires IsFloatOrComplexInvocable< FN > && IsFloatOrComplexInvocable< DERIV >
+    Newton(FN, DERIV) -> Newton< FN, DERIV >;
+
+    template<typename FN, typename DERIV, typename ARG_T>
+        requires IsFloatOrComplexInvocable< FN > && IsFloatOrComplexInvocable< DERIV > && IsFloatOrComplex< ARG_T >
+    Newton(FN, DERIV, ARG_T) -> Newton< FN, DERIV, ARG_T >;
+
 
     // =================================================================================================================
     //
@@ -271,66 +251,59 @@ namespace nxx::roots
     namespace detail
     {
         /**
-         * @brief The fdfsolve function is a convenience function for running a polishing solver (i.e. with derivative),
-         * without dealing with low level details. If fine grained control is needed, such as advanced search stopping
-         * criteria or running each iteration manually, please see the documentation for the solver classes.
-         * @tparam SOLVER The type of the solver. This could be the Newton or DNewton solvers, but any solver with the
-         * correct interface can be used.
-         * @param solver The actual solver object.
-         * @param guess The initial guess of the root. The guess must be reasonably close to the actual root.
-         * @param eps The max. allowed error.
-         * @param maxiter The max. number of allowed iterations.
-         * @return The root estimate.
+         * @brief Implements a generic root finding solver function template for polishing solvers.
+         *
+         * This function template, `fdfsolve_impl`, provides a generic implementation for root finding
+         * algorithms that utilize polishing solvers. It is designed to work with solvers that conform
+         * to the requirements of polishing solvers, such as having a defined `IsPolishingSolver` static member,
+         * initialization, and iteration methods. The function handles initialization, iteration, and
+         * convergence checking, returning the result along with any potential errors encountered during
+         * the solving process.
+         *
+         * @tparam SOLVER The type of the solver to be used in root finding. Must conform to the polishing solver concept.
          */
         template<typename SOLVER>
-            requires requires(SOLVER solver, typename SOLVER::FUNCTION_RETURN_T guess)
-            {
-                // clang-format off
-                { solver.evaluate(0.0) } -> std::same_as< typename SOLVER::FUNCTION_RETURN_T >;
-                { solver.init(guess) };
-                { solver.iterate() };
-                // clang-format on
-            }
-        auto fdfsolve_impl(SOLVER                             solver,
-                           typename SOLVER::FUNCTION_RETURN_T guess,
-                           FloatingPoint auto                 eps,
-                           //     = nxx::EPS,
-                           int maxiter) // = nxx::MAXITER)
+            requires SOLVER::IsPolishingSolver
+        auto fdfsolve_impl(SOLVER                solver,
+                           IsFloatOrComplex auto guess,
+                           IsFloat auto          eps,
+                           std::integral auto    maxiter)
         {
-            using EXPECTED_T = impl::RootErrorImpl< typename SOLVER::FUNCTION_RETURN_T >;
-            using RETURN_T = tl::expected< typename SOLVER::FUNCTION_RETURN_T, EXPECTED_T >;
+            using ERROR_T = detail::RootErrorImpl< typename SOLVER::RESULT_T >;  /**< Type for error handling. */
+            using RETURN_T = tl::expected< typename SOLVER::RESULT_T, ERROR_T >; /**< Type for the function return value. */
 
             solver.init(guess);
-            RETURN_T result = solver.result();
+            RETURN_T result = solver.current();
 
-            // Check for NaN or Inf.
-            if (!std::isfinite(abs(solver.evaluate(result.value())))) {
-                result = tl::make_unexpected(EXPECTED_T("Invalid initial guess!", RootErrorType::NumericalError, result.value()));
+            // Check for NaN or Inf in the initial guess evaluation.
+            using std::isfinite;
+            if (!isfinite(abs(solver.evaluate(result.value())))) {
+                result = tl::make_unexpected(ERROR_T("Invalid initial guess!", RootErrorType::NumericalError, result.value()));
                 return result;
             }
 
-            // Begin iteration loop.
+            // Begin the iteration loop.
             int iter = 1;
             while (true) {
-                result = solver.result();
+                result = solver.current();
 
-                // Check for NaN or Inf
-                if (!std::isfinite(abs(result.value()))) {
-                    result = tl::make_unexpected(EXPECTED_T("Non-finite result!", RootErrorType::NumericalError, result.value(), iter));
+                // Check for non-finite results.
+                if (!isfinite(abs(result.value()))) {
+                    result = tl::make_unexpected(ERROR_T("Non-finite result!", RootErrorType::NumericalError, result.value(), iter));
                     break;
                 }
 
-                // Check for convergence
-                if (abs(solver.evaluate(solver.result())) < eps) break;
+                // Check for convergence.
+                if (abs(solver.evaluate(solver.current())) < eps) break;
 
-                // Check for max. iterations
+                // Check for exceeding the maximum number of iterations.
                 if (iter >= maxiter) {
                     result = tl::make_unexpected(
-                        EXPECTED_T("Maximum number of iterations exceeded!", RootErrorType::MaxIterationsExceeded, result.value(), iter));
+                        ERROR_T("Maximum number of iterations exceeded!", RootErrorType::MaxIterationsExceeded, result.value(), iter));
                     break;
                 }
 
-                // Perform one iteration
+                // Perform one iteration.
                 ++iter;
                 solver.iterate();
             }
@@ -339,19 +312,38 @@ namespace nxx::roots
         }
     }
 
-    template<template< typename, typename > class SOLVER_T,
-        IsFloatInvocable FN_T,
-        IsFloatInvocable DERIV_T,
-        FloatingPoint GUESS_T,
-        FloatingPoint EPS_T = GUESS_T,
-        std::integral ITER_T = int>
+    /**
+     * @brief Defines a high-level root finding function template `fdfsolve` with default parameters.
+     *
+     * The `fdfsolve` function template is an extension of the root finding interface that provides
+     * default values for the tolerance (epsilon) and the maximum number of iterations. This overloaded
+     * version allows users to specify only the function, its derivative, and an initial guess, while
+     * using default values for epsilon and maximum iterations based on the type of the guess. It supports
+     * different polishing solvers, making it versatile for various root finding needs.
+     *
+     * @tparam SOLVER_T The template class of the solver to be used. Must be a valid polishing solver type.
+     * @tparam FN_T The type of the function for which the root is being refined.
+     * @tparam DERIV_T The type of the derivative function of FN_T.
+     * @tparam GUESS_T The type of the initial guess for the root.
+     * @tparam EPS_T The type of the epsilon value for convergence check, defaulted based on GUESS_T.
+     * @tparam ITER_T The type of the maximum iterations count, defaulted to int.
+     */
+    template<template< typename, typename, typename > class SOLVER_T,
+        IsFloatOrComplexInvocable FN_T,
+        IsFloatOrComplexInvocable DERIV_T,
+        IsFloatOrComplex GUESS_T,
+        IsFloat EPS_T,
+        std::integral ITER_T>
     auto fdfsolve(FN_T    function,
                   DERIV_T derivative,
                   GUESS_T guess,
-                  EPS_T   eps     = epsilon< GUESS_T >(),
-                  ITER_T  maxiter = iterations< GUESS_T >())
+                  EPS_T   eps,     /**< Default epsilon value based on the type of the guess. */
+                  ITER_T  maxiter) /**< Default maximum iterations based on the type of the guess. */
     {
-        auto solver = SOLVER_T(function, derivative);
+        // Instantiates the solver with the given function, its derivative, and types.
+        auto solver = SOLVER_T< FN_T, DERIV_T, GUESS_T >(function, derivative);
+
+        // Delegates the solving process to fdfsolve_impl, passing in the solver and other parameters.
         return detail::fdfsolve_impl(solver, guess, eps, maxiter);
     }
 } // namespace nxx::roots
