@@ -9,11 +9,28 @@
 //#include <numerixx.hpp>
 #include <Roots.hpp>
 
+#include <boost/multiprecision/cpp_bin_float.hpp>
+
+using NXX_FLOAT = boost::multiprecision::cpp_bin_float_50;
+
+template<>
+struct fmt::formatter< NXX_FLOAT > : fmt::formatter< double >
+{
+    auto format(const NXX_FLOAT& d, fmt::format_context& ctx) const
+    {
+        return fmt::formatter< double >::format(static_cast< double >(d), ctx);
+    }
+};
+
+
 int main()
 {
     using namespace nxx::roots;
     std::cout << std::fixed << std::setprecision(8);
-    auto func = nxx::poly::Polynomial({ -5.0, 0.0, 1.0 });
+    // auto func = nxx::poly::Polynomial({ NXX_FLOAT(-5.0), NXX_FLOAT(0.0), NXX_FLOAT(1.0) });
+    auto func = [](nxx::IsFloat auto x) { return x * x - decltype(x)(5.0); };
+
+    auto xyz = *search< BracketExpandUp >(func, { NXX_FLOAT(1.0), NXX_FLOAT(1.1) });
 
     // ============================================================================================
     // The nxx::roots namespace contains a number of search algorithms, for finding a bracketing
@@ -50,7 +67,7 @@ int main()
 
     auto PrintBounds = [](auto b) { return std::string("(" + std::to_string(b.first) + ", " + std::to_string(b.second) + ")"); };
 
-    std::cout << "\nIdentify the brackets around the root of the polynomial: " << to_string(func) << "\n";
+    // std::cout << "\nIdentify the brackets around the root of the polynomial: " << to_string(func) << "\n";
     std::cout << "BracketExpandUp Method:         " << PrintBounds(*search< BracketExpandUp >(func, { 1.0, 1.1 })) << std::endl;
     std::cout << "BracketSearchUp Method:         " << PrintBounds(*search< BracketSearchUp >(func, { 1.0, 1.1 })) << std::endl;
     std::cout << "BracketExpandDown Method:       " << PrintBounds(*search< BracketExpandDown >(func, { 4.9, 5.0 })) << std::endl;
@@ -123,10 +140,13 @@ int main()
         for (int i = 0; i <= 100; ++i) {
             // Print the current iteration:
             std::cout << fmt::format("{:10} | {:15.10f} | {:15.10f} | {:15.10f} ",
-                                     i,                       // Iteration number
-                                     solver.current().first,  // Lower bound
-                                     solver.current().second, // Upper bound
-                                     solver.ratio())          // Expansion factor
+                                     i,
+                                     // Iteration number
+                                     solver.current().first,
+                                     // Lower bound
+                                     solver.current().second,
+                                     // Upper bound
+                                     solver.ratio()) // Expansion factor
                 << std::endl;
 
             // Check if a root is in the current interval:

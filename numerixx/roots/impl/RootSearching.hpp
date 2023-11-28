@@ -769,13 +769,13 @@ namespace nxx::roots
             requires SOLVER::IsBracketingSearcher
         auto search_impl(SOLVER             solver,
                          IsFloatStruct auto bounds,
-                         IsFloat auto       searchFactor,
+                         IsFloat auto       ratio,
                          std::integral auto maxiter)
         {
             using ET = RootErrorImpl< decltype(bounds) >;    /**< Type for error handling. */
             using RT = tl::expected< decltype(bounds), ET >; /**< Type for the function return value. */
 
-            solver.init(bounds, searchFactor);
+            solver.init(bounds, ratio);
             auto                      curBounds = solver.current();
             RT                        result    = curBounds;
             typename SOLVER::RESULT_T eval_lower;
@@ -846,8 +846,8 @@ namespace nxx::roots
         std::integral ITER_T = int>
     auto search(FN_T     function,
                 STRUCT_T bounds,
-                FACTOR_T searchFactor = std::numbers::phi_v< StructCommonType_t< STRUCT_T > >,
-                ITER_T   maxiter      = iterations< StructCommonType_t< STRUCT_T > >())
+                FACTOR_T ratio   = std::numbers::phi,
+                ITER_T   maxiter = iterations< StructCommonType_t< STRUCT_T > >())
     {
         auto [lo, hi] = bounds; /**< Extract lower and upper bounds from the struct. */
 
@@ -855,7 +855,7 @@ namespace nxx::roots
         auto solver = SOLVER_T< FN_T, ARG_T >(function);                /**< Instantiates the solver with the given function. */
 
         // Delegates the search process to search_impl, passing in the solver and other parameters.
-        return detail::search_impl(solver, std::pair< ARG_T, ARG_T >{ lo, hi }, searchFactor, maxiter);
+        return detail::search_impl(solver, std::pair< ARG_T, ARG_T >{ lo, hi }, ratio, maxiter);
     }
 
 
@@ -880,8 +880,8 @@ namespace nxx::roots
         std::integral ITER_T = int>
     auto search(FN_T                           function,
                 std::initializer_list< ARG_T > bounds,
-                FACTOR_T                       searchFactor = std::numbers::phi_v< ARG_T >,
-                ITER_T                         maxiter      = iterations< ARG_T >())
+                FACTOR_T                       ratio   = std::numbers::phi,
+                ITER_T                         maxiter = iterations< ARG_T >())
     {
         // Ensure the initializer list has exactly two elements representing the bounds.
         if (bounds.size() != 2) throw NumerixxError("Initializer list must contain exactly two elements!");
@@ -890,7 +890,7 @@ namespace nxx::roots
         auto bnds   = std::span(bounds.begin(), bounds.end()); /**< Create a span for bounds extraction. */
 
         // Delegates the search process to search_impl, passing in the solver and other parameters.
-        return detail::search_impl(solver, std::pair{ bnds.front(), bnds.back() }, searchFactor, maxiter);
+        return detail::search_impl(solver, std::pair{ bnds.front(), bnds.back() }, ratio, maxiter);
     }
 
 
@@ -919,8 +919,8 @@ namespace nxx::roots
         requires nxx::IsFloat< typename CONT_T::value_type >
     auto search(FN_T          function,
                 const CONT_T& bounds,
-                FACTOR_T      searchFactor = std::numbers::phi_v< typename CONT_T::value_type >,
-                ITER_T        maxiter      = iterations< typename CONT_T::value_type >())
+                FACTOR_T      ratio   = std::numbers::phi,
+                ITER_T        maxiter = iterations< typename CONT_T::value_type >())
     {
         // Ensure the container has exactly two elements representing the bounds.
         if (bounds.size() != 2) throw NumerixxError("Container must contain exactly two elements!");
@@ -930,7 +930,7 @@ namespace nxx::roots
         auto solver = SOLVER_T< FN_T, ARG_T >(function); /**< Instantiates the solver with the given function. */
 
         // Delegates the search process to search_impl, passing in the solver and other parameters.
-        return detail::search_impl(solver, std::pair{ bounds.front(), bounds.back() }, searchFactor, maxiter);
+        return detail::search_impl(solver, std::pair{ bounds.front(), bounds.back() }, ratio, maxiter);
     }
 } // namespace nxx::roots
 
