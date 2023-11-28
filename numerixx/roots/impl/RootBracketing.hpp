@@ -107,24 +107,18 @@ namespace nxx::roots
 
             /**
              * @brief Constructs the BracketingBase with a function and initial bounds.
-             * @tparam T The type of the bounds, must be a float type.
              * @param objective The function for which the root is being bracketed.
              * @param bounds Initial bounds for the root.
              */
-            template<typename T>
-                requires nxx::IsFloat< T >
-            BracketingBase(FUNCTION_T objective, std::initializer_list< T > bounds)
+            BracketingBase(FUNCTION_T objective, std::initializer_list< ARG_T > bounds)
                 : m_func{ std::move(objective) } { init(bounds); }
 
             /**
              * @brief Constructs the BracketingBase with a function and bounds from a container.
-             * @tparam CONT_T The container type holding the bounds.
              * @param objective The function for which the root is being bracketed.
              * @param bounds Container with the initial bounds.
              */
-            template<IsContainer CONT_T>
-                requires nxx::IsFloat< typename CONT_T::value_type >
-            BracketingBase(FUNCTION_T objective, CONT_T bounds)
+            BracketingBase(FUNCTION_T objective, IsFloatContainer auto bounds)
                 : m_func{ std::move(objective) } { init(bounds); }
 
             /**
@@ -133,8 +127,7 @@ namespace nxx::roots
              * @param objective The function for which the root is being bracketed.
              * @param bounds Struct with the initial bounds.
              */
-            template<IsFloatStruct STRUCT_T>
-            BracketingBase(FUNCTION_T objective, STRUCT_T bounds)
+            BracketingBase(FUNCTION_T objective, IsFloatStruct auto bounds)
                 : m_func{ std::move(objective) } { init(bounds); }
 
             /**
@@ -628,8 +621,7 @@ namespace nxx::roots
         std::integral ITER_T = int>
     auto fsolve(FN_T                           function,
                 std::initializer_list< ARG_T > bounds,
-                EPS_T                          eps = epsilon< ARG_T >(),
-                /**< Default epsilon value based on ARG_T. */
+                EPS_T                          eps = epsilon< ARG_T >(), /**< Default epsilon value based on ARG_T. */
                 ITER_T maxiter = iterations< ARG_T >()) /**< Default maximum iterations based on ARG_T. */
     {
         // Check for correct number of elements in the initializer list.
@@ -671,10 +663,8 @@ namespace nxx::roots
         requires nxx::IsFloat< typename CONT_T::value_type >
     auto fsolve(FN_T          function,
                 const CONT_T& bounds,
-                EPS_T         eps = epsilon< typename CONT_T::value_type >(),
-                /**< Default epsilon value based on the container's value type. */
-                ITER_T maxiter = iterations< typename CONT_T::value_type >())
-    /**< Default maximum iterations based on the container's value type. */
+                EPS_T         eps = epsilon< typename CONT_T::value_type >(), /**< Default epsilon value based on the container's value type. */
+                ITER_T maxiter = iterations< typename CONT_T::value_type >()) /**< Default maximum iterations based on the container's value type. */
     {
         // Ensure the container has exactly two elements representing the bounds.
         if (bounds.size() != 2) throw NumerixxError("Container must contain exactly two elements!");

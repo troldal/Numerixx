@@ -228,8 +228,14 @@ int main()
         std::cout << "------------------------------------------------------------------\n\n";
     };
 
-    std::cout << "Manual root-finding using Newton's method:" << std::endl;
+    std::cout << "Manual root-finding using the Newton-Raphson method:" << std::endl;
     polish_root(Newton(func, nxx::deriv::derivativeOf(func), NXX_FLOAT(1.25)), NXX_FLOAT(1.25));
+
+    std::cout << "Manual root-finding using the Secant method:" << std::endl;
+    polish_root(Secant(func, nxx::deriv::derivativeOf(func), NXX_FLOAT(1.25)), NXX_FLOAT(1.25));
+
+    std::cout << "Manual root-finding using the Steffensen method:" << std::endl;
+    polish_root(Steffensen(func, nxx::deriv::derivativeOf(func), NXX_FLOAT(1.25)), NXX_FLOAT(1.25));
 
     return 0;
 }

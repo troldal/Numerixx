@@ -50,13 +50,13 @@ int main()
 
     auto PrintBounds = [](auto b) { return std::string("(" + std::to_string(b.first) + ", " + std::to_string(b.second) + ")"); };
 
-    std::cout << "\nIdentify the brackets around the root of the polynomial: " << func.asString() << "\n";
-    std::cout << "BracketExpandUp Method:         " << PrintBounds(*search(BracketExpandUp(func), { 1.0, 1.1 })) << std::endl;
-    std::cout << "BracketSearchUp Method:         " << PrintBounds(*search(BracketSearchUp(func), { 1.0, 1.1 })) << std::endl;
-    std::cout << "BracketExpandDown Method:       " << PrintBounds(*search(BracketExpandDown(func), { 4.9, 5.0 })) << std::endl;
-    std::cout << "BracketSearchDown Method:       " << PrintBounds(*search(BracketSearchDown(func), { 4.9, 5.0 })) << std::endl;
-    std::cout << "BracketExpandOut Method:        " << PrintBounds(*search(BracketExpandOut(func), { 1.0, 1.1 })) << std::endl;
-    std::cout << "BracketSubdivide Method:        " << PrintBounds(*search(BracketSubdivide(func), { -5.0, 10.0 })) << std::endl;
+    std::cout << "\nIdentify the brackets around the root of the polynomial: " << to_string(func) << "\n";
+    std::cout << "BracketExpandUp Method:         " << PrintBounds(*search<BracketExpandUp>(func, { 1.0, 1.1 })) << std::endl;
+    std::cout << "BracketSearchUp Method:         " << PrintBounds(*search<BracketSearchUp>(func, { 1.0, 1.1 })) << std::endl;
+    std::cout << "BracketExpandDown Method:       " << PrintBounds(*search<BracketExpandDown>(func, { 4.9, 5.0 })) << std::endl;
+    std::cout << "BracketSearchDown Method:       " << PrintBounds(*search<BracketSearchDown>(func, { 4.9, 5.0 })) << std::endl;
+    std::cout << "BracketExpandOut Method:        " << PrintBounds(*search<BracketExpandOut>(func, { 1.0, 1.1 })) << std::endl;
+    std::cout << "BracketSubdivide Method:        " << PrintBounds(*search<BracketSubdivide>(func, { -5.0, 10.0 })) << std::endl;
 
     // The given polynomial has two roots, one at x = -2.23606798, and the other at x = 2.23606798. The examples above finds the
     // bracketing interval for the root at x = 2.23606798, except for the BracketSubdivide method, which finds the bracketing
@@ -71,7 +71,7 @@ int main()
 
     std::cout << "\nIdentify the brackets around the root of the polynomial, using a searchFactor of 2.0 and maxiter = 10: "
               << "\n";
-    std::cout << "BracketExpandUp Method:         " << PrintBounds(*search(BracketExpandUp(func), { 1.0, 1.1 }, 2.0, 10)) << std::endl;
+    std::cout << "BracketExpandUp Method:         " << PrintBounds(*search<BracketExpandUp>(func, { 1.0, 1.1 }, 2.0, 10)) << std::endl;
 
     // ============================================================================================
     // As mentioned above, the search() function will return a tl::expected object, which will
@@ -88,11 +88,11 @@ int main()
     };
 
     std::cout << "Initial Bracket:   [5.0, 10.0] (expanding down)\n";
-    auto root = search(BracketExpandDown([](double x) { return std::log(x); }), { 5.0, 10.0 });
+    auto root = search<BracketExpandDown>([](double x) { return std::log(x); }, { 5.0, 10.0 });
     if (!root) print_error(root.error());
 
     std::cout << "Initial Bracket:   [5.0, 10.0] (expanding up)\n";
-    root = search(BracketExpandUp([](double x) { return std::log(x); }), { 5.0, 10.0 }, 1.0, 10);
+    root = search<BracketExpandUp>([](double x) { return std::log(x); }, { 5.0, 10.0 }, 1.0, 10);
     if (!root) print_error(root.error());
 
     // The error object is a subclass of the RootError class, which is a subclass of the std::runtime_error
@@ -113,14 +113,11 @@ int main()
     // ============================================================================================
 
     // Ad hoc lambda function to print the current iteration:
-    auto find_bracket = [](auto solver, std::pair< double, double > bounds) {
+    auto find_bracket = [](auto solver) {
         // Print the header:
         std::cout << "----------------------------------------------------------------\n";
         std::cout << fmt::format("{:>10} | {:>15} | {:>15} | {:>15} ", "Iter", "Lower", "Upper", "Factor") << std::endl;
         std::cout << "----------------------------------------------------------------\n";
-
-        // Initialize the solver:
-        solver.init(bounds);
 
         // Iterate until convergence (or until 100 iterations have been performed):
         for (int i = 0; i <= 100; ++i) {
@@ -129,7 +126,7 @@ int main()
                                      i,                         // Iteration number
                                      solver.current().first,     // Lower bound
                                      solver.current().second,    // Upper bound
-                                     solver.factor())           // Expansion factor
+                                     solver.ratio())           // Expansion factor
                       << std::endl;
 
             // Check if a root is in the current interval:
@@ -140,8 +137,9 @@ int main()
         }
 
         // Print the final result:
-        std::cout << std::fixed << std::setprecision(10) << "SUCCESS! Bounds found at: (" << solver.current().first << ", "
-                  << solver.current().second << ")\n";
+        std::cout << std::fixed << std::setprecision(10)
+            << "SUCCESS! Bounds found at: (" << solver.current().first << ", "
+            << solver.current().second << ")\n";
         std::cout << "----------------------------------------------------------------\n\n";
     };
 
@@ -149,12 +147,22 @@ int main()
               << "\n\n";
 
     std::cout << "BracketExpandUp Method:         " << std::endl;
-    BracketExpandUp solver(func);
-    find_bracket(solver, { 1.0, 1.1 });
+    find_bracket(BracketExpandUp(func, { 1.0, 1.1 }));
+
+    std::cout << "BracketSearchUp Method:         " << std::endl;
+    find_bracket(BracketSearchUp(func, { 1.0, 1.1 }));
+
+    std::cout << "BracketExpandDown Method:         " << std::endl;
+    find_bracket(BracketExpandDown(func, { 4.9, 5.0 }));
+
+    std::cout << "BracketSearchDown Method:         " << std::endl;
+    find_bracket(BracketSearchDown(func, { 4.9, 5.0 }));
+
+    std::cout << "BracketExpandOut Method:         " << std::endl;
+    find_bracket(BracketExpandOut(func, { 1.0, 1.1 }));
 
     std::cout << "BracketSubdivide Method:         " << std::endl;
-    BracketSubdivide solver2(func);
-    find_bracket(solver2, { -50.0, 100.0 });
+    find_bracket(BracketSubdivide(func, { -5.0, 10.0 }));
 
     return 0;
 }

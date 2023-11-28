@@ -236,6 +236,198 @@ namespace nxx::roots
 
     // =================================================================================================================
     //
+    //  ad88888ba
+    // d8"     "8b                                                    ,d
+    // Y8,                                                            88
+    // `Y8aaaaa,     ,adPPYba,   ,adPPYba,  ,adPPYYba,  8b,dPPYba,  MM88MMM
+    //   `"""""8b,  a8P_____88  a8"     ""  ""     `Y8  88P'   `"8a   88
+    //         `8b  8PP"""""""  8b          ,adPPPPP88  88       88   88
+    // Y8a     a8P  "8b,   ,aa  "8a,   ,aa  88,    ,88  88       88   88,
+    //  "Y88888P"    `"Ybbd8"'   `"Ybbd8"'  `"8bbdP"Y8  88       88   "Y888
+    //
+    // =================================================================================================================
+
+    /**
+     * @brief Defines the Secant class for performing the secant method of root polishing.
+     *
+     * The Secant class template implements the secant method, an iterative root finding algorithm
+     * that uses a succession of roots of secant lines to approximate a root of a function. This class
+     * template inherits from a base class that provides common functionalities for root polishing algorithms,
+     * and adds specific logic for the secant method iterations. It is designed to handle an initial guess
+     * and a subsequent series of approximations to converge on the root. The secant method is a derivative-free
+     * alternative to Newton's method and is particularly useful when the derivative of the function is not
+     * readily available or is expensive to compute.
+     *
+     * @tparam FN The type of the function for which the root is being polished.
+     * @tparam DFN The type of the derivative function of FN, used in the initial step.
+     * @tparam ARG_T The type of the argument to the function, defaults to double.
+     */
+    template<IsFloatOrComplexInvocable FN, IsFloatOrComplexInvocable DFN, IsFloatOrComplex ARG_T = double>
+    class Secant final : public detail::PolishingBase< Secant< FN, DFN, ARG_T >, FN, DFN, ARG_T >
+    {
+        using BASE = detail::PolishingBase< Secant< FN, DFN, ARG_T >, FN, DFN, ARG_T >; /**< Base class alias for readability. */
+
+        ARG_T m_prevGuess;             /**< Stores the previous guess for the root. */
+        bool  m_hasPrevGuess{ false }; /**< Flag to indicate whether a previous guess is available. */
+        bool  m_firstStep{ true };     /**< Flag to indicate whether the first step is to be taken. */
+
+    public:
+        using BASE::BASE; /**< Inherits constructors from PolishingBase. */
+
+        /**
+         * @brief Initializes the secant solver with an initial guess.
+         * @param initialGuess The initial guess for the root.
+         */
+        void init(ARG_T initialGuess)
+        {
+            BASE::init(initialGuess);
+            m_hasPrevGuess = false;
+            m_firstStep    = true;
+        }
+
+        /**
+         * @brief Performs a single iteration of the secant method.
+         * @details This method switches between a Newton-Raphson step for the first iteration
+         *          and a Secant step for subsequent iterations.
+         * @throws std::runtime_error If a division by near-zero occurs.
+         */
+        void iterate()
+        {
+            if (m_firstStep) {
+                ARG_T f_x       = BASE::evaluate(BASE::m_guess);
+                ARG_T f_prime_x = BASE::derivative(BASE::m_guess);
+
+                if (abs(f_prime_x) < std::numeric_limits< ARG_T >::epsilon()) {
+                    throw std::runtime_error("Division by near-zero in Newton-Raphson step.");
+                    // TODO: Return a tl::expected instead of throwing an exception.
+                }
+
+                m_prevGuess = BASE::m_guess;
+                BASE::m_guess -= f_x / f_prime_x;
+                m_firstStep    = false;
+                m_hasPrevGuess = true;
+            }
+            else {
+                ARG_T f_x      = BASE::evaluate(BASE::m_guess);
+                ARG_T f_x_prev = BASE::evaluate(m_prevGuess);
+
+                if (abs(f_x - f_x_prev) < std::numeric_limits< ARG_T >::epsilon()) {
+                    throw std::runtime_error("Division by near-zero in Secant method.");
+                    // TODO: Return a tl::expected instead of throwing an exception.
+                }
+
+                ARG_T newGuess = BASE::m_guess - f_x * (BASE::m_guess - m_prevGuess) / (f_x - f_x_prev);
+                m_prevGuess    = BASE::m_guess;
+                BASE::m_guess  = newGuess;
+            }
+        }
+    };
+
+    /**
+     * @brief Deduction guides for Secant class.
+     * Allows the type of Secant class to be deduced from the constructor parameters.
+     */
+    template<typename FN, typename DFN>
+        requires IsFloatOrComplexInvocable< FN > && IsFloatOrComplexInvocable< DFN >
+    Secant(FN, DFN) -> Secant< FN, DFN >;
+
+    template<typename FN, typename DFN, typename ARG_T>
+        requires IsFloatOrComplexInvocable< FN > && IsFloatOrComplexInvocable< DFN > && IsFloatOrComplex< ARG_T >
+    Secant(FN, DFN, ARG_T) -> Secant< FN, DFN, ARG_T >;
+
+
+    // =================================================================================================================
+    //
+    //  ad88888ba                        ad88     ad88
+    // d8"     "8b  ,d                  d8"      d8"
+    // Y8,          88                  88       88
+    // `Y8aaaaa,  MM88MMM  ,adPPYba,  MM88MMM  MM88MMM  ,adPPYba,  8b,dPPYba,   ,adPPYba,   ,adPPYba,  8b,dPPYba,
+    //   `"""""8b,  88    a8P_____88    88       88    a8P_____88  88P'   `"8a  I8[    ""  a8P_____88  88P'   `"8a
+    //         `8b  88    8PP"""""""    88       88    8PP"""""""  88       88   `"Y8ba,   8PP"""""""  88       88
+    // Y8a     a8P  88,   "8b,   ,aa    88       88    "8b,   ,aa  88       88  aa    ]8I  "8b,   ,aa  88       88
+    //  "Y88888P"   "Y888  `"Ybbd8"'    88       88     `"Ybbd8"'  88       88  `"YbbdP"'   `"Ybbd8"'  88       88
+    //
+    // =================================================================================================================
+
+    /**
+     * @brief Defines the Steffensen class for performing Steffensen's method of root polishing.
+     *
+     * Steffensen's method is an iterative root finding algorithm that improves upon the simple fixed-point
+     * iteration by incorporating a form of Aitken's Δ² process. This class template, `Steffensen`, inherits
+     * from a base class that provides common functionalities for root polishing algorithms, and adds the
+     * specific logic for Steffensen's method iterations. It starts with a Newton-Raphson step and then
+     * switches to Steffensen's method for subsequent iterations. This method is particularly effective
+     * for functions where the derivative is difficult to compute or is not readily available.
+     *
+     * @tparam FN The type of the function for which the root is being polished.
+     * @tparam DFN The type of the derivative function of FN, used in the initial step.
+     * @tparam ARG_T The type of the argument to the function, defaults to double.
+     */
+    template<IsFloatOrComplexInvocable FN, IsFloatOrComplexInvocable DFN, IsFloatOrComplex ARG_T = double>
+    class Steffensen final : public detail::PolishingBase< Steffensen< FN, DFN, ARG_T >, FN, DFN, ARG_T >
+    {
+        using BASE = detail::PolishingBase< Steffensen< FN, DFN, ARG_T >, FN, DFN, ARG_T >; /**< Base class alias for readability. */
+
+        bool m_firstStep{ true }; /**< Flag to indicate whether the first step is to be taken. */
+
+    public:
+        using BASE::BASE; /**< Inherits constructors from PolishingBase. */
+
+        /**
+         * @brief Performs a single iteration of the hybrid Steffensen method.
+         * @details Uses Newton-Raphson for the first iteration and Steffensen's method subsequently.
+         * @throws std::runtime_error If a division by near-zero occurs.
+         */
+        void iterate()
+        {
+            if (m_firstStep) {
+                // Perform a Newton-Raphson step for the first iteration.
+                ARG_T f_x       = BASE::evaluate(BASE::m_guess);
+                ARG_T f_prime_x = BASE::derivative(BASE::m_guess);
+
+                if (abs(f_prime_x) < std::numeric_limits< ARG_T >::epsilon()) {
+                    throw std::runtime_error("Division by near-zero in Newton-Raphson step.");
+                    // TODO: Return a tl::expected instead of throwing an exception.
+                }
+
+                BASE::m_guess -= f_x / f_prime_x;
+                m_firstStep = false;
+            }
+            else {
+                // Perform a Steffensen's method step for subsequent iterations.
+                ARG_T x  = BASE::m_guess;
+                ARG_T fx = BASE::evaluate(x);
+
+                ARG_T x1  = x + fx;
+                ARG_T fx1 = BASE::evaluate(x1);
+                ARG_T x2  = x1 + fx1;
+
+                ARG_T denominator = fx1 - fx;
+                if (abs(denominator) < std::numeric_limits< ARG_T >::epsilon()) {
+                    throw std::runtime_error("Division by near-zero in Steffensen's method.");
+                    // TODO: Return a tl::expected instead of throwing an exception.
+                }
+
+                BASE::m_guess = x - (fx * fx) / denominator;
+            }
+        }
+    };
+
+    /**
+     * @brief Deduction guides for Steffensen class.
+     * Allows the type of Steffensen class to be deduced from the constructor parameters.
+     */
+    template<typename FN, typename DFN>
+        requires IsFloatOrComplexInvocable< FN > && IsFloatOrComplexInvocable< DFN >
+    Steffensen(FN, DFN) -> Steffensen< FN, DFN >;
+
+    template<typename FN, typename DFN, typename ARG_T>
+        requires IsFloatOrComplexInvocable< FN > && IsFloatOrComplexInvocable< DFN > && IsFloatOrComplex< ARG_T >
+    Steffensen(FN, DFN, ARG_T) -> Steffensen< FN, DFN, ARG_T >;
+
+
+    // =================================================================================================================
+    //
     //    ad88          88     ad88                          88
     //   d8"            88    d8"                            88
     //   88             88    88                             88

@@ -20,6 +20,12 @@ FetchContent_Declare(fmt
 )
 FetchContent_MakeAvailable(fmt)
 
+#get_target_property(fmt_include_dirs fmt INTERFACE_INCLUDE_DIRECTORIES)
+#set_target_properties(fmt PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
+#        "$<BUILD_INTERFACE:${fmt_include_dirs}>;$<INSTALL_INTERFACE:include>"
+#        INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${fmt_include_dirs}")
+
+
 #=================================================================================================================
 # Define targets
 #=================================================================================================================
@@ -116,7 +122,22 @@ list(APPEND OPENXLSX_DEBUG_FLAGS_GNU
         "-Wduplicated-cond"
         "-Wduplicated-branches"
         "-Wlogical-op"
-        "-Wnull-dereference")
+        "-Wnull-dereference"
+        "-Wall"
+        "-Wextra"
+        "-Wshadow"
+        "-Wnon-virtual-dtor"
+        "-Wold-style-cast"
+        "-Wcast-align"
+        "-Wunused"
+        "-Woverloaded-virtual"
+        "-Wpedantic"
+        "-Wconversion"
+        "-Wdouble-promotion"
+        "-Wformat=2"
+        "-Weffc++"
+        "-Wno-unknown-pragmas"
+)
 list(APPEND OPENXLSX_DEBUG_FLAGS_GNUCLANG
         "-Wall"
         "-Wextra"
@@ -168,15 +189,16 @@ list(APPEND OPENXLSX_RELEASE_FLAGS_MSVC
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     target_compile_options(DemoRootFinding PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNU}>)
+    target_compile_options(DemoRootSearching PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNU}>)
     target_compile_options(DemoPoly PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNU}>)
     target_compile_options(DemoDeriv PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNU}>)
     target_compile_options(DemoMultiroot PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNU}>)
 
 
 elseif (("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR
-("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang") OR
-("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU"))
+("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
     target_compile_options(DemoRootFinding PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNUCLANG}>)
+    target_compile_options(DemoRootSearching PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNUCLANG}>)
     target_compile_options(DemoPoly PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNUCLANG}>)
     target_compile_options(DemoDeriv PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNUCLANG}>)
     target_compile_options(DemoMultiroot PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNUCLANG}>)
@@ -185,6 +207,9 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     string(REGEX REPLACE "/W[3|4]" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     target_compile_options(DemoRootFinding PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_MSVC}>)
     target_compile_options(DemoRootFinding PRIVATE $<$<CONFIG:Release>:${OPENXLSX_RELEASE_FLAGS_MSVC}>)
+
+    target_compile_options(DemoRootSearching PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_MSVC}>)
+    target_compile_options(DemoRootSearching PRIVATE $<$<CONFIG:Release>:${OPENXLSX_RELEASE_FLAGS_MSVC}>)
 
     target_compile_options(DemoPoly PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_MSVC}>)
     target_compile_options(DemoPoly PRIVATE $<$<CONFIG:Release>:${OPENXLSX_RELEASE_FLAGS_MSVC}>)

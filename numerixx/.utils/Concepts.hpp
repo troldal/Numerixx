@@ -91,6 +91,9 @@ namespace nxx
         { a.size() } -> std::convertible_to< std::size_t >;
     };
 
+    template<typename T>
+    concept IsFloatContainer = IsContainer< T > && IsFloat< typename T::value_type >;
+
     template<typename S>
         requires (!IsContainer< S >)
     struct StructTraits

@@ -8,7 +8,7 @@
     88     `8888  Y8a.    .a8P  88    `888'    88  88           88     `8b   88   d8'    `8b    d8'    `8b
     88      `888   `"Y8888Y"'   88     `8'     88  88888888888  88      `8b  88  8P        Y8  8P        Y8
 
-    Copyright © 2022 Kenneth Troldal Balslev
+    Copyright © 2023 Kenneth Troldal Balslev
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the “Software”), to deal
@@ -41,533 +41,667 @@
 // ===== Standard Library Includes
 #include <numbers>
 
+/**
+ * @file RootSearching.hpp
+ * @brief This file contains various search algorithms for finding roots of a function.
+ *
+ * The search algorithms provided in this file include bracketing searchers and bracket expansion searchers.
+ * Bracketing searchers incrementally expand the search bounds either upwards or downwards to find a bracket
+ * where a root exists. Bracket expansion searchers expand both the lower and upper bounds symmetrically outwards
+ * or expand one bound while keeping the other fixed. These algorithms are useful for finding a bracket where a root
+ * exists when the initial guess is not near the actual root.
+ *
+ * @author Kenneth Troldal Balslev
+ * @copyright Copyright (c) 2023 Kenneth Troldal Balslev
+ * @license MIT License
+ */
 namespace nxx::roots
 {
+    // =================================================================================================================
+    //
+    //  ad88888ba                                                   88           88
+    // d8"     "8b                                                  88           ""
+    // Y8,                                                          88
+    // `Y8aaaaa,     ,adPPYba,  ,adPPYYba,  8b,dPPYba,   ,adPPYba,  88,dPPYba,   88  8b,dPPYba,    ,adPPYb,d8
+    //   `"""""8b,  a8P_____88  ""     `Y8  88P'   "Y8  a8"     ""  88P'    "8a  88  88P'   `"8a  a8"    `Y88
+    //         `8b  8PP"""""""  ,adPPPPP88  88          8b          88       88  88  88       88  8b       88
+    // Y8a     a8P  "8b,   ,aa  88,    ,88  88          "8a,   ,aa  88       88  88  88       88  "8a,   ,d88
+    //  "Y88888P"    `"Ybbd8"'  `"8bbdP"Y8  88           `"Ybbd8"'  88       88  88  88       88   `"YbbdP"Y8
+    //                                                                                             aa,    ,88
+    //                                                                                              "Y8bbdP"
+    // =================================================================================================================
 
-    // ========================================================================
-    // BRACKET SEARCHING
-    // ========================================================================
     namespace detail
     {
         /**
-         * @brief A template base class for search algorithms.
+         * @brief Provides a base class template for search-based algorithms.
          *
-         * This class serves as the base for various search algorithms, providing common
-         * functionality and data members. It is designed to work with a specific search
-         * policy provided as a template parameter. The policy should define the traits
-         * used for proper instantiation of this class.
+         * The SearchBase class template serves as a foundational component for
+         * algorithms that conduct searches within a specified bound, utilizing a factor for
+         * controlling the search behavior. It encapsulates common functionalities such as storing the
+         * objective function, maintaining the current search bounds, and a factor influencing the search process.
+         * This class enforces certain type constraints on the template parameters to ensure compatibility with
+         * search-based algorithms.
          *
-         * @tparam POLICY The search policy implementation.
+         * @tparam SUBCLASS The subclass inheriting from SearchBase.
+         * @tparam FUNCTION_T The type of the function involved in the search process.
+         * @tparam ARG_T The type of the argument to the function.
+         *
+         * @note This class template uses SFINAE to enforce type constraints on its template parameters.
          */
-        template< typename POLICY >
-        requires std::floating_point< typename SearchingTraits< POLICY >::return_type >
+        template<typename SUBCLASS, IsFloatInvocable FUNCTION_T, IsFloat ARG_T>
+            requires std::same_as< typename SearchingTraits< SUBCLASS >::FUNCTION_T, FUNCTION_T > &&
+                     nxx::IsFloatInvocable< FUNCTION_T > &&
+                     nxx::IsFloat< ARG_T > &&
+                     nxx::IsFloat< typename SearchingTraits< SUBCLASS >::RETURN_T >
         class SearchBase
         {
-            /*
-             * Friend declarations.
-             */
-            friend POLICY;
+            friend SUBCLASS;
 
         public:
-            using function_type = typename SearchingTraits< POLICY >::function_type;
-            using return_type   = typename SearchingTraits< POLICY >::RETURN_T;
+            static constexpr bool IsBracketingSearcher = true; /**< Flag indicating the class is a bracketing searcher. */
+
+            using RESULT_T = std::invoke_result_t< FUNCTION_T, ARG_T >; /**< Result type of the function. */
+            using BOUNDS_T = std::pair< ARG_T, ARG_T >;                 /**< Type for representing the search bounds. */
+            using RATIO_T = ARG_T;                                      /**< Type for representing the search adjustment ratio. */
 
         protected:
-            /**
-             * @brief Default constructor.
-             */
-            ~SearchBase() = default;
+            ~SearchBase() = default; /**< Protected destructor to prevent direct instantiation. */
 
         private:
-            std::pair< return_type, return_type > m_bounds { 0.0, 1.0 };
-            function_type                         m_objective {};
-            return_type                           m_factor {};
-            bool                                  m_isInitialized { false };
-
-            /**
-             * @brief Constructor with objective function.
-             *
-             * Initializes the search algorithm with the provided objective function.
-             * The function is stored internally and used for evaluation during the search process.
-             *
-             * @param objective The objective function to optimize.
-             */
-            explicit SearchBase(function_type objective, return_type factor)
-                : m_objective(std::move(objective)),
-                  m_factor(factor)
-            {
-                if (m_factor < 1.0) throw std::invalid_argument("Invalid factor.");
-            }
-
-            /**
-             * @brief Set the search bounds.
-             *
-             * This method sets the search bounds, represented by a pair of lower and upper
-             * bounds. If the lower bound is greater than the upper bound, the values will be
-             * swapped internally to ensure a valid search space.
-             *
-             * @param bounds A pair of lower and upper bounds.
-             * @throws std::invalid_argument If the lower and upper bounds are equal.
-             */
-            void setBounds(auto bounds)
-            {
-                if (!m_isInitialized) throw std::logic_error("Search algorithm not initialized!");
-                auto [lower, upper] = bounds;
-                static_assert(std::floating_point< decltype(lower) >);
-                if (lower == upper) throw std::invalid_argument("Invalid bounds.");
-                if (lower > upper)
-                    m_bounds = std::pair< return_type, return_type > { upper, lower };
-                else
-                    m_bounds = std::pair< return_type, return_type > { lower, upper };
-            }
-
-            /**
-             * @brief Set the search bounds using an initializer list.
-             *
-             * This method sets the search bounds using an initializer list containing two elements.
-             * The elements are treated as the lower and upper bounds for the search space.
-             * If the first element is greater than the second element, the values will be
-             * swapped internally to ensure a valid search space.
-             *
-             * @tparam T The floating-point type.
-             * @param bounds An initializer list with exactly two elements.
-             * @throws std::logic_error If the initializer list does not contain exactly two elements.
-             */
-            template< typename T >
-            requires std::floating_point< T >
-            void setBounds(std::initializer_list< T > bounds)
-            {
-                if (bounds.size() != 2) throw std::logic_error("Initializer list must contain exactly two elements!");
-                setBounds(std::pair< return_type, return_type > { *bounds.begin(), *(bounds.begin() + 1) });
-            }
-
-            /**
-             * @brief Set the search factor.
-             *
-             * This method sets the search factor, which is used to determine the next search
-             * point. The search factor is multiplied with the current search point to obtain
-             * the next search point. The search factor must be greater than 1.0.
-             *
-             * @param factor The search factor.
-             * @throws std::invalid_argument If the search factor is less than or equal to 1.0.
-             */
-            void setFactor(auto factor) requires std::floating_point< decltype(factor) >
-            {
-                if (!m_isInitialized) throw std::logic_error("Search algorithm not initialized!");
-                if (factor < 1.0) throw std::invalid_argument("Invalid factor.");
-                m_factor = factor;
-            }
+            FUNCTION_T m_objective{};                /**< The objective function for the search. */
+            BOUNDS_T   m_bounds{ 0.0, 1.0 };         /**< Holds the current search bounds. */
+            RATIO_T    m_ratio{ std::numbers::phi }; /**< The factor influencing the search process. */
+            bool       m_isInitialized{ false };     /**< Indicates whether the search has been initialized. */
 
         public:
             /**
-             * @brief Copy constructor.
-             *
-             * @param other Another SearchBase object to be copied.
+             * @brief Constructs the SearchBase with an objective function.
+             * @param objective The function involved in the search process.
+             * @details This constructor initializes the search algorithm with a specific objective
+             *          function. It sets default bounds and factor, but leaves the algorithm uninitialized.
              */
-            SearchBase(const SearchBase& other) = default;
+            explicit SearchBase(FUNCTION_T objective)
+                : m_objective{ std::move(objective) } {}
 
             /**
-             * @brief Move constructor.
-             *
-             * @param other Another SearchBase object to be moved.
+             * @brief Constructs the SearchBase with an objective function, bounds from an initializer list, and an optional factor.
+             * @param objective The function involved in the search process.
+             * @param bounds Initializer list with exactly two elements representing the search bounds.
+             * @param factor The factor influencing the search process, defaults to the golden ratio.
+             * @details This constructor initializes the search algorithm with a specific objective
+             *          function, search bounds defined by an initializer list, and an optional factor.
              */
-            SearchBase(SearchBase&& other) noexcept = default;
+            SearchBase(FUNCTION_T objective, std::initializer_list< ARG_T > bounds, RATIO_T factor = std::numbers::phi)
+                : m_objective{ std::move(objective) },
+                  m_ratio{ factor } { init(bounds, factor); }
 
             /**
-             * @brief Copy assignment operator.
-             *
-             * @param other Another SearchBase object to be copied.
-             * @return A reference to this object.
+             * @brief Constructs the SearchBase with an objective function, bounds from a container, and an optional factor.
+             * @param objective The function involved in the search process.
+             * @param bounds Container with exactly two elements representing the search bounds.
+             * @param factor The factor influencing the search process, defaults to the golden ratio.
+             * @details This constructor initializes the search algorithm with a specific objective
+             *          function, search bounds defined by a container, and an optional factor.
              */
-            SearchBase& operator=(const SearchBase& other) = default;
+            SearchBase(FUNCTION_T objective, IsFloatContainer auto bounds, RATIO_T factor = std::numbers::phi)
+                : m_objective{ std::move(objective) },
+                  m_ratio{ factor } { init(bounds, factor); }
 
             /**
-             * @brief Move assignment operator.
-             *
-             * @param other Another SearchBase object to be moved.
-             * @return A reference to this object.
+             * @brief Constructs the SearchBase with an objective function, bounds from a float struct, and an optional factor.
+             * @param objective The function involved in the search process.
+             * @param bounds Struct with exactly two members representing the search bounds.
+             * @param factor The factor influencing the search process, defaults to the golden ratio.
+             * @details This constructor initializes the search algorithm with a specific objective
+             *          function, search bounds defined by a struct, and an optional factor.
              */
-            SearchBase& operator=(SearchBase&& other) noexcept = default;
+            SearchBase(FUNCTION_T objective, IsFloatStruct auto bounds, RATIO_T factor = std::numbers::phi)
+                : m_objective{ std::move(objective) },
+                  m_ratio{ factor } { init(bounds, factor); }
 
             /**
-             * @brief Returns the current search bounds.
-             *
-             * @return A const reference to a pair of lower and upper bounds.
+             * @brief Sets the search bounds.
+             * @param bounds The new bounds to be set for the search, represented as a pair of values.
+             * @throws NumerixxError If the search algorithm has not been initialized or if bounds are invalid.
              */
-            [[nodiscard]]
-            std::pair< double, double > bounds() const
+            void setBounds(const BOUNDS_T& bounds)
             {
-                if (!m_isInitialized) throw std::logic_error("Search algorithm not initialized!");
-                return m_bounds;
+                if (!m_isInitialized) throw NumerixxError("Search algorithm not initialized!");
+
+                auto [lower, upper] = bounds;
+                if (lower == upper) throw NumerixxError("Invalid bounds.");
+
+                if (lower > upper)
+                    m_bounds = BOUNDS_T{ upper, lower };
+                else
+                    m_bounds = BOUNDS_T{ lower, upper };
             }
 
             /**
-             * @brief Get the factor used in the search algorithm.
-             *
-             * This method returns the factor used by the search algorithm for certain
-             * operations, such as adjusting the search bounds. The factor may be
-             * different for different search policies and can affect the behavior of
-             * the algorithm.
-             *
-             * @return The factor used in the search algorithm.
+             * @brief Sets the search adjustment ratio.
+             * @param factor The new ratio to be set for the search process.
+             * @throws NumerixxError If the search algorithm has not been initialized or if ratio is invalid.
              */
-            return_type factor() const
+            void setRatio(RATIO_T factor)
             {
-                if (!m_isInitialized) throw std::logic_error("Search algorithm not initialized!");
-                return m_factor;
+                if (!m_isInitialized) throw NumerixxError("Search algorithm not initialized!");
+                if (factor < 1.0) throw NumerixxError("Invalid factor.");
+                m_ratio = factor;
+            }
+
+            SearchBase(const SearchBase& other)                = default; /**< Default copy constructor. */
+            SearchBase(SearchBase&& other) noexcept            = default; /**< Default move constructor. */
+            SearchBase& operator=(const SearchBase& other)     = default; /**< Default copy assignment operator. */
+            SearchBase& operator=(SearchBase&& other) noexcept = default; /**< Default move assignment operator. */
+
+            /**
+             * @brief Initializes the search with bounds from an initializer list and an optional factor.
+             * @param bounds Initializer list with exactly two elements representing the search bounds.
+             * @param factor The factor influencing the search process, defaults to the golden ratio.
+             * @throws NumerixxError If the initializer list does not contain exactly two elements or if the factor is invalid.
+             */
+            void init(std::initializer_list< ARG_T > bounds, RATIO_T factor = std::numbers::phi)
+            {
+                if (bounds.size() != 2) throw NumerixxError("Initializer list must contain exactly two elements!");
+                auto bnds = std::span(bounds.begin(), bounds.end());
+                init(std::pair{ bnds.front(), bnds.back() }, factor);
             }
 
             /**
-             * @brief Initialize the search bounds.
-             *
-             * This method is a shorthand for calling setBounds with a pair of lower and upper bounds.
-             *
-             * @param bounds A pair of lower and upper bounds.
+             * @brief Initializes the search with bounds from a container and an optional factor.
+             * @param bounds Container with exactly two elements representing the search bounds.
+             * @param factor The factor influencing the search process, defaults to the golden ratio.
+             * @throws NumerixxError If the container does not contain exactly two elements or if the factor is invalid.
              */
-            void init(auto bounds, return_type factor = 0.0)
+            void init(IsFloatContainer auto bounds, RATIO_T factor = std::numbers::phi)
             {
-                m_isInitialized = true;
-                setBounds(bounds);
-                if (factor >= 1.0) setFactor(factor);
+                if (bounds.size() != 2) throw NumerixxError("Container must contain exactly two elements!");
+                init(std::pair{ bounds.front(), bounds.back() }, factor);
             }
 
             /**
-             * @brief Initialize the search bounds using an initializer list.
-             *
-             * This method is a shorthand for calling setBounds with an initializer list containing two elements.
-             *
-             * @tparam T The floating-point type.
-             * @param bounds An initializer list with exactly two elements.
+             * @brief Initializes the search with bounds from a float struct and an optional factor.
+             * @param bounds Struct with exactly two members representing the search bounds.
+             * @param factor The factor influencing the search process, defaults to the golden ratio.
+             * @throws NumerixxError If the factor is invalid.
              */
-            template< typename T >
-            requires std::floating_point< T >
-            void init(std::initializer_list< T > bounds, return_type factor = 0.0)
+            void init(IsFloatStruct auto bounds, RATIO_T factor = std::numbers::phi)
             {
-                m_isInitialized = true;
-                setBounds(bounds);
-                if (factor >= 1.0) setFactor(factor);
+                if (factor < 1.0) throw NumerixxError("Invalid factor.");
+
+                m_isInitialized     = true;
+                auto [lower, upper] = bounds;
+                setBounds(BOUNDS_T{ lower, upper });
+                if (factor >= 1.0) setRatio(factor);
             }
 
             /**
-             * @brief Reset the search algorithm.
-             *
-             * This method resets the search algorithm to its initial state.
+             * @brief Resets the search to an uninitialized state.
              */
             void reset() { m_isInitialized = false; }
 
             /**
-             * @brief Evaluate the objective function at a given point.
-             *
-             * This method evaluates the stored objective function at the specified point `x` and
-             * returns the result.
-             *
-             * @param value The point at which to evaluate the objective function.
-             * @return The value of the objective function at the specified point.
+             * @brief Evaluates the objective function at a given value.
+             * @param value The value at which the function is to be evaluated.
+             * @return The result of evaluating the function at the specified value.
              */
             [[nodiscard]]
-            auto evaluate(double value) const
+            RESULT_T evaluate(ARG_T value) const { return m_objective(value); }
+
+            /**
+             * @brief Returns the current search bounds.
+             * @details This method returns the current bounds being used by the search algorithm.
+             *          It throws an exception if the search has not been initialized.
+             * @throws NumerixxError If the search algorithm has not been initialized.
+             * @return The current search bounds.
+             */
+            [[nodiscard]]
+            const BOUNDS_T& current() const
             {
-                return m_objective(value);
+                if (!m_isInitialized) throw NumerixxError("Search algorithm not initialized!");
+                return m_bounds;
+            }
+
+            /**
+             * @brief Returns the current search adjustment ratio.
+             * @details This method returns the ratio influencing the search process.
+             *          It throws an exception if the search has not been initialized.
+             * @throws NumerixxError If the search algorithm has not been initialized.
+             * @return The current search adjustment ratio.
+             */
+            [[nodiscard]]
+            RATIO_T ratio() const
+            {
+                if (!m_isInitialized) throw NumerixxError("Search algorithm not initialized!");
+                return m_ratio;
             }
         };
-    }    // namespace impl
+    } // namespace impl
+
+
+    // =================================================================================================================
+    //
+    //  ad88888ba                                                   88           88        88
+    // d8"     "8b                                                  88           88        88
+    // Y8,                                                          88           88        88
+    // `Y8aaaaa,     ,adPPYba,  ,adPPYYba,  8b,dPPYba,   ,adPPYba,  88,dPPYba,   88        88  8b,dPPYba,
+    //   `"""""8b,  a8P_____88  ""     `Y8  88P'   "Y8  a8"     ""  88P'    "8a  88        88  88P'    "8a
+    //         `8b  8PP"""""""  ,adPPPPP88  88          8b          88       88  88        88  88       d8
+    // Y8a     a8P  "8b,   ,aa  88,    ,88  88          "8a,   ,aa  88       88  Y8a.    .a8P  88b,   ,a8"
+    //  "Y88888P"    `"Ybbd8"'  `"8bbdP"Y8  88           `"Ybbd8"'  88       88   `"Y8888Y"'   88`YbbdP"'
+    //                                                                                         88
+    //                                                                                         88
+    // =================================================================================================================
 
     /**
-     * @brief A class for bracket search up algorithm.
+     * @brief Defines the BracketSearchUp class for performing upward bracketing search.
      *
-     * The BracketSearchUp class implements a bracket search algorithm that moves the search
-     * bounds upwards. The algorithm starts with an initial bracket and iteratively expands the
-     * bracket until a root is found. The objective function is expected to be a continuous
-     * function for which the algorithm tries to find a root.
+     * The BracketSearchUp class template is a specialized search algorithm designed to incrementally
+     * expand the search bounds upwards (increasing values) to find a bracket where a root exists.
+     * It inherits from a base class that provides common functionalities for search-based algorithms,
+     * and adds the specific logic for upward bracketing. This class is templated to accept a function
+     * and an optional argument type, along with an optional factor that controls the expansion of the bounds.
      *
-     * @tparam FN The objective function type.
+     * @tparam FN The type of the function for which the bracket is being searched.
+     * @tparam ARG_T The type of the argument to the function, defaults to double.
      */
-    template< typename FN >
-        requires IsFloatInvocable< FN >
-    class BracketSearchUp final : public detail::SearchBase< BracketSearchUp< FN > >
+
+    template<IsFloatInvocable FN, IsFloat ARG_T = double>
+    class BracketSearchUp final : public detail::SearchBase< BracketSearchUp< FN, ARG_T >, FN, ARG_T >
     {
-        using BASE = detail::SearchBase< BracketSearchUp< FN > >;
+        using BASE = detail::SearchBase< BracketSearchUp< FN, ARG_T >, FN, ARG_T >; /**< Base class alias for readability. */
 
     public:
-        using function_type = FN;
-        using return_type   = std::invoke_result_t< FN, double >;
+        using BASE::BASE; /**< Inherits constructors from SearchBase. */
 
         /**
-         * @brief Constructor with objective function.
-         *
-         * Initializes the BracketSearchUp algorithm with the provided objective function.
-         * The function is stored internally and used for evaluation during the search process.
-         *
-         * @param objective The objective function to optimize.
-         */
-        explicit BracketSearchUp(function_type objective, return_type factor = std::numbers::phi_v< return_type >)
-            : BASE(std::move(objective), factor)
-        {}
-
-        /**
-         * @brief Perform a single iteration of the search algorithm.
-         *
-         * During each iteration, the search bounds are expanded upwards using the golden ratio.
-         * The iteration stops when a root is found, i.e., when the objective function values
-         * at the bounds have opposite signs.
+         * @brief Performs a single iteration of the upward bracketing search.
+         * @details This method expands the search bounds upwards if the current bounds do not bracket a root.
+         *          The expansion factor controls the rate at which the bounds are expanded.
          */
         void iterate()
         {
             const auto& bounds = BASE::current();
 
+            // Check if current bounds already bracket a root
             if (BASE::evaluate(bounds.first) * BASE::evaluate(bounds.second) < 0.0) return;
 
+            // Expand the bounds upwards
             auto newBounds   = bounds;
             newBounds.first  = bounds.second;
-            newBounds.second = bounds.second + (bounds.second - bounds.first) * BASE::factor();
+            newBounds.second = bounds.second + (bounds.second - bounds.first) * BASE::ratio();
             BASE::setBounds(newBounds);
         }
     };
 
     /**
-     * @brief A class for bracket search down algorithm.
-     *
-     * The BracketSearchDown class implements a bracket search algorithm that moves the search
-     * bounds downwards. The algorithm starts with an initial bracket and iteratively expands the
-     * bracket until a root is found. The objective function is expected to be a continuous
-     * function for which the algorithm tries to find a root.
-     *
-     * @tparam FN The objective function type.
+     * @brief Deduction guides for BracketSearchUp class.
+     * Allows the type of BracketSearchUp class to be deduced from the constructor parameters.
      */
     template<typename FN>
         requires IsFloatInvocable< FN >
-    class BracketSearchDown final : public detail::SearchBase< BracketSearchDown< FN > >
+    BracketSearchUp(FN) -> BracketSearchUp< FN >;
+
+    template<typename FN, typename ARG_T, typename FACTOR_T = ARG_T>
+        requires IsFloatInvocable< FN > && IsFloat< ARG_T > && IsFloat< FACTOR_T >
+    BracketSearchUp(FN, std::initializer_list< ARG_T >, FACTOR_T factor = std::numbers::phi) -> BracketSearchUp< FN, ARG_T >;
+
+    template<typename FN, typename CONT_T, typename FACTOR_T = typename CONT_T::value_type>
+        requires IsFloatInvocable< FN > && IsFloatContainer< CONT_T >
+    BracketSearchUp(FN, CONT_T, FACTOR_T factor = std::numbers::phi) -> BracketSearchUp< FN, typename CONT_T::value_type >;
+
+    template<typename FN, typename BOUNDS_T, typename FACTOR_T = StructCommonType_t< BOUNDS_T >>
+        requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
+    BracketSearchUp(FN, BOUNDS_T, FACTOR_T factor = std::numbers::phi) -> BracketSearchUp< FN, StructCommonType_t< BOUNDS_T > >;
+
+    // =================================================================================================================
+    //
+    //  ad88888ba                                                   88           88888888ba,
+    // d8"     "8b                                                  88           88      `"8b
+    // Y8,                                                          88           88        `8b
+    // `Y8aaaaa,     ,adPPYba,  ,adPPYYba,  8b,dPPYba,   ,adPPYba,  88,dPPYba,   88         88   ,adPPYba,   8b      db      d8  8b,dPPYba,
+    //   `"""""8b,  a8P_____88  ""     `Y8  88P'   "Y8  a8"     ""  88P'    "8a  88         88  a8"     "8a  `8b    d88b    d8'  88P'   `"8a
+    //         `8b  8PP"""""""  ,adPPPPP88  88          8b          88       88  88         8P  8b       d8   `8b  d8'`8b  d8'   88       88
+    // Y8a     a8P  "8b,   ,aa  88,    ,88  88          "8a,   ,aa  88       88  88      .a8P   "8a,   ,a8"    `8bd8'  `8bd8'    88       88
+    //  "Y88888P"    `"Ybbd8"'  `"8bbdP"Y8  88           `"Ybbd8"'  88       88  88888888Y"'     `"YbbdP"'       YP      YP      88       88
+    //
+    //
+    // =================================================================================================================
+
+
+    /**
+     * @brief Defines the BracketSearchDown class for performing downward bracketing search.
+     *
+     * The BracketSearchDown class template is a specialized search algorithm designed to incrementally
+     * expand the search bounds downwards (decreasing values) to find a bracket where a root exists.
+     * It inherits from a base class that provides common functionalities for search-based algorithms,
+     * and adds the specific logic for downward bracketing. This class is templated to accept a function
+     * and an optional argument type, along with an optional factor that controls the contraction of the bounds.
+     *
+     * @tparam FN The type of the function for which the bracket is being searched.
+     * @tparam ARG_T The type of the argument to the function, defaults to double.
+     */
+    template<IsFloatInvocable FN, IsFloat ARG_T = double>
+    class BracketSearchDown final : public detail::SearchBase< BracketSearchDown< FN, ARG_T >, FN, ARG_T >
     {
-        using BASE = detail::SearchBase< BracketSearchDown< FN > >;
+        using BASE = detail::SearchBase< BracketSearchDown< FN, ARG_T >, FN, ARG_T >; /**< Base class alias for readability. */
 
     public:
-        using function_type = FN;
-        using return_type   = std::invoke_result_t< FN, double >;
+        using BASE::BASE; /**< Inherits constructors from SearchBase. */
 
         /**
-         * @brief Constructor with objective function.
-         *
-         * Initializes the BracketSearchDown algorithm with the provided objective function.
-         * The function is stored internally and used for evaluation during the search process.
-         *
-         * @param objective The objective function to optimize.
-         */
-        explicit BracketSearchDown(function_type objective, return_type factor = std::numbers::phi_v< return_type >)
-            : BASE(std::move(objective), factor)
-        {}
-
-        /**
-         * @brief Perform a single iteration of the search algorithm.
-         *
-         * During each iteration, the search bounds are expanded downwards using the golden ratio.
-         * The iteration stops when a root is found, i.e., when the objective function values
-         * at the bounds have opposite signs.
+         * @brief Performs a single iteration of the downward bracketing search.
+         * @details This method expands the search bounds downwards if the current bounds do not bracket a root.
+         *          The expansion factor controls the rate at which the bounds are contracted.
          */
         void iterate()
         {
             const auto& bounds = BASE::current();
 
+            // Check if current bounds already bracket a root
             if (BASE::evaluate(bounds.first) * BASE::evaluate(bounds.second) < 0.0) return;
 
+            // Expand the bounds downwards
             auto newBounds   = bounds;
             newBounds.second = bounds.first;
-            newBounds.first  = bounds.first - (bounds.second - bounds.first) * BASE::factor();
+            newBounds.first  = bounds.first - (bounds.second - bounds.first) * BASE::ratio();
             BASE::setBounds(newBounds);
         }
     };
 
     /**
-     * @brief A class for bracket expand up algorithm.
-     *
-     * The BracketExpandUp class implements a bracket expansion algorithm that expands the search
-     * bounds upwards. The algorithm starts with an initial bracket and iteratively expands the
-     * bracket until a root is found. The objective function is expected to be a continuous
-     * function for which the algorithm tries to find a root.
-     *
-     * @tparam FN The objective function type.
+     * @brief Deduction guides for BracketSearchDown class.
+     * Allows the type of BracketSearchDown class to be deduced from the constructor parameters.
      */
     template<typename FN>
         requires IsFloatInvocable< FN >
-    class BracketExpandUp final : public detail::SearchBase< BracketExpandUp< FN > >
+    BracketSearchDown(FN) -> BracketSearchDown< FN >;
+
+    template<typename FN, typename ARG_T, typename FACTOR_T = ARG_T>
+        requires IsFloatInvocable< FN > && IsFloat< ARG_T > && IsFloat< FACTOR_T >
+    BracketSearchDown(FN, std::initializer_list< ARG_T >, FACTOR_T factor = std::numbers::phi) -> BracketSearchDown< FN, ARG_T >;
+
+    template<typename FN, typename CONT_T, typename FACTOR_T = typename CONT_T::value_type>
+        requires IsFloatInvocable< FN > && IsFloatContainer< CONT_T >
+    BracketSearchDown(FN, CONT_T, FACTOR_T factor = std::numbers::phi) -> BracketSearchDown< FN, typename CONT_T::value_type >;
+
+    template<typename FN, typename BOUNDS_T, typename FACTOR_T = StructCommonType_t< BOUNDS_T >>
+        requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
+    BracketSearchDown(FN, BOUNDS_T, FACTOR_T factor = std::numbers::phi) -> BracketSearchDown< FN, StructCommonType_t< BOUNDS_T > >;
+
+    // =================================================================================================================
+    //
+    // 88888888888                                                              88  88        88
+    // 88                                                                       88  88        88
+    // 88                                                                       88  88        88
+    // 88aaaaa      8b,     ,d8  8b,dPPYba,   ,adPPYYba,  8b,dPPYba,    ,adPPYb,88  88        88  8b,dPPYba,
+    // 88"""""       `Y8, ,8P'   88P'    "8a  ""     `Y8  88P'   `"8a  a8"    `Y88  88        88  88P'    "8a
+    // 88              )888(     88       d8  ,adPPPPP88  88       88  8b       88  88        88  88       d8
+    // 88            ,d8" "8b,   88b,   ,a8"  88,    ,88  88       88  "8a,   ,d88  Y8a.    .a8P  88b,   ,a8"
+    // 88888888888  8P'     `Y8  88`YbbdP"'   `"8bbdP"Y8  88       88   `"8bbdP"Y8   `"Y8888Y"'   88`YbbdP"'
+    //                           88                                                               88
+    //                           88                                                               88
+    // =================================================================================================================
+
+    /**
+     * @brief Defines the BracketExpandUp class for performing upward bracket expansion.
+     *
+     * The BracketExpandUp class template is a specialized search algorithm designed to incrementally
+     * expand the upper bound upwards (increasing values) while keeping the lower bound fixed. This is useful
+     * for finding a bracket where a root exists when the initial guess is lower than the actual root. It inherits
+     * from a base class that provides common functionalities for search-based algorithms and adds the specific
+     * logic for upward bracket expansion. This class is templated to accept a function and an optional argument type,
+     * along with an optional factor that controls the expansion of the upper bound.
+     *
+     * @tparam FN The type of the function for which the bracket is being expanded.
+     * @tparam ARG_T The type of the argument to the function, defaults to double.
+     */
+    template<IsFloatInvocable FN, IsFloat ARG_T = double>
+    class BracketExpandUp final : public detail::SearchBase< BracketExpandUp< FN, ARG_T >, FN, ARG_T >
     {
-        using BASE = detail::SearchBase< BracketExpandUp< FN > >;
+        using BASE = detail::SearchBase< BracketExpandUp< FN, ARG_T >, FN, ARG_T >; /**< Base class alias for readability. */
 
     public:
-        using function_type = FN;
-        using return_type   = std::invoke_result_t< FN, double >;
+        using BASE::BASE; /**< Inherits constructors from SearchBase. */
 
         /**
-         * @brief Constructor with objective function.
-         *
-         * Initializes the BracketExpandUp algorithm with the provided objective function.
-         * The function is stored internally and used for evaluation during the search process.
-         *
-         * @param objective The objective function to optimize.
-         */
-        explicit BracketExpandUp(function_type objective, return_type factor = std::numbers::phi_v< return_type >)
-            : BASE(std::move(objective), factor)
-        {}
-
-        /**
-         * @brief Perform a single iteration of the search algorithm.
-         *
-         * During each iteration, the search bounds are expanded upwards using the golden ratio.
-         * The iteration stops when a root is found, i.e., when the objective function values
-         * at the bounds have opposite signs.
+         * @brief Performs a single iteration of the upward bracket expansion.
+         * @details This method expands the upper bound upwards if the current bounds do not bracket a root.
+         *          The expansion factor controls the rate at which the upper bound is expanded.
          */
         void iterate()
         {
             const auto& bounds = BASE::current();
 
+            // Check if current bounds already bracket a root
             if (BASE::evaluate(bounds.first) * BASE::evaluate(bounds.second) < 0.0) return;
 
+            // Expand the upper bound upwards
             auto newBounds   = bounds;
-            newBounds.second = bounds.second + (bounds.second - bounds.first) * BASE::factor();
+            newBounds.second = bounds.second + (bounds.second - bounds.first) * BASE::ratio();
             BASE::setBounds(newBounds);
         }
     };
 
     /**
-     * @brief A class for bracket expand down algorithm.
-     *
-     * The BracketExpandDown class implements a bracket expansion algorithm that expands the search
-     * bounds downwards. The algorithm starts with an initial bracket and iteratively expands the
-     * bracket until a root is found. The objective function is expected to be a continuous
-     * function for which the algorithm tries to find a root.
-     *
-     * @tparam FN The objective function type.
+     * @brief Deduction guides for BracketExpandUp class.
+     * Allows the type of BracketExpandUp class to be deduced from the constructor parameters.
      */
     template<typename FN>
         requires IsFloatInvocable< FN >
-    class BracketExpandDown final : public detail::SearchBase< BracketExpandDown< FN > >
+    BracketExpandUp(FN) -> BracketExpandUp< FN >;
+
+    template<typename FN, typename ARG_T, typename FACTOR_T = ARG_T>
+        requires IsFloatInvocable< FN > && IsFloat< ARG_T > && IsFloat< FACTOR_T >
+    BracketExpandUp(FN, std::initializer_list< ARG_T >, FACTOR_T factor = std::numbers::phi) -> BracketExpandUp< FN, ARG_T >;
+
+    template<typename FN, typename CONT_T, typename FACTOR_T = typename CONT_T::value_type>
+        requires IsFloatInvocable< FN > && IsFloatContainer< CONT_T >
+    BracketExpandUp(FN, CONT_T, FACTOR_T factor = std::numbers::phi) -> BracketExpandUp< FN, typename CONT_T::value_type >;
+
+    template<typename FN, typename BOUNDS_T, typename FACTOR_T = StructCommonType_t< BOUNDS_T >>
+        requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
+    BracketExpandUp(FN, BOUNDS_T, FACTOR_T factor = std::numbers::phi) -> BracketExpandUp< FN, StructCommonType_t< BOUNDS_T > >;
+
+
+    // =================================================================================================================
+    //
+    // 88888888888                                                              88  88888888ba,
+    // 88                                                                       88  88      `"8b
+    // 88                                                                       88  88        `8b
+    // 88aaaaa      8b,     ,d8  8b,dPPYba,   ,adPPYYba,  8b,dPPYba,    ,adPPYb,88  88         88   ,adPPYba,   8b      db      d8  8b,dPPYba,
+    // 88"""""       `Y8, ,8P'   88P'    "8a  ""     `Y8  88P'   `"8a  a8"    `Y88  88         88  a8"     "8a  `8b    d88b    d8'  88P'   `"8a
+    // 88              )888(     88       d8  ,adPPPPP88  88       88  8b       88  88         8P  8b       d8   `8b  d8'`8b  d8'   88       88
+    // 88            ,d8" "8b,   88b,   ,a8"  88,    ,88  88       88  "8a,   ,d88  88      .a8P   "8a,   ,a8"    `8bd8'  `8bd8'    88       88
+    // 88888888888  8P'     `Y8  88`YbbdP"'   `"8bbdP"Y8  88       88   `"8bbdP"Y8  88888888Y"'     `"YbbdP"'       YP      YP      88       88
+    //                           88
+    //                           88
+    // =================================================================================================================
+
+    /**
+     * @brief Defines the BracketExpandDown class for performing downward bracket expansion.
+     *
+     * The BracketExpandDown class template is a specialized search algorithm designed to incrementally
+     * expand the lower bound downwards (decreasing values) while keeping the upper bound fixed. This is useful
+     * for finding a bracket where a root exists when the initial guess is higher than the actual root. It inherits
+     * from a base class that provides common functionalities for search-based algorithms and adds the specific
+     * logic for downward bracket expansion. This class is templated to accept a function and an optional argument type,
+     * along with an optional factor that controls the expansion of the lower bound.
+     *
+     * @tparam FN The type of the function for which the bracket is being expanded.
+     * @tparam ARG_T The type of the argument to the function, defaults to double.
+     */
+    template<IsFloatInvocable FN, IsFloat ARG_T = double>
+    class BracketExpandDown final : public detail::SearchBase< BracketExpandDown< FN, ARG_T >, FN, ARG_T >
     {
-        using BASE = detail::SearchBase< BracketExpandDown< FN > >;
+        using BASE = detail::SearchBase< BracketExpandDown< FN, ARG_T >, FN, ARG_T >; /**< Base class alias for readability. */
 
     public:
-        using function_type = FN;
-        using return_type   = std::invoke_result_t< FN, double >;
+        using BASE::BASE; /**< Inherits constructors from SearchBase. */
 
         /**
-         * @brief Constructor with objective function.
-         *
-         * Initializes the BracketExpandDown algorithm with the provided objective function.
-         * The function is stored internally and used for evaluation during the search process.
-         *
-         * @param objective The objective function to optimize.
-         */
-        explicit BracketExpandDown(function_type objective, return_type factor = std::numbers::phi_v< return_type >)
-            : BASE(std::move(objective), factor)
-        {}
-
-        /**
-         * @brief Perform a single iteration of the search algorithm.
-         *
-         * During each iteration, the search bounds are expanded downwards using the golden ratio.
-         * The iteration stops when a root is found, i.e., when the objective function values
-         * at the bounds have opposite signs.
+         * @brief Performs a single iteration of the downward bracket expansion.
+         * @details This method expands the lower bound downwards if the current bounds do not bracket a root.
+         *          The expansion factor controls the rate at which the lower bound is expanded.
          */
         void iterate()
         {
             const auto& bounds = BASE::current();
 
+            // Check if current bounds already bracket a root
             if (BASE::evaluate(bounds.first) * BASE::evaluate(bounds.second) < 0.0) return;
 
+            // Expand the lower bound downwards
             auto newBounds  = bounds;
-            newBounds.first = bounds.first - (bounds.second - bounds.first) * BASE::factor();
-            BASE::setBounds(newBounds);
-        }
-    };
-
-    template<typename FN>
-        requires IsFloatInvocable< FN >
-    class BracketExpandOut final : public detail::SearchBase< BracketExpandOut< FN > >
-    {
-        using BASE = detail::SearchBase< BracketExpandOut< FN > >;
-
-    public:
-        using function_type = FN;
-        using return_type   = std::invoke_result_t< FN, double >;
-
-        /**
-         * @brief Constructor with objective function.
-         *
-         * Initializes the BracketExpandDown algorithm with the provided objective function.
-         * The function is stored internally and used for evaluation during the search process.
-         *
-         * @param objective The objective function to optimize.
-         */
-        explicit BracketExpandOut(function_type objective, return_type factor = std::numbers::phi_v< return_type >)
-            : BASE(std::move(objective), factor)
-        {}
-
-        /**
-         * @brief Perform a single iteration of the search algorithm.
-         *
-         * During each iteration, the search bounds are expanded downwards using the golden ratio.
-         * The iteration stops when a root is found, i.e., when the objective function values
-         * at the bounds have opposite signs.
-         */
-        void iterate()
-        {
-            const auto& bounds = BASE::current();
-
-            if (BASE::evaluate(bounds.first) * BASE::evaluate(bounds.second) < 0.0) return;
-
-            auto newBounds   = bounds;
-            newBounds.first  = bounds.first - (bounds.second - bounds.first) * BASE::factor() / 2.0;
-            newBounds.second = bounds.second + (bounds.second - bounds.first) * BASE::factor() / 2.0;
+            newBounds.first = bounds.first - (bounds.second - bounds.first) * BASE::ratio();
             BASE::setBounds(newBounds);
         }
     };
 
     /**
-     * @brief A class for root finding of a function within an interval using a subdivide and search approach.
-     *
-     * This class is designed for finding the root of a function within an interval by iteratively
-     * subdividing the interval and searching for the subinterval where the root lies. The process
-     * continues until the root is found or the number of subdivisions exceeds a specified threshold.
-     * The class inherits from the SearchBase class.
-     *
-     * @tparam FN A function object type representing the objective function to be optimized. The
-     *            function must have a signature compatible with `double function(double)`.
+     * @brief Deduction guides for BracketExpandDown class.
+     * Allows the type of BracketExpandDown class to be deduced from the constructor parameters.
      */
     template<typename FN>
         requires IsFloatInvocable< FN >
-    class BracketSubdivide final : public detail::SearchBase< BracketSubdivide< FN > >
+    BracketExpandDown(FN) -> BracketExpandDown< FN >;
+
+    template<typename FN, typename ARG_T, typename FACTOR_T = ARG_T>
+        requires IsFloatInvocable< FN > && IsFloat< ARG_T > && IsFloat< FACTOR_T >
+    BracketExpandDown(FN, std::initializer_list< ARG_T >, FACTOR_T factor = std::numbers::phi) -> BracketExpandDown< FN, ARG_T >;
+
+    template<typename FN, typename CONT_T, typename FACTOR_T = typename CONT_T::value_type>
+        requires IsFloatInvocable< FN > && IsFloatContainer< CONT_T >
+    BracketExpandDown(FN, CONT_T, FACTOR_T factor = std::numbers::phi) -> BracketExpandDown< FN, typename CONT_T::value_type >;
+
+    template<typename FN, typename BOUNDS_T, typename FACTOR_T = StructCommonType_t< BOUNDS_T >>
+        requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
+    BracketExpandDown(FN, BOUNDS_T, FACTOR_T factor = std::numbers::phi) -> BracketExpandDown< FN, StructCommonType_t< BOUNDS_T > >;
+
+
+    // =================================================================================================================
+    //
+    // 88888888888                                                              88    ,ad8888ba,
+    // 88                                                                       88   d8"'    `"8b                  ,d
+    // 88                                                                       88  d8'        `8b                 88
+    // 88aaaaa      8b,     ,d8  8b,dPPYba,   ,adPPYYba,  8b,dPPYba,    ,adPPYb,88  88          88  88       88  MM88MMM
+    // 88"""""       `Y8, ,8P'   88P'    "8a  ""     `Y8  88P'   `"8a  a8"    `Y88  88          88  88       88    88
+    // 88              )888(     88       d8  ,adPPPPP88  88       88  8b       88  Y8,        ,8P  88       88    88
+    // 88            ,d8" "8b,   88b,   ,a8"  88,    ,88  88       88  "8a,   ,d88   Y8a.    .a8P   "8a,   ,a88    88,
+    // 88888888888  8P'     `Y8  88`YbbdP"'   `"8bbdP"Y8  88       88   `"8bbdP"Y8    `"Y8888Y"'     `"YbbdP'Y8    "Y888
+    //                           88
+    //                           88
+    // =================================================================================================================
+
+    /**
+     * @brief Defines the BracketExpandOut class for performing outward bracket expansion.
+     *
+     * The BracketExpandOut class template is a specialized search algorithm designed to incrementally
+     * expand both the lower and upper bounds symmetrically outwards. This is useful for finding a bracket
+     * where a root exists when the initial guess is not near the actual root. It inherits from a base class
+     * that provides common functionalities for search-based algorithms and adds the specific logic for
+     * outward bracket expansion. This class is templated to accept a function and an optional argument type,
+     * along with an optional factor that controls the symmetric expansion of the bounds.
+     *
+     * @tparam FN The type of the function for which the bracket is being expanded.
+     * @tparam ARG_T The type of the argument to the function, defaults to double.
+     */
+    template<IsFloatInvocable FN, IsFloat ARG_T = double>
+    class BracketExpandOut final : public detail::SearchBase< BracketExpandOut< FN, ARG_T >, FN, ARG_T >
     {
-        using BASE = detail::SearchBase< BracketSubdivide< FN > >;
+        using BASE = detail::SearchBase< BracketExpandOut< FN, ARG_T >, FN, ARG_T >; /**< Base class alias for readability. */
 
     public:
-        using function_type = FN;
-        using return_type   = std::invoke_result_t< FN, double >;
+        using BASE::BASE; /**< Inherits constructors from SearchBase. */
 
         /**
-         * @brief Constructor with objective function and optional factor.
-         *
-         * Initializes the search algorithm with the provided objective function and an optional
-         * factor determining the number of subdivisions of the search interval.
-         *
-         * @param objective The objective function to optimize.
-         * @param factor The initial number of subdivisions of the search interval (default is 1.0).
+         * @brief Performs a single iteration of the outward bracket expansion.
+         * @details This method expands both the lower and upper bounds outwards symmetrically if the current
+         *          bounds do not bracket a root. The expansion factor controls the rate at which the bounds are expanded.
          */
-        explicit BracketSubdivide(function_type objective, return_type factor = std::numbers::phi_v< return_type >)
-            : BASE(std::move(objective), factor)
-        {}
+        void iterate()
+        {
+            const auto& bounds = BASE::current();
+
+            // Check if current bounds already bracket a root
+            if (BASE::evaluate(bounds.first) * BASE::evaluate(bounds.second) < 0.0) return;
+
+            // Expand the bounds symmetrically outwards
+            auto newBounds   = bounds;
+            newBounds.first  = bounds.first - (bounds.second - bounds.first) * BASE::ratio() / 2.0;
+            newBounds.second = bounds.second + (bounds.second - bounds.first) * BASE::ratio() / 2.0;
+            BASE::setBounds(newBounds);
+        }
+    };
+
+    /**
+     * @brief Deduction guides for BracketExpandOut class.
+     * Allows the type of BracketExpandOut class to be deduced from the constructor parameters.
+     */
+    template<typename FN>
+        requires IsFloatInvocable< FN >
+    BracketExpandOut(FN) -> BracketExpandOut< FN >;
+
+    template<typename FN, typename ARG_T, typename FACTOR_T = ARG_T>
+        requires IsFloatInvocable< FN > && IsFloat< ARG_T > && IsFloat< FACTOR_T >
+    BracketExpandOut(FN, std::initializer_list< ARG_T >, FACTOR_T factor = std::numbers::phi) -> BracketExpandOut< FN, ARG_T >;
+
+    template<typename FN, typename CONT_T, typename FACTOR_T = typename CONT_T::value_type>
+        requires IsFloatInvocable< FN > && IsFloatContainer< CONT_T >
+    BracketExpandOut(FN, CONT_T, FACTOR_T factor = std::numbers::phi) -> BracketExpandOut< FN, typename CONT_T::value_type >;
+
+    template<typename FN, typename BOUNDS_T, typename FACTOR_T = StructCommonType_t< BOUNDS_T >>
+        requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
+    BracketExpandOut(FN, BOUNDS_T, FACTOR_T factor = std::numbers::phi) -> BracketExpandOut< FN, StructCommonType_t< BOUNDS_T > >;
+
+
+    // =================================================================================================================
+    //
+    //  ad88888ba                88                    88  88               88           88
+    // d8"     "8b               88                    88  ""               ""           88
+    // Y8,                       88                    88                                88
+    // `Y8aaaaa,    88       88  88,dPPYba,    ,adPPYb,88  88  8b       d8  88   ,adPPYb,88   ,adPPYba,
+    //   `"""""8b,  88       88  88P'    "8a  a8"    `Y88  88  `8b     d8'  88  a8"    `Y88  a8P_____88
+    //         `8b  88       88  88       d8  8b       88  88   `8b   d8'   88  8b       88  8PP"""""""
+    // Y8a     a8P  "8a,   ,a88  88b,   ,a8"  "8a,   ,d88  88    `8b,d8'    88  "8a,   ,d88  "8b,   ,aa
+    //  "Y88888P"    `"YbbdP'Y8  8Y"Ybbd8"'    `"8bbdP"Y8  88      "8"      88   `"8bbdP"Y8   `"Ybbd8"'
+    //
+    //
+    // =================================================================================================================
+
+    /**
+     * @brief Defines the BracketSubdivide class for performing bracket subdivision search.
+     *
+     * The BracketSubdivide class template is a specialized search algorithm designed to subdivide
+     * the current search bounds into smaller segments in an attempt to find a bracket where a root exists.
+     * It inherits from a base class that provides common functionalities for search-based algorithms,
+     * and adds the specific logic for subdividing the search bounds. This class is templated to accept
+     * a function and an optional argument type, along with an optional factor that controls the subdivision process.
+     *
+     * @tparam FN The type of the function for which the bracket is being searched.
+     * @tparam ARG_T The type of the argument to the function, defaults to double.
+     */
+    template<IsFloatInvocable FN, IsFloat ARG_T = double>
+    class BracketSubdivide final : public detail::SearchBase< BracketSubdivide< FN, ARG_T >, FN, ARG_T >
+    {
+        using BASE = detail::SearchBase< BracketSubdivide< FN, ARG_T >, FN, ARG_T >; /**< Base class alias for readability. */
+
+    public:
+        using BASE::BASE; /**< Inherits constructors from SearchBase. */
 
         /**
-         * @brief Iterates the search algorithm.
-         *
-         * This method subdivides the current search interval into smaller subintervals based on the
-         * current factor value. It then searches for the subinterval where the root lies, updates the
-         * bounds accordingly, and returns. If the root is not found in any of the subintervals, the
-         * factor is doubled, and the search continues in the next iteration.
+         * @brief Performs a single iteration of the bracket subdivision search.
+         * @details This method subdivides the current bounds into smaller segments based on the factor,
+         *          attempting to find a segment where the function changes sign, indicating a bracket.
+         *          If no such segment is found, the factor is doubled to increase the search range.
          */
         void iterate()
         {
             const auto& bounds = BASE::current();
             if (BASE::evaluate(bounds.first) * BASE::evaluate(bounds.second) < 0.0) return;
 
-            size_t factor = std::ceil(BASE::factor());
+            size_t factor = std::ceil(BASE::ratio());
             auto   diff   = (bounds.second - bounds.first) / factor;
             auto   lower  = bounds.first;
             auto   upper  = bounds.first + diff;
@@ -580,50 +714,74 @@ namespace nxx::roots
                 upper += diff;
             }
 
-            BASE::setFactor(BASE::factor() * 2.0);
+            BASE::setRatio(BASE::ratio() * 2.0); // Increase the factor to expand the search range
         }
     };
+
+    /**
+     * @brief Deduction guides for BracketSubdivide class.
+     * Allows the type of BracketSubdivide class to be deduced from the constructor parameters.
+     */
+    template<typename FN>
+        requires IsFloatInvocable< FN >
+    BracketSubdivide(FN) -> BracketSubdivide< FN >;
+
+    template<typename FN, typename ARG_T, typename FACTOR_T = ARG_T>
+        requires IsFloatInvocable< FN > && IsFloat< ARG_T > && IsFloat< FACTOR_T >
+    BracketSubdivide(FN, std::initializer_list< ARG_T >, FACTOR_T factor = std::numbers::phi) -> BracketSubdivide< FN, ARG_T >;
+
+    template<typename FN, typename CONT_T, typename FACTOR_T = typename CONT_T::value_type>
+        requires IsFloatInvocable< FN > && IsFloatContainer< CONT_T >
+    BracketSubdivide(FN, CONT_T, FACTOR_T factor = std::numbers::phi) -> BracketSubdivide< FN, typename CONT_T::value_type >;
+
+    template<typename FN, typename BOUNDS_T, typename FACTOR_T = StructCommonType_t< BOUNDS_T >>
+        requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
+    BracketSubdivide(FN, BOUNDS_T, FACTOR_T factor = std::numbers::phi) -> BracketSubdivide< FN, StructCommonType_t< BOUNDS_T > >;
+
+
+    // =================================================================================================================
+    //                                                            88
+    //                                                            88
+    //                                                            88
+    // ,adPPYba,   ,adPPYba,  ,adPPYYba,  8b,dPPYba,   ,adPPYba,  88,dPPYba,
+    // I8[    ""  a8P_____88  ""     `Y8  88P'   "Y8  a8"     ""  88P'    "8a
+    //  `"Y8ba,   8PP"""""""  ,adPPPPP88  88          8b          88       88
+    // aa    ]8I  "8b,   ,aa  88,    ,88  88          "8a,   ,aa  88       88
+    // `"YbbdP"'   `"Ybbd8"'  `"8bbdP"Y8  88           `"Ybbd8"'  88       88
+    //
+    // =================================================================================================================
 
     namespace detail
     {
         /**
-         * @brief The main search implementation function.
+         * @brief Implements a generic search solver function template for bracketing searchers.
          *
-         * This function template implements the search algorithm for a root finding solver.
-         * The SOLVER type must meet specific requirements defined by the requires expression.
+         * This function template, `search_impl`, provides a generic implementation for search operations
+         * using various bracketing searcher algorithms. It is designed to work with solvers that conform
+         * to the requirements of bracketing searchers, such as having a defined `IsBracketingSearcher` static member,
+         * initialization, and iteration methods. The function handles initialization, iteration, and
+         * checking for a successful bracketing of the root, returning the result along with any potential errors encountered
+         * during the searching process.
          *
-         * @tparam SOLVER The solver type to use for root finding.
-         * @param solver The solver instance used to perform root finding.
-         * @param bounds The initial bounds of the search interval.
-         * @param searchFactor An optional parameter specifying the search factor for the solver (default is the golden ratio).
-         * @param maxiter The maximum number of iterations allowed before the search terminates (default is nxx::MAXITER).
-         * @return An expected object containing either the bounds of the found root or an error.
+         * @tparam SOLVER The type of the solver to be used in search operations. Must conform to the bracketing searcher concept.
          */
-        template< typename SOLVER >
-        requires requires(SOLVER solver, std::pair< typename SOLVER::return_type, typename SOLVER::return_type > bounds) {
-                     // clang-format off
-                     { solver.evaluate(0.0) } -> std::floating_point;
-                     { solver.init(bounds) };
-                     { solver.iterate() };
-                     { solver.current() };
-                     { solver.factor() };
-                     // clang-format on
-                 }
-        inline auto search_impl(SOLVER                                                                  solver,
-                                std::pair< typename SOLVER::return_type, typename SOLVER::return_type > bounds,
-                                typename SOLVER::return_type searchFactor = std::numbers::phi_v< typename SOLVER::return_type >,
-                                int                          maxiter      = nxx::MAXITER)
+        template<typename SOLVER>
+            requires SOLVER::IsBracketingSearcher
+        auto search_impl(SOLVER             solver,
+                         IsFloatStruct auto bounds,
+                         IsFloat auto       searchFactor,
+                         std::integral auto maxiter)
         {
-            using ET = RootErrorImpl< decltype(bounds) >;
-            using RT = tl::expected< decltype(bounds), ET >;
+            using ET = RootErrorImpl< decltype(bounds) >;    /**< Type for error handling. */
+            using RT = tl::expected< decltype(bounds), ET >; /**< Type for the function return value. */
 
             solver.init(bounds, searchFactor);
-            auto                         curBounds = solver.current();
-            RT                           result    = curBounds;
-            typename SOLVER::return_type eval_lower;
-            typename SOLVER::return_type eval_upper;
+            auto                      curBounds = solver.current();
+            RT                        result    = curBounds;
+            typename SOLVER::RESULT_T eval_lower;
+            typename SOLVER::RESULT_T eval_upper;
 
-            // Check for NaN or Inf.
+            // Check for NaN or Inf in the initial bounds.
             if (!std::isfinite(solver.evaluate(curBounds.first)) || !std::isfinite(solver.evaluate(curBounds.second))) {
                 result = tl::make_unexpected(ET("Invalid initial brackets!", RootErrorType::NumericalError, result.value()));
                 return result;
@@ -635,10 +793,9 @@ namespace nxx::roots
                 eval_lower = solver.evaluate(curBounds.first);
                 eval_upper = solver.evaluate(curBounds.second);
 
-                // Check for NaN or Inf.
+                // Check for non-finite results.
                 if (!std::isfinite(curBounds.first) || !std::isfinite(curBounds.second) || !std::isfinite(eval_lower) ||
-                    !std::isfinite(eval_upper))
-                {
+                    !std::isfinite(eval_upper)) {
                     result = tl::make_unexpected(ET("Non-finite result!", RootErrorType::NumericalError, curBounds, iter));
                     break;
                 }
@@ -663,57 +820,118 @@ namespace nxx::roots
 
             return result;
         }
-    }    // namespace impl
+    } // namespace impl
+
 
     /**
-     * @brief A search function template for root finding using a solver.
+     * @brief Defines a high-level search function template `search` using bracketing searchers.
      *
-     * This function template wraps the search_impl function with a more user-friendly interface.
+     * The `search` function template provides a convenient interface for performing search operations
+     * using various bracketing searcher algorithms. It abstracts the creation and configuration of the
+     * solver instance and then delegates the actual search process to `search_impl`. This function is templated
+     * to accept a solver type, the function, bounds for the search, a search factor for controlling the search
+     * process, and a maximum number of iterations. It supports different types of bracketing searchers, making it
+     * versatile for various search needs.
      *
-     * @tparam SOLVER The solver type to use for root finding.
-     * @param solver The solver instance used to perform root finding.
-     * @param bounds The initial bounds of the search interval as a pair.
-     * @param searchFactor An optional parameter specifying the search factor for the solver (default is the golden ratio).
-     * @param maxiter The maximum number of iterations allowed before the search terminates (default is nxx::MAXITER).
-     * @return An expected object containing either the bounds of the found root or an error.
+     * @tparam SOLVER_T The template class of the solver to be used. Must be a valid bracketing searcher type.
+     * @tparam FN_T The type of the function for which the search is being conducted.
+     * @tparam STRUCT_T The struct type holding the bounds for the search.
+     * @tparam FACTOR_T The type of the search factor, defaulted based on STRUCT_T.
+     * @tparam ITER_T The type of the maximum iterations count, defaulted to int.
      */
-    template< typename SOLVER >
-    inline auto search(SOLVER                       solver,
-                       auto                         bounds,
-                       typename SOLVER::return_type searchFactor = std::numbers::phi_v< typename SOLVER::return_type >,
-                       int                          maxiter      = nxx::MAXITER)
+    template<template< typename, typename > class SOLVER_T,
+        IsFloatInvocable FN_T,
+        IsFloatStruct STRUCT_T,
+        IsFloat FACTOR_T = StructCommonType_t< STRUCT_T >,
+        std::integral ITER_T = int>
+    auto search(FN_T     function,
+                STRUCT_T bounds,
+                FACTOR_T searchFactor = std::numbers::phi_v< StructCommonType_t< STRUCT_T > >,
+                ITER_T   maxiter      = iterations< StructCommonType_t< STRUCT_T > >())
     {
-        using RT      = typename SOLVER::return_type;
-        auto [lo, hi] = bounds;
-        return search_impl(solver, std::pair< RT, RT > { lo, hi }, searchFactor, maxiter);
+        auto [lo, hi] = bounds; /**< Extract lower and upper bounds from the struct. */
+
+        using ARG_T = std::common_type_t< decltype(lo), decltype(hi) >; /**< Common type for the bounds. */
+        auto solver = SOLVER_T< FN_T, ARG_T >(function);                /**< Instantiates the solver with the given function. */
+
+        // Delegates the search process to search_impl, passing in the solver and other parameters.
+        return detail::search_impl(solver, std::pair< ARG_T, ARG_T >{ lo, hi }, searchFactor, maxiter);
     }
+
 
     /**
-     * @brief A search function template for root finding using a solver with initializer_list bounds.
+     * @brief Extends the high-level search function template `search` for initializer list bounds.
      *
-     * This function template wraps the search_impl function with a more user-friendly interface that
-     * accepts an initializer list for the bounds.
+     * This version of the `search` function template allows for specifying the bounds using an initializer list.
+     * It is particularly useful when the bounds are known at compile time or for concise inline specifications.
+     * The function checks the size of the initializer list to ensure exactly two elements are provided for the
+     * bounds. It then creates a solver instance and delegates the search process to `search_impl`.
      *
-     * @tparam SOLVER The solver type to use for root finding.
-     * @tparam T The type of the bounds in the initializer list.
-     * @param solver The solver instance used to perform root finding.
-     * @param bounds The initial bounds of the search interval as an initializer_list.
-     * @param searchFactor An optional parameter specifying the search factor for the solver (default is the golden ratio).
-     * @param maxiter The maximum number of iterations allowed before the search terminates (default is nxx::MAXITER).
-     * @return An expected object containing either the bounds of the found root or an error.
-     * @throws std::logic_error if the initializer list contains a number of elements different from 2.
+     * @tparam SOLVER_T The template class of the solver to be used. Must be a valid bracketing searcher type.
+     * @tparam FN_T The type of the function for which the search is being conducted.
+     * @tparam ARG_T The type of the bounds and the argument to the function.
+     * @tparam FACTOR_T The type of the search factor, defaulted based on ARG_T.
+     * @tparam ITER_T The type of the maximum iterations count, defaulted to int.
      */
-    template< typename SOLVER, typename T >
-    inline auto search(SOLVER                       solver,
-                       std::initializer_list< T >   bounds,
-                       typename SOLVER::return_type searchFactor = std::numbers::phi_v< typename SOLVER::return_type >,
-                       int                          maxiter      = nxx::MAXITER)
+    template<template< typename, typename > class SOLVER_T,
+        IsFloatInvocable FN_T,
+        IsFloat ARG_T,
+        IsFloat FACTOR_T = ARG_T,
+        std::integral ITER_T = int>
+    auto search(FN_T                           function,
+                std::initializer_list< ARG_T > bounds,
+                FACTOR_T                       searchFactor = std::numbers::phi_v< ARG_T >,
+                ITER_T                         maxiter      = iterations< ARG_T >())
     {
-        using RT = typename SOLVER::return_type;
-        if (bounds.size() != 2) throw std::logic_error("Initializer list must contain exactly two elements!");
-        return search_impl(solver, std::pair< RT, RT > { *bounds.begin(), *(bounds.begin() + 1) }, searchFactor, maxiter);
+        // Ensure the initializer list has exactly two elements representing the bounds.
+        if (bounds.size() != 2) throw NumerixxError("Initializer list must contain exactly two elements!");
+
+        auto solver = SOLVER_T< FN_T, ARG_T >(function);       /**< Instantiates the solver with the given function. */
+        auto bnds   = std::span(bounds.begin(), bounds.end()); /**< Create a span for bounds extraction. */
+
+        // Delegates the search process to search_impl, passing in the solver and other parameters.
+        return detail::search_impl(solver, std::pair{ bnds.front(), bnds.back() }, searchFactor, maxiter);
     }
 
-}    // namespace nxx::roots
+
+    /**
+     * @brief Extends the high-level search function template `search` for container-based bounds.
+     *
+     * This version of the `search` function template is designed to accept bounds specified in a container
+     * such as a vector or an array. It verifies the container size to ensure exactly two elements are provided
+     * for the bounds, which are necessary for the bracketing methods. The function then creates a solver instance
+     * and delegates the search process to `search_impl`. This overload is particularly useful when the bounds
+     * are dynamically determined or retrieved from a data structure.
+     *
+     * @tparam SOLVER_T The template class of the solver to be used. Must be a valid bracketing searcher type.
+     * @tparam FN_T The type of the function for which the search is being conducted.
+     * @tparam CONT_T The container type holding the bounds for the search.
+     * @tparam FACTOR_T The type of the search factor, defaulted based on CONT_T.
+     * @tparam ITER_T The type of the maximum iterations count, defaulted to int.
+     *
+     * @note This function requires that the container's value type is a float type.
+     */
+    template<template< typename, typename > class SOLVER_T,
+        IsFloatInvocable FN_T,
+        IsContainer CONT_T,
+        IsFloat FACTOR_T = typename CONT_T::value_type,
+        std::integral ITER_T = int>
+        requires nxx::IsFloat< typename CONT_T::value_type >
+    auto search(FN_T          function,
+                const CONT_T& bounds,
+                FACTOR_T      searchFactor = std::numbers::phi_v< typename CONT_T::value_type >,
+                ITER_T        maxiter      = iterations< typename CONT_T::value_type >())
+    {
+        // Ensure the container has exactly two elements representing the bounds.
+        if (bounds.size() != 2) throw NumerixxError("Container must contain exactly two elements!");
+
+        using ARG_T = typename CONT_T::value_type; /**< Type of the argument derived from the container's value type. */
+
+        auto solver = SOLVER_T< FN_T, ARG_T >(function); /**< Instantiates the solver with the given function. */
+
+        // Delegates the search process to search_impl, passing in the solver and other parameters.
+        return detail::search_impl(solver, std::pair{ bounds.front(), bounds.back() }, searchFactor, maxiter);
+    }
+} // namespace nxx::roots
 
 #endif    // NUMERIXX_ROOTSEARCHING_HPP
