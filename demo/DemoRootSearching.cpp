@@ -51,12 +51,12 @@ int main()
     auto PrintBounds = [](auto b) { return std::string("(" + std::to_string(b.first) + ", " + std::to_string(b.second) + ")"); };
 
     std::cout << "\nIdentify the brackets around the root of the polynomial: " << to_string(func) << "\n";
-    std::cout << "BracketExpandUp Method:         " << PrintBounds(*search<BracketExpandUp>(func, { 1.0, 1.1 })) << std::endl;
-    std::cout << "BracketSearchUp Method:         " << PrintBounds(*search<BracketSearchUp>(func, { 1.0, 1.1 })) << std::endl;
-    std::cout << "BracketExpandDown Method:       " << PrintBounds(*search<BracketExpandDown>(func, { 4.9, 5.0 })) << std::endl;
-    std::cout << "BracketSearchDown Method:       " << PrintBounds(*search<BracketSearchDown>(func, { 4.9, 5.0 })) << std::endl;
-    std::cout << "BracketExpandOut Method:        " << PrintBounds(*search<BracketExpandOut>(func, { 1.0, 1.1 })) << std::endl;
-    std::cout << "BracketSubdivide Method:        " << PrintBounds(*search<BracketSubdivide>(func, { -5.0, 10.0 })) << std::endl;
+    std::cout << "BracketExpandUp Method:         " << PrintBounds(*search< BracketExpandUp >(func, { 1.0, 1.1 })) << std::endl;
+    std::cout << "BracketSearchUp Method:         " << PrintBounds(*search< BracketSearchUp >(func, { 1.0, 1.1 })) << std::endl;
+    std::cout << "BracketExpandDown Method:       " << PrintBounds(*search< BracketExpandDown >(func, { 4.9, 5.0 })) << std::endl;
+    std::cout << "BracketSearchDown Method:       " << PrintBounds(*search< BracketSearchDown >(func, { 4.9, 5.0 })) << std::endl;
+    std::cout << "BracketExpandOut Method:        " << PrintBounds(*search< BracketExpandOut >(func, { 1.0, 1.1 })) << std::endl;
+    std::cout << "BracketSubdivide Method:        " << PrintBounds(*search< BracketSubdivide >(func, { -5.0, 10.0 })) << std::endl;
 
     // The given polynomial has two roots, one at x = -2.23606798, and the other at x = 2.23606798. The examples above finds the
     // bracketing interval for the root at x = 2.23606798, except for the BracketSubdivide method, which finds the bracketing
@@ -70,8 +70,8 @@ int main()
     // The following code uses a searchFactor of 2.0, and a maxiter of 10.
 
     std::cout << "\nIdentify the brackets around the root of the polynomial, using a searchFactor of 2.0 and maxiter = 10: "
-              << "\n";
-    std::cout << "BracketExpandUp Method:         " << PrintBounds(*search<BracketExpandUp>(func, { 1.0, 1.1 }, 2.0, 10)) << std::endl;
+        << "\n";
+    std::cout << "BracketExpandUp Method:         " << PrintBounds(*search< BracketExpandUp >(func, { 1.0, 1.1 }, 2.0, 10)) << std::endl;
 
     // ============================================================================================
     // As mentioned above, the search() function will return a tl::expected object, which will
@@ -88,11 +88,11 @@ int main()
     };
 
     std::cout << "Initial Bracket:   [5.0, 10.0] (expanding down)\n";
-    auto root = search<BracketExpandDown>([](double x) { return std::log(x); }, { 5.0, 10.0 });
+    auto root = search< BracketExpandDown >([](double x) { return std::log(x); }, { 5.0, 10.0 });
     if (!root) print_error(root.error());
 
     std::cout << "Initial Bracket:   [5.0, 10.0] (expanding up)\n";
-    root = search<BracketExpandUp>([](double x) { return std::log(x); }, { 5.0, 10.0 }, 1.0, 10);
+    root = search< BracketExpandUp >([](double x) { return std::log(x); }, { 5.0, 10.0 }, 1.0, 10);
     if (!root) print_error(root.error());
 
     // The error object is a subclass of the RootError class, which is a subclass of the std::runtime_error
@@ -123,11 +123,11 @@ int main()
         for (int i = 0; i <= 100; ++i) {
             // Print the current iteration:
             std::cout << fmt::format("{:10} | {:15.10f} | {:15.10f} | {:15.10f} ",
-                                     i,                         // Iteration number
-                                     solver.current().first,     // Lower bound
-                                     solver.current().second,    // Upper bound
-                                     solver.ratio())           // Expansion factor
-                      << std::endl;
+                                     i,                       // Iteration number
+                                     solver.current().first,  // Lower bound
+                                     solver.current().second, // Upper bound
+                                     solver.ratio())          // Expansion factor
+                << std::endl;
 
             // Check if a root is in the current interval:
             if (solver.evaluate(solver.current().first) * solver.evaluate(solver.current().second) < 0.0) break;
