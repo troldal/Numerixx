@@ -34,8 +34,13 @@ struct bounds
     const auto integral_f1_simpson   = *integrate< Simpson >(f1, f1_bounds);
     const auto integral_f1_trapezoid = *integrate< Trapezoid >(f1, f1_bounds);
 
-    auto tmp = integralOf< Trapezoid >(f1);
-    std::cout << tmp(f1_bounds, 1E-12, 5) << "\n";
+    try {
+        auto tmp = integralOf< Trapezoid >(f1);
+        std::cout << tmp(f1_bounds, 1E-12, 5) << "\n";
+    }
+        catch (const nxx::NumerixxError& e) {
+                std::cout << e.log() << "\n";
+        }
 
     auto       f2_bounds             = bounds{ 0.0, std::numbers::pi };
     const auto integral_f2_romberg   = *integrate< Romberg >(f2, { 0.0, std::numbers::pi });

@@ -54,6 +54,37 @@
 #include <type_traits>
 #include <span>
 
+/**
+ * @file Integration.hpp
+ * @brief Comprehensive header file for numerical integration utilities.
+ *
+ * This header file, Integration.hpp, provides a full suite of tools and templates for performing
+ * numerical integration in C++. It includes a range of classes and functions that facilitate
+ * numerical integration using various algorithms like Trapezoid, Simpson, Romberg, and others.
+ * The file is structured to provide a cohesive and extensible framework for integration tasks,
+ * suitable for both educational and professional applications in scientific computing,
+ * engineering, and related fields.
+ *
+ * The file contains:
+ * - Base class templates for integration solvers (IntegrationBase).
+ * - Specific integration algorithm implementations (Trapezoid, Simpson, Romberg).
+ * - Generic integration function templates (integrate) that work with various solver classes.
+ * - Overloads of the integrate function to support different types of bounds (e.g., arrays, structures).
+ * - A functor class template (IntegrationFunctor) for encapsulating integration algorithms as callable objects.
+ * - A factory function template (integralOf) for easy creation of integration functors.
+ *
+ * @note
+ * This file is designed to be included as a single header, providing all necessary tools for
+ * numerical integration without the need for multiple includes. It relies on several external
+ * dependencies, including the standard library, Boost (for multi_array), and tl::expected for
+ * error handling.
+ *
+ * @warning
+ * The user must ensure that the function to be integrated and the integration bounds are
+ * compatible with the algorithms used. Improper use or configuration may result in inaccurate
+ * results or runtime errors.
+ */
+
 namespace nxx::integrate
 {
     namespace detail
@@ -71,6 +102,20 @@ namespace nxx::integrate
         //
         // =============================================================================================================
 
+        /**
+         * @class IntegrationBase
+         * @brief Template base class for numerical integration solvers.
+         *
+         * @details This class template serves as a base for creating various numerical integration solvers.
+         *          It enforces constraints on the types of function and arguments used in the integration process.
+         *          It provides the fundamental interface and members that all derived integration solver classes should adhere to.
+         *
+         * @tparam DERIVED The derived class following the Curiously Recurring Template Pattern (CRTP).
+         * @tparam FUNCTION_T The type of function to be integrated.
+         * @tparam ARG_T The type of the argument for the function.
+         *
+         * @note This class uses the CRTP design pattern to enable static polymorphism.
+         */
         template<typename DERIVED, typename FUNCTION_T, typename ARG_T>
             requires std::same_as< typename IntegrationTraits< DERIVED >::FUNCTION_T, FUNCTION_T > &&
                      nxx::IsFloatInvocable< FUNCTION_T > &&
@@ -78,7 +123,7 @@ namespace nxx::integrate
                      nxx::IsFloat< typename IntegrationTraits< DERIVED >::RETURN_T >
         class IntegrationBase
         {
-            friend DERIVED;
+            friend DERIVED; // Granting access to derived classes.
 
         public:
             static constexpr bool IsIntegrationSolver = true; /**< Flag indicating the class is a bracketing solver. */
@@ -90,15 +135,26 @@ namespace nxx::integrate
             ~IntegrationBase() = default; /**< Protected destructor to prevent direct instantiation. */
 
         private:
-            FUNCTION_T m_func{};     /**< The function object to find the root for. */
-            BOUNDS_T   m_bounds{};   /**< Holds the current bounds around the root. */
-            RESULT_T   m_estimate{}; /**< Holds the current estimate of the root. */
+            FUNCTION_T m_func{};     /**< The function object to integrate. */
+            BOUNDS_T   m_bounds{};   /**< Holds the current bounds of the integration. */
+            RESULT_T   m_estimate{}; /**< Holds the current estimate of the integral. */
             ARG_T      m_interval{}; /**< Holds the current interval size. */
 
         public:
+            /**
+             * @brief Constructor initializing the integration solver with a function and bounds.
+             * @param objective The function to integrate.
+             * @param bounds The bounds of integration.
+             */
             IntegrationBase(FUNCTION_T objective, const IsFloatStruct auto& bounds)
                 : m_func{ std::move(objective) } { init(bounds); }
 
+            /**
+             * @brief Constructor initializing the integration solver with a function and bounds array.
+             * @param objective The function to integrate.
+             * @param bounds Array representing the bounds of integration.
+             * @tparam N Size of the bounds array, must be 2.
+             */
             template<size_t N> requires (N == 2)
             IntegrationBase(FUNCTION_T objective, const ARG_T (&bounds)[N])
                 : m_func{ std::move(objective) }
@@ -107,24 +163,48 @@ namespace nxx::integrate
                 init(std::pair{ bnds.front(), bnds.back() });
             }
 
+            // Rule of Five for proper management of resources.
             IntegrationBase(const IntegrationBase& other)                = default; /**< Default copy constructor. */
             IntegrationBase(IntegrationBase&& other) noexcept            = default; /**< Default move constructor. */
             IntegrationBase& operator=(const IntegrationBase& other)     = default; /**< Default copy assignment operator. */
             IntegrationBase& operator=(IntegrationBase&& other) noexcept = default; /**< Default move assignment operator. */
 
+            /**
+             * @brief Initializes the integration solver with bounds.
+             * @param bounds The bounds of integration.
+             * @tparam STRUCT_T The type of the bounds, must satisfy the IsFloatStruct concept.
+             */
             template<IsFloatStruct STRUCT_T>
             void init(STRUCT_T bounds)
             {
                 auto [lower, upper] = bounds;
+                validateRange(lower, upper);
                 m_bounds            = BOUNDS_T{ lower, upper };
                 m_interval          = upper - lower;
                 m_estimate          = m_interval * (evaluate(lower) + evaluate(upper)) / 2;
             }
 
+            /**
+             * @brief Evaluates the function at a given value.
+             * @param value The argument value to evaluate the function at.
+             * @return The result of the function evaluation.
+             */
             RESULT_T evaluate(ARG_T value) { return m_func(value); }
 
+            /**
+             * @brief Retrieves the current estimate of the integral.
+             * @return The current integral estimate.
+             */
             RESULT_T current() const { return m_estimate; }
 
+            /**
+             * @brief Performs an iteration of the integration algorithm.
+             *
+             * @details This function triggers the derived class's specific integration algorithm.
+             *          It should be overridden in the derived class to implement the actual integration logic.
+             *          The derived class uses the current state of this base class (like bounds, function, etc.)
+             *          to perform an iteration of the integration process.
+             */
             void iterate() { std::invoke(static_cast< DERIVED& >(*this)); }
         };
     } // namespace detail
@@ -143,20 +223,37 @@ namespace nxx::integrate
     //                                  88
     // =================================================================================================================
 
-
+    /**
+     * @class Trapezoid
+     * @brief Implementation of numerical integration using the trapezoidal rule.
+     *
+     * @details This class implements the numerical integration using the trapezoidal rule.
+     *          It is derived from IntegrationBase and overrides the operator() to implement
+     *          the specific logic for the trapezoidal rule.
+     *
+     * @tparam FN The type of function to be integrated.
+     * @tparam ARG_T The type of the argument for the function, defaulted to double.
+     */
     template<IsFloatInvocable FN, IsFloat ARG_T = double>
     class Trapezoid final : public detail::IntegrationBase< Trapezoid< FN, ARG_T >, FN, ARG_T >
     {
         using BASE = detail::IntegrationBase< Trapezoid< FN, ARG_T >, FN, ARG_T >; /**< Base class alias for readability. */
 
     public:
-        using BASE::BASE; /**< Inherits constructors from BracketingBase. */
+        using BASE::BASE; /**< Inherits constructors from IntegrationBase. */
         using RESULT_T = std::invoke_result_t< FN, ARG_T >;
 
-        static const inline std::string SolverName = "Trapezoid";
+        static const inline std::string SolverName = "Trapezoid"; /**< Name of the solver. */
 
-        int m_iter{ 1 };
+        int m_iter{ 1 }; /**< Iteration counter. */
 
+        /**
+         * @brief Overloaded function call operator that performs a single iteration of the trapezoidal rule.
+         *
+         * @details This method calculates the next approximation of the integral using the trapezoidal rule.
+         *          It divides the integration interval into smaller sub-intervals and calculates the area
+         *          of trapezoids formed under the curve of the function.
+         */
         void operator()()
         {
             const auto& [lower, upper] = BASE::m_bounds;
@@ -184,6 +281,10 @@ namespace nxx::integrate
         }
     };
 
+    /**
+     * @brief Deduction guides for Trapezoid class.
+     * Allows the type of Trapezoid class to be deduced from the constructor parameters.
+     */
     template<typename FN, typename BOUNDS_T>
         requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
     Trapezoid(FN, BOUNDS_T) -> Trapezoid< FN, StructCommonType_t< BOUNDS_T > >;
@@ -206,6 +307,17 @@ namespace nxx::integrate
     //                                                                                     "Y8bbdP"
     // =================================================================================================================
 
+    /**
+     * @class Romberg
+     * @brief Implementation of numerical integration using the Romberg integration method.
+     *
+     * @details This class implements the numerical integration using the Romberg integration method.
+     *          It is derived from IntegrationBase and overrides the operator() to implement
+     *          the specific logic for Romberg integration.
+     *
+     * @tparam FN The type of function to be integrated.
+     * @tparam ARG_T The type of the argument for the function, defaulted to double.
+     */
     template<IsFloatInvocable FN, IsFloat ARG_T = double>
     class Romberg final : public detail::IntegrationBase< Romberg< FN, ARG_T >, FN, ARG_T >
     {
@@ -214,13 +326,20 @@ namespace nxx::integrate
     public:
         using BASE::BASE; /**< Inherits constructors from BracketingBase. */
         using RESULT_T = std::invoke_result_t< FN, ARG_T >;
-        using ARRAY_T = boost::multi_array< RESULT_T, 2 >;
+        using ARRAY_T = boost::multi_array< RESULT_T, 2 >; /**< Type for the Romberg integration table. */
 
-        static const inline std::string SolverName = "Romberg";
+        static const inline std::string SolverName = "Romberg"; /**< Name of the solver. */
 
-        int     m_iter{ 1 };
-        ARRAY_T R;
+        int     m_iter{ 1 }; /**< Iteration counter. */
+        ARRAY_T R;           /**< Romberg integration table. */
 
+        /**
+         * @brief Overloaded function call operator that performs a single iteration of Romberg integration.
+         *
+         * @details This method calculates the next approximation of the integral using the Romberg integration method.
+         *          It updates the Romberg table with new values computed in each iteration and uses these values to
+         *          extrapolate to higher order estimates of the integral.
+         */
         void operator()()
         {
             using boost::extents;
@@ -254,6 +373,10 @@ namespace nxx::integrate
         }
     };
 
+    /**
+     * @brief Deduction guides for Romberg class.
+     * Allows the type of Romberg class to be deduced from the constructor parameters.
+     */
     template<typename FN, typename BOUNDS_T>
         requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
     Romberg(FN, BOUNDS_T) -> Romberg< FN, StructCommonType_t< BOUNDS_T > >;
@@ -277,6 +400,17 @@ namespace nxx::integrate
     //                                      88
     // =================================================================================================================
 
+    /**
+     * @class Simpson
+     * @brief Implementation of numerical integration using Simpson's rule.
+     *
+     * @details This class implements the numerical integration using Simpson's rule.
+     *          It is derived from IntegrationBase and overrides the operator() to implement
+     *          the specific logic for Simpson's rule integration.
+     *
+     * @tparam FN The type of function to be integrated.
+     * @tparam ARG_T The type of the argument for the function, defaulted to double.
+     */
     template<IsFloatInvocable FN, IsFloat ARG_T = double>
     class Simpson final : public detail::IntegrationBase< Simpson< FN, ARG_T >, FN, ARG_T >
     {
@@ -286,10 +420,17 @@ namespace nxx::integrate
         using BASE::BASE; // Inherits constructors from IntegrationBase.
         using RESULT_T = std::invoke_result_t< FN, ARG_T >;
 
-        static const inline std::string SolverName = "Simpson";
+        static const inline std::string SolverName = "Simpson"; /**< Name of the solver. */
 
         int m_iter{ 1 };
 
+        /**
+         * @brief Overloaded function call operator that performs a single iteration of Simpson's rule.
+         *
+         * @details This method calculates the next approximation of the integral using Simpson's rule.
+         *          It divides the integration interval into smaller sub-intervals and calculates the area
+         *          under the curve of the function using Simpson's rule.
+         */
         void operator()()
         {
             const auto& [lower, upper] = BASE::m_bounds;
@@ -313,7 +454,10 @@ namespace nxx::integrate
         }
     };
 
-    // Deduction guide similar to the one for Trapezoid
+    /**
+     * @brief Deduction guides for Romberg class.
+     * Allows the type of Romberg class to be deduced from the constructor parameters.
+     */
     template<typename FN, typename BOUNDS_T>
         requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
     Simpson(FN, BOUNDS_T) -> Simpson< FN, StructCommonType_t< BOUNDS_T > >;
@@ -336,6 +480,24 @@ namespace nxx::integrate
     //                                       "Y8bbdP"
     // =================================================================================================================
 
+    /**
+     * @brief Performs numerical integration using a specified solver.
+     *
+     * @details This function template provides a generic interface for numerical integration. It constructs
+     *          an instance of the specified solver class and iteratively refines the estimate of the integral
+     *          within given bounds and tolerance limits.
+     *
+     * @tparam SOLVER_T Template template parameter specifying the solver class.
+     * @tparam FN The type of function to be integrated.
+     * @tparam STRUCT_T The type of the structure representing bounds.
+     * @tparam TOL_T The type of the tolerance value, defaulted to the common type of STRUCT_T.
+     * @tparam ITER_T The type of the iteration count, defaulted to int.
+     * @param function The function to be integrated.
+     * @param bounds The bounds of integration.
+     * @param tolerance The tolerance for the result accuracy, defaults to machine epsilon for the result type.
+     * @param maxIterations The maximum number of iterations allowed, defaults to 25.
+     * @return A tl::expected object containing either the result of the integration or an error.
+     */
     template<template< typename, typename > class SOLVER_T,
         IsFloatInvocable FN, IsFloatStruct STRUCT_T, IsFloat TOL_T = StructCommonType_t< STRUCT_T >, std::integral ITER_T = int>
     auto integrate(FN       function,
@@ -385,6 +547,25 @@ namespace nxx::integrate
             { .value = result, .eabs = eabs, .erel = erel, .iterations = maxIterations })));
     }
 
+    /**
+     * @brief Overload of the integrate function accepting bounds as an array.
+     *
+     * @details This function template is an overload of the primary `integrate` function. It accepts
+     *          the bounds of integration as an array and delegates to the primary `integrate` function
+     *          by converting these bounds into a pair.
+     *
+     * @tparam SOLVER_T Template template parameter specifying the solver class.
+     * @tparam FN The type of function to be integrated.
+     * @tparam ARG_T The type of the argument for the bounds.
+     * @tparam TOL_T The type of the tolerance value, defaulted to ARG_T.
+     * @tparam ITER_T The type of the iteration count, defaulted to int.
+     * @tparam N The size of the bounds array, must be 2.
+     * @param function The function to be integrated.
+     * @param bounds Array representing the bounds of integration.
+     * @param tolerance The tolerance for the result accuracy, defaults to machine epsilon for the argument type.
+     * @param maxIterations The maximum number of iterations allowed, defaults to 25.
+     * @return A tl::expected object containing either the result of the integration or an error.
+     */
     template<template< typename, typename > class SOLVER_T,
              IsFloatInvocable FN, IsFloat ARG_T, IsFloat TOL_T = ARG_T, std::integral ITER_T = int,
              size_t N>
@@ -415,12 +596,34 @@ namespace nxx::integrate
 
     namespace detail
     {
+        /**
+         * @class IntegrationFunctor
+         * @brief Functor class for numerical integration algorithms.
+         *
+         * @details This class encapsulates a function to be integrated and provides a convenient functor
+         *          interface for performing numerical integration. It utilizes the integrate function and
+         *          handles the result and error scenarios.
+         *
+         * @tparam ALGO Template template parameter specifying the integration algorithm class.
+         * @tparam FN The type of function to be integrated.
+         */
         template<template< typename, typename > class ALGO, IsFloatInvocable FN>
         class IntegrationFunctor
         {
-            FN m_function{};
+            FN m_function{}; /**< The function to be integrated. */
 
         public:
+            /**
+             * @brief Functor operator for integration with structure-based bounds.
+             *
+             * @tparam STRUCT_T The type of the structure representing bounds.
+             * @tparam TOL_T The type of the tolerance value, defaulted to the common type of STRUCT_T.
+             * @param bounds The bounds of integration.
+             * @param tol The tolerance for the result accuracy, defaults to machine epsilon for the result type.
+             * @param iter The maximum number of iterations allowed, defaults to 25.
+             * @return The result of the integration.
+             * @throws Throws an error if the integration result is an unexpected value.
+             */
             template<IsFloatStruct STRUCT_T, IsFloat TOL_T = StructCommonType_t< STRUCT_T >>
             auto operator()(STRUCT_T bounds,
                             TOL_T    tol  = epsilon< StructCommonType_t< STRUCT_T > >(),
@@ -431,6 +634,18 @@ namespace nxx::integrate
                 throw result.error();
             }
 
+            /**
+             * @brief Functor operator for integration with array-based bounds.
+             *
+             * @tparam ARG_T The type of the argument for the bounds.
+             * @tparam TOL_T The type of the tolerance value, defaulted to ARG_T.
+             * @tparam N The size of the bounds array, must be 2.
+             * @param bounds Array representing the bounds of integration.
+             * @param tol The tolerance for the result accuracy, defaults to machine epsilon for the argument type.
+             * @param iter The maximum number of iterations allowed, defaults to 25.
+             * @return The result of the integration.
+             * @throws Throws an error if the integration result is an unexpected value.
+             */
             template<IsFloat ARG_T, IsFloat TOL_T = ARG_T, size_t N>
             auto operator()(const ARG_T (&bounds)[N],
                             TOL_T         tol  = epsilon< ARG_T >(),
@@ -445,8 +660,20 @@ namespace nxx::integrate
         };
     } // namespace detail
 
+    /**
+     * @brief Factory function to create an IntegrationFunctor for a given function.
+     *
+     * @details This function template provides a convenient way to create an IntegrationFunctor for a
+     *          specific function and a numerical integration algorithm. It abstracts the creation process
+     *          and allows users to focus on specifying the function and optionally the integration algorithm.
+     *
+     * @tparam ALGO_T Template template parameter specifying the integration algorithm class, defaulted to Romberg.
+     * @tparam FN The type of function to be integrated.
+     * @param function The function for which the integral functor is to be created.
+     * @return An instance of IntegrationFunctor configured with the given function and algorithm.
+     */
     template<template< typename, typename > class ALGO_T = Romberg, IsFloatInvocable FN>
-    auto integralOf(FN) { return detail::IntegrationFunctor< ALGO_T, FN >(); }
+    auto integralOf(FN function) { return detail::IntegrationFunctor< ALGO_T, FN >(); }
 } // namespace nxx::integrate
 
 #endif    // NUMERIXX_INTEGRATION_HPP

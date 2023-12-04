@@ -43,7 +43,8 @@ namespace nxx::integrate::detail
 
         friend std::ostream& operator<<(std::ostream& os, const IntegrationErrorData& data)
         {
-            os << "Value: " << data.value << "\n"
+            os << std::setprecision(16)
+                << "Value: " << data.value << "\n"
                 << "Abs. Error: " << data.eabs << "\n"
                 << "Rel. Error: " << data.erel << "\n"
                 << "Iterations: " << data.iterations << "\n";
