@@ -1,7 +1,7 @@
 #==================================================================================================================
 # Preamble
 #==================================================================================================================
-cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.26 FATAL_ERROR)
 project(numerixx.samples)
 
 #==============================================================================
@@ -19,11 +19,6 @@ FetchContent_Declare(fmt
         GIT_TAG master
 )
 FetchContent_MakeAvailable(fmt)
-
-#get_target_property(fmt_include_dirs fmt INTERFACE_INCLUDE_DIRECTORIES)
-#set_target_properties(fmt PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
-#        "$<BUILD_INTERFACE:${fmt_include_dirs}>;$<INSTALL_INTERFACE:include>"
-#        INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${fmt_include_dirs}")
 
 
 #=================================================================================================================

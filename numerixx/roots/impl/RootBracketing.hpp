@@ -73,7 +73,6 @@ namespace nxx::roots
          * @tparam FUNCTION_T The type of the function for which the root is being bracketed.
          * @tparam ARG_T The type of the argument to the function.
          */
-
         template<typename DERIVED, typename FUNCTION_T, typename ARG_T>
             requires std::same_as< typename BracketingTraits< DERIVED >::FUNCTION_T, FUNCTION_T > &&
                      nxx::IsFloatInvocable< FUNCTION_T > &&
@@ -298,11 +297,11 @@ namespace nxx::roots
         requires IsFloatInvocable< FN > && IsFloat< ARG_T >
     Ridder(FN, std::initializer_list< ARG_T >) -> Ridder< FN, ARG_T >;
 
-    template<IsFloatInvocable FN, IsContainer CONT_T>
+    template<typename FN, typename CONT_T>
         requires IsFloatInvocable< FN > && IsFloat< typename CONT_T::value_type >
     Ridder(FN, CONT_T) -> Ridder< FN, typename CONT_T::value_type >;
 
-    template<IsFloatInvocable FN, IsFloatStruct BOUNDS_T>
+    template<typename FN, typename BOUNDS_T>
         requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
     Ridder(FN, BOUNDS_T) -> Ridder< FN, StructCommonType_t< BOUNDS_T > >;
 
@@ -370,11 +369,11 @@ namespace nxx::roots
         requires IsFloatInvocable< FN > && IsFloat< ARG_T >
     Bisection(FN, std::initializer_list< ARG_T >) -> Bisection< FN, ARG_T >;
 
-    template<IsFloatInvocable FN, IsContainer CONT_T>
+    template<typename FN, typename CONT_T>
         requires IsFloatInvocable< FN > && IsFloat< typename CONT_T::value_type >
     Bisection(FN, CONT_T) -> Bisection< FN, typename CONT_T::value_type >;
 
-    template<IsFloatInvocable FN, IsFloatStruct BOUNDS_T>
+    template<typename FN, typename BOUNDS_T>
         requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
     Bisection(FN, BOUNDS_T) -> Bisection< FN, StructCommonType_t< BOUNDS_T > >;
 
@@ -447,11 +446,11 @@ namespace nxx::roots
         requires IsFloatInvocable< FN > && IsFloat< ARG_T >
     RegulaFalsi(FN, std::initializer_list< ARG_T >) -> RegulaFalsi< FN, ARG_T >;
 
-    template<IsFloatInvocable FN, IsContainer CONT_T>
+    template<typename FN, typename CONT_T>
         requires IsFloatInvocable< FN > && IsFloat< typename CONT_T::value_type >
     RegulaFalsi(FN, CONT_T) -> RegulaFalsi< FN, typename CONT_T::value_type >;
 
-    template<IsFloatInvocable FN, IsFloatStruct BOUNDS_T>
+    template<typename FN, typename BOUNDS_T>
         requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
     RegulaFalsi(FN, BOUNDS_T) -> RegulaFalsi< FN, StructCommonType_t< BOUNDS_T > >;
 
@@ -579,10 +578,8 @@ namespace nxx::roots
         std::integral ITER_T = int>
     auto fsolve(FN_T     function,
                 STRUCT_T bounds,
-                EPS_T    eps = epsilon< StructCommonType_t< STRUCT_T > >(),
-                /**< Default epsilon value based on the type of bounds. */
-                ITER_T maxiter = iterations< StructCommonType_t< STRUCT_T > >())
-    /**< Default max. iterations based on the type of bounds. */
+                EPS_T    eps     = epsilon< StructCommonType_t< STRUCT_T > >(),
+                ITER_T   maxiter = iterations< StructCommonType_t< STRUCT_T > >())
     {
         auto [lo, hi] = bounds; /**< Extract lower and upper bounds from the struct. */
 
@@ -621,9 +618,8 @@ namespace nxx::roots
         std::integral ITER_T = int>
     auto fsolve(FN_T                           function,
                 std::initializer_list< ARG_T > bounds,
-                EPS_T                          eps = epsilon< ARG_T >(),
-                /**< Default epsilon value based on ARG_T. */
-                ITER_T maxiter = iterations< ARG_T >()) /**< Default maximum iterations based on ARG_T. */
+                EPS_T                          eps     = epsilon< ARG_T >(),
+                ITER_T                         maxiter = iterations< ARG_T >())
     {
         // Check for correct number of elements in the initializer list.
         if (bounds.size() != 2) throw NumerixxError("Initializer list must contain exactly two elements!");
@@ -664,10 +660,8 @@ namespace nxx::roots
         requires nxx::IsFloat< typename CONT_T::value_type >
     auto fsolve(FN_T          function,
                 const CONT_T& bounds,
-                EPS_T         eps = epsilon< typename CONT_T::value_type >(),
-                /**< Default epsilon value based on the container's value type. */
-                ITER_T maxiter = iterations< typename CONT_T::value_type >())
-    /**< Default maximum iterations based on the container's value type. */
+                EPS_T         eps     = epsilon< typename CONT_T::value_type >(),
+                ITER_T        maxiter = iterations< typename CONT_T::value_type >())
     {
         // Ensure the container has exactly two elements representing the bounds.
         if (bounds.size() != 2) throw NumerixxError("Container must contain exactly two elements!");
@@ -679,7 +673,6 @@ namespace nxx::roots
         // Delegates the solving process to fsolve_impl, passing in the solver and other parameters.
         return detail::fsolve_impl(solver, std::pair{ bounds.front(), bounds.back() }, eps, maxiter);
     }
-
 } // namespace nxx::roots
 
 #endif    // NUMERIXX_ROOTBRACKETING_HPP
