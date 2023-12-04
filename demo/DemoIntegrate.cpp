@@ -9,7 +9,7 @@
 #include <numbers>
 #include <boost/multiprecision/cpp_bin_float.hpp>
 
-using NXX_FLOAT = double;//boost::multiprecision::cpp_bin_float_50;
+using NXX_FLOAT = double; //boost::multiprecision::cpp_bin_float_50;
 
 int main()
 {
@@ -17,19 +17,19 @@ int main()
     std::cout << std::fixed << std::setprecision(50);
 
     // Define some test functions
-    auto f1 = [](nxx::IsFloat auto x) { return x * x; };       // Integral from 0 to 1 is 1/3
+    auto f1 = [](nxx::IsFloat auto x) { return x * x; };  // Integral from 0 to 1 is 1/3
     auto f2 = [](nxx::IsFloat auto x) { return sin(x); }; // Integral from 0 to pi is 2
     auto f3 = [](nxx::IsFloat auto x) { return exp(-x * x); };
     // Integral from -inf to inf is sqrt(pi), but we'll approximate with a large interval
 
 struct bounds
-{
-    NXX_FLOAT lower;
-    NXX_FLOAT upper;
-};
+    {
+        NXX_FLOAT lower;
+        NXX_FLOAT upper;
+    };
 
     // Compute the integrals using the different methods
-    auto f1_bounds = bounds{0.0, 2.0};
+    auto       f1_bounds             = bounds{ 0.0, 2.0 };
     const auto integral_f1_romberg   = *integrate< Romberg >(f1, f1_bounds);
     const auto integral_f1_simpson   = *integrate< Simpson >(f1, f1_bounds);
     const auto integral_f1_trapezoid = *integrate< Trapezoid >(f1, f1_bounds);
@@ -37,12 +37,12 @@ struct bounds
     auto tmp = integralOf< Trapezoid >(f1);
     std::cout << tmp(f1_bounds, 1E-12, 5) << "\n";
 
-    auto f2_bounds = bounds{0.0, std::numbers::pi};
-    const auto integral_f2_romberg   = *integrate< Romberg >(f2, {0.0, std::numbers::pi});
-    const auto integral_f2_simpson   = *integrate< Simpson >(f2, {0.0, std::numbers::pi});
-    const auto integral_f2_trapezoid = *integrate< Trapezoid >(f2, {0.0, std::numbers::pi});
+    auto       f2_bounds             = bounds{ 0.0, std::numbers::pi };
+    const auto integral_f2_romberg   = *integrate< Romberg >(f2, { 0.0, std::numbers::pi });
+    const auto integral_f2_simpson   = *integrate< Simpson >(f2, { 0.0, std::numbers::pi });
+    const auto integral_f2_trapezoid = *integrate< Trapezoid >(f2, { 0.0, std::numbers::pi });
 
-    auto f3_bounds = bounds{-10.0, 10.0};
+    auto       f3_bounds             = bounds{ -10.0, 10.0 };
     const auto integral_f3_romberg   = *integrate< Romberg >(f3, f3_bounds);
     const auto integral_f3_simpson   = *integrate< Simpson >(f3, f3_bounds);
     const auto integral_f3_trapezoid = *integrate< Trapezoid >(f3, f3_bounds);
@@ -91,7 +91,6 @@ struct bounds
     std::cout << "Trapezoid:   " << integral_f3_trapezoid << "\n\n";
 
     auto manualIntegrate = [](auto solver, double tolerance = 1e-12, int maxIterations = 25) {
-
         auto result = solver.current();
         std::cout << "Manual:      " << result << "\n";
         for (auto i = 0; i < maxIterations; i++) {
@@ -99,7 +98,7 @@ struct bounds
             if (abs(result - solver.current()) < tolerance)
                 return solver.current();
             result = solver.current();
-                std::cout << "Manual:      " << result << "\n";
+            std::cout << "Manual:      " << result << "\n";
         }
 
         return result;

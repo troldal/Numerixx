@@ -49,9 +49,8 @@ namespace nxx::integrate::detail
                 << "Iterations: " << data.iterations << "\n";
             return os;
         }
-        };
+    };
 } // namespace nxx::integrate::detail
-
 
 
 #endif //INTEGRATIONERROR_HPP

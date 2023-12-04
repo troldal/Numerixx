@@ -132,7 +132,7 @@ namespace nxx
 
     template<typename S>
     concept IsFloatStruct =
-        !std::is_array_v<std::remove_cvref_t<S>> &&
+        !std::is_array_v< std::remove_cvref_t< S > > &&
         nxx::IsFloat< typename StructTraits< S >::first_type > &&
         nxx::IsFloat< typename StructTraits< S >::second_type >;
 

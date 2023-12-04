@@ -71,7 +71,6 @@ namespace nxx::integrate
         using ARG_T = T;
         using RETURN_T = std::invoke_result_t< FN, ARG_T >;
     };
-
 } // namespace nxx::integrate
 
 #endif //INTEGRATIONTRAITS_HPP

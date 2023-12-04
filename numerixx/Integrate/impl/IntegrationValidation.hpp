@@ -36,10 +36,10 @@
 
 namespace nxx::integrate::detail
 {
-        void validateRange(std::floating_point auto lower, std::floating_point auto upper)
-        {
-            if (lower >= upper) throw NumerixxError("The lower bound must be less than the upper bound.");
-        }
+    void validateRange(std::floating_point auto lower, std::floating_point auto upper)
+    {
+        if (lower >= upper) throw NumerixxError("The lower bound must be less than the upper bound.");
+    }
 } // namespace nxx::integrate::detail
 
 #endif //INTEGRATIONVALIDATION_HPP
