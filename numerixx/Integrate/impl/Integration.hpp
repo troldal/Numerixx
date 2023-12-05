@@ -255,9 +255,9 @@ namespace nxx::integrate
 
         static const inline std::string SolverName = "Trapezoid"; /**< Name of the solver. */
 
-        int                     m_iter{ 1 };         /**< Iteration counter. */
+        int                     m_iter{ 1 };          /**< Iteration counter. */
         uint64_t                m_midpointCount{ 1 }; // Initialize numOfMidpoints
-        std::vector< RESULT_T > m_midpoints;           // Member variable for midpoints
+        std::vector< RESULT_T > m_midpoints;          // Member variable for midpoints
 
         /**
          * @brief Overloaded function call operator that performs a single iteration of the trapezoidal rule.
