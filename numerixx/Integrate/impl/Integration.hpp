@@ -83,6 +83,10 @@
  * The user must ensure that the function to be integrated and the integration bounds are
  * compatible with the algorithms used. Improper use or configuration may result in inaccurate
  * results or runtime errors.
+ *
+ * @todo Consider approaches to improve memory usage, especially for the Trapezoid and Simpson classes.
+ * @todo Consider implementing a parallel version of the integration algorithms.
+ * @todo Implement performance tests and benchmarks.
  */
 
 namespace nxx::integrate
@@ -157,11 +161,7 @@ namespace nxx::integrate
              */
             template<size_t N> requires (N == 2)
             IntegrationBase(FUNCTION_T objective, const ARG_T (&bounds)[N])
-                : m_func{ std::move(objective) }
-            {
-                auto bnds = std::span(bounds, N);
-                init(std::pair{ bnds.front(), bnds.back() });
-            }
+                : m_func{ std::move(objective) } { init(std::pair{ bounds[0], bounds[1] }); }
 
             // Rule of Five for proper management of resources.
             IntegrationBase(const IntegrationBase& other)                = default; /**< Default copy constructor. */
@@ -179,9 +179,9 @@ namespace nxx::integrate
             {
                 auto [lower, upper] = bounds;
                 validateRange(lower, upper);
-                m_bounds            = BOUNDS_T{ lower, upper };
-                m_interval          = upper - lower;
-                m_estimate          = m_interval * (evaluate(lower) + evaluate(upper)) / 2;
+                m_bounds   = BOUNDS_T{ lower, upper };
+                m_interval = upper - lower;
+                m_estimate = m_interval * (evaluate(lower) + evaluate(upper)) / 2;
             }
 
             /**
@@ -189,7 +189,7 @@ namespace nxx::integrate
              * @param value The argument value to evaluate the function at.
              * @return The result of the function evaluation.
              */
-            RESULT_T evaluate(ARG_T value) { return m_func(value); }
+            RESULT_T evaluate(ARG_T value) const { return m_func(value); }
 
             /**
              * @brief Retrieves the current estimate of the integral.
@@ -201,7 +201,7 @@ namespace nxx::integrate
              * @brief Performs an iteration of the integration algorithm.
              *
              * @details This function triggers the derived class's specific integration algorithm.
-             *          It should be overridden in the derived class to implement the actual integration logic.
+             *          This enforces that the derived classes has an overloaded function call operator.
              *          The derived class uses the current state of this base class (like bounds, function, etc.)
              *          to perform an iteration of the integration process.
              */
@@ -231,6 +231,16 @@ namespace nxx::integrate
      *          It is derived from IntegrationBase and overrides the operator() to implement
      *          the specific logic for the trapezoidal rule.
      *
+     *          The Trapezoid class is designed for use in single-threaded environments.
+     *          It is not thread-safe and should not be accessed concurrently from multiple
+     *          threads. If multithreaded usage is required, it is the responsibility of the
+     *          user to ensure proper synchronization mechanisms are in place to prevent
+     *          concurrent access and modification.
+     *
+     *          The class focuses on performance and efficiency in single-threaded scenarios.
+     *          Using this class in a multithreaded context without adequate synchronization
+     *          can lead to undefined behavior and incorrect computation results.
+     *
      * @tparam FN The type of function to be integrated.
      * @tparam ARG_T The type of the argument for the function, defaulted to double.
      */
@@ -245,7 +255,9 @@ namespace nxx::integrate
 
         static const inline std::string SolverName = "Trapezoid"; /**< Name of the solver. */
 
-        int m_iter{ 1 }; /**< Iteration counter. */
+        int                     m_iter{ 1 };         /**< Iteration counter. */
+        uint64_t                m_midpointCount{ 1 }; // Initialize numOfMidpoints
+        std::vector< RESULT_T > m_midpoints;           // Member variable for midpoints
 
         /**
          * @brief Overloaded function call operator that performs a single iteration of the trapezoidal rule.
@@ -258,19 +270,23 @@ namespace nxx::integrate
         {
             const auto& [lower, upper] = BASE::m_bounds;
 
-            BASE::m_interval /= 2;                              // Halve the step size in each iteration
-            const int numOfMidpoints = std::pow(2, m_iter - 1); // Calculate the number of midpoints for this iteration
+            // Recalculate the interval based on the iteration number
+            uint64_t divisor = 1 << m_iter;
+            BASE::m_interval = (upper - lower) / divisor;
 
-            // Create a vector of midpoints
-            std::vector< RESULT_T > midPoints(numOfMidpoints);
-            std::generate(midPoints.begin(),
-                          midPoints.end(),
+            // Double the number of midpoints for this iteration
+            if (m_iter > 1) m_midpointCount *= 2;
+
+            // Resize midPoints vector if necessary
+            m_midpoints.resize(m_midpointCount);
+            std::generate(m_midpoints.begin(),
+                          m_midpoints.end(),
                           [n = 1, lower, h = BASE::m_interval]() mutable { return lower + (2 * n++ - 1) * h; });
 
             // Calculate the sum of function values at the midpoints
             const RESULT_T sum =
-                std::transform_reduce(midPoints.begin(),
-                                      midPoints.end(),
+                std::transform_reduce(m_midpoints.begin(),
+                                      m_midpoints.end(),
                                       ARG_T(0.0),
                                       std::plus(),
                                       [&](RESULT_T x) { return BASE::evaluate(x); });
@@ -315,6 +331,16 @@ namespace nxx::integrate
      *          It is derived from IntegrationBase and overrides the operator() to implement
      *          the specific logic for Romberg integration.
      *
+     *          The Romberg class is designed for use in single-threaded environments.
+     *          It is not thread-safe and should not be accessed concurrently from multiple
+     *          threads. If multithreaded usage is required, it is the responsibility of the
+     *          user to ensure proper synchronization mechanisms are in place to prevent
+     *          concurrent access and modification.
+     *
+     *          The class focuses on performance and efficiency in single-threaded scenarios.
+     *          Using this class in a multithreaded context without adequate synchronization
+     *          can lead to undefined behavior and incorrect computation results.
+     *
      * @tparam FN The type of function to be integrated.
      * @tparam ARG_T The type of the argument for the function, defaulted to double.
      */
@@ -343,30 +369,32 @@ namespace nxx::integrate
         void operator()()
         {
             using boost::extents;
-            using boost::multi_array;
-
             R.resize(extents[m_iter + 1][m_iter + 1]);
 
             const auto& [lower, upper] = BASE::m_bounds;
 
             // Initialize the first element with the basic trapezoidal rule
-            if (m_iter == 1) { R[0][0] = (upper - lower) * (BASE::evaluate(lower) + BASE::evaluate(upper)) / 2; }
+            if (m_iter == 1) { R[0][0] = BASE::m_interval * (BASE::evaluate(lower) + BASE::evaluate(upper)) / 2; }
 
-            // Calculate the step size for this iteration
-            const RESULT_T h = (upper - lower) / std::pow(2, m_iter);
+            // Halve the step size for this iteration
+            uint64_t divisor = 1 << m_iter;
+            BASE::m_interval = (upper - lower) / divisor;
 
             // Trapezoidal rule: Calculate the sum of the function values at the midpoints
-            RESULT_T sum = 0.0;
-            for (int k = 1; k <= std::pow(2, m_iter - 1); ++k)
-                sum += BASE::evaluate(lower + (2 * k - 1) * h);
+            RESULT_T       sum          = 0.0;
+            const uint64_t numMidpoints = 1 << (m_iter - 1); // 2^(m_iter - 1) using bitwise shift
+            for (uint64_t k = 1; k <= numMidpoints; ++k)
+                sum += BASE::evaluate(lower + (2 * k - 1) * BASE::m_interval);
 
             // Update the Romberg table for the first column (trapezoidal rule)
-            R[m_iter][0] = R[m_iter - 1][0] / 2 + h * sum;
+            R[m_iter][0] = R[m_iter - 1][0] / 2 + BASE::m_interval * sum;
 
             // Apply the Romberg integration formula
-            for (int j = 1; j <= m_iter; ++j)
-                // Use the previously computed values to extrapolate to higher orders
-                R[m_iter][j] = R[m_iter][j - 1] + (R[m_iter][j - 1] - R[m_iter - 1][j - 1]) / (std::pow(4, j) - 1);
+            RESULT_T four_pow_j = 1; // Initial value for 4^j
+            for (int j = 1; j <= m_iter; ++j) {
+                four_pow_j *= 4; // Multiply by 4 at each step
+                R[m_iter][j] = R[m_iter][j - 1] + (R[m_iter][j - 1] - R[m_iter - 1][j - 1]) / (four_pow_j - 1);
+            }
 
             BASE::m_estimate = R[m_iter][m_iter];
             m_iter++;
@@ -408,6 +436,16 @@ namespace nxx::integrate
      *          It is derived from IntegrationBase and overrides the operator() to implement
      *          the specific logic for Simpson's rule integration.
      *
+     *          The Simpson class is designed for use in single-threaded environments.
+     *          It is not thread-safe and should not be accessed concurrently from multiple
+     *          threads. If multithreaded usage is required, it is the responsibility of the
+     *          user to ensure proper synchronization mechanisms are in place to prevent
+     *          concurrent access and modification.
+     *
+     *          The class focuses on performance and efficiency in single-threaded scenarios.
+     *          Using this class in a multithreaded context without adequate synchronization
+     *          can lead to undefined behavior and incorrect computation results.
+     *
      * @tparam FN The type of function to be integrated.
      * @tparam ARG_T The type of the argument for the function, defaulted to double.
      */
@@ -422,7 +460,9 @@ namespace nxx::integrate
 
         static const inline std::string SolverName = "Simpson"; /**< Name of the solver. */
 
-        int m_iter{ 1 };
+        int                     m_iter{ 1 };
+        int                     numOfIntervals{ 1 }; // Initialize numOfIntervals
+        std::vector< RESULT_T > points;              // Member variable for points
 
         /**
          * @brief Overloaded function call operator that performs a single iteration of Simpson's rule.
@@ -435,11 +475,18 @@ namespace nxx::integrate
         {
             const auto& [lower, upper] = BASE::m_bounds;
 
-            BASE::m_interval /= 2;                     // Halve the step size in each iteration
-            int numOfPoints = 1 + std::pow(2, m_iter); // Calculate the number of points for this iteration
+            // Halve the step size for this iteration
+            uint64_t divisor = 1 << m_iter;
+            BASE::m_interval = (upper - lower) / divisor;
 
-            // Create a vector of points
-            std::vector< RESULT_T > points(numOfPoints);
+            // Double the number of intervals using arithmetic operation
+            numOfIntervals *= 2;
+
+            // Calculate the total number of points
+            int numOfPoints = numOfIntervals + 1;
+
+            // Resize points vector if necessary
+            points.resize(numOfPoints);
             std::generate(points.begin(),
                           points.end(),
                           [n = 0, lower, h = BASE::m_interval]() mutable { return lower + n++ * h; });
@@ -575,8 +622,7 @@ namespace nxx::integrate
                    TOL_T         tolerance     = epsilon< ARG_T >(),
                    ITER_T        maxIterations = 25)
     {
-        auto bnds = std::span(bounds, N);
-        return integrate< SOLVER_T >(function, std::pair(bnds.front(), bnds.back()), tolerance, maxIterations);
+        return integrate< SOLVER_T >(function, std::pair(bounds[0], bounds[1]), tolerance, maxIterations);
     }
 
 
@@ -652,8 +698,7 @@ namespace nxx::integrate
                             int           iter = 25) const
                 requires (N == 2)
             {
-                auto bnds   = std::span(bounds, N);
-                auto result = integrate< ALGO >(m_function, std::pair(bnds.front(), bnds.back()), tol, iter);
+                auto result = integrate< ALGO >(m_function, std::pair(bounds[0], bounds[1]), tol, iter);
                 if (result) return result.value();
                 throw result.error();
             }
