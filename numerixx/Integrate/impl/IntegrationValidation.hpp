@@ -34,8 +34,28 @@
 // ===== Numerixx Includes
 #include <Error.hpp>
 
+/**
+ * @file IntegrationValidation.hpp
+ * @brief Header file defining the validateRange function for checking integration bounds.
+ *
+ * This file contains the definition of the validateRange function, which is used to validate
+ * the range of integration bounds. It ensures that the lower bound is less than the upper bound,
+ * throwing an exception if this condition is not met. This function is crucial for ensuring
+ * the correctness and stability of numerical integration processes.
+ */
 namespace nxx::integrate::detail
 {
+    /**
+     * @brief Validates the range of integration bounds.
+     *
+     * @details This function checks if the lower bound is less than the upper bound for an integration range.
+     *          If the lower bound is not less than the upper bound, it throws a NumerixxError.
+     *
+     * @tparam T The type of the bounds, constrained to floating-point types.
+     * @param lower The lower bound of the range.
+     * @param upper The upper bound of the range.
+     * @throw NumerixxError if the lower bound is not less than the upper bound.
+     */
     void validateRange(IsFloat auto lower, IsFloat auto upper)
     {
         if (lower >= upper) throw NumerixxError("The lower bound must be less than the upper bound.");

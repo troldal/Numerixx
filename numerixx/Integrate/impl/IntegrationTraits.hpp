@@ -34,43 +34,85 @@
 // ===== Numerixx Includes
 #include <Concepts.hpp>
 
+/**
+ * @file IntegrationTraits.hpp
+ * @brief Header file defining the IntegrationTraits structure for various integration solvers.
+ *
+ * This file contains the template specializations of the IntegrationTraits structure for the Trapezoid,
+ * Romberg, and Simpson classes. IntegrationTraits is designed to provide type information relevant to
+ * the integration process, such as the types of the function, argument, and return value.
+ */
 namespace nxx::integrate
 {
+    /**
+     * @brief Forward declarations of the integration solver classes.
+     *
+     * These declarations provide a reference for the IntegrationTraits specializations without needing
+     * to include the full definitions of these classes.
+     */
     template<IsFloatInvocable FN, IsFloat ARG_T>
     class Trapezoid;
-
     template<IsFloatInvocable FN, IsFloat ARG_T>
     class Romberg;
-
     template<IsFloatInvocable FN, IsFloat ARG_T>
     class Simpson;
 
-    template<typename FN>
-    struct IntegrationTraits;
-
-    template<typename FN, typename T>
-    struct IntegrationTraits< Trapezoid< FN, T > >
+    namespace detail
     {
-        using FUNCTION_T = FN;
-        using ARG_T = T;
-        using RETURN_T = std::invoke_result_t< FN, ARG_T >;
-    };
+        /**
+         * @struct IntegrationTraits
+         * @brief Primary template for integration traits, to be specialized for each solver.
+         *
+         * @details This structure template is used to define traits for integration solver classes.
+         *          It's specialized for each specific solver class to provide the necessary type information.
+         *
+         * @tparam FN The type of function to be integrated.
+         */
+        template<typename FN>
+        struct IntegrationTraits;
 
-    template<typename FN, typename T>
-    struct IntegrationTraits< Romberg< FN, T > >
-    {
-        using FUNCTION_T = FN;
-        using ARG_T = T;
-        using RETURN_T = std::invoke_result_t< FN, ARG_T >;
-    };
+        /**
+         * @brief Specialization of IntegrationTraits for the Trapezoid solver.
+         *
+         * @tparam FN The type of function to be integrated.
+         * @tparam T The type of the argument for the function.
+         */
+        template<typename FN, typename T>
+        struct IntegrationTraits< Trapezoid< FN, T > >
+        {
+            using FUNCTION_T = FN;                              /**< The type of the function to be integrated. */
+            using ARG_T = T;                                    /**< The type of the argument for the function. */
+            using RETURN_T = std::invoke_result_t< FN, ARG_T >; /**< The type of the return value of the function. */
+        };
 
-    template<typename FN, typename T>
-    struct IntegrationTraits< Simpson< FN, T > >
-    {
-        using FUNCTION_T = FN;
-        using ARG_T = T;
-        using RETURN_T = std::invoke_result_t< FN, ARG_T >;
-    };
+        /**
+         * @brief Specialization of IntegrationTraits for the Romberg solver.
+         *
+         * @tparam FN The type of function to be integrated.
+         * @tparam T The type of the argument for the function.
+         */
+        template<typename FN, typename T>
+        struct IntegrationTraits< Romberg< FN, T > >
+        {
+            using FUNCTION_T = FN;                              /**< The type of the function to be integrated. */
+            using ARG_T = T;                                    /**< The type of the argument for the function. */
+            using RETURN_T = std::invoke_result_t< FN, ARG_T >; /**< The type of the return value of the function. */
+        };
+
+        /**
+         * @brief Specialization of IntegrationTraits for the Simpson solver.
+         *
+         * @tparam FN The type of function to be integrated.
+         * @tparam T The type of the argument for the function.
+         */
+        template<typename FN, typename T>
+        struct IntegrationTraits< Simpson< FN, T > >
+        {
+            using FUNCTION_T = FN;                              /**< The type of the function to be integrated. */
+            using ARG_T = T;                                    /**< The type of the argument for the function. */
+            using RETURN_T = std::invoke_result_t< FN, ARG_T >; /**< The type of the return value of the function. */
+        };
+    } // namespace detail
 } // namespace nxx::integrate
 
 #endif //INTEGRATIONTRAITS_HPP

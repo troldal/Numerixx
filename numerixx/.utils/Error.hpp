@@ -42,6 +42,10 @@
 #include <stdexcept>
 #include <utility>
 
+// TODO: Consider JSON output
+// TODO: Consider integration with logging frameworks
+// TODO: Consider the need for locale settings
+
 namespace nxx
 {
     enum class NumerixxErrorType { General, Poly, Polyroots, Roots, MultiRoots, Deriv, Integral, Func };
@@ -110,7 +114,7 @@ namespace nxx
     };
 
     template<typename T>
-    class Error : public NumerixxError
+    class Error final : public NumerixxError
     {
     public:
         explicit Error(const std::string&            str,

@@ -31,16 +31,50 @@
 #ifndef INTEGRATIONERROR_HPP
 #define INTEGRATIONERROR_HPP
 
+/**
+ * @file IntegrationError.hpp
+ * @brief Header file defining the IntegrationErrorData structure.
+ *
+ * This file contains the definition of the IntegrationErrorData structure, which is used to
+ * encapsulate detailed error information related to numerical integration processes.
+ * It provides a comprehensive view of the error state, including the last computed value,
+ * absolute and relative errors, and the number of iterations performed.
+ *
+ * This structure is particularly useful for diagnosing issues in numerical integration routines,
+ * allowing users to assess the quality of the result and the convergence behavior of the algorithm.
+ */
 namespace nxx::integrate::detail
 {
+    /**
+     * @struct IntegrationErrorData
+     * @brief Struct to hold detailed error information for integration processes.
+     *
+     * @details This structure encapsulates error-related information for numerical integration routines.
+     *          It stores the last computed value, absolute and relative errors, and the number of iterations.
+     *
+     * @note This structure is used internally as a template parameter to the nxx::Error class.
+     *
+     * @tparam T The data type of the value and error measurements (typically a floating-point type).
+     * @tparam ITER_T The data type for counting iterations (typically an integral type).
+     */
     template<typename T, typename ITER_T>
     struct IntegrationErrorData
     {
-        T      value;
-        T      eabs;
-        T      erel;
-        ITER_T iterations;
+        T      value;      /**< The last computed value of the integration process. */
+        T      eabs;       /**< The absolute error of the computed value. */
+        T      erel;       /**< The relative error of the computed value. */
+        ITER_T iterations; /**< The total number of iterations performed. */
 
+        /**
+         * @brief Overloads the output stream operator for IntegrationErrorData.
+         *
+         * @details This function allows IntegrationErrorData instances to be easily printed to an output stream.
+         *          It formats the data with high precision and labels for clarity.
+         *
+         * @param os The output stream to write to.
+         * @param data The IntegrationErrorData instance to output.
+         * @return Returns the modified output stream.
+         */
         friend std::ostream& operator<<(std::ostream& os, const IntegrationErrorData& data)
         {
             os << std::setprecision(16)
