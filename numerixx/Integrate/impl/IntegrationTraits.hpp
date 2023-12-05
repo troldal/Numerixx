@@ -113,6 +113,6 @@ namespace nxx::integrate
             using RETURN_T = std::invoke_result_t< FN, ARG_T >; /**< The type of the return value of the function. */
         };
     } // namespace detail
-} // namespace nxx::integrate
+}     // namespace nxx::integrate
 
 #endif //INTEGRATIONTRAITS_HPP
