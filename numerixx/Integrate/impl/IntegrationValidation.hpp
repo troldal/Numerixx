@@ -63,3 +63,4 @@ namespace nxx::integrate::detail
 } // namespace nxx::integrate::detail
 
 #endif //INTEGRATIONVALIDATION_HPP
+

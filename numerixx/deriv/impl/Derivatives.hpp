@@ -795,7 +795,6 @@ namespace nxx::deriv
      * @tparam ALGO The algorithm type for computing the derivative. This can be any algorithm with the right interface,
      * and can be both 1st order and higher order derivatives. The default is \c Order1CentralRichardson.
      * @param function The function to compute the derivative of.
-     * @param stepsize (Optional) The step size to use in the computation. The default is the cubic root of the machine epsilon.
      *
      * @return A function object representing the derivative of the input function. The lambda will take one floating point
      * argument, and return the (approximated) derivative of the function.

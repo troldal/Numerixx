@@ -65,7 +65,7 @@ int main()
     // contain a value, the result of using the * operator is undefined.
     // ============================================================================================
     std::cout << "\nCompute the root of the polynomial f(x) = x^2 - 5 using bracketing methods:\n";
-    std::cout << "Bisection Method:         " << *fsolve< Bisection >(func, bounds) << std::endl;
+    std::cout << "Bisection Method:         " << *fsolve< Bisection >(func, { 0.0, 2.5 }) << std::endl;
     std::cout << "Ridder's Method:          " << *fsolve< Ridder >(func, bounds) << std::endl;
     std::cout << "Regula Falsi Method:      " << *fsolve< RegulaFalsi >(func, bounds) << std::endl << std::endl;
 
