@@ -89,11 +89,9 @@ namespace nxx::roots
          *
          * @note This class template uses SFINAE to enforce type constraints on its template parameters.
          */
-        template<typename SUBCLASS, IsFloatInvocable FUNCTION_T, IsFloat ARG_T>
-            requires std::same_as< typename SearchingTraits< SUBCLASS >::FUNCTION_T, FUNCTION_T > &&
-                     nxx::IsFloatInvocable< FUNCTION_T > &&
-                     nxx::IsFloat< ARG_T > &&
-                     nxx::IsFloat< typename SearchingTraits< SUBCLASS >::RETURN_T >
+        template< typename SUBCLASS, IsFloatInvocable FUNCTION_T, IsFloat ARG_T >
+        requires std::same_as< typename SearchingTraits< SUBCLASS >::FUNCTION_T, FUNCTION_T > && nxx::IsFloatInvocable< FUNCTION_T > &&
+                 nxx::IsFloat< ARG_T > && nxx::IsFloat< typename SearchingTraits< SUBCLASS >::RETURN_T >
         class SearchBase
         {
             friend SUBCLASS;
@@ -103,51 +101,17 @@ namespace nxx::roots
 
             using RESULT_T = std::invoke_result_t< FUNCTION_T, ARG_T >; /**< Result type of the function. */
             using BOUNDS_T = std::pair< ARG_T, ARG_T >;                 /**< Type for representing the search bounds. */
-            using RATIO_T = ARG_T;                                      /**< Type for representing the search adjustment ratio. */
+            using RATIO_T  = ARG_T;                                     /**< Type for representing the search adjustment ratio. */
 
         protected:
             ~SearchBase() = default; /**< Protected destructor to prevent direct instantiation. */
 
         private:
-            FUNCTION_T m_objective{};                /**< The objective function for the search. */
-            BOUNDS_T   m_bounds{ 0.0, 1.0 };         /**< Holds the current search bounds. */
-            RATIO_T    m_ratio{ std::numbers::phi }; /**< The factor influencing the search process. */
-            bool       m_isInitialized{ false };     /**< Indicates whether the search has been initialized. */
+            FUNCTION_T m_objective {};                /**< The objective function for the search. */
+            BOUNDS_T   m_bounds { 0.0, 1.0 };         /**< Holds the current search bounds. */
+            RATIO_T    m_ratio { std::numbers::phi }; /**< The factor influencing the search process. */
 
         public:
-            /**
-             * @brief Constructs the SearchBase with an objective function.
-             * @param objective The function involved in the search process.
-             * @details This constructor initializes the search algorithm with a specific objective
-             *          function. It sets default bounds and factor, but leaves the algorithm uninitialized.
-             */
-            explicit SearchBase(FUNCTION_T objective)
-                : m_objective{ std::move(objective) } {}
-
-            /**
-             * @brief Constructs the SearchBase with an objective function, bounds from an initializer list, and an optional factor.
-             * @param objective The function involved in the search process.
-             * @param bounds Initializer list with exactly two elements representing the search bounds.
-             * @param factor The factor influencing the search process, defaults to the golden ratio.
-             * @details This constructor initializes the search algorithm with a specific objective
-             *          function, search bounds defined by an initializer list, and an optional factor.
-             */
-            SearchBase(FUNCTION_T objective, std::initializer_list< ARG_T > bounds, RATIO_T factor = std::numbers::phi)
-                : m_objective{ std::move(objective) },
-                  m_ratio{ factor } { init(bounds, factor); }
-
-            /**
-             * @brief Constructs the SearchBase with an objective function, bounds from a container, and an optional factor.
-             * @param objective The function involved in the search process.
-             * @param bounds Container with exactly two elements representing the search bounds.
-             * @param factor The factor influencing the search process, defaults to the golden ratio.
-             * @details This constructor initializes the search algorithm with a specific objective
-             *          function, search bounds defined by a container, and an optional factor.
-             */
-            SearchBase(FUNCTION_T objective, IsFloatContainer auto bounds, RATIO_T factor = std::numbers::phi)
-                : m_objective{ std::move(objective) },
-                  m_ratio{ factor } { init(bounds, factor); }
-
             /**
              * @brief Constructs the SearchBase with an objective function, bounds from a float struct, and an optional factor.
              * @param objective The function involved in the search process.
@@ -157,8 +121,20 @@ namespace nxx::roots
              *          function, search bounds defined by a struct, and an optional factor.
              */
             SearchBase(FUNCTION_T objective, IsFloatStruct auto bounds, RATIO_T factor = std::numbers::phi)
-                : m_objective{ std::move(objective) },
-                  m_ratio{ factor } { init(bounds, factor); }
+                : m_objective { std::move(objective) },
+                  m_ratio { factor }
+            {
+                init(bounds, factor);
+            }
+
+            template< size_t N >
+            requires(N == 2)
+            SearchBase(FUNCTION_T objective, const ARG_T (&bounds)[N], RATIO_T factor = std::numbers::phi)
+                : m_objective { std::move(objective) },
+                  m_ratio { factor }
+            {
+                init(std::pair { bounds[0], bounds[1] }, factor);
+            }
 
             /**
              * @brief Sets the search bounds.
@@ -167,15 +143,13 @@ namespace nxx::roots
              */
             void setBounds(const BOUNDS_T& bounds)
             {
-                if (!m_isInitialized) throw NumerixxError("Search algorithm not initialized!");
-
                 auto [lower, upper] = bounds;
                 if (lower == upper) throw NumerixxError("Invalid bounds.");
 
                 if (lower > upper)
-                    m_bounds = BOUNDS_T{ upper, lower };
+                    m_bounds = BOUNDS_T { upper, lower };
                 else
-                    m_bounds = BOUNDS_T{ lower, upper };
+                    m_bounds = BOUNDS_T { lower, upper };
             }
 
             /**
@@ -185,7 +159,6 @@ namespace nxx::roots
              */
             void setRatio(RATIO_T factor)
             {
-                if (!m_isInitialized) throw NumerixxError("Search algorithm not initialized!");
                 if (factor < 1.0) throw NumerixxError("Invalid factor.");
                 m_ratio = factor;
             }
@@ -196,31 +169,6 @@ namespace nxx::roots
             SearchBase& operator=(SearchBase&& other) noexcept = default; /**< Default move assignment operator. */
 
             /**
-             * @brief Initializes the search with bounds from an initializer list and an optional factor.
-             * @param bounds Initializer list with exactly two elements representing the search bounds.
-             * @param factor The factor influencing the search process, defaults to the golden ratio.
-             * @throws NumerixxError If the initializer list does not contain exactly two elements or if the factor is invalid.
-             */
-            void init(std::initializer_list< ARG_T > bounds, RATIO_T factor = std::numbers::phi)
-            {
-                if (bounds.size() != 2) throw NumerixxError("Initializer list must contain exactly two elements!");
-                auto bnds = std::span(bounds.begin(), bounds.end());
-                init(std::pair{ bnds.front(), bnds.back() }, factor);
-            }
-
-            /**
-             * @brief Initializes the search with bounds from a container and an optional factor.
-             * @param bounds Container with exactly two elements representing the search bounds.
-             * @param factor The factor influencing the search process, defaults to the golden ratio.
-             * @throws NumerixxError If the container does not contain exactly two elements or if the factor is invalid.
-             */
-            void init(IsFloatContainer auto bounds, RATIO_T factor = std::numbers::phi)
-            {
-                if (bounds.size() != 2) throw NumerixxError("Container must contain exactly two elements!");
-                init(std::pair{ bounds.front(), bounds.back() }, factor);
-            }
-
-            /**
              * @brief Initializes the search with bounds from a float struct and an optional factor.
              * @param bounds Struct with exactly two members representing the search bounds.
              * @param factor The factor influencing the search process, defaults to the golden ratio.
@@ -228,18 +176,10 @@ namespace nxx::roots
              */
             void init(IsFloatStruct auto bounds, RATIO_T factor = std::numbers::phi)
             {
-                if (factor < 1.0) throw NumerixxError("Invalid factor.");
-
-                m_isInitialized     = true;
                 auto [lower, upper] = bounds;
-                setBounds(BOUNDS_T{ lower, upper });
-                if (factor >= 1.0) setRatio(factor);
+                setBounds(BOUNDS_T { lower, upper });
+                setRatio(factor);
             }
-
-            /**
-             * @brief Resets the search to an uninitialized state.
-             */
-            void reset() { m_isInitialized = false; }
 
             /**
              * @brief Evaluates the objective function at a given value.
@@ -247,7 +187,10 @@ namespace nxx::roots
              * @return The result of evaluating the function at the specified value.
              */
             [[nodiscard]]
-            RESULT_T evaluate(ARG_T value) const { return m_objective(value); }
+            RESULT_T evaluate(ARG_T value) const
+            {
+                return m_objective(value);
+            }
 
             /**
              * @brief Returns the current search bounds.
@@ -259,7 +202,6 @@ namespace nxx::roots
             [[nodiscard]]
             const BOUNDS_T& current() const
             {
-                if (!m_isInitialized) throw NumerixxError("Search algorithm not initialized!");
                 return m_bounds;
             }
 
@@ -273,12 +215,10 @@ namespace nxx::roots
             [[nodiscard]]
             RATIO_T ratio() const
             {
-                if (!m_isInitialized) throw NumerixxError("Search algorithm not initialized!");
                 return m_ratio;
             }
         };
-    } // namespace impl
-
+    }    // namespace detail
 
     // =================================================================================================================
     //
@@ -307,7 +247,7 @@ namespace nxx::roots
      * @tparam ARG_T The type of the argument to the function, defaults to double.
      */
 
-    template<IsFloatInvocable FN, IsFloat ARG_T = double>
+    template< IsFloatInvocable FN, IsFloat ARG_T = double >
     class BracketSearchUp final : public detail::SearchBase< BracketSearchUp< FN, ARG_T >, FN, ARG_T >
     {
         using BASE = detail::SearchBase< BracketSearchUp< FN, ARG_T >, FN, ARG_T >; /**< Base class alias for readability. */
@@ -339,20 +279,12 @@ namespace nxx::roots
      * @brief Deduction guides for BracketSearchUp class.
      * Allows the type of BracketSearchUp class to be deduced from the constructor parameters.
      */
-    template<typename FN>
-        requires IsFloatInvocable< FN >
-    BracketSearchUp(FN) -> BracketSearchUp< FN >;
-
-    template<typename FN, typename ARG_T, typename FACTOR_T = ARG_T>
-        requires IsFloatInvocable< FN > && IsFloat< ARG_T > && IsFloat< FACTOR_T >
+    template< typename FN, typename ARG_T, typename FACTOR_T = ARG_T >
+    requires IsFloatInvocable< FN > && IsFloat< ARG_T > && IsFloat< FACTOR_T >
     BracketSearchUp(FN, std::initializer_list< ARG_T >, FACTOR_T factor = std::numbers::phi) -> BracketSearchUp< FN, ARG_T >;
 
-    template<typename FN, typename CONT_T, typename FACTOR_T = typename CONT_T::value_type>
-        requires IsFloatInvocable< FN > && IsFloatContainer< CONT_T >
-    BracketSearchUp(FN, CONT_T, FACTOR_T factor = std::numbers::phi) -> BracketSearchUp< FN, typename CONT_T::value_type >;
-
-    template<typename FN, typename BOUNDS_T, typename FACTOR_T = StructCommonType_t< BOUNDS_T >>
-        requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
+    template< typename FN, typename BOUNDS_T, typename FACTOR_T = StructCommonType_t< BOUNDS_T > >
+    requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
     BracketSearchUp(FN, BOUNDS_T, FACTOR_T factor = std::numbers::phi) -> BracketSearchUp< FN, StructCommonType_t< BOUNDS_T > >;
 
     // =================================================================================================================
@@ -369,7 +301,6 @@ namespace nxx::roots
     //
     // =================================================================================================================
 
-
     /**
      * @brief Defines the BracketSearchDown class for performing downward bracketing search.
      *
@@ -382,7 +313,7 @@ namespace nxx::roots
      * @tparam FN The type of the function for which the bracket is being searched.
      * @tparam ARG_T The type of the argument to the function, defaults to double.
      */
-    template<IsFloatInvocable FN, IsFloat ARG_T = double>
+    template< IsFloatInvocable FN, IsFloat ARG_T = double >
     class BracketSearchDown final : public detail::SearchBase< BracketSearchDown< FN, ARG_T >, FN, ARG_T >
     {
         using BASE = detail::SearchBase< BracketSearchDown< FN, ARG_T >, FN, ARG_T >; /**< Base class alias for readability. */
@@ -414,20 +345,12 @@ namespace nxx::roots
      * @brief Deduction guides for BracketSearchDown class.
      * Allows the type of BracketSearchDown class to be deduced from the constructor parameters.
      */
-    template<typename FN>
-        requires IsFloatInvocable< FN >
-    BracketSearchDown(FN) -> BracketSearchDown< FN >;
-
-    template<typename FN, typename ARG_T, typename FACTOR_T = ARG_T>
-        requires IsFloatInvocable< FN > && IsFloat< ARG_T > && IsFloat< FACTOR_T >
+    template< typename FN, typename ARG_T, typename FACTOR_T = ARG_T >
+    requires IsFloatInvocable< FN > && IsFloat< ARG_T > && IsFloat< FACTOR_T >
     BracketSearchDown(FN, std::initializer_list< ARG_T >, FACTOR_T factor = std::numbers::phi) -> BracketSearchDown< FN, ARG_T >;
 
-    template<typename FN, typename CONT_T, typename FACTOR_T = typename CONT_T::value_type>
-        requires IsFloatInvocable< FN > && IsFloatContainer< CONT_T >
-    BracketSearchDown(FN, CONT_T, FACTOR_T factor = std::numbers::phi) -> BracketSearchDown< FN, typename CONT_T::value_type >;
-
-    template<typename FN, typename BOUNDS_T, typename FACTOR_T = StructCommonType_t< BOUNDS_T >>
-        requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
+    template< typename FN, typename BOUNDS_T, typename FACTOR_T = StructCommonType_t< BOUNDS_T > >
+    requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
     BracketSearchDown(FN, BOUNDS_T, FACTOR_T factor = std::numbers::phi) -> BracketSearchDown< FN, StructCommonType_t< BOUNDS_T > >;
 
     // =================================================================================================================
@@ -457,7 +380,7 @@ namespace nxx::roots
      * @tparam FN The type of the function for which the bracket is being expanded.
      * @tparam ARG_T The type of the argument to the function, defaults to double.
      */
-    template<IsFloatInvocable FN, IsFloat ARG_T = double>
+    template< IsFloatInvocable FN, IsFloat ARG_T = double >
     class BracketExpandUp final : public detail::SearchBase< BracketExpandUp< FN, ARG_T >, FN, ARG_T >
     {
         using BASE = detail::SearchBase< BracketExpandUp< FN, ARG_T >, FN, ARG_T >; /**< Base class alias for readability. */
@@ -488,33 +411,25 @@ namespace nxx::roots
      * @brief Deduction guides for BracketExpandUp class.
      * Allows the type of BracketExpandUp class to be deduced from the constructor parameters.
      */
-    template<typename FN>
-        requires IsFloatInvocable< FN >
-    BracketExpandUp(FN) -> BracketExpandUp< FN >;
-
-    template<typename FN, typename ARG_T, typename FACTOR_T = ARG_T>
-        requires IsFloatInvocable< FN > && IsFloat< ARG_T > && IsFloat< FACTOR_T >
+    template< typename FN, typename ARG_T, typename FACTOR_T = ARG_T >
+    requires IsFloatInvocable< FN > && IsFloat< ARG_T > && IsFloat< FACTOR_T >
     BracketExpandUp(FN, std::initializer_list< ARG_T >, FACTOR_T factor = std::numbers::phi) -> BracketExpandUp< FN, ARG_T >;
 
-    template<typename FN, typename CONT_T, typename FACTOR_T = typename CONT_T::value_type>
-        requires IsFloatInvocable< FN > && IsFloatContainer< CONT_T >
-    BracketExpandUp(FN, CONT_T, FACTOR_T factor = std::numbers::phi) -> BracketExpandUp< FN, typename CONT_T::value_type >;
-
-    template<typename FN, typename BOUNDS_T, typename FACTOR_T = StructCommonType_t< BOUNDS_T >>
-        requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
+    template< typename FN, typename BOUNDS_T, typename FACTOR_T = StructCommonType_t< BOUNDS_T > >
+    requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
     BracketExpandUp(FN, BOUNDS_T, FACTOR_T factor = std::numbers::phi) -> BracketExpandUp< FN, StructCommonType_t< BOUNDS_T > >;
-
 
     // =================================================================================================================
     //
     // 88888888888                                                              88  88888888ba,
     // 88                                                                       88  88      `"8b
     // 88                                                                       88  88        `8b
-    // 88aaaaa      8b,     ,d8  8b,dPPYba,   ,adPPYYba,  8b,dPPYba,    ,adPPYb,88  88         88   ,adPPYba,   8b      db      d8  8b,dPPYba,
-    // 88"""""       `Y8, ,8P'   88P'    "8a  ""     `Y8  88P'   `"8a  a8"    `Y88  88         88  a8"     "8a  `8b    d88b    d8'  88P'   `"8a
-    // 88              )888(     88       d8  ,adPPPPP88  88       88  8b       88  88         8P  8b       d8   `8b  d8'`8b  d8'   88       88
-    // 88            ,d8" "8b,   88b,   ,a8"  88,    ,88  88       88  "8a,   ,d88  88      .a8P   "8a,   ,a8"    `8bd8'  `8bd8'    88       88
-    // 88888888888  8P'     `Y8  88`YbbdP"'   `"8bbdP"Y8  88       88   `"8bbdP"Y8  88888888Y"'     `"YbbdP"'       YP      YP      88       88
+    // 88aaaaa      8b,     ,d8  8b,dPPYba,   ,adPPYYba,  8b,dPPYba,    ,adPPYb,88  88         88   ,adPPYba,   8b      db      d8
+    // 8b,dPPYba, 88"""""       `Y8, ,8P'   88P'    "8a  ""     `Y8  88P'   `"8a  a8"    `Y88  88         88  a8"     "8a  `8b    d88b d8'
+    // 88P'   `"8a 88              )888(     88       d8  ,adPPPPP88  88       88  8b       88  88         8P  8b       d8   `8b  d8'`8b d8'
+    // 88       88 88            ,d8" "8b,   88b,   ,a8"  88,    ,88  88       88  "8a,   ,d88  88      .a8P   "8a,   ,a8"    `8bd8'  `8bd8'
+    // 88       88 88888888888  8P'     `Y8  88`YbbdP"'   `"8bbdP"Y8  88       88   `"8bbdP"Y8  88888888Y"'     `"YbbdP"'       YP      YP
+    // 88       88
     //                           88
     //                           88
     // =================================================================================================================
@@ -532,7 +447,7 @@ namespace nxx::roots
      * @tparam FN The type of the function for which the bracket is being expanded.
      * @tparam ARG_T The type of the argument to the function, defaults to double.
      */
-    template<IsFloatInvocable FN, IsFloat ARG_T = double>
+    template< IsFloatInvocable FN, IsFloat ARG_T = double >
     class BracketExpandDown final : public detail::SearchBase< BracketExpandDown< FN, ARG_T >, FN, ARG_T >
     {
         using BASE = detail::SearchBase< BracketExpandDown< FN, ARG_T >, FN, ARG_T >; /**< Base class alias for readability. */
@@ -563,22 +478,13 @@ namespace nxx::roots
      * @brief Deduction guides for BracketExpandDown class.
      * Allows the type of BracketExpandDown class to be deduced from the constructor parameters.
      */
-    template<typename FN>
-        requires IsFloatInvocable< FN >
-    BracketExpandDown(FN) -> BracketExpandDown< FN >;
-
-    template<typename FN, typename ARG_T, typename FACTOR_T = ARG_T>
-        requires IsFloatInvocable< FN > && IsFloat< ARG_T > && IsFloat< FACTOR_T >
+    template< typename FN, typename ARG_T, typename FACTOR_T = ARG_T >
+    requires IsFloatInvocable< FN > && IsFloat< ARG_T > && IsFloat< FACTOR_T >
     BracketExpandDown(FN, std::initializer_list< ARG_T >, FACTOR_T factor = std::numbers::phi) -> BracketExpandDown< FN, ARG_T >;
 
-    template<typename FN, typename CONT_T, typename FACTOR_T = typename CONT_T::value_type>
-        requires IsFloatInvocable< FN > && IsFloatContainer< CONT_T >
-    BracketExpandDown(FN, CONT_T, FACTOR_T factor = std::numbers::phi) -> BracketExpandDown< FN, typename CONT_T::value_type >;
-
-    template<typename FN, typename BOUNDS_T, typename FACTOR_T = StructCommonType_t< BOUNDS_T >>
-        requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
+    template< typename FN, typename BOUNDS_T, typename FACTOR_T = StructCommonType_t< BOUNDS_T > >
+    requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
     BracketExpandDown(FN, BOUNDS_T, FACTOR_T factor = std::numbers::phi) -> BracketExpandDown< FN, StructCommonType_t< BOUNDS_T > >;
-
 
     // =================================================================================================================
     //
@@ -607,7 +513,7 @@ namespace nxx::roots
      * @tparam FN The type of the function for which the bracket is being expanded.
      * @tparam ARG_T The type of the argument to the function, defaults to double.
      */
-    template<IsFloatInvocable FN, IsFloat ARG_T = double>
+    template< IsFloatInvocable FN, IsFloat ARG_T = double >
     class BracketExpandOut final : public detail::SearchBase< BracketExpandOut< FN, ARG_T >, FN, ARG_T >
     {
         using BASE = detail::SearchBase< BracketExpandOut< FN, ARG_T >, FN, ARG_T >; /**< Base class alias for readability. */
@@ -639,22 +545,13 @@ namespace nxx::roots
      * @brief Deduction guides for BracketExpandOut class.
      * Allows the type of BracketExpandOut class to be deduced from the constructor parameters.
      */
-    template<typename FN>
-        requires IsFloatInvocable< FN >
-    BracketExpandOut(FN) -> BracketExpandOut< FN >;
-
-    template<typename FN, typename ARG_T, typename FACTOR_T = ARG_T>
-        requires IsFloatInvocable< FN > && IsFloat< ARG_T > && IsFloat< FACTOR_T >
+    template< typename FN, typename ARG_T, typename FACTOR_T = ARG_T >
+    requires IsFloatInvocable< FN > && IsFloat< ARG_T > && IsFloat< FACTOR_T >
     BracketExpandOut(FN, std::initializer_list< ARG_T >, FACTOR_T factor = std::numbers::phi) -> BracketExpandOut< FN, ARG_T >;
 
-    template<typename FN, typename CONT_T, typename FACTOR_T = typename CONT_T::value_type>
-        requires IsFloatInvocable< FN > && IsFloatContainer< CONT_T >
-    BracketExpandOut(FN, CONT_T, FACTOR_T factor = std::numbers::phi) -> BracketExpandOut< FN, typename CONT_T::value_type >;
-
-    template<typename FN, typename BOUNDS_T, typename FACTOR_T = StructCommonType_t< BOUNDS_T >>
-        requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
+    template< typename FN, typename BOUNDS_T, typename FACTOR_T = StructCommonType_t< BOUNDS_T > >
+    requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
     BracketExpandOut(FN, BOUNDS_T, FACTOR_T factor = std::numbers::phi) -> BracketExpandOut< FN, StructCommonType_t< BOUNDS_T > >;
-
 
     // =================================================================================================================
     //
@@ -682,7 +579,7 @@ namespace nxx::roots
      * @tparam FN The type of the function for which the bracket is being searched.
      * @tparam ARG_T The type of the argument to the function, defaults to double.
      */
-    template<IsFloatInvocable FN, IsFloat ARG_T = double>
+    template< IsFloatInvocable FN, IsFloat ARG_T = double >
     class BracketSubdivide final : public detail::SearchBase< BracketSubdivide< FN, ARG_T >, FN, ARG_T >
     {
         using BASE = detail::SearchBase< BracketSubdivide< FN, ARG_T >, FN, ARG_T >; /**< Base class alias for readability. */
@@ -714,7 +611,7 @@ namespace nxx::roots
                 upper += diff;
             }
 
-            BASE::setRatio(BASE::ratio() * 2.0); // Increase the factor to expand the search range
+            BASE::setRatio(BASE::ratio() * 2.0);    // Increase the factor to expand the search range
         }
     };
 
@@ -722,22 +619,13 @@ namespace nxx::roots
      * @brief Deduction guides for BracketSubdivide class.
      * Allows the type of BracketSubdivide class to be deduced from the constructor parameters.
      */
-    template<typename FN>
-        requires IsFloatInvocable< FN >
-    BracketSubdivide(FN) -> BracketSubdivide< FN >;
-
-    template<typename FN, typename ARG_T, typename FACTOR_T = ARG_T>
-        requires IsFloatInvocable< FN > && IsFloat< ARG_T > && IsFloat< FACTOR_T >
+    template< typename FN, typename ARG_T, typename FACTOR_T = ARG_T >
+    requires IsFloatInvocable< FN > && IsFloat< ARG_T > && IsFloat< FACTOR_T >
     BracketSubdivide(FN, std::initializer_list< ARG_T >, FACTOR_T factor = std::numbers::phi) -> BracketSubdivide< FN, ARG_T >;
 
-    template<typename FN, typename CONT_T, typename FACTOR_T = typename CONT_T::value_type>
-        requires IsFloatInvocable< FN > && IsFloatContainer< CONT_T >
-    BracketSubdivide(FN, CONT_T, FACTOR_T factor = std::numbers::phi) -> BracketSubdivide< FN, typename CONT_T::value_type >;
-
-    template<typename FN, typename BOUNDS_T, typename FACTOR_T = StructCommonType_t< BOUNDS_T >>
-        requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
+    template< typename FN, typename BOUNDS_T, typename FACTOR_T = StructCommonType_t< BOUNDS_T > >
+    requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
     BracketSubdivide(FN, BOUNDS_T, FACTOR_T factor = std::numbers::phi) -> BracketSubdivide< FN, StructCommonType_t< BOUNDS_T > >;
-
 
     // =================================================================================================================
     //                                                            88
@@ -765,12 +653,9 @@ namespace nxx::roots
          *
          * @tparam SOLVER The type of the solver to be used in search operations. Must conform to the bracketing searcher concept.
          */
-        template<typename SOLVER>
-            requires SOLVER::IsBracketingSearcher
-        auto search_impl(SOLVER             solver,
-                         IsFloatStruct auto bounds,
-                         IsFloat auto       ratio,
-                         std::integral auto maxiter)
+        template< typename SOLVER >
+        requires SOLVER::IsBracketingSearcher
+        auto search_impl(SOLVER solver, IsFloatStruct auto bounds, IsFloat auto ratio, std::integral auto maxiter)
         {
             using ET = RootErrorImpl< decltype(bounds) >;    /**< Type for error handling. */
             using RT = tl::expected< decltype(bounds), ET >; /**< Type for the function return value. */
@@ -795,7 +680,8 @@ namespace nxx::roots
 
                 // Check for non-finite results.
                 if (!std::isfinite(curBounds.first) || !std::isfinite(curBounds.second) || !std::isfinite(eval_lower) ||
-                    !std::isfinite(eval_upper)) {
+                    !std::isfinite(eval_upper))
+                {
                     result = tl::make_unexpected(ET("Non-finite result!", RootErrorType::NumericalError, curBounds, iter));
                     break;
                 }
@@ -820,8 +706,7 @@ namespace nxx::roots
 
             return result;
         }
-    } // namespace impl
-
+    }    // namespace detail
 
     /**
      * @brief Defines a high-level search function template `search` using bracketing searchers.
@@ -839,11 +724,11 @@ namespace nxx::roots
      * @tparam FACTOR_T The type of the search factor, defaulted based on STRUCT_T.
      * @tparam ITER_T The type of the maximum iterations count, defaulted to int.
      */
-    template<template< typename, typename > class SOLVER_T,
-        IsFloatInvocable FN_T,
-        IsFloatStruct STRUCT_T,
-        IsFloat FACTOR_T = StructCommonType_t< STRUCT_T >,
-        std::integral ITER_T = int>
+    template< template< typename, typename > class SOLVER_T,
+              IsFloatInvocable FN_T,
+              IsFloatStruct    STRUCT_T,
+              IsFloat          FACTOR_T = StructCommonType_t< STRUCT_T >,
+              std::integral    ITER_T   = int >
     auto search(FN_T     function,
                 STRUCT_T bounds,
                 FACTOR_T ratio   = std::numbers::phi,
@@ -851,13 +736,12 @@ namespace nxx::roots
     {
         auto [lo, hi] = bounds; /**< Extract lower and upper bounds from the struct. */
 
-        using ARG_T = std::common_type_t< decltype(lo), decltype(hi) >; /**< Common type for the bounds. */
-        auto solver = SOLVER_T< FN_T, ARG_T >(function);                /**< Instantiates the solver with the given function. */
+        using ARG_T = StructCommonType_t< STRUCT_T >;            /**< Common type for the bounds. */
+        auto solver = SOLVER_T< FN_T, ARG_T >(function, bounds); /**< Instantiates the solver with the given function. */
 
         // Delegates the search process to search_impl, passing in the solver and other parameters.
-        return detail::search_impl(solver, std::pair< ARG_T, ARG_T >{ lo, hi }, ratio, maxiter);
+        return detail::search_impl(solver, std::pair< ARG_T, ARG_T > { lo, hi }, ratio, maxiter);
     }
-
 
     /**
      * @brief Extends the high-level search function template `search` for initializer list bounds.
@@ -873,65 +757,21 @@ namespace nxx::roots
      * @tparam FACTOR_T The type of the search factor, defaulted based on ARG_T.
      * @tparam ITER_T The type of the maximum iterations count, defaulted to int.
      */
-    template<template< typename, typename > class SOLVER_T,
-        IsFloatInvocable FN_T,
-        IsFloat ARG_T,
-        IsFloat FACTOR_T = ARG_T,
-        std::integral ITER_T = int>
-    auto search(FN_T                           function,
-                std::initializer_list< ARG_T > bounds,
-                FACTOR_T                       ratio   = std::numbers::phi,
-                ITER_T                         maxiter = iterations< ARG_T >())
+    template< template< typename, typename > class SOLVER_T,
+              IsFloatInvocable FN_T,
+              IsFloat          ARG_T,
+              IsFloat          FACTOR_T = ARG_T,
+              std::integral    ITER_T   = int,
+              size_t           N >
+    requires(N == 2)
+    auto search(FN_T function, const ARG_T (&bounds)[N], FACTOR_T ratio = std::numbers::phi, ITER_T maxiter = iterations< ARG_T >())
     {
-        // Ensure the initializer list has exactly two elements representing the bounds.
-        if (bounds.size() != 2) throw NumerixxError("Initializer list must contain exactly two elements!");
-
-        auto solver = SOLVER_T< FN_T, ARG_T >(function);       /**< Instantiates the solver with the given function. */
-        auto bnds   = std::span(bounds.begin(), bounds.end()); /**< Create a span for bounds extraction. */
+        auto solver =
+            SOLVER_T< FN_T, ARG_T >(function, std::pair(bounds[0], bounds[1])); /**< Instantiates the solver with the given function. */
 
         // Delegates the search process to search_impl, passing in the solver and other parameters.
-        return detail::search_impl(solver, std::pair{ bnds.front(), bnds.back() }, ratio, maxiter);
+        return detail::search_impl(solver, std::pair(bounds[0], bounds[1]), ratio, maxiter);
     }
-
-
-    /**
-     * @brief Extends the high-level search function template `search` for container-based bounds.
-     *
-     * This version of the `search` function template is designed to accept bounds specified in a container
-     * such as a vector or an array. It verifies the container size to ensure exactly two elements are provided
-     * for the bounds, which are necessary for the bracketing methods. The function then creates a solver instance
-     * and delegates the search process to `search_impl`. This overload is particularly useful when the bounds
-     * are dynamically determined or retrieved from a data structure.
-     *
-     * @tparam SOLVER_T The template class of the solver to be used. Must be a valid bracketing searcher type.
-     * @tparam FN_T The type of the function for which the search is being conducted.
-     * @tparam CONT_T The container type holding the bounds for the search.
-     * @tparam FACTOR_T The type of the search factor, defaulted based on CONT_T.
-     * @tparam ITER_T The type of the maximum iterations count, defaulted to int.
-     *
-     * @note This function requires that the container's value type is a float type.
-     */
-    template<template< typename, typename > class SOLVER_T,
-        IsFloatInvocable FN_T,
-        IsContainer CONT_T,
-        IsFloat FACTOR_T = typename CONT_T::value_type,
-        std::integral ITER_T = int>
-        requires nxx::IsFloat< typename CONT_T::value_type >
-    auto search(FN_T          function,
-                const CONT_T& bounds,
-                FACTOR_T      ratio   = std::numbers::phi,
-                ITER_T        maxiter = iterations< typename CONT_T::value_type >())
-    {
-        // Ensure the container has exactly two elements representing the bounds.
-        if (bounds.size() != 2) throw NumerixxError("Container must contain exactly two elements!");
-
-        using ARG_T = typename CONT_T::value_type; /**< Type of the argument derived from the container's value type. */
-
-        auto solver = SOLVER_T< FN_T, ARG_T >(function); /**< Instantiates the solver with the given function. */
-
-        // Delegates the search process to search_impl, passing in the solver and other parameters.
-        return detail::search_impl(solver, std::pair{ bounds.front(), bounds.back() }, ratio, maxiter);
-    }
-} // namespace nxx::roots
+}    // namespace nxx::roots
 
 #endif    // NUMERIXX_ROOTSEARCHING_HPP
