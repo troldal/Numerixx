@@ -107,9 +107,9 @@ namespace nxx::roots
             ~SearchBase() = default; /**< Protected destructor to prevent direct instantiation. */
 
         private:
-            FUNCTION_T m_objective {};                /**< The objective function for the search. */
-            BOUNDS_T   m_bounds { 0.0, 1.0 };         /**< Holds the current search bounds. */
-            RATIO_T    m_ratio { std::numbers::phi }; /**< The factor influencing the search process. */
+            FUNCTION_T m_objective {}; /**< The objective function for the search. */
+            BOUNDS_T   m_bounds {};    /**< Holds the current search bounds. */
+            RATIO_T    m_ratio {};     /**< The factor influencing the search process. */
 
         public:
             /**
