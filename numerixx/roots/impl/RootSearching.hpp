@@ -127,6 +127,13 @@ namespace nxx::roots
                 init(bounds, factor);
             }
 
+            /**
+             * @brief Constructor for the SearchBase class.
+             * @tparam N The size of the bounds array. Must be 2.
+             * @param objective The objective function for the search process.
+             * @param bounds An array of two elements representing the search bounds.
+             * @param factor The factor influencing the search process. Defaults to the golden ratio.
+             */
             template< size_t N >
             requires(N == 2)
             SearchBase(FUNCTION_T objective, const ARG_T (&bounds)[N], RATIO_T factor = std::numbers::phi)
@@ -217,6 +224,8 @@ namespace nxx::roots
             {
                 return m_ratio;
             }
+
+            void iterate() { std::invoke(static_cast< SUBCLASS& >(*this)); }
         };
     }    // namespace detail
 
@@ -260,7 +269,7 @@ namespace nxx::roots
          * @details This method expands the search bounds upwards if the current bounds do not bracket a root.
          *          The expansion factor controls the rate at which the bounds are expanded.
          */
-        void iterate()
+        void operator()()
         {
             const auto& bounds = BASE::current();
 
@@ -326,7 +335,7 @@ namespace nxx::roots
          * @details This method expands the search bounds downwards if the current bounds do not bracket a root.
          *          The expansion factor controls the rate at which the bounds are contracted.
          */
-        void iterate()
+        void operator()()
         {
             const auto& bounds = BASE::current();
 
@@ -393,7 +402,7 @@ namespace nxx::roots
          * @details This method expands the upper bound upwards if the current bounds do not bracket a root.
          *          The expansion factor controls the rate at which the upper bound is expanded.
          */
-        void iterate()
+        void operator()()
         {
             const auto& bounds = BASE::current();
 
@@ -460,7 +469,7 @@ namespace nxx::roots
          * @details This method expands the lower bound downwards if the current bounds do not bracket a root.
          *          The expansion factor controls the rate at which the lower bound is expanded.
          */
-        void iterate()
+        void operator()()
         {
             const auto& bounds = BASE::current();
 
@@ -526,7 +535,7 @@ namespace nxx::roots
          * @details This method expands both the lower and upper bounds outwards symmetrically if the current
          *          bounds do not bracket a root. The expansion factor controls the rate at which the bounds are expanded.
          */
-        void iterate()
+        void operator()()
         {
             const auto& bounds = BASE::current();
 
@@ -593,7 +602,7 @@ namespace nxx::roots
          *          attempting to find a segment where the function changes sign, indicating a bracket.
          *          If no such segment is found, the factor is doubled to increase the search range.
          */
-        void iterate()
+        void operator()()
         {
             const auto& bounds = BASE::current();
             if (BASE::evaluate(bounds.first) * BASE::evaluate(bounds.second) < 0.0) return;

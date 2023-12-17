@@ -169,6 +169,8 @@ namespace nxx::roots
             {
                 return m_bounds;
             }
+
+            void iterate() { std::invoke(static_cast< DERIVED& >(*this)); }
         };
     }    // namespace detail
 
@@ -210,7 +212,7 @@ namespace nxx::roots
          * @details This method updates the bounds using Ridder's algorithm. It calculates
          *          a new estimate for the root and adjusts the bounds accordingly.
          */
-        void iterate()
+        void operator()()
         {
             const auto& bounds = BASE::current();
             using RT           = std::invoke_result_t< FN, decltype(bounds.first) >;
@@ -287,7 +289,7 @@ namespace nxx::roots
          * @details This method updates the bounds by bisecting the current interval and
          *          choosing the subinterval where the sign of the function changes.
          */
-        void iterate()
+        void operator()()
         {
             const auto& bounds = BASE::current();
             using RT           = std::invoke_result_t< FN, decltype(bounds.first) >;
@@ -351,7 +353,7 @@ namespace nxx::roots
          * @details This method updates the bounds by applying the regula falsi formula
          *          to find a new estimate for the root, then adjusts the bounds accordingly.
          */
-        void iterate()
+        void operator()()
         {
             const auto& bounds = BASE::current();
             using RT           = std::invoke_result_t< FN, decltype(bounds.first) >;

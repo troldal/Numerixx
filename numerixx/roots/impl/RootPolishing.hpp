@@ -96,17 +96,8 @@ namespace nxx::roots
             FUNCTION_T m_func{};               /**< The function object to find the root for. */
             DERIV_T    m_deriv{};              /**< The function object for the derivative. */
             RESULT_T   m_guess;                /**< The current root estimate. */
-            bool       m_initialized{ false }; /**< Flag indicating whether the object has been initialized. */
 
         public:
-            /**
-             * @brief Constructs the PolishingBase with a function and its derivative.
-             * @param objective The function for which the root is being refined.
-             * @param derivative The derivative of the objective function.
-             */
-            PolishingBase(FUNCTION_T objective, DERIV_T derivative)
-                : m_func{ objective },
-                  m_deriv{ derivative } {}
 
             /**
              * @brief Constructs the PolishingBase with a function, its derivative, and an initial guess.
@@ -117,31 +108,13 @@ namespace nxx::roots
             PolishingBase(FUNCTION_T objective, DERIV_T derivative, ARG_T guess)
                 : m_func{ objective },
                   m_deriv{ derivative },
-                  m_guess{ guess },
-                  m_initialized{ true } {}
+                  m_guess { guess }
+            {}
 
             PolishingBase(const PolishingBase& other)                = default; /**< Default copy constructor. */
             PolishingBase(PolishingBase&& other) noexcept            = default; /**< Default move constructor. */
             PolishingBase& operator=(const PolishingBase& other)     = default; /**< Default copy assignment operator. */
             PolishingBase& operator=(PolishingBase&& other) noexcept = default; /**< Default move assignment operator. */
-
-            /**
-             * @brief Initializes the solver with a new guess.
-             * @tparam T Type of the guess, must be a float or complex type.
-             * @param guess The new initial guess for the root.
-             */
-            template<typename T>
-                requires nxx::IsFloatOrComplex< T >
-            void init(T guess)
-            {
-                m_initialized = true;
-                m_guess       = guess;
-            }
-
-            /**
-             * @brief Resets the solver, marking it as uninitialized.
-             */
-            void reset() { m_initialized = false; }
 
             /**
              * @brief Evaluates the function with the given value.
@@ -172,9 +145,11 @@ namespace nxx::roots
              */
             RESULT_T current() const
             {
-                if (!m_initialized) throw NumerixxError("Solver has not been initialized.");
+                // if (!m_initialized) throw NumerixxError("Solver has not been initialized.");
                 return m_guess;
             }
+
+            void iterate() { std::invoke(static_cast< SUBCLASS& >(*this)); }
         };
     } // namespace impl
 
@@ -218,17 +193,13 @@ namespace nxx::roots
          * @details This method updates the root estimate using the Newton-Raphson formula.
          *          It assumes the class has been properly initialized.
          */
-        void iterate() { BASE::m_guess = BASE::m_guess - BASE::evaluate(BASE::m_guess) / BASE::derivative(BASE::m_guess); }
+        void operator()() { BASE::m_guess = BASE::m_guess - BASE::evaluate(BASE::m_guess) / BASE::derivative(BASE::m_guess); }
     };
 
     /**
      * @brief Deduction guides for Newton class.
      * Allows the type of Newton class to be deduced from the constructor parameters.
      */
-    template<typename FN, typename DERIV>
-        requires IsFloatOrComplexInvocable< FN > && IsFloatOrComplexInvocable< DERIV >
-    Newton(FN, DERIV) -> Newton< FN, DERIV >;
-
     template<typename FN, typename DERIV, typename ARG_T>
         requires IsFloatOrComplexInvocable< FN > && IsFloatOrComplexInvocable< DERIV > && IsFloatOrComplex< ARG_T >
     Newton(FN, DERIV, ARG_T) -> Newton< FN, DERIV, ARG_T >;
@@ -275,23 +246,12 @@ namespace nxx::roots
         using BASE::BASE; /**< Inherits constructors from PolishingBase. */
 
         /**
-         * @brief Initializes the secant solver with an initial guess.
-         * @param initialGuess The initial guess for the root.
-         */
-        void init(ARG_T initialGuess)
-        {
-            BASE::init(initialGuess);
-            m_hasPrevGuess = false;
-            m_firstStep    = true;
-        }
-
-        /**
          * @brief Performs a single iteration of the secant method.
          * @details This method switches between a Newton-Raphson step for the first iteration
          *          and a Secant step for subsequent iterations.
          * @throws std::runtime_error If a division by near-zero occurs.
          */
-        void iterate()
+        void operator()()
         {
             if (m_firstStep) {
                 ARG_T f_x       = BASE::evaluate(BASE::m_guess);
@@ -327,10 +287,6 @@ namespace nxx::roots
      * @brief Deduction guides for Secant class.
      * Allows the type of Secant class to be deduced from the constructor parameters.
      */
-    template<typename FN, typename DFN>
-        requires IsFloatOrComplexInvocable< FN > && IsFloatOrComplexInvocable< DFN >
-    Secant(FN, DFN) -> Secant< FN, DFN >;
-
     template<typename FN, typename DFN, typename ARG_T>
         requires IsFloatOrComplexInvocable< FN > && IsFloatOrComplexInvocable< DFN > && IsFloatOrComplex< ARG_T >
     Secant(FN, DFN, ARG_T) -> Secant< FN, DFN, ARG_T >;
@@ -378,7 +334,7 @@ namespace nxx::roots
          * @details Uses Newton-Raphson for the first iteration and Steffensen's method subsequently.
          * @throws std::runtime_error If a division by near-zero occurs.
          */
-        void iterate()
+        void operator()()
         {
             if (m_firstStep) {
                 // Perform a Newton-Raphson step for the first iteration.
@@ -417,10 +373,6 @@ namespace nxx::roots
      * @brief Deduction guides for Steffensen class.
      * Allows the type of Steffensen class to be deduced from the constructor parameters.
      */
-    template<typename FN, typename DFN>
-        requires IsFloatOrComplexInvocable< FN > && IsFloatOrComplexInvocable< DFN >
-    Steffensen(FN, DFN) -> Steffensen< FN, DFN >;
-
     template<typename FN, typename DFN, typename ARG_T>
         requires IsFloatOrComplexInvocable< FN > && IsFloatOrComplexInvocable< DFN > && IsFloatOrComplex< ARG_T >
     Steffensen(FN, DFN, ARG_T) -> Steffensen< FN, DFN, ARG_T >;
@@ -457,14 +409,12 @@ namespace nxx::roots
         template<typename SOLVER>
             requires SOLVER::IsPolishingSolver
         auto fdfsolve_impl(SOLVER                solver,
-                           IsFloatOrComplex auto guess,
                            IsFloat auto          eps,
                            std::integral auto    maxiter)
         {
             using ERROR_T = detail::RootErrorImpl< typename SOLVER::RESULT_T >;  /**< Type for error handling. */
             using RETURN_T = tl::expected< typename SOLVER::RESULT_T, ERROR_T >; /**< Type for the function return value. */
 
-            solver.init(guess);
             RETURN_T result = solver.current();
 
             // Check for NaN or Inf in the initial guess evaluation.
@@ -529,15 +479,13 @@ namespace nxx::roots
     auto fdfsolve(FN_T    function,
                   DERIV_T derivative,
                   GUESS_T guess,
-                  EPS_T   eps,
-                  /**< Default epsilon value based on the type of the guess. */
-                  ITER_T maxiter) /**< Default maximum iterations based on the type of the guess. */
+                  EPS_T   eps, ITER_T maxiter)
     {
         // Instantiates the solver with the given function, its derivative, and types.
-        auto solver = SOLVER_T< FN_T, DERIV_T, GUESS_T >(function, derivative);
+        auto solver = SOLVER_T< FN_T, DERIV_T, GUESS_T >(function, derivative, guess);
 
         // Delegates the solving process to fdfsolve_impl, passing in the solver and other parameters.
-        return detail::fdfsolve_impl(solver, guess, eps, maxiter);
+        return detail::fdfsolve_impl(solver, eps, maxiter);
     }
 } // namespace nxx::roots
 

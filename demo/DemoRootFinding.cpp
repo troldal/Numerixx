@@ -200,7 +200,7 @@ int main()
         std::cout << "------------------------------------------------------------------\n";
 
         // Initialize the solver:
-        solver.init(guess);
+        // solver.init(guess);
 
         // Iterate until convergence (or until 100 iterations have been performed):
         for (int i = 0; i <= 100; ++i) {
