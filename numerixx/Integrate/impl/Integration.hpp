@@ -496,7 +496,7 @@ namespace nxx::integrate
             for (size_t i = 1; i < numOfPoints - 1; ++i) { sum += BASE::evaluate(points[i]) * (i % 2 == 0 ? 2 : 4); }
 
             // Update the integral estimate
-            BASE::m_estimate = BASE::m_interval / 3 * (BASE::evaluate(lower) + BASE::evaluate(upper) + sum);
+            BASE::m_estimate = (BASE::m_interval / 3) * (BASE::evaluate(lower) + BASE::evaluate(upper) + sum);
             m_iter++;
         }
     };
