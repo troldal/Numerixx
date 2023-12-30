@@ -9,7 +9,7 @@
 #include <numbers>
 #include <boost/multiprecision/cpp_bin_float.hpp>
 
-using NXX_FLOAT = double;//boost::multiprecision::cpp_bin_float_50;
+using NXX_FLOAT = double; //boost::multiprecision::cpp_bin_float_50;
 
 int main()
 {
@@ -17,8 +17,8 @@ int main()
     std::cout << std::fixed << std::setprecision(50);
 
     // Define some test functions
-    auto f1 = [](nxx::IsFloat auto x) { return x * x; };  // Integral from 0 to 1 is 1/3
-    auto f2 = [](nxx::IsFloat auto x) { return sin(x); }; // Integral from 0 to pi is 2
+    auto f1 = [](nxx::IsFloat auto x) { return x * x; };       // Integral from 0 to 1 is 1/3
+    auto f2 = [](nxx::IsFloat auto x) { return sin(x); };      // Integral from 0 to pi is 2
     auto f3 = [](nxx::IsFloat auto x) { return exp(-x * x); }; // Integral from -inf to inf is sqrt(pi)
 
     struct bounds
@@ -64,7 +64,6 @@ int main()
     std::cout << "Romberg:     " << integral_f1_romberg({ 0.0, 2.0 }) << "\n";
     std::cout << "Simpson:     " << integral_f1_simpson({ 0.0, 2.0 }) << "\n";
     std::cout << "Trapezoid:   " << integral_f1_trapezoid({ 0.0, 2.0 }) << "\n\n";
-
 
     try {
         auto tmp = integralOf< Trapezoid >(f1);
