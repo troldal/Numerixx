@@ -156,7 +156,7 @@ namespace nxx::roots
              * @param value The value at which the function is to be evaluated.
              * @return The result of evaluating the function at the specified value.
              */
-            RESULT_T evaluate(IsFloat auto value) { return static_cast<RESULT_T>(m_func(value)); }
+            RESULT_T evaluate(IsFloat auto value) { return static_cast< RESULT_T >(m_func(value)); }
             /**
              * @brief Returns the current bounds of the solver.
              * @details This method returns the current bounds being used by the solver.

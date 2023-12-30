@@ -171,7 +171,7 @@ int main()
                 << std::endl;
 
             // Check if convergence has been reached:
-            if (min->second < nxx::epsilon<typename decltype(solver)::RESULT_T>()) break;
+            if (min->second < nxx::epsilon< typename decltype(solver)::RESULT_T >()) break;
 
             // Perform one iteration:
             solver.iterate();
