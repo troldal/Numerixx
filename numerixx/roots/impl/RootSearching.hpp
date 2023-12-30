@@ -690,8 +690,7 @@ namespace nxx::roots
 
                 // Check for non-finite results.
                 if (!isfinite(curBounds.first) || !isfinite(curBounds.second) || !isfinite(eval_lower) ||
-                    !isfinite(eval_upper))
-                {
+                    !isfinite(eval_upper)) {
                     result = tl::make_unexpected(ET("Non-finite result!", RootErrorType::NumericalError, curBounds, iter));
                     break;
                 }
