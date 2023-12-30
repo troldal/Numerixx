@@ -95,7 +95,7 @@ namespace nxx
     concept IsFloatContainer = IsContainer< T > && IsFloat< typename T::value_type >;
 
     template<typename S>
-        requires (!IsContainer< S >)
+        requires (!IsContainer< S > && !std::is_pointer_v< S > && !std::is_array_v< S >)
     struct StructTraits
     {
     private:

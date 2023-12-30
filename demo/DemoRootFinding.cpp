@@ -13,16 +13,16 @@
 #include <fmt/format.h>
 #include <boost/multiprecision/cpp_bin_float.hpp>
 
-using NXX_FLOAT = boost::multiprecision::cpp_bin_float_50;
+using NXX_FLOAT = double;//boost::multiprecision::cpp_bin_float_50;
 
-template<>
-struct fmt::formatter< NXX_FLOAT > : fmt::formatter< double >
-{
-    auto format(const NXX_FLOAT& d, fmt::format_context& ctx) const
-    {
-        return fmt::formatter< double >::format(static_cast< double >(d), ctx);
-    }
-};
+// template<>
+// struct fmt::formatter< NXX_FLOAT > : fmt::formatter< double >
+// {
+//     auto format(const NXX_FLOAT& d, fmt::format_context& ctx) const
+//     {
+//         return fmt::formatter< double >::format(static_cast< double >(d), ctx);
+//     }
+// };
 
 int main()
 {
@@ -184,13 +184,13 @@ int main()
     };
 
     std::cout << "Manual root-finding using Ridder's method:" << std::endl;
-    bracket_root(Ridder(func, bounds));
+    bracket_root(Ridder(func, { 0.0, 2.5 }));
 
     std::cout << "Manual root-finding using the bisection method:" << std::endl;
-    bracket_root(Bisection(func, bounds));
+    bracket_root(Bisection(func, { 0.0, 2.5 }));
 
     std::cout << "Manual root-finding using the regula falsi method:" << std::endl;
-    bracket_root(RegulaFalsi(func, bounds));
+    bracket_root(RegulaFalsi(func, { 0.0, 2.5 }));
 
     // Lambda function for printing the results of the polishing solvers:
     auto polish_root = [](auto solver, NXX_FLOAT guess) {

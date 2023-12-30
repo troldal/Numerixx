@@ -251,6 +251,7 @@ namespace nxx::roots
     requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
     Ridder(FN, BOUNDS_T) -> Ridder< FN, StructCommonType_t< BOUNDS_T > >;
 
+
     // =================================================================================================================
     //
     //  88888888ba   88                                              88

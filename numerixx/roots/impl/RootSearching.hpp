@@ -668,6 +668,7 @@ namespace nxx::roots
         {
             using ET = RootErrorImpl< decltype(bounds) >;    /**< Type for error handling. */
             using RT = tl::expected< decltype(bounds), ET >; /**< Type for the function return value. */
+            using std::isfinite;
 
             solver.init(bounds, ratio);
             auto                      curBounds = solver.current();
@@ -676,7 +677,7 @@ namespace nxx::roots
             typename SOLVER::RESULT_T eval_upper;
 
             // Check for NaN or Inf in the initial bounds.
-            if (!std::isfinite(solver.evaluate(curBounds.first)) || !std::isfinite(solver.evaluate(curBounds.second))) {
+            if (!isfinite(solver.evaluate(curBounds.first)) || !isfinite(solver.evaluate(curBounds.second))) {
                 result = tl::make_unexpected(ET("Invalid initial brackets!", RootErrorType::NumericalError, result.value()));
                 return result;
             }
@@ -688,8 +689,8 @@ namespace nxx::roots
                 eval_upper = solver.evaluate(curBounds.second);
 
                 // Check for non-finite results.
-                if (!std::isfinite(curBounds.first) || !std::isfinite(curBounds.second) || !std::isfinite(eval_lower) ||
-                    !std::isfinite(eval_upper))
+                if (!isfinite(curBounds.first) || !isfinite(curBounds.second) || !isfinite(eval_lower) ||
+                    !isfinite(eval_upper))
                 {
                     result = tl::make_unexpected(ET("Non-finite result!", RootErrorType::NumericalError, curBounds, iter));
                     break;

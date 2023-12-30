@@ -1,27 +1,29 @@
-****************************
-One Dimensional Root-Finding
-****************************
+***********************************
+Uncovering One-Dimensional Roots
+***********************************
 
-This chapter describes classes and functions for finding roots of one-dimensional functions. The algorithms can either be bracketing algorithms (not requiring function derivatives), or polishing algorithms (require computation of the function derivative).
+This section delves into a range of classes and functions dedicated to the discovery of roots in one-dimensional functions. The featured algorithms are divided into two main types: bracketing algorithms, which operate without the need for function derivatives, and polishing algorithms, which require the computation of the function's derivative. In addition, the library offers search algorithms that can be used to find a bracket where a root exists when the initial guess is not near the actual root.
 
-The header files :file:`RootBracketing.hpp` and :file:`RootPolishing.hpp` contains the implementations for the root finding algorithms as well as common base classes to keep track of internal state during iteration.
+The essential header files `RootBracketing.hpp`, `RootPolishing.hpp`, and `RootSearching.hpp` encompass the root-finding algorithms' implementations. Additionally, they house common base classes vital for monitoring the internal progression during iterative processes.
 
 Overview
 ========
+One-dimensional root-finding techniques are numerical algorithms designed to pinpoint the roots or zeros of a single-variable function. These techniques are pivotal in various domains like science, engineering, and mathematics, particularly when identifying the independent variable value that zeros out a function.
 
-One-dimensional root-finding methods are numerical algorithms that are used to locate the roots or zeros of a function of one variable. These methods are important in a wide range of applications in science, engineering, and mathematics, where it is often necessary to find the value of the independent variable that makes a function equal to zero.
+Popular one-dimensional root-finding methods encompass the bisection method, Newton's method, Ridder's method, and the secant method. Each of these methods brings its unique advantages and potential drawbacks, and their applicability hinges on the nature of the problem at hand.
 
-The most commonly used one-dimensional root-finding methods include the bisection method, Newton's method, Ridder' method, and the secant method. Each method has its own strengths and weaknesses, and the choice of method depends on the specific problem being solved.
+The bisection method stands out for its reliability and surefire convergence, albeit sometimes at a slower pace. Newton's method offers a quicker alternative but necessitates a differentiable function and might face convergence issues or settle at a local minimum. Ridder's and the secant methods, outpacing the bisection method, can converge more rapidly. However, they often require the function to maintain a continuous second derivative and might face convergence challenges in certain scenarios. It's crucial to recognize each method's assumptions and constraints to accurately assess the solutions' precision and convergence attributes.
 
-The bisection method is a robust and reliable method that is guaranteed to converge, but may be slow to converge. Newton's method is a faster method that requires the function to be differentiable, but may not converge or converge to a local minimum. Ridder' method and the secant method are faster than the bisection method and can converge faster, but may require the function to have a continuous second derivative and may not converge in some cases. As with any numerical method, it is important to understand the assumptions and limitations of each method and to carefully evaluate the accuracy and convergence properties of the solutions obtained.
+Important Considerations
+========================
 
-Caveats
-=======
+It's imperative to recognize that root-finding functions are designed to locate a single root at any given instance. In cases where multiple roots are present within the search range, the function will identify and return the initial root it encounters. Pinpointing which root will be found in a region with several roots is generally unpredictable. Notably, attempting to find a root in such areas usually doesn't trigger any error messages, despite the inherent challenges.
 
-It should be noted that root finding functions have the capability to search for only one root at a time. In situations where there exist multiple roots within the search range, the function will return the first root it finds, but it's difficult to determine which of the roots it will be. Typically, attempting to find a root in an area containing multiple roots will not generate any error message.
 
 Quick Start
 ===========
+
+The Numerixx library provides a variety of algorithms for one-dimensional root finding, including bracketing methods, polishing methods, and search methods. These methods can be used to find roots of a function, which are the values that make the function equal to zero.
 
 The easiest way to use the one-dimensional root finding solvers is to create an instance of one of the solver classes (e.g. :code:`Bisection` or :code:`Newton`) and plug it in to the :code:`fsolve` or :code:`fdfsolve` function. The solver objects can be instanitated with any callable object, such a lambda or a normal C++ function.
 
@@ -102,6 +104,67 @@ Discrete Newton's method
 Discrete Newton's method is a variant of Newton's method that is used for finding roots of discrete functions or numerical data. Instead of computing the derivative of the function at each estimate, the discrete derivative is computed using the available data points. This method approximates the second derivative using the difference between the first derivatives at adjacent points, and then iteratively refines the estimate of the root using a similar approach as Newton's method. Discrete Newton's method can be an effective way to find roots of numerical data, but it may be less stable than Newton's method when used on analytic functions.
 
 .. doxygenclass:: nxx::roots::DNewton
+   :members:
+
+Steffensen's method
+^^^^^^^^^^^^^^^^^^^
+
+Steffensen's method is an iterative root finding algorithm that improves upon the simple fixed-point iteration by incorporating a form of Aitken's Δ² process. This method is particularly effective for functions where the derivative is difficult to compute or is not readily available.
+
+.. doxygenclass:: nxx::roots::Steffensen
+   :members:
+
+Search Methods
+--------------
+
+Search methods are one-dimensional root-finding algorithms that work by incrementally expanding or subdividing the search bounds to find a bracket where a root exists. These methods are useful when the initial guess is not near the actual root.
+
+BracketSearchUp
+^^^^^^^^^^^^^^^
+
+The BracketSearchUp class template is a specialized search algorithm designed to incrementally expand the search bounds upwards (increasing values) to find a bracket where a root exists.
+
+.. doxygenclass:: nxx::roots::BracketSearchUp
+   :members:
+
+BracketSearchDown
+^^^^^^^^^^^^^^^^^
+
+The BracketSearchDown class template is a specialized search algorithm designed to incrementally expand the search bounds downwards (decreasing values) to find a bracket where a root exists.
+
+.. doxygenclass:: nxx::roots::BracketSearchDown
+   :members:
+
+BracketExpandUp
+^^^^^^^^^^^^^^^
+
+The BracketExpandUp class template is a specialized search algorithm designed to incrementally expand the upper bound upwards (increasing values) while keeping the lower bound fixed. This is useful for finding a bracket where a root exists when the initial guess is lower than the actual root.
+
+.. doxygenclass:: nxx::roots::BracketExpandUp
+   :members:
+
+BracketExpandDown
+^^^^^^^^^^^^^^^^^
+
+The BracketExpandDown class template is a specialized search algorithm designed to incrementally expand the lower bound downwards (decreasing values) while keeping the upper bound fixed. This is useful for finding a bracket where a root exists when the initial guess is higher than the actual root.
+
+.. doxygenclass:: nxx::roots::BracketExpandDown
+   :members:
+
+BracketExpandOut
+^^^^^^^^^^^^^^^^
+
+The BracketExpandOut class template is a specialized search algorithm designed to incrementally expand both the lower and upper bounds symmetrically outwards. This is useful for finding a bracket where a root exists when the initial guess is not near the actual root. It inherits from a base class that provides common functionalities for search-based algorithms and adds the specific logic for outward bracket expansion. This class is templated to accept a function and an optional argument type, along with an optional factor that controls the symmetric expansion of the bounds.
+
+.. doxygenclass:: nxx::roots::BracketExpandOut
+   :members:
+
+BracketSubdivide
+^^^^^^^^^^^^^^^^
+
+The BracketSubdivide class template is a specialized search algorithm designed to subdivide the current search bounds into smaller segments in an attempt to find a bracket where a root exists. It inherits from a base class that provides common functionalities for search-based algorithms, and adds the specific logic for subdividing the search bounds. This class is templated to accept a function and an optional argument type, along with an optional factor that controls the subdivision process.
+
+.. doxygenclass:: nxx::roots::BracketSubdivide
    :members:
 
 Design and Implementation Details
