@@ -31,6 +31,8 @@
 #ifndef NUMERIXX_ERROR_HPP
 #define NUMERIXX_ERROR_HPP
 
+#define BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED
+
 // ===== External Includes
 #include <boost/stacktrace.hpp>
 // #include <hwinfo/hwinfo.hpp>
