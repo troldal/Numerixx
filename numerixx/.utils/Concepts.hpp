@@ -40,6 +40,11 @@ namespace nxx
     template<typename T>
     concept IsFloat = std::floating_point< T > || boost::multiprecision::is_number< T >::value;
 
+    template<typename T, typename F>
+    concept IsFloatFunction = requires(F f, const std::vector<T>& v) {
+                                        { f(v) } -> std::convertible_to<T>;
+                                    };
+
     /**
      * @brief Concept to check if a type is a complex number.
      * @tparam T The type to check.

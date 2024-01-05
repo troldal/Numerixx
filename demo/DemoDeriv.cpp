@@ -33,7 +33,7 @@ int main()
 
     // ============================================================================================
     // The most straightforward way of computing the numerical derivatives is to use the 'central'
-    // function. This function will calculate the dericative of a function using a central difference
+    // function. This function will calculate the derivative of a function using a central difference
     // method. Alternatively, the 'forward' or 'backward' can be used to compute the derivative using
     // forward difference or backward difference methods, respectively. All three functions use
     // Richardson extrapolation for computing the derivatives.

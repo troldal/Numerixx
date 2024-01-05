@@ -33,6 +33,7 @@
 
 // ===== Numerixx Includes
 #include <Deriv.hpp>
+#include "MultiFunction.hpp"
 
 // ===== External Includes
 #include "blaze/Blaze.h"
@@ -127,137 +128,60 @@ namespace nxx::deriv
     template< typename T >
     using MultiReturnType = std::invoke_result_t< T, std::vector< double > >;
 
-    /**
-     * @brief Calculate the partial derivative of a multi-function.
-     *
-     * This function calculates the partial derivative of a multi-function with respect to the
-     * argument at the specified index. The user can optionally provide a step size for the
-     * numerical approximation of the derivative.
-     *
-     * @tparam IsMultiFunction   Boolean flag indicating whether the provided function is a multi-function.
-     * @param function          The multi-function for which the partial derivative needs to be calculated.
-     * @param args              The arguments at which the function is evaluated.
-     * @param index             The index of the argument with respect to which the derivative is computed.
-     * @param stepsize          Optional step size for numerical approximation. Default is the
-     *                          step size obtained from StepSize<MultiReturnType<decltype(function)>>.
-     *
-     * @return The partial derivative of the multi-function.
-     *
-     * @note This function requires the argument type to be convertible to the return type of the function.
-     * @see StepSize
-     */
-    template< typename ALGO >
-    inline auto partialdiff(IsMultiFunction auto                  function,
-                            auto                                  args,
-                            size_t                                index,
-                            MultiReturnType< decltype(function) > stepsize = StepSize< MultiReturnType< decltype(function) > >)
-        requires std::convertible_to< typename impl::VectorTraits< decltype(args) >::value_type, MultiReturnType< decltype(function) > >
-    {
-        std::vector< MultiReturnType< decltype(function) > > argvector(args.begin(), args.end());
 
-        // Create a lambda function for a multi variable function,
-        // that takes a single argument and returns the function value
-        auto f = [&](double value) {
-            argvector[index] = value;
-            return function(argvector);
-        };
+    template<typename ALGO = Order1CentralRichardson, typename T, typename Func>
+    std::vector<T> partialdiff(const Func& func, const std::vector<T>& point) {
+        std::vector<T> derivatives(point.size(), T(0));
 
-        // Return the partial derivative
-        return diff< ALGO >(f, argvector[index], std::max(stepsize, stepsize * argvector[index]));
-    }
+        for (size_t i = 0; i < point.size(); ++i) {
+            // Create a single-variable function by fixing all variables except the i-th variable
+            auto singleVarFunc = [&, i](T x) {
+                std::vector<T> tempPoint = point;
+                tempPoint[i] = x;
+                return func(tempPoint);
+            };
 
-    /**
-     * @brief Calculates the multidimensional difference for the given function and arguments.
-     *
-     * The multidiff function calculates the multidimensional difference for the given function and arguments.
-     * It takes in three parameters:
-     *     - function: The function for which the difference is to be calculated.
-     *     - args: The arguments for the function.
-     *     - stepsize: The step size to be used for the difference calculation (default: StepSize<MultiReturnType<decltype(function)>>).
-     *
-     * The function returns the multidimensional difference.
-     *
-     * @param function The function for which the difference is to be calculated.
-     * @param args The arguments for the function.
-     * @param stepsize The step size to be used for the difference calculation (default: StepSize<MultiReturnType<decltype(function)>>).
-     * @return The multidimensional difference.
-     *
-     * @tparam function The type of function for which the difference is to be calculated.
-     * @tparam args The type of arguments for the function.
-     * @tparam stepsize The type of step size to be used for the difference calculation.
-     *                 It must be convertible to MultiReturnType<decltype(function)>.
-     *
-     * @requires std::convertible_to<typename impl::VectorTraits<decltype(args)>::value_type, MultiReturnType<decltype(function)>>.
-     */
-    template< typename ALGO >
-    inline auto multidiff(IsMultiFunction auto                  function,
-                          auto                                  args,
-                          MultiReturnType< decltype(function) > stepsize = StepSize< MultiReturnType< decltype(function) > >)
-        requires std::convertible_to< typename impl::VectorTraits< decltype(args) >::value_type, MultiReturnType< decltype(function) > >
-    {
-        std::vector< MultiReturnType< decltype(function) > > argvector(args.begin(), args.end());
-
-        size_t index = 0;
-        for (auto arg : argvector) {
-            args[index++] = *partialdiff< ALGO >(function, argvector, index, std::max(stepsize, stepsize * arg));
+            // Compute the derivative using the diff function
+            derivatives[i] = *diff<ALGO>(singleVarFunc, point[i]);
         }
 
-        return args;
+        return derivatives;
     }
 
-    /**
-     * \brief Calculate the Jacobian matrix for a given set of functions and arguments.
-     *
-     * This function calculates the Jacobian matrix for a given set of functions and arguments.
-     * The Jacobian matrix represents the partial derivatives of each function with respect to each argument.
-     *
-     * \tparam IsMultiFunctionArray A type that represents an array or range of functions.
-     * \tparam args A type that represents the arguments for the functions.
-     * \param functions An array or range of functions.
-     * \param args The arguments for the functions.
-     * \param stepsize The step size used for numerical differentiation (optional).
-     *                If not provided, the default step size based on the return type of the functions will be used.
-     *
-     * \return The Jacobian matrix as a matrix-like data structure.
-     *
-     * \requirements
-     * - The `functions` must be an array or range of functions.
-     * - The `args` must be convertible to the return type of the functions.
-     *
-     * \note
-     * - The `functions` and `args` must have the same number of elements, otherwise undefined behavior may occur.
-     * - The `impl::VectorTraits` type provides information about the vector-like properties of the `args` type.
-     *
-     * \see StepSize
-     * \see MultiReturnType
-     * \see impl::VectorTraits
-     * \see JacobianMatrix
-     */
-    template< typename ALGO >
-    inline auto jacobian(IsMultiFunctionArray auto                                   functions,
-                         auto                                                        args,
-                         MultiReturnType< typename decltype(functions)::value_type > stepsize =
-                             StepSize< MultiReturnType< typename decltype(functions)::value_type > >)
-        requires std::convertible_to< typename impl::VectorTraits< decltype(args) >::value_type,
-                                      MultiReturnType< typename decltype(functions)::value_type > >
-    {
-        using namespace nxx::deriv;
-        using namespace blaze;
+    template<typename T>
+    blaze::DynamicMatrix<T> jacobian(const multiroots::DynamicFunctionArray<T>& functions, const std::vector<T>& point) {
+        // Determine the size of the Jacobian matrix
+        size_t numRows = std::distance(functions.begin(), functions.end());
+        size_t numCols = point.size();
 
-        using return_type = MultiReturnType< typename decltype(functions)::value_type >;
+        // Create a matrix to hold the Jacobian
+        blaze::DynamicMatrix<T> J(numRows, numCols);
 
-        blaze::DynamicMatrix< return_type > J(functions.size(), functions.size());
-
-        size_t index = 0;
-        for (auto& fn : functions) {
-            auto pdiffs = multidiff< ALGO >(fn, args, stepsize);
-            auto row    = blaze::row(J, index);
-            auto dst    = row.begin();
-            for (auto src = pdiffs.begin(); src != pdiffs.end(); ++src, ++dst) *dst = *src;
-            ++index;
+        // Compute the partial derivatives for each function
+        size_t row = 0;
+        for (const auto& func : functions) {
+            std::vector<T> partials = partialdiff(func, point);
+            for (size_t col = 0; col < numCols; ++col) {
+                J(row, col) = partials[col];
+            }
+            ++row;
         }
 
         return J;
+    }
+
+    template< typename T >
+    blaze::DynamicMatrix< T > jacobian(const multiroots::DynamicFunctionArray< T >& functions,
+                                              const blaze::DynamicVector< T >&             point)
+    {
+        return jacobian(functions, std::vector< T >(point.begin(), point.end()));
+    }
+
+    template< typename T >
+    blaze::DynamicMatrix< T > jacobian(const multiroots::DynamicFunctionArray< T >& functions,
+                                              const std::initializer_list< T >&            point)
+    {
+        return jacobian(functions, std::vector< T >(point));
     }
 
 }    // namespace nxx::deriv

@@ -56,7 +56,7 @@ namespace nxx::multiroots
         {
             using return_type    = RET;
             using container_type = ARG;
-            using argument_type  = typename ARG::value_type;
+            using argument_type  = typename std::remove_cvref_t<ARG>::value_type;
         };
 
     }    // namespace impl
@@ -70,8 +70,8 @@ namespace nxx::multiroots
         std::floating_point< typename impl::FunctionTraits< FunctionType >::argument_type >;
     // clang-format on
 
-    template< typename FunctionType >
-    requires IsMultirootFunction< FunctionType >
+    template< typename T >
+    //requires IsMultirootFunction< FunctionType >
     class DMultiNewton;
 
     /*
@@ -83,13 +83,13 @@ namespace nxx::multiroots
     /*
      * Specialization of the PolishingTraits class for Newton<FN, DFN>
      */
-    template< typename FunctionType >
-    struct MultirootsSolverTraits< DMultiNewton< FunctionType > >
+    template< typename T >
+    struct MultirootsSolverTraits< DMultiNewton< T > >
     {
-        using function_type  = FunctionType;
-        using return_type    = typename impl::FunctionTraits< FunctionType >::return_type;
-        using container_type = typename impl::FunctionTraits< FunctionType >::container_type;
-        using argument_type  = typename impl::FunctionTraits< FunctionType >::argument_type;
+        //using function_type  = FunctionType;
+        using return_type    = T;//typename impl::FunctionTraits< FunctionType >::return_type;
+        //using container_type = typename impl::FunctionTraits< FunctionType >::container_type;
+        //using argument_type  = typename impl::FunctionTraits< FunctionType >::argument_type;
     };
 
     // ========================================================================
@@ -97,7 +97,7 @@ namespace nxx::multiroots
     // ========================================================================
 
     template< typename SOLVER >
-    requires IsMultirootFunction< typename MultirootsSolverTraits< SOLVER >::function_type >
+    //requires IsMultirootFunction< typename MultirootsSolverTraits< SOLVER >::function_type >
     class MultirootBase
     {
         /*
@@ -106,51 +106,44 @@ namespace nxx::multiroots
         friend SOLVER;
 
     public:
-        using function_type  = typename MultirootsSolverTraits< SOLVER >::function_type;
+        //using function_type  = typename MultirootsSolverTraits< SOLVER >::function_type;
         using return_type    = typename MultirootsSolverTraits< SOLVER >::return_type;
-        using container_type = typename MultirootsSolverTraits< SOLVER >::container_type;
-        using argument_type  = typename MultirootsSolverTraits< SOLVER >::argument_type;
+        //using container_type = typename MultirootsSolverTraits< SOLVER >::container_type;
+        //using argument_type  = typename MultirootsSolverTraits< SOLVER >::argument_type;
 
     private:
-        std::vector< function_type > m_functions {}; /**< The function object to find the root for. */
+        //std::vector< function_type > m_functions {}; /**< The function object to find the root for. */
+        DynamicFunctionArray<return_type> m_functions {};
 
         using RT = blaze::DynamicVector< return_type >;
         RT m_guess; /**< The current root estimate. */
 
-        template< typename FunctionArrayT >
-        requires std::convertible_to< typename FunctionArrayT::value_type, function_type >
-        explicit MultirootBase(const FunctionArrayT& functions)
-            : m_functions(functions.cbegin(), functions.cend()),
-              m_guess(functions.size(), 1.0)
-        {}
+        template< typename ARR >
+        explicit MultirootBase(const DynamicFunctionArray<return_type>& functions, const ARR& guess)
+            : m_functions(functions)//,
+              //m_functions(functions.begin(), functions.end()),
+              //m_guess(guess.begin(), guess.end())
+        {
+            m_guess.resize(functions.size());
+
+            size_t index = 0;
+                for (auto& g : guess) m_guess[index++] = g;
+        }
 
         auto size() const { return m_functions.size(); }
 
     public:
-        template< typename ARR >
-        requires std::floating_point< typename nxx::deriv::impl::VectorTraits< ARR >::value_type > ||
-                 std::floating_point< typename ARR::value_type >
-        void init(const ARR& guess)
-        {
-            std::copy(guess.begin(), guess.end(), m_guess.begin());
-        }
-
-        template< typename T >
-        requires std::floating_point< T >
-        void init(std::initializer_list< T > guess)
-        {
-            std::copy(guess.begin(), guess.end(), m_guess.begin());
-        }
 
         template< typename ARR >
-        requires std::floating_point< typename nxx::deriv::impl::VectorTraits< ARR >::value_type > ||
-                 std::floating_point< typename ARR::value_type >
+//        requires std::floating_point< typename nxx::deriv::impl::VectorTraits< ARR >::value_type > ||
+//                 std::floating_point< typename ARR::value_type >
         auto evaluate(ARR values)
         {
             std::vector< return_type > vals(values.begin(), values.end());
 
+            auto tmp = m_functions(vals);
             size_t index = 0;
-            for (auto& f : m_functions) values[index++] = (f(vals));
+                for (auto& f : tmp) values[index++] = f;
 
             return values;
         }
@@ -162,37 +155,46 @@ namespace nxx::multiroots
         }
     };
 
-    template< typename FunctionType >
-    requires IsMultirootFunction< FunctionType >
-    class DMultiNewton final : public MultirootBase< DMultiNewton< FunctionType > >
+    template< typename T >
+    //requires IsMultirootFunction< FunctionType >
+    class DMultiNewton final : public MultirootBase< DMultiNewton< T > >
     {
     public:
         /*
          * Public alias declarations.
          */
-        using function_type  = FunctionType;
-        using return_type    = typename impl::FunctionTraits< FunctionType >::return_type;
-        using container_type = typename impl::FunctionTraits< FunctionType >::container_type;
-        using argument_type  = typename impl::FunctionTraits< FunctionType >::argument_type;
+        //using function_type  = FunctionType;
+        using return_type    = T;//typename impl::FunctionTraits< FunctionType >::return_type;
+        //using container_type = typename impl::FunctionTraits< FunctionType >::container_type;
+        //using argument_type  = typename impl::FunctionTraits< FunctionType >::argument_type;
 
     private:
         /*
          * Private alias declarations.
          */
-        using BASE = MultirootBase< DMultiNewton< FunctionType > >;
+        using BASE = MultirootBase< DMultiNewton< T > >;
 
     public:
-        explicit DMultiNewton(const std::vector< FunctionType >& funcArray)
-            : BASE(funcArray)
+        template< typename ARR >
+        explicit DMultiNewton(const DynamicFunctionArray<T>& funcArray, const ARR& guess)
+            : BASE(funcArray, guess)
+        {}
+
+        explicit DMultiNewton(const DynamicFunctionArray<T>& funcArray, const std::initializer_list<T> guess)
+            : BASE(funcArray, std::vector(guess.begin(), guess.end()))
         {}
 
         void iterate()
         {
             // Solve the linear system J * dx = -f(x) (solving for dx) and update the root estimate (x_new = x_old + dx).
-            BASE::m_guess += blaze::solve(nxx::deriv::jacobian< nxx::deriv::Order1CentralRichardson >(BASE::m_functions, BASE::m_guess),
+            BASE::m_guess += blaze::solve(nxx::deriv::jacobian(BASE::m_functions, BASE::m_guess),
                                           -BASE::evaluate(BASE::m_guess));
         }
     };
+
+    // deduction guide:
+        //template <typename T>
+        //DMultiNewton(const DynamicFunctionArray<T>&) -> DMultiNewton<std::function<T(const std::vector<T>&)>>;
 
     template< typename SOLVER >
     //    requires requires(SOLVER solver, typename SOLVER::function_return_type guess) {
@@ -211,7 +213,7 @@ namespace nxx::multiroots
         // using RT = tl::expected< typename SOLVER::return_type, ET >;
         using RT = std::vector< typename SOLVER::return_type >;
 
-        solver.init(guess);
+        //solver.init(guess);
         RT result = solver.result();
 
         auto calcEPS = [&]() {
