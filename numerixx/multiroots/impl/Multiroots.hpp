@@ -96,18 +96,18 @@ namespace nxx::multiroots
     // MULTIROOT-FINDING WITH DERIVATIVES
     // ========================================================================
 
-    template< typename SOLVER >
+    template< typename SUBCLASS >
     //requires IsMultirootFunction< typename MultirootsSolverTraits< SOLVER >::function_type >
     class MultirootBase
     {
         /*
          * Friend declarations.
          */
-        friend SOLVER;
+        friend SUBCLASS;
 
     public:
         //using function_type  = typename MultirootsSolverTraits< SOLVER >::function_type;
-        using return_type    = typename MultirootsSolverTraits< SOLVER >::return_type;
+        using return_type    = typename MultirootsSolverTraits< SUBCLASS >::return_type;
         //using container_type = typename MultirootsSolverTraits< SOLVER >::container_type;
         //using argument_type  = typename MultirootsSolverTraits< SOLVER >::argument_type;
 

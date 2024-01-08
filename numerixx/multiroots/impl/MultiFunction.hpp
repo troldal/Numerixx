@@ -1,265 +1,159 @@
-/*
-    888b      88  88        88  88b           d88  88888888888  88888888ba   88  8b        d8  8b        d8
-    8888b     88  88        88  888b         d888  88           88      "8b  88   Y8,    ,8P    Y8,    ,8P
-    88 `8b    88  88        88  88`8b       d8'88  88           88      ,8P  88    `8b  d8'      `8b  d8'
-    88  `8b   88  88        88  88 `8b     d8' 88  88aaaaa      88aaaaaa8P'  88      Y88P          Y88P
-    88   `8b  88  88        88  88  `8b   d8'  88  88"""""      88""""88'    88      d88b          d88b
-    88    `8b 88  88        88  88   `8b d8'   88  88           88    `8b    88    ,8P  Y8,      ,8P  Y8,
-    88     `8888  Y8a.    .a8P  88    `888'    88  88           88     `8b   88   d8'    `8b    d8'    `8b
-    88      `888   `"Y8888Y"'   88     `8'     88  88888888888  88      `8b  88  8P        Y8  8P        Y8
-
-    Copyright © 2023 Kenneth Troldal Balslev
-
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the “Software”), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is furnished
-    to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
-    INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-    PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-    OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
+//
+// Created by kenne on 08/01/2024.
+//
 
 #ifndef NUMERIXX_MULTIFUNCTION_HPP
 #define NUMERIXX_MULTIFUNCTION_HPP
 
-#include <concepts>
+#include "ContainerTraits.hpp"
+#include "FunctionTraits.hpp"
+#include <Concepts.hpp>
+
+#include <algorithm>
+#include <cmath>
 #include <functional>
 #include <initializer_list>
-#include <iterator>
-#include <stdexcept>
-#include <tuple>
-#include <vector>
+#include <iostream>
+#include <span>
+#include <type_traits>
 
 namespace nxx::multiroots
 {
 
     /**
-     * @brief A concept to check if a container holds elements convertible to type T.
+     * @brief A class template to encapsulate a multi-dimensional function for root finding.
      *
-     * @tparam T The target type.
-     * @tparam Container The container type.
+     * @details This class wraps a callable object, allowing it to be invoked with different types
+     *          of inputs, such as initializer lists and containers. The class ensures that the
+     *          types of the callable's return value and arguments meet certain requirements.
+     *
+     * @tparam T The return type of the function. Must be a floating-point type as per nxx::IsFloat.
+     * @tparam U The type of the elements in the input container. Must be a floating-point type after
+     *           removing const/volatile qualifiers and references.
      */
-    template< typename T, typename Container >
-    concept ContainerOfT = requires(Container a) {
-                               {
-                                   *a.begin()
-                               } -> std::convertible_to< T >;
-                           };
-
-    /**
-     * @brief A concept to check if a container holds elements convertible to std::function of type T.
-     *
-     * @tparam T The target type.
-     * @tparam Container The container type.
-     */
-    template< typename T, typename Container >
-    concept ConvertibleToFunction = requires(Container a) {
-                                        {
-                                            *a.begin()
-                                        } -> std::convertible_to< std::function< T(const std::vector< T >&) > >;
-                                    };
-
-    /**
-     * @class DynamicFunctionArray
-     * @brief A class for managing a dynamic array of functions.
-     *
-     * DynamicFunctionArray is designed to store a collection of std::function objects that take a std::vector<T>
-     * as input and return a value of type T. It provides mechanisms to add new functions and apply all stored
-     * functions to a set of inputs.
-     *
-     * @tparam T The type of elements processed by the functions.
-     */
-    template< IsFloat T >
-    class DynamicFunctionArray
+    template< typename T, typename U >
+    requires nxx::IsFloat< T > && nxx::IsFloat< std::remove_cvref_t< U > >
+    class MultiFunction
     {
     public:
-        // Type alias for the function signature and iterator
-        using Function       = std::function< T(const std::vector< T >&) >;
-        using const_iterator = typename std::vector< Function >::const_iterator;
+        using FUNC_T = std::function< T(std::span< U >) >;    ///< Type of the encapsulated function.
 
         /**
-         * @brief Default constructor.
+         * @brief Constructs a MultiFunction object with a given callable.
+         *
+         * @details This constructor wraps a given callable, ensuring it has a compatible signature.
+         *
+         * @tparam CALLABLE_T The type of the callable to be wrapped.
+         * @param  f The callable object to be wrapped.
          */
-        DynamicFunctionArray() = default;
-
-        /**
-         * @brief Initializer list constructor.
-         * @param initList An initializer list of functions.
-         */
-        DynamicFunctionArray(std::initializer_list< Function > initList)
-            : functions(initList)
+        template< typename CALLABLE_T >
+        requires(
+            std::is_same_v< typename traits::FunctionTraits< CALLABLE_T >::argument_type, std::span< std::remove_cvref_t< U > > > ||
+            std::is_same_v< typename traits::FunctionTraits< CALLABLE_T >::argument_type, std::span< const std::remove_cvref_t< U > > >)
+        explicit MultiFunction(CALLABLE_T f)
+            : function(f)
         {}
 
         /**
-         * @brief Variadic constructor for adding multiple functions.
-         * @param funcs A variadic list of functions.
+         * @brief Invokes the function using a std::initializer_list, specifically for const U types.
+         *
+         * @details This operator allows the function to be called with an initializer list.
+         *          It is enabled only when U is a const type. The initializer list is converted
+         *          to a std::span before invoking the encapsulated function.
+         *
+         * @param  list An initializer list of elements of type U.
+         * @return The return value of the encapsulated function.
          */
-        template< IsFloatFunction<T>... Functions >
-        explicit DynamicFunctionArray(Functions... funcs)
-            : functions { funcs... }
-        {}
-
-        /**
-         * @brief Constructor from a container of functions.
-         * @param container A container of function objects.
-         */
-        template< ConvertibleToFunction< T > Container >
-        explicit DynamicFunctionArray(const Container& container)
+        T operator()(std::initializer_list< U > list) const requires std::is_const_v< U >
         {
-            functions.assign(container.begin(), container.end());
+            std::span< U > span(data(list), list.size());
+            return function(span);
         }
 
         /**
-         * @brief Constructor for range-based initialization.
-         * @param first The beginning of the range.
-         * @param last The end of the range.
+         * @brief Invokes the function using a std::initializer_list, specifically for non-const U types.
+         *
+         * @details This operator allows the function to be called with an initializer list.
+         *          It is enabled only when U is a non-const type. The initializer list is first
+         *          converted to a std::vector, then to a std::span, before invoking the encapsulated function.
+         *
+         * @param  list An initializer list of elements of type U.
+         * @return The return value of the encapsulated function.
          */
-        template< ConvertibleToFunction< T > Iter >
-        DynamicFunctionArray(Iter first, Iter last)
+        T operator()(std::initializer_list< U > list) const requires(!std::is_const_v< U >)
         {
-            functions.assign(first, last);
+            std::vector< U > tempVec(list);    // Create a temporary vector from the initializer list
+            std::span< U >   span(tempVec.data(), tempVec.size());
+            return function(span);
         }
 
         /**
-         * @brief Adds a new function to the array.
-         * @param func The function to add.
+         * @brief Invokes the function using a container, where the container's value type matches U.
+         *
+         * @details This operator allows the function to be called with a container,
+         *          provided the container's value type exactly matches U (after removing cv-ref qualifiers).
+         *          It converts the container to a std::span before invoking the function.
+         *          If U is a const type, the container is used directly. Otherwise, a copy is made.
+         *
+         * @tparam CONTAINER_T The type of the input container.
+         * @param  container The container holding elements of type U.
+         * @return The return value of the encapsulated function.
          */
-        void addFunction(const Function& func) { functions.push_back(func); }
-
-        /**
-         * @brief Function call operator for arbitrary containers.
-         * @param input The input container.
-         * @return A std::vector<T> containing the results of applying each function to the input.
-         */
-        //template< ContainerOfT< T > Container >
-        template< typename Container >
-        std::vector< T > operator()(const Container& input) const
+        template< typename CONTAINER_T >
+        requires std::is_same_v< std::remove_cvref_t< U >, traits::ContainerValueType_t< CONTAINER_T > >
+        T operator()(const CONTAINER_T& container) const
         {
-            return evaluate(input.begin(), input.end());
-        }
-
-        /**
-         * @brief Function call operator for initializer lists.
-         * @param input The initializer list input.
-         * @return A std::vector<T> containing the results of applying each function to the input.
-         */
-        //std::vector< T > operator()(std::initializer_list< T > input) const { return evaluate(input.begin(), input.end()); }
-
-        /**
-         * @brief Accesses an individual function object.
-         * @param index The index of the function in the array.
-         * @return A const reference to the function.
-         * @throws std::out_of_range If the index is out of range.
-         */
-        const Function& operator[](size_t index) const
-        {
-            if (index >= functions.size()) {
-                throw std::out_of_range("Index out of range");
+            if constexpr (std::is_const_v< U >) {
+                std::span< U > span(container.data(), container.size());
+                return function(span);
             }
-            return functions[index];
+            else {
+                CONTAINER_T    tempVec(container);    // Create a temporary vector from the container
+                std::span< U > span(tempVec.data(), tempVec.size());
+                return function(span);
+            }
         }
 
         /**
-         * @brief Returns a const iterator to the beginning of the function array.
-         * @return A const iterator.
+         * @brief Invokes the function using a container, where the container's value type is convertible to U.
+         *
+         * @details This operator allows the function to be called with a container,
+         *          provided the container's value type is convertible to U, and not exactly U.
+         *          It creates a temporary std::vector of U, copies and converts the elements
+         *          of the container into it, and then uses this vector to invoke the function.
+         *
+         * @tparam CONTAINER_T The type of the input container.
+         * @param  container The container holding elements convertible to U.
+         * @return The return value of the encapsulated function.
          */
-        const_iterator begin() const { return functions.cbegin(); }
-        const_iterator cbegin() const { return functions.cbegin(); }
+        template< typename CONTAINER_T >
+        requires std::convertible_to< traits::ContainerValueType_t< CONTAINER_T >, std::remove_cvref_t< U > > &&
+                 (!std::is_same_v< std::remove_cvref_t< U >, traits::ContainerValueType_t< CONTAINER_T > >)
+        T operator()(const CONTAINER_T& container) const
+        {
+            std::vector< U > tempVec(container.size());    // Create a temporary vector from the container
+            std::transform(container.cbegin(), container.cend(), tempVec.begin(), [](float value) { return static_cast< double >(value); });
 
-        /**
-         * @brief Returns a const iterator to the end of the function array.
-         * @return A const iterator.
-         */
-        const_iterator end() const { return functions.cend(); }
-        const_iterator cend() const { return functions.cend(); }
-
-        /**
-         * @brief Returns the number of functions in the array.
-         * @return The number of functions.
-                */
-        auto size() const { return functions.size(); }
+            std::span< U > span(tempVec.data(), tempVec.size());
+            return function(span);
+        }
 
     private:
-        std::vector< Function > functions;    ///< Internal storage for function objects.
-
-        /**
-         * @brief Helper function to evaluate all functions using iterators.
-         * @param begin The beginning iterator of the input range.
-         * @param end The end iterator of the input range.
-         * @return A std::vector<T> containing the results of each function.
-         */
-        template< typename Iter >
-        std::vector< T > evaluate(Iter begin, Iter end) const
-        {
-            std::vector< T > results;
-            results.reserve(functions.size());
-            std::vector< T > args(begin, end);
-            for (const auto& func : functions) {
-                results.push_back(func(args));
-            }
-            return results;
-        }
+        FUNC_T function;    ///< The internal function object.
     };
 
-
-
-
-
-
-
-
-    // Concepts for checking if a type is a std::vector
-    template< typename T, typename Container >
-    concept IsVectorOfT = requires(Container a) {
-                              {
-                                  *a.begin()
-                              } -> std::convertible_to< T >;
-                          };
-
-    template< typename T, typename... Functions >
-    class StaticFunctionArray
-    {
-    public:
-        // Constructor
-        explicit StaticFunctionArray(Functions... funcs)
-            : functions(funcs...)
-        {}
-
-        // Function call operator for arbitrary container
-        template< IsVectorOfT< T > Container >
-        std::vector< T > operator()(const Container& input) const
-        {
-            std::vector< T > results;
-            results.reserve(sizeof...(Functions));
-            applyFunctions< 0 >(input, results);
-            return results;
-        }
-
-        // Function call operator for initializer list
-        std::vector< T > operator()(std::initializer_list< T > input) const { return this->operator()(std::vector< T >(input)); }
-
-    private:
-        std::tuple< Functions... > functions;
-
-        // Helper to recursively apply functions from the tuple
-        template< std::size_t I, IsVectorOfT< T > Container >
-        void applyFunctions(const Container& input, std::vector< T >& results) const
-        {
-            if constexpr (I < sizeof...(Functions)) {
-                results.push_back(std::get< I >(functions)(input));
-                applyFunctions< I + 1 >(input, results);
-            }
-        }
-    };
+    /**
+     * @brief Deduction guide for MultiFunction.
+     *
+     * @details Provides a deduction guide for the MultiFunction template, allowing the compiler
+     *          to deduce the template arguments from the type of the function object passed to
+     *          the constructor.
+     *
+     * @tparam Func The type of the function object.
+     */
+    template< typename FUNC_T >
+    MultiFunction(FUNC_T) -> MultiFunction< typename traits::FunctionTraits< FUNC_T >::return_type,
+                                            typename traits::FunctionTraits< FUNC_T >::argument_type::value_type >;
 
 }    // namespace nxx::multiroots
 

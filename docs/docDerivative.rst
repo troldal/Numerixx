@@ -142,7 +142,7 @@ The API for using the :code:`diff<>` function is given below.
 .. doxygenfunction:: diff(IsFunction auto function, ReturnType<decltype(function)> val, ReturnType<decltype(function)> stepsize)
    :project: Numerixx
 
-Derivative Function Objects
+Derivative FUNC_T Objects
 ---------------------------
 The functions and algorithms described above can of course be wrapped in a function object representing the derivative
 of the function in question. However, Numerixx provides a convenience function for creating function objects like this

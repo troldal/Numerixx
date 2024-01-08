@@ -33,6 +33,6 @@ set(SPHINX_BUILD ${CMAKE_CURRENT_BINARY_DIR}/docs/sphinx)
 add_custom_target(Sphinx ALL DEPENDS ${DOXYGEN_INDEX_FILE}
         # Tell Breathe where to find the Doxygen output
         COMMAND ${SPHINX_EXECUTABLE} -b html -Dbreathe_projects.Numerixx=${DOXYGEN_OUTPUT_DIR} ${SPHINX_SOURCE} ${SPHINX_BUILD}
-        #COMMAND ${SPHINX_EXECUTABLE} -b latex -Dbreathe_projects.numerix=${DOXYGEN_OUTPUT_DIR} ${SPHINX_SOURCE} ${SPHINX_BUILD}
+        COMMAND ${SPHINX_EXECUTABLE} -b latex -Dbreathe_projects.numerix=${DOXYGEN_OUTPUT_DIR} ${SPHINX_SOURCE} ${SPHINX_BUILD}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         COMMENT "Generating documentation with Sphinx")

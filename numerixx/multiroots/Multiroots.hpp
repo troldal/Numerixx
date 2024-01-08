@@ -31,6 +31,8 @@
 #ifndef NUMERIXX_MULTIROOTS_HPP
 #define NUMERIXX_MULTIROOTS_HPP
 
+#include "impl/MultiFunction.hpp"
+#include "impl/MultiFunctionArray.hpp"
 #include "impl/MultiDerivatives.hpp"
 #include "impl/Multiroots.hpp"
 

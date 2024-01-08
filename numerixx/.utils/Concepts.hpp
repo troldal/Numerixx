@@ -32,18 +32,19 @@
 #define NUMERIXX_CONCEPTS_HPP
 
 // ===== Standard Library Includes
-#include <complex>
 #include <boost/multiprecision/cpp_bin_float.hpp>
+#include <complex>
+#include <span>
 
 namespace nxx
 {
-    template<typename T>
+    template< typename T >
     concept IsFloat = std::floating_point< T > || boost::multiprecision::is_number< T >::value;
 
-    template<typename T, typename F>
-    concept IsFloatFunction = requires(F f, const std::vector<T>& v) {
-                                        { f(v) } -> std::convertible_to<T>;
-                                    };
+    //    template<typename T, typename F>
+    //    concept IsFloatFunction = requires(F f, const std::vector<T>& v) {
+    //                                        { f(v) } -> std::convertible_to<T>;
+    //                                    };
 
     /**
      * @brief Concept to check if a type is a complex number.
@@ -58,9 +59,9 @@ namespace nxx
                             {
                                 std::imag(x)
                             } -> nxx::IsFloat;
-    };
+                        };
 
-    template<typename T>
+    template< typename T >
     concept IsFloatOrComplex = IsComplex< T > || nxx::IsFloat< T >;
 
     /**
@@ -69,45 +70,70 @@ namespace nxx
      */
     template< typename Func >
     concept IsFloatInvocable = requires(Func f) {
-        requires nxx::IsFloatOrComplex< std::invoke_result_t< Func, float > >;
-        requires nxx::IsFloatOrComplex< std::invoke_result_t< Func, double > >;
-        requires nxx::IsFloatOrComplex< std::invoke_result_t< Func, long double > >;
-    };
+                                   requires nxx::IsFloatOrComplex< std::invoke_result_t< Func, float > >;
+                                   requires nxx::IsFloatOrComplex< std::invoke_result_t< Func, double > >;
+                                   requires nxx::IsFloatOrComplex< std::invoke_result_t< Func, long double > >;
+                               };
 
-    template<typename Func>
-    concept IsComplexInvocable = requires(Func f)
-    {
-        requires nxx::IsComplex< std::invoke_result_t< Func, std::complex< float > > >;
-        requires nxx::IsComplex< std::invoke_result_t< Func, std::complex< double > > >;
-        requires nxx::IsComplex< std::invoke_result_t< Func, std::complex< long double > > >;
-    };
+    template< typename Func >
+    concept IsComplexInvocable = requires(Func f) {
+                                     requires nxx::IsComplex< std::invoke_result_t< Func, std::complex< float > > >;
+                                     requires nxx::IsComplex< std::invoke_result_t< Func, std::complex< double > > >;
+                                     requires nxx::IsComplex< std::invoke_result_t< Func, std::complex< long double > > >;
+                                 };
 
-    template<typename Func>
+    template< typename Func >
     concept IsFloatOrComplexInvocable = IsFloatInvocable< Func > || IsComplexInvocable< Func >;
 
-    template<typename T>
-    concept IsContainer = requires(T a)
-    {
-        typename T::value_type;
-        typename T::iterator;
-        typename T::const_iterator;
-        { a.begin() } -> std::same_as< typename T::iterator >;
-        { a.end() } -> std::same_as< typename T::iterator >;
-        { a.size() } -> std::convertible_to< std::size_t >;
+    template<typename Func, typename Arg>
+    struct is_invocable_with_span {
+        static constexpr bool value = requires(Func f, std::span<Arg> arg) {
+                                          { f(arg) } -> nxx::IsFloatOrComplex;
+                                      };
     };
 
-    template<typename T>
+    template<typename Func>
+    concept IsSpanInvocable =
+        is_invocable_with_span<Func, float>::value ||
+        is_invocable_with_span<Func, double>::value ||
+        is_invocable_with_span<Func, long double>::value;
+
+
+//    template< typename Func >
+//    concept IsSpanInvocable = requires(Func f) {
+//                                  requires nxx::IsFloatOrComplex< std::invoke_result_t< Func, std::span< float > > >;
+//                                  requires nxx::IsFloatOrComplex< std::invoke_result_t< Func, std::span< double > > >;
+//                                  requires nxx::IsFloatOrComplex< std::invoke_result_t< Func, std::span< long double > > >;
+//                              };
+
+    template< typename T >
+    concept IsContainer = requires(T a) {
+                              typename T::value_type;
+                              typename T::iterator;
+                              typename T::const_iterator;
+                              {
+                                  a.begin()
+                              } -> std::same_as< typename T::iterator >;
+                              {
+                                  a.end()
+                              } -> std::same_as< typename T::iterator >;
+                              {
+                                  a.size()
+                              } -> std::convertible_to< std::size_t >;
+                          };
+
+    template< typename T >
     concept IsFloatContainer = IsContainer< T > && IsFloat< typename T::value_type >;
 
-    template<typename S>
-        requires (!IsContainer< S > && !std::is_pointer_v< S > && !std::is_array_v< S >)
+    template< typename S >
+    requires(!IsContainer< S > && !std::is_pointer_v< S > && !std::is_array_v< S >)
     struct StructTraits
     {
     private:
         static constexpr auto commonType = [](S s) {
             auto [first, second] = s;
-            using RT = std::common_type_t< decltype(first), decltype(second) >;
-            return RT{ (first + second) };
+            using RT             = std::common_type_t< decltype(first), decltype(second) >;
+            return RT { (first + second) };
         };
 
         static constexpr auto firstType = [](S s) {
@@ -122,34 +148,32 @@ namespace nxx
 
     public:
         using common_type = std::invoke_result_t< decltype(commonType), S >;
-        using first_type = std::invoke_result_t< decltype(firstType), S >;
+        using first_type  = std::invoke_result_t< decltype(firstType), S >;
         using second_type = std::invoke_result_t< decltype(secondType), S >;
     };
 
-    template<typename S>
+    template< typename S >
     using StructCommonType_t = typename StructTraits< S >::common_type;
 
-    template<typename S>
+    template< typename S >
     using StructFirstType_t = typename StructTraits< S >::first_type;
 
-    template<typename S>
+    template< typename S >
     using StructSecondType_t = typename StructTraits< S >::second_type;
 
-    template<typename S>
-    concept IsFloatStruct =
-        !std::is_array_v< std::remove_cvref_t< S > > &&
-        nxx::IsFloat< typename StructTraits< S >::first_type > &&
-        nxx::IsFloat< typename StructTraits< S >::second_type >;
+    template< typename S >
+    concept IsFloatStruct = !std::is_array_v< std::remove_cvref_t< S > > && nxx::IsFloat< typename StructTraits< S >::first_type > &&
+                            nxx::IsFloat< typename StructTraits< S >::second_type >;
 
-} // namespace nxx
+}    // namespace nxx
 
 namespace nxx::poly
 {
-    template<typename T>
-        requires nxx::IsFloat< T > || IsComplex< T >
+    template< typename T >
+    requires nxx::IsFloat< T > || IsComplex< T >
     class Polynomial;
 
     template< typename POLY >
     concept IsPolynomial = std::same_as< POLY, Polynomial< typename POLY::value_type > >;
-}
+}    // namespace nxx::poly
 #endif    // NUMERIXX_CONCEPTS_HPP

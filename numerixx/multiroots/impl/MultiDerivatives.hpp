@@ -33,7 +33,7 @@
 
 // ===== Numerixx Includes
 #include <Deriv.hpp>
-#include "MultiFunction.hpp"
+#include "MultiFunctionArray.hpp"
 
 // ===== External Includes
 #include "blaze/Blaze.h"
