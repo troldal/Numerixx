@@ -31,7 +31,8 @@
 #ifndef NUMERIXX_ERROR_HPP
 #define NUMERIXX_ERROR_HPP
 
-#define BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED
+//#define BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED
+//#define BOOST_STACKTRACE_USE_WINDBG
 
 // ===== External Includes
 #include <boost/stacktrace.hpp>

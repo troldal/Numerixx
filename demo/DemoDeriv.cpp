@@ -9,18 +9,18 @@
 #include <iomanip>
 #include <iostream>
 #include <numbers>
-#include <boost/multiprecision/cpp_bin_float.hpp>
+//#include <boost/multiprecision/cpp_bin_float.hpp>
 
-using NXX_FLOAT = boost::multiprecision::cpp_bin_float_100;
+using NXX_FLOAT = double;//boost::multiprecision::cpp_bin_float_100;
 
-template<>
-struct fmt::formatter< NXX_FLOAT > : fmt::formatter< double >
-{
-    auto format(const NXX_FLOAT& d, fmt::format_context& ctx) const
-    {
-        return fmt::formatter< double >::format(static_cast< double >(d), ctx);
-    }
-};
+//template<>
+//struct fmt::formatter< NXX_FLOAT > : fmt::formatter< double >
+//{
+//    auto format(const NXX_FLOAT& d, fmt::format_context& ctx) const
+//    {
+//        return fmt::formatter< double >::format(static_cast< double >(d), ctx);
+//    }
+//};
 
 void print(const auto& testcases);
 

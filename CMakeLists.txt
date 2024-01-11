@@ -13,6 +13,7 @@ set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_definitions(NOMINMAX)
+message(STATUS "Using toolchain file: ${CMAKE_TOOLCHAIN_FILE}")
 #==============================================================================
 # Add individual subdirectories
 #==============================================================================

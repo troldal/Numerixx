@@ -15,7 +15,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 #==============================================================================
 find_package(gcem REQUIRED)
 find_package(tl-expected REQUIRED)
-find_package(blaze REQUIRED)
+find_package(blaze CONFIG REQUIRED)
 find_package(LAPACK REQUIRED)
 find_package(Boost REQUIRED)
 
@@ -99,6 +99,7 @@ add_library(numerixx::all ALIAS nxx_all)
 # Link libraries
 #==============================================================================
 #target_link_libraries(nxx_utility INTERFACE HWinfo)
+target_link_libraries(nxx_utility INTERFACE Boost::boost)
 target_link_libraries(nxx_func INTERFACE nxx_utility gcem tl::expected)
 target_link_libraries(nxx_deriv INTERFACE nxx_utility gcem tl::expected)
 target_link_libraries(nxx_integrate INTERFACE nxx_utility gcem tl::expected)
@@ -114,3 +115,4 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MS
     target_link_libraries(nxx_multiroots INTERFACE OpenMP::OpenMP_CXX)
 endif()
 target_link_libraries(nxx_all INTERFACE nxx_func nxx_poly nxx_deriv nxx_roots nxx_multiroots)
+

@@ -563,6 +563,7 @@ namespace nxx::deriv
         {
             //        if (!function) throw NumerixxError("Function object is invalid.");
 
+            using ARG_T = decltype(val);
             using RETURN_T = std::invoke_result_t< decltype(function), decltype(val) >;
             static_assert(nxx::IsFloat< RETURN_T >, "The return type of the provided function must be a floating point type.");
             using DerivError = Error< DerivErrorData< decltype(val) > >;
@@ -574,7 +575,7 @@ namespace nxx::deriv
             else
                 return EXPECTED_T(tl::make_unexpected(DerivError("Computation of derivative gave non-finite result.",
                                                                  NumerixxErrorType::Deriv,
-                                                                 { .x = val, .h = stepsize, .f = function(val), .df = deriv })));
+                                                                 { .x = ARG_T(val), .h = ARG_T(stepsize), .f = ARG_T(function(val)), .df = ARG_T(deriv) })));
         }
     } // namespace detail
 

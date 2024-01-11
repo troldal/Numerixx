@@ -24,21 +24,17 @@
   }, {
     "name" : "nlohmann-json",
     "version>=" : "3.11.2"
-  },
-    {
-      "name": "boost-multi-array",
-      "version>=": "1.83.0"
-    },
-    {
-      "name": "boost-multiprecision",
-      "version>=": "1.83.0"
-    },
-    {
-      "name": "boost-math",
-      "version>=": "1.83.0"
-    },
-    {
-      "name": "fmt",
-      "version>=": "10.1.1"
+  }, {
+    "name" : "boost-multi-array",
+    "version>=" : "1.83.0"
+  }, {
+    "name" : "boost-multiprecision",
+    "version>=" : "1.83.0"
+  }, {
+    "name" : "boost-math",
+    "version>=" : "1.83.0"
+  }, {
+    "name" : "fmt",
+    "version>=" : "10.1.1"
   } ]
 }

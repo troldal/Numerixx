@@ -32,7 +32,7 @@ namespace nxx::multiroots
      *           removing const/volatile qualifiers and references.
      */
     template< typename T, typename U >
-    requires nxx::IsFloat< T > && nxx::IsFloat< std::remove_cvref_t< U > >
+    requires nxx::IsFloat< T > && nxx::IsFloat< std::remove_cvref_t< U > > && (std::is_same_v< T, std::remove_cvref_t< U > >)
     class MultiFunction
     {
     public:
@@ -132,7 +132,7 @@ namespace nxx::multiroots
         T operator()(const CONTAINER_T& container) const
         {
             std::vector< U > tempVec(container.size());    // Create a temporary vector from the container
-            std::transform(container.cbegin(), container.cend(), tempVec.begin(), [](float value) { return static_cast< double >(value); });
+            std::transform(container.begin(), container.end(), tempVec.begin(), [](float value) { return static_cast< double >(value); });
 
             std::span< U > span(tempVec.data(), tempVec.size());
             return function(span);
