@@ -10,10 +10,8 @@
 #include <Concepts.hpp>
 
 #include <algorithm>
-#include <cmath>
 #include <functional>
 #include <initializer_list>
-#include <iostream>
 #include <span>
 #include <type_traits>
 
@@ -27,16 +25,16 @@ namespace nxx::multiroots
      *          of inputs, such as initializer lists and containers. The class ensures that the
      *          types of the callable's return value and arguments meet certain requirements.
      *
-     * @tparam T The return type of the function. Must be a floating-point type as per nxx::IsFloat.
-     * @tparam U The type of the elements in the input container. Must be a floating-point type after
+     * @tparam RES_T The return type of the function. Must be a floating-point type as per nxx::IsFloat.
+     * @tparam PARAM_T The type of the elements in the input container. Must be a floating-point type after
      *           removing const/volatile qualifiers and references.
      */
-    template< typename T, typename U >
-    requires nxx::IsFloat< T > && nxx::IsFloat< std::remove_cvref_t< U > > && (std::is_same_v< T, std::remove_cvref_t< U > >)
+    template< typename RES_T, typename PARAM_T >
+    requires nxx::IsFloat< RES_T > && nxx::IsFloat< std::remove_cvref_t< PARAM_T > > && (std::is_same_v< RES_T, std::remove_cvref_t< PARAM_T > >)
     class MultiFunction
     {
     public:
-        using FUNC_T = std::function< T(std::span< U >) >;    ///< Type of the encapsulated function.
+        using FUNC_T = std::function< RES_T(std::span< PARAM_T >) >;    ///< Type of the encapsulated function.
 
         /**
          * @brief Constructs a MultiFunction object with a given callable.
@@ -48,11 +46,18 @@ namespace nxx::multiroots
          */
         template< typename CALLABLE_T >
         requires(
-            std::is_same_v< typename traits::FunctionTraits< CALLABLE_T >::argument_type, std::span< std::remove_cvref_t< U > > > ||
-            std::is_same_v< typename traits::FunctionTraits< CALLABLE_T >::argument_type, std::span< const std::remove_cvref_t< U > > >)
-        explicit MultiFunction(CALLABLE_T f)
+            (!std::is_same_v< CALLABLE_T, MultiFunction >) &&    // Prevents infinite recursion
+            (std::is_same_v< typename traits::FunctionTraits< CALLABLE_T >::argument_type, std::span< std::remove_cvref_t< PARAM_T > > > ||
+             std::is_same_v< typename traits::FunctionTraits< CALLABLE_T >::argument_type, std::span< const std::remove_cvref_t< PARAM_T > > >))
+        MultiFunction(CALLABLE_T f)
             : function(f)
         {}
+
+        MultiFunction(const MultiFunction&) = default;
+        MultiFunction(MultiFunction&&)      = default;
+        MultiFunction& operator=(const MultiFunction&) = default;
+        MultiFunction& operator=(MultiFunction&&) = default;
+
 
         /**
          * @brief Invokes the function using a std::initializer_list, specifically for const U types.
@@ -64,9 +69,9 @@ namespace nxx::multiroots
          * @param  list An initializer list of elements of type U.
          * @return The return value of the encapsulated function.
          */
-        T operator()(std::initializer_list< U > list) const requires std::is_const_v< U >
+        RES_T operator()(std::initializer_list< PARAM_T > list) const requires std::is_const_v< PARAM_T >
         {
-            std::span< U > span(data(list), list.size());
+            std::span< PARAM_T > span(data(list), list.size());
             return function(span);
         }
 
@@ -80,10 +85,10 @@ namespace nxx::multiroots
          * @param  list An initializer list of elements of type U.
          * @return The return value of the encapsulated function.
          */
-        T operator()(std::initializer_list< U > list) const requires(!std::is_const_v< U >)
+        RES_T operator()(std::initializer_list< PARAM_T > list) const requires(!std::is_const_v< PARAM_T >)
         {
-            std::vector< U > tempVec(list);    // Create a temporary vector from the initializer list
-            std::span< U >   span(tempVec.data(), tempVec.size());
+            std::vector< PARAM_T > tempVec(list);    // Create a temporary vector from the initializer list
+            std::span< PARAM_T >   span(tempVec.data(), tempVec.size());
             return function(span);
         }
 
@@ -100,16 +105,16 @@ namespace nxx::multiroots
          * @return The return value of the encapsulated function.
          */
         template< typename CONTAINER_T >
-        requires std::is_same_v< std::remove_cvref_t< U >, traits::ContainerValueType_t< CONTAINER_T > >
-        T operator()(const CONTAINER_T& container) const
+        requires std::is_same_v< std::remove_cvref_t< PARAM_T >, traits::ContainerValueType_t< CONTAINER_T > >
+        RES_T operator()(const CONTAINER_T& container) const
         {
-            if constexpr (std::is_const_v< U >) {
-                std::span< U > span(container.data(), container.size());
+            if constexpr (std::is_const_v< PARAM_T >) {
+                std::span< PARAM_T > span(container.data(), container.size());
                 return function(span);
             }
             else {
                 CONTAINER_T    tempVec(container);    // Create a temporary vector from the container
-                std::span< U > span(tempVec.data(), tempVec.size());
+                std::span< PARAM_T > span(tempVec.data(), tempVec.size());
                 return function(span);
             }
         }
@@ -127,14 +132,14 @@ namespace nxx::multiroots
          * @return The return value of the encapsulated function.
          */
         template< typename CONTAINER_T >
-        requires std::convertible_to< traits::ContainerValueType_t< CONTAINER_T >, std::remove_cvref_t< U > > &&
-                 (!std::is_same_v< std::remove_cvref_t< U >, traits::ContainerValueType_t< CONTAINER_T > >)
-        T operator()(const CONTAINER_T& container) const
+        requires std::convertible_to< traits::ContainerValueType_t< CONTAINER_T >, std::remove_cvref_t< PARAM_T > > &&
+                 (!std::is_same_v< std::remove_cvref_t< PARAM_T >, traits::ContainerValueType_t< CONTAINER_T > >)
+        RES_T operator()(const CONTAINER_T& container) const
         {
-            std::vector< U > tempVec(container.size());    // Create a temporary vector from the container
+            std::vector< PARAM_T > tempVec(container.size());    // Create a temporary vector from the container
             std::transform(container.begin(), container.end(), tempVec.begin(), [](float value) { return static_cast< double >(value); });
 
-            std::span< U > span(tempVec.data(), tempVec.size());
+            std::span< PARAM_T > span(tempVec.data(), tempVec.size());
             return function(span);
         }
 
@@ -149,11 +154,12 @@ namespace nxx::multiroots
      *          to deduce the template arguments from the type of the function object passed to
      *          the constructor.
      *
-     * @tparam Func The type of the function object.
+     * @tparam FUNC_T The type of the function object.
      */
     template< typename FUNC_T >
     MultiFunction(FUNC_T) -> MultiFunction< typename traits::FunctionTraits< FUNC_T >::return_type,
                                             typename traits::FunctionTraits< FUNC_T >::argument_type::value_type >;
+
 
 }    // namespace nxx::multiroots
 

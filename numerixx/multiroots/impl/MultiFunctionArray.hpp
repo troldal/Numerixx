@@ -8,7 +8,7 @@
     88     `8888  Y8a.    .a8P  88    `888'    88  88           88     `8b   88   d8'    `8b    d8'    `8b
     88      `888   `"Y8888Y"'   88     `8'     88  88888888888  88      `8b  88  8P        Y8  8P        Y8
 
-    Copyright © 2023 Kenneth Troldal Balslev
+    Copyright © 2024 Kenneth Troldal Balslev
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the “Software”), to deal
@@ -28,15 +28,22 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+/**
+ * @file MultiFunctionArray.hpp
+ * @brief This file contains the declaration of the MultiFunctionArray class.
+ *
+ * The MultiFunctionArray class is a template class designed to store and manage a collection
+ * of function objects, where each function follows a specified signature. It provides
+ * functionalities to add functions to the array, invoke all functions with a set of parameters,
+ * and access individual functions.
+ */
+
 #ifndef NUMERIXX_MULTIFUNCTIONARRAY_HPP
 #define NUMERIXX_MULTIFUNCTIONARRAY_HPP
 
 #include <concepts>
-#include <functional>
 #include <initializer_list>
-#include <iterator>
 #include <stdexcept>
-#include <tuple>
 #include <vector>
 
 #include <Concepts.hpp>
@@ -44,89 +51,220 @@
 namespace nxx::multiroots
 {
     /**
-     * @class DynamicFunctionArray
-     * @brief A class for managing a dynamic array of functions.
+     * @class MultiFunctionArray
+     * @brief Template class for managing a collection of function objects.
      *
-     * DynamicFunctionArray is designed to store a collection of std::function objects that take a std::vector<T>
-     * as input and return a value of type T. It provides mechanisms to add new functions and apply all stored
-     * functions to a set of inputs.
-     *
-     * @tparam T The type of elements processed by the functions.
+     * @tparam RET_T The return type of the functions in the array.
+     * @tparam PARAM_T The parameter type of the functions in the array.
      */
-    template< IsFloat T >
-    class DynamicFunctionArray
+    template< IsFloat RET_T, IsFloat PARAM_T >
+    class MultiFunctionArray
     {
     public:
-        // Type alias for the function signature and iterator
-        using FUNC_T         = std::function< T(const std::span< T >&) >;
-        using const_iterator = typename std::vector< FUNC_T >::const_iterator;
+        using FUNC_T         = MultiFunction< RET_T, PARAM_T >;                   ///< Alias for function type.
+        using const_iterator = typename std::vector< FUNC_T >::const_iterator;    ///< Iterator type.
 
         /**
-         * @brief Default constructor.
+         * @brief Default constructor for MultiFunctionArray.
          */
-        DynamicFunctionArray() = default;
+        MultiFunctionArray() = default;
 
         /**
-         * @brief Initializer list constructor.
-         * @param initList An initializer list of functions.
+         * @brief Constructor for initializing with a list of functions.
+         * @details This constructor takes a variadic list of function objects and adds them to the array.
+         * @tparam FIRSTFUNC_T Type of the first function in the list.
+         * @tparam RESTFUNCS_T Types of the remaining functions in the list.
+         * @param firstFunc The first function to be added to the array.
+         * @param restFuncs The remaining functions to be added to the array.
          */
-//        DynamicFunctionArray(std::initializer_list< FUNC_T > initList)
-//            : functions(initList)
-//        {}
-
-        /**
-         * @brief Constructor from a container of functions.
-         * @param container A container of function objects.
-         */
-        template< typename Container >
-        requires IsSpanInvocable< typename Container::value_type >
-        explicit DynamicFunctionArray(const Container& container)
+        template< typename FIRSTFUNC_T, typename... RESTFUNCS_T >
+        requires IsInvocable< FIRSTFUNC_T >
+        explicit MultiFunctionArray(FIRSTFUNC_T firstFunc, RESTFUNCS_T... restFuncs)
         {
-            functions.assign(container.begin(), container.end());
+            // Use addFunction for the first function
+            addFunction(firstFunc);
+
+            // Use addFunction for the rest of the functions
+            (addFunction(restFuncs), ...);
         }
 
         /**
-         * @brief Constructor for range-based initialization.
-         * @param first The beginning of the range.
-         * @param last The end of the range.
+         * @brief Constructor for initializing with a container of functions.
+         * @details This constructor takes a container with function objects and adds them to the array.
+         * @tparam CONTAINER_T Type of the container.
+         * @param container The container holding the functions to be added.
          */
-        template< typename Iter >
-        requires IsFloatInvocable< typename std::iterator_traits<Iter>::value_type >
-        DynamicFunctionArray(Iter first, Iter last)
+        template< typename CONTAINER_T >
+        requires IsInvocable< typename CONTAINER_T::value_type >
+        explicit MultiFunctionArray(const CONTAINER_T& container)
         {
-            functions.assign(first, last);
+            // Iterate over the container and add each function to the array
+            for (const auto& func : container) {
+                if constexpr (std::is_same_v< MultiFunction< RET_T, PARAM_T >, typename CONTAINER_T::value_type >)
+                    functions.push_back(func);
+                else
+                    addFunction(func);
+            }
         }
 
         /**
-         * @brief Adds a new function to the array.
-         * @param func The function to add.
+         * @brief Adds a function to the array.
+         * @details The function to be added must match the signature defined by RES_T and PARAM_T.
+         * @tparam CALLABLE_T Type of the function to be added.
+         * @param func The function to be added.
          */
-        void addFunction(const FUNC_T& func) { functions.push_back(func); }
+        template< typename CALLABLE_T >
+        requires std::same_as< RET_T, typename traits::FunctionTraits< std::decay_t< CALLABLE_T > >::return_type > &&
+                 std::same_as< PARAM_T, typename traits::FunctionTraits< std::decay_t< CALLABLE_T > >::argument_type::value_type >
+        void addFunction(const CALLABLE_T& func)
+        {
+            functions.push_back(FUNC_T(func));
+        }
 
         /**
-         * @brief Function call operator for arbitrary containers.
+         * @brief Applies all functions to the input container and returns a container of the same type.
+         * @tparam CONTAINER_T Type of the input container.
          * @param input The input container.
-         * @return A std::vector<T> containing the results of applying each function to the input.
+         * @return CONTAINER_T A container of the same type as input, containing the results of function applications.
          */
-        //template< ContainerOfT< T > Container >
-        template< typename Container >
-        std::vector< T > operator()(const Container& input) const
+        template< typename CONTAINER_T >
+        CONTAINER_T operator()(const CONTAINER_T& input) const
         {
-            return evaluate(input.begin(), input.end());
+            return evaluate< CONTAINER_T >(input);
         }
 
         /**
-         * @brief Function call operator for initializer lists.
-         * @param input The initializer list input.
-         * @return A std::vector<T> containing the results of applying each function to the input.
+         * @brief Applies all functions to the initializer list and returns a vector of results.
+         * @param input An initializer list of input values.
+         * @return std::vector<RET_T> A vector containing the results of each function invocation.
          */
-        std::vector< T > operator()(std::initializer_list< T > input) const { return evaluate(input.begin(), input.end()); }
+        std::vector< RET_T > operator()(std::initializer_list< RET_T > input) const { return evaluate< std::vector< RET_T > >(input); }
 
         /**
-         * @brief Accesses an individual function object.
-         * @param index The index of the function in the array.
-         * @return A const reference to the function.
-         * @throws std::out_of_range If the index is out of range.
+         * @brief Evaluates the input container using the stored functions, returning a container of the same type.
+         * @tparam CONTAINER_T Type of the input container.
+         * @param input The input container.
+         * @return CONTAINER_T A container of the same type as input, containing the results of function applications.
+         */
+        template< typename CONTAINER_T >
+        CONTAINER_T eval(const CONTAINER_T& input) const
+        {
+            return operator()< CONTAINER_T >(input);
+        }
+
+        /**
+         * @brief Evaluates the initializer list using the stored functions, returning a vector of results.
+         * @param input An initializer list of input values.
+         * @return std::vector<RET_T> A vector containing the results of each function invocation.
+         */
+        std::vector< RET_T > eval(std::initializer_list< RET_T > input) const { return operator()< std::vector< RET_T > >(input); }
+
+        /**
+         * @brief Applies all functions to the input container and returns a container of the specified output type.
+         * @tparam OUT_T Template template parameter specifying the type of the output container.
+         * @tparam CONTAINER_T Type of the input container.
+         * @param input The input container.
+         * @return OUT_T<RET_T> An output container of the specified type containing the results.
+         */
+        template< template< typename... > class OUT_T, typename CONTAINER_T >
+        OUT_T< RET_T > operator()(const CONTAINER_T& input) const
+        {
+            return evaluate< OUT_T< RET_T > >(input);
+        }
+
+        /**
+         * @brief Applies all functions to the initializer list and returns a container of the specified output type.
+         * @tparam OUT_T Template template parameter specifying the type of the output container.
+         * @param input An initializer list of input values.
+         * @return OUT_T<RET_T> An output container of the specified type containing the results.
+         */
+        template< template< typename... > class OUT_T >
+        OUT_T< RET_T > operator()(std::initializer_list< RET_T > input) const
+        {
+            return evaluate< OUT_T< RET_T > >(input);
+        }
+
+        /**
+         * @brief Evaluates the input container using the stored functions, returning a container of the specified output type.
+         * @tparam OUT_T Template template parameter specifying the type of the output container.
+         * @tparam CONTAINER_T Type of the input container.
+         * @param input The input container.
+         * @return OUT_T<RET_T> An output container of the specified type containing the results.
+         */
+        template< template< typename... > class OUT_T, typename CONTAINER_T >
+        OUT_T< RET_T > eval(const CONTAINER_T& input) const
+        {
+            return operator()< OUT_T >(input);
+        }
+
+        /**
+         * @brief Evaluates the initializer list using the stored functions, returning a container of the specified output type.
+         * @tparam OUT_T Template template parameter specifying the type of the output container.
+         * @param input An initializer list of input values.
+         * @return OUT_T<RET_T> An output container of the specified type containing the results.
+         */
+        template< template< typename... > class OUT_T >
+        OUT_T< RET_T > eval(std::initializer_list< RET_T > input) const
+        {
+            return operator()< OUT_T >(input);
+        }
+
+        /**
+         * @brief Applies all functions to the input container and returns an output container with additional template parameters.
+         * @tparam OUT_T Template template parameter specifying the type of the output container, with additional template parameters.
+         * @tparam CONTAINER_T Type of the input container.
+         * @param input The input container.
+         * @return OUT_T<RET_T, false> An output container of the specified type containing the results.
+         */
+        template< template< typename, bool, typename... > class OUT_T, typename CONTAINER_T >
+        OUT_T< RET_T, false > operator()(const CONTAINER_T& input) const
+        {
+            return evaluate< OUT_T< RET_T, false > >(input);
+        }
+
+        /**
+         * @brief Applies all functions to the initializer list and returns an output container with additional template parameters.
+         * @tparam OUT_T Template template parameter specifying the type of the output container, with additional template parameters.
+         * @param input An initializer list of input values.
+         * @return OUT_T<RET_T, false> An output container of the specified type containing the results.
+         */
+        template< template< typename, bool, typename... > class OUT_T >
+        OUT_T< RET_T, false > operator()(std::initializer_list< RET_T > input) const
+        {
+            return evaluate< OUT_T< RET_T, false > >(input);
+        }
+
+        /**
+         * @brief Evaluates the input container using the stored functions, returning an output container with additional template
+         * parameters.
+         * @tparam OUT_T Template template parameter specifying the type of the output container, with additional template parameters.
+         * @tparam CONTAINER_T Type of the input container.
+         * @param input The input container.
+         * @return OUT_T<RET_T, false> An output container of the specified type containing the results.
+         */
+        template< template< typename, bool, typename... > class OUT_T, typename CONTAINER_T >
+        OUT_T< RET_T, false > eval(const CONTAINER_T& input) const
+        {
+            return operator()< OUT_T >(input);
+        }
+
+        /**
+         * @brief Evaluates the initializer list using the stored functions, returning an output container with additional template
+         * parameters.
+         * @tparam OUT_T Template template parameter specifying the type of the output container, with additional template parameters.
+         * @param input An initializer list of input values.
+         * @return OUT_T<RET_T, false> An output container of the specified type containing the results.
+         */
+        template< template< typename, bool, typename... > class OUT_T >
+        OUT_T< RET_T, false > eval(std::initializer_list< RET_T > input) const
+        {
+            return operator()< OUT_T >(input);
+        }
+
+        /**
+         * @brief Accesses a function at a specified index.
+         * @param index The index of the function to access.
+         * @return const FUNC_T& A reference to the function at the specified index.
          */
         const FUNC_T& operator[](size_t index) const
         {
@@ -137,97 +275,54 @@ namespace nxx::multiroots
         }
 
         /**
-         * @brief Returns a const iterator to the beginning of the function array.
-         * @return A const iterator.
+         * @brief Returns an iterator to the beginning of the function array.
+         * @return const_iterator An iterator to the first function in the array.
          */
         const_iterator begin() const { return functions.cbegin(); }
         const_iterator cbegin() const { return functions.cbegin(); }
 
-        /**
-         * @brief Returns a const iterator to the end of the function array.
-         * @return A const iterator.
-         */
         const_iterator end() const { return functions.cend(); }
         const_iterator cend() const { return functions.cend(); }
 
         /**
          * @brief Returns the number of functions in the array.
-         * @return The number of functions.
-                */
+         * @return auto The number of functions stored in the array.
+         */
         auto size() const { return functions.size(); }
 
     private:
         std::vector< FUNC_T > functions;    ///< Internal storage for function objects.
 
         /**
-         * @brief Helper function to evaluate all functions using iterators.
-         * @param begin The beginning iterator of the input range.
-         * @param end The end iterator of the input range.
-         * @return A std::vector<T> containing the results of each function.
+         * @brief Evaluates the input container using the stored functions and returns an output container of the specified type.
+         * @tparam OUT_T Type of     the output container.
+         * @tparam CONT_T Type of the input container.
+         * @param input The input container.
+         * @return OUT_T An output container of the specified type containing the results.
+         * @details This method transforms each function's result into an output container of type OUT_T.
+         *          It requires that OUT_T is constructible with the size of the input and provides an iterator interface.
          */
-        template< typename Iter >
-        std::vector< T > evaluate(Iter begin, Iter end) const
+        template< typename OUT_T, typename CONT_T >
+        OUT_T evaluate(const CONT_T& input) const
         {
-            std::vector< T > results;
-            results.reserve(functions.size());
-            std::vector< T > args(begin, end);
-            for (const auto& func : functions) {
-                results.push_back(func(args));
-            }
-            return results;
+            OUT_T                result(functions.size());
+            std::vector< RET_T > args(input.begin(), input.end());
+
+            std::transform(functions.begin(), functions.end(), result.begin(), [&args](const auto& func) {
+                return std::invoke(func, args);
+            });
+
+            return result;
         }
     };
 
-
-
-
-
-
-
-
-    // Concepts for checking if a type is a std::vector
-    template< typename T, typename Container >
-    concept IsVectorOfT = requires(Container a) {
-                              {
-                                  *a.begin()
-                              } -> std::convertible_to< T >;
-                          };
-
-    template< typename T, typename... Functions >
-    class StaticFunctionArray
-    {
-    public:
-        // Constructor
-        explicit StaticFunctionArray(Functions... funcs)
-            : functions(funcs...)
-        {}
-
-        // Function call operator for arbitrary container
-        template< IsVectorOfT< T > Container >
-        std::vector< T > operator()(const Container& input) const
-        {
-            std::vector< T > results;
-            results.reserve(sizeof...(Functions));
-            applyFunctions< 0 >(input, results);
-            return results;
-        }
-
-        // Function call operator for initializer list
-        std::vector< T > operator()(std::initializer_list< T > input) const { return this->operator()(std::vector< T >(input)); }
-
-    private:
-        std::tuple< Functions... > functions;
-
-        // Helper to recursively apply functions from the tuple
-        template< std::size_t I, IsVectorOfT< T > Container >
-        void applyFunctions(const Container& input, std::vector< T >& results) const
-        {
-            if constexpr (I < sizeof...(Functions)) {
-                results.push_back(std::get< I >(functions)(input));
-                applyFunctions< I + 1 >(input, results);
-            }
-        }
-    };
+    /**
+     *@brief Deduction guide for MultiFunctionArray to deduce template parameters from function types.
+     */
+    template< typename FirstFunc, typename... RestFuncs >
+    MultiFunctionArray(FirstFunc&& firstFunc, RestFuncs&&... restFuncs)
+        -> MultiFunctionArray< typename traits::FunctionTraits< std::decay_t< FirstFunc > >::return_type,
+                               typename traits::FunctionTraits< std::decay_t< FirstFunc > >::argument_type::value_type >;
 
 }    // namespace nxx::multiroots
 

@@ -14,10 +14,10 @@ namespace nxx::traits
      *          decomposing the type of its call operator. It inherits from a specialization
      *          of FunctionTraits for the type of the callable's operator().
      *
-     * @tparam Func The type of the callable object.
+     * @tparam FUNC_T The type of the callable object.
      */
-    template< typename Func >
-    struct FunctionTraits : public FunctionTraits< decltype(&Func::operator()) >
+    template< typename FUNC_T >
+    struct FunctionTraits : public FunctionTraits< decltype(&FUNC_T::operator()) >
     {
     };
 
@@ -27,14 +27,14 @@ namespace nxx::traits
      * @details This specialization deduces the return type and argument type of a single-parameter
      *          function pointer.
      *
-     * @tparam R The return type of the function.
-     * @tparam Arg The type of the single argument of the function.
+     * @tparam RES_T The return type of the function.
+     * @tparam PARAM_T The type of the single argument of the function.
      */
-    template< typename R, typename Arg >
-    struct FunctionTraits< R (*)(Arg) >
+    template< typename RES_T, typename PARAM_T >
+    struct FunctionTraits< RES_T (*)(PARAM_T) >
     {
-        using return_type   = R;
-        using argument_type = Arg;
+        using return_type   = RES_T;
+        using argument_type = PARAM_T;
     };
 
     /**
@@ -44,15 +44,15 @@ namespace nxx::traits
      * @details This specialization handles member function pointers and captures the return type
      *          and argument type for member functions (or lambdas) that take a single parameter.
      *
-     * @tparam R The return type of the function.
-     * @tparam C The class type of the member function.
-     * @tparam Arg The type of the single argument of the function.
+     * @tparam RES_T The return type of the function.
+     * @tparam CLASS_T The class type of the member function.
+     * @tparam PARAM_T The type of the single argument of the function.
      */
-    template< typename R, typename C, typename Arg >
-    struct FunctionTraits< R (C::*)(Arg) const >
+    template< typename RES_T, typename CLASS_T, typename PARAM_T >
+    struct FunctionTraits< RES_T (CLASS_T::*)(PARAM_T) const >
     {
-        using return_type   = R;
-        using argument_type = Arg;
+        using return_type   = RES_T;
+        using argument_type = PARAM_T;
     };
 }
 

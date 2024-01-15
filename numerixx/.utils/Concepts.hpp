@@ -64,6 +64,27 @@ namespace nxx
     template< typename T >
     concept IsFloatOrComplex = IsComplex< T > || nxx::IsFloat< T >;
 
+    namespace detail
+    {
+        template< typename T, typename = void >
+        struct is_callable : std::false_type
+        {
+        };
+
+        template< typename T >
+        struct is_callable< T, std::void_t< decltype(&T::operator()) > > : std::true_type
+        {
+        };
+
+        // Helper variable template
+        template< typename T >
+        inline constexpr bool is_callable_v = is_callable< T >::value;
+    }    // namespace detail
+
+    template< typename Func >
+    concept IsInvocable = detail::is_callable_v< Func >;
+
+
     /**
      * @brief Concept checking whether a type is a callable function object that returns a floating point type.
      * @tparam FN The type to check.
