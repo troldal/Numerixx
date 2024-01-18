@@ -28,20 +28,28 @@ int main()
     };
 
     MultiFunctionArray functions { f1, f2, f3 };
-    std::cout << functions.eval< blaze::DynamicVector >({ 0., 0., 0. }) << std::endl;
 
+    auto result1 = multisolve<SteepestDescent>(functions, { 2.0, 2.0, 2.0 });
+    auto result2 = multisolve<MultiNewton>(functions, *result1);
 
-    auto J = jacobian(functions, blaze::DynamicVector{ 0., 0., 0. });
-    std::cout << J << std::endl;
+    std::cout << "Root:\n" << *result2 << std::endl;
+    std::cout << "Result:\n" << functions(*result2) << std::endl;
 
-    // std::cout << std::fixed << std::setprecision(20);
-    // auto solver = DMultiNewton(functions, { 0.0, 0.0, 0.0 });
-    auto solver = SteepestDescent(functions, { 0.0, 0.0, 0.0 });
-    auto result = multisolve(solver, { 2.0, 2.0, 2.0 }, 1.0e-2, 1000);
-    std::cout << result << std::endl;
+    // auto               f1 = [](std::span< double > coeffs) { return 1 - coeffs[0]; };
+    // auto               f2 = [](std::span< double > coeffs) { return 10 * (coeffs[1] - coeffs[0] * coeffs[0]); };
+    // MultiFunctionArray functions { f1, f2 };
+    //
+    // auto result = multisolve< MultiNewton >(functions, { -10.0, -5.0 });
+    // std::cout << "Root:\n" << *result << std::endl;
+    // std::cout << "Result:\n" << functions(*result) << std::endl;
 
-    std::cout << functions.eval< blaze::DynamicVector>(result) << std::endl;
-
+    // auto               f1 = [](std::span< double > coeffs) { return pow(coeffs[0], 2) + coeffs[0] * coeffs[1] - 10; };
+    // auto               f2 = [](std::span< double > coeffs) { return coeffs[1] + 3 * coeffs[0] * pow(coeffs[1], 2) - 57; };
+    // MultiFunctionArray functions { f1, f2 };
+    //
+    // auto result = multisolve< MultiNewton >(functions, { 10., 10. });
+    // std::cout << "Root:\n" << *result << std::endl;
+    // std::cout << "Result:\n" << functions(*result) << std::endl;
 
     return 0;
 }

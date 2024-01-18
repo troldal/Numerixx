@@ -169,6 +169,11 @@ namespace nxx::roots
                 return m_bounds;
             }
 
+            /**
+             * @brief Performs a single iteration of the algorithm.
+             * @details This method must be implemented in the derived class, and
+             *          performs a single iteration of the root bracketing algorithm.
+             */
             void iterate() { std::invoke(static_cast< DERIVED& >(*this)); }
         };
     }    // namespace detail
