@@ -65,11 +65,12 @@ int main()
     std::cout << "Simpson:     " << integral_f1_simpson({ 0.0, 2.0 }) << "\n";
     std::cout << "Trapezoid:   " << integral_f1_trapezoid({ 0.0, 2.0 }) << "\n\n";
 
-    try {
-        auto tmp = integralOf< Trapezoid >(f1);
-        std::cout << tmp(f1_bounds, 1E-12, 5) << "\n";
-    }
-    catch (const nxx::NumerixxError& e) { std::cout << e.log() << "\n"; }
+    // TODO: This doesn't work on clang-cl
+    // try {
+    //     auto tmp = integralOf< Trapezoid >(f1);
+    //     std::cout << tmp(f1_bounds, 1E-12, 5) << "\n";
+    // }
+    // catch (const nxx::NumerixxError& e) { std::cout << e.log() << "\n"; }
 
     auto manualIntegrate = [](auto solver, double tolerance = 1e-12, int maxIterations = 25) {
         auto result = solver.current();

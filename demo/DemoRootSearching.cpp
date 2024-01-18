@@ -11,16 +11,16 @@
 
 #include <boost/multiprecision/cpp_bin_float.hpp>
 
-using NXX_FLOAT = boost::multiprecision::cpp_bin_float_50;
+using NXX_FLOAT = double;//boost::multiprecision::cpp_bin_float_50;
 
-template<>
-struct fmt::formatter< NXX_FLOAT > : fmt::formatter< double >
-{
-    auto format(const NXX_FLOAT& d, fmt::format_context& ctx) const
-    {
-        return fmt::formatter< double >::format(static_cast< double >(d), ctx);
-    }
-};
+// template<>
+// struct fmt::formatter< NXX_FLOAT > : fmt::formatter< double >
+// {
+//     auto format(const NXX_FLOAT& d, fmt::format_context& ctx) const
+//     {
+//         return fmt::formatter< double >::format(static_cast< double >(d), ctx);
+//     }
+// };
 
 
 int main()
@@ -114,12 +114,13 @@ int main()
 
     // The error object is a subclass of the RootError class, which is a subclass of the std::runtime_error
     // class. This means that the error object can be used in a try-catch block, as shown below.
-    try {
-        throw root.error();
-    }
-    catch (const RootError& e) {
-        std::cout << "Exception caught: " << e.what() << std::endl << std::endl;
-    }
+    // try {
+    //     throw root.error();
+    // }
+    // catch (const RootError& e) {
+    //     std::cout << "Exception caught: " << e.what() << std::endl << std::endl;
+    // }
+    // TODO: This doesn't work on clang-cl
 
     // ============================================================================================
     // If more fine-grained control is needed, the algorithms can be used directly. The algorithms

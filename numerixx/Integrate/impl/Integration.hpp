@@ -244,6 +244,22 @@ namespace nxx::integrate
      * @tparam FN The type of function to be integrated.
      * @tparam ARG_T The type of the argument for the function, defaulted to double.
      */
+
+    class MyFunctor2 {
+    public:
+        MyFunctor2(double lower_val, double h_val)
+            : n(1), lower(lower_val), h(h_val) {}
+
+        auto operator()() {
+            return lower + (2 * n++ - 1) * h;;
+        }
+
+    private:
+        int n; // Assuming 'n' is of type int. Adjust the type as necessary.
+        double lower; // Replace with the actual type of 'lower' if known.
+        double h; // Replace with the actual type if known.
+    };
+
     template<IsFloatInvocable FN, IsFloat ARG_T = double>
     class Trapezoid final : public detail::IntegrationBase< Trapezoid< FN, ARG_T >, FN, ARG_T >
     {
@@ -277,11 +293,14 @@ namespace nxx::integrate
             // Double the number of midpoints for this iteration
             if (m_iter > 1) m_midpointCount *= 2;
 
+            auto f = MyFunctor2(lower, BASE::m_interval);
+
             // Resize midPoints vector if necessary
             m_midpoints.resize(m_midpointCount);
             std::generate(m_midpoints.begin(),
                           m_midpoints.end(),
-                          [n = 1, lower, h = BASE::m_interval]() mutable { return lower + (2 * n++ - 1) * h; });
+                          // [n = 1, lower, h = BASE::m_interval]() mutable { return lower + (2 * n++ - 1) * h; });
+                          f); // For some reason, the lambda solution doesn't work on clang-cl
 
             // Calculate the sum of function values at the midpoints
             const RESULT_T sum =
@@ -449,6 +468,22 @@ namespace nxx::integrate
      * @tparam FN The type of function to be integrated.
      * @tparam ARG_T The type of the argument for the function, defaulted to double.
      */
+
+    class MyFunctor {
+    public:
+        MyFunctor(double lower_val, double h_val)
+            : n(0), lower(lower_val), h(h_val) {}
+
+        auto operator()() {
+            return lower + n++ * h;
+        }
+
+    private:
+        int n; // Assuming 'n' is of type int. Adjust the type as necessary.
+        double lower; // Replace with the actual type of 'lower' if known.
+        double h; // Replace with the actual type if known.
+    };
+
     template<IsFloatInvocable FN, IsFloat ARG_T = double>
     class Simpson final : public detail::IntegrationBase< Simpson< FN, ARG_T >, FN, ARG_T >
     {
@@ -485,11 +520,14 @@ namespace nxx::integrate
             // Calculate the total number of points
             int numOfPoints = numOfIntervals + 1;
 
+            auto f = MyFunctor(lower, BASE::m_interval);
+
             // Resize points vector if necessary
             points.resize(numOfPoints);
             std::generate(points.begin(),
                           points.end(),
-                          [n = 0, lower, h = BASE::m_interval]() mutable { return lower + n++ * h; });
+                          // [n = 0, lower, h = BASE::m_interval]() mutable { return lower + n++ * h; });
+                                f); // For some reason, the lambda solution doesn't work on clang-cl
 
             // Calculate the sum of function values at the points, with alternating coefficients 4 and 2
             RESULT_T sum = 0.0;
