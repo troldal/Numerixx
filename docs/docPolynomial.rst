@@ -4,7 +4,7 @@
 Polynomials
 ***********
 
-This sections describes classes and functions for creating polynomial functions of arbitrary order. Declarations can be found in :file:`poly/Polynomial.hpp`.
+The Polynomial section explores the :code:`Polynomial` class. It provides a powerful representation of mathematical polynomials for numerical manipulation and computation. This section will guide you through constructing polynomials, performing basic and advanced operations, handling polynomial-related errors, and working with real and complex coefficients. Declarations can be found in :file:`poly/Poly.hpp`.
 
 Overview
 ========

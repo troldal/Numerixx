@@ -28,13 +28,30 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-
 #ifndef NUMERIXX_ROOTS_HPP
 #define NUMERIXX_ROOTS_HPP
 
-#include "RootSearching.hpp"
-#include "RootBracketing.hpp"
-#include "RootPolishing.hpp"
+#include <Constants.hpp>
+#include <Concepts.hpp>
+
+namespace nxx::roots
+{
+    template<template< typename, typename, typename > class SOLVER_T,
+        IsFloatOrComplexInvocable FN_T,
+        IsFloatOrComplexInvocable DERIV_T,
+        IsFloatOrComplex GUESS_T,
+        IsFloat EPS_T = GUESS_T,
+        std::integral ITER_T = int>
+    auto fdfsolve(FN_T    function,
+                  DERIV_T derivative,
+                  GUESS_T guess,
+                  EPS_T   eps     = epsilon< GUESS_T >(),
+                  ITER_T  maxiter = iterations< GUESS_T >());
+}
+
+
+#include "impl/RootBracketing.hpp"
+#include "impl/RootPolishing.hpp"
+#include "impl/RootSearching.hpp"
 
 #endif    // NUMERIXX_ROOTS_HPP
-

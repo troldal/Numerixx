@@ -32,7 +32,11 @@
 *.app
 
 # Python environment
-venv
+venv*/
 
-_build
-cmake-build-*
+# Build directories
+cmake-build-*/
+out/
+
+# IDEs and editors
+.vs/

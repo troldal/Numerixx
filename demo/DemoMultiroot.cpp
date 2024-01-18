@@ -2,38 +2,54 @@
 // Created by Kenneth Balslev on 09/12/2022.
 //
 
+#include <Multiroots.hpp>
+#include <blaze/Blaze.h>
+#include <cmath>
 #include <deque>
+#include <iomanip>
 #include <iostream>
 #include <list>
-#include <numerixx.hpp>
+#include <numbers>
+#include <span>
 #include <vector>
-#include <cmath>
 
 int main()
 {
+    std::cout << std::fixed << std::setprecision(8);
     using namespace nxx::deriv;
     using namespace nxx::multiroots;
 
-//    std::vector< std::function< double(std::vector< double >) > > fns = {
-//        [](const std::vector< double >& coeffs) { return coeffs[1] * coeffs[1] * (1.0 - coeffs[0]) - coeffs[0] * coeffs[0] * coeffs[0]; },
-//        [](const std::vector< double >& coeffs) { return coeffs[0] * coeffs[0] + coeffs[1] * coeffs[1] - 1.0; }
-//    };
-
-//    std::vector< std::function< double(std::vector< double >) > > fns = {
-//        [](const std::vector< double >& coeffs) { return 1 - coeffs[0]; },
-//        [](const std::vector< double >& coeffs) { return 10 * (coeffs[1] - coeffs[0] * coeffs[0]);}
-//    };
-
-    std::vector< std::function< double(std::vector< double >) > > fns = {
-        [](const std::vector< double >& coeffs) { return 3 * coeffs[0] - std::cos(coeffs[1]*coeffs[2]) - 0.5; },
-        [](const std::vector< double >& coeffs) { return coeffs[0] * coeffs[0] - 81*std::pow(coeffs[1] + 0.1,2)+std::sin(coeffs[2])+1.06; },
-        [](const std::vector< double >& coeffs) { return std::exp(-coeffs[0]*coeffs[1]) + 20*coeffs[2] + (10*M_PI-3)/3; }
+    auto f1 = [](std::span< double > coeffs) { return 3 * coeffs[0] - std::cos(coeffs[1] * coeffs[2]) - 0.5; };
+    auto f2 = [](std::span< double > coeffs) {
+        return coeffs[0] * coeffs[0] - 81 * std::pow(coeffs[1] + 0.1, 2) + std::sin(coeffs[2]) + 1.06;
+    };
+    auto f3 = [](std::span< double > coeffs) {
+        return std::exp(-coeffs[0] * coeffs[1]) + 20 * coeffs[2] + (10 * std::numbers::pi - 3) / 3;
     };
 
-    std::cout << std::fixed;
-    auto solver = nxx::multiroots::DMultiNewton(fns);
-    auto result = multisolve(solver, { 2.0, 2.0, 2.0 }, 1.0e-6, 100);
-    for (auto g : result) std::cout << g << std::endl;
+    MultiFunctionArray functions { f1, f2, f3 };
+
+    auto result1 = multisolve<SteepestDescent>(functions, { 2.0, 2.0, 2.0 });
+    auto result2 = multisolve<MultiNewton>(functions, *result1);
+
+    std::cout << "Root:\n" << *result2 << std::endl;
+    std::cout << "Result:\n" << functions(*result2) << std::endl;
+
+    // auto               f1 = [](std::span< double > coeffs) { return 1 - coeffs[0]; };
+    // auto               f2 = [](std::span< double > coeffs) { return 10 * (coeffs[1] - coeffs[0] * coeffs[0]); };
+    // MultiFunctionArray functions { f1, f2 };
+    //
+    // auto result = multisolve< MultiNewton >(functions, { -10.0, -5.0 });
+    // std::cout << "Root:\n" << *result << std::endl;
+    // std::cout << "Result:\n" << functions(*result) << std::endl;
+
+    // auto               f1 = [](std::span< double > coeffs) { return pow(coeffs[0], 2) + coeffs[0] * coeffs[1] - 10; };
+    // auto               f2 = [](std::span< double > coeffs) { return coeffs[1] + 3 * coeffs[0] * pow(coeffs[1], 2) - 57; };
+    // MultiFunctionArray functions { f1, f2 };
+    //
+    // auto result = multisolve< MultiNewton >(functions, { 10., 10. });
+    // std::cout << "Root:\n" << *result << std::endl;
+    // std::cout << "Result:\n" << functions(*result) << std::endl;
 
     return 0;
 }

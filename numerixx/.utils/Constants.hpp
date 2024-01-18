@@ -1,14 +1,14 @@
 /*
-    o.     O O       o Oo      oO o.OOoOoo `OooOOo.  ooOoOOo o      O o      O
-    Oo     o o       O O O    o o  O        o     `o    O     O    o   O    o
-    O O    O O       o o  o  O  O  o        O      O    o      o  O     o  O
-    O  o   o o       o O   Oo   O  ooOO     o     .O    O       oO       oO
-    O   o  O o       O O        o  O        OOooOO'     o       Oo       Oo
-    o    O O O       O o        O  o        o    o      O      o  o     o  o
-    o     Oo `o     Oo o        O  O        O     O     O     O    O   O    O
-    O     `o  `OoooO'O O        o ooOooOoO  O      o ooOOoOo O      o O      o
+    888b      88  88        88  88b           d88  88888888888  88888888ba   88  8b        d8  8b        d8
+    8888b     88  88        88  888b         d888  88           88      "8b  88   Y8,    ,8P    Y8,    ,8P
+    88 `8b    88  88        88  88`8b       d8'88  88           88      ,8P  88    `8b  d8'      `8b  d8'
+    88  `8b   88  88        88  88 `8b     d8' 88  88aaaaa      88aaaaaa8P'  88      Y88P          Y88P
+    88   `8b  88  88        88  88  `8b   d8'  88  88"""""      88""""88'    88      d88b          d88b
+    88    `8b 88  88        88  88   `8b d8'   88  88           88    `8b    88    ,8P  Y8,      ,8P  Y8,
+    88     `8888  Y8a.    .a8P  88    `888'    88  88           88     `8b   88   d8'    `8b    d8'    `8b
+    88      `888   `"Y8888Y"'   88     `8'     88  88888888888  88      `8b  88  8P        Y8  8P        Y8
 
-    Copyright © 2023 Kenneth Troldal Balslev
+    Copyright © 2022 Kenneth Troldal Balslev
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the “Software”), to deal
@@ -31,11 +31,33 @@
 #ifndef NUMERIXX_CONSTANTS_HPP
 #define NUMERIXX_CONSTANTS_HPP
 
-namespace nxx {
+#include <boost/multiprecision/cpp_bin_float.hpp>
 
-    constexpr int MAXITER = 100;
-    constexpr double EPS = 1.0E-8;
+namespace nxx
+{
+    constexpr int    MAXITER = 10000;  // Maximum number of iterations
+    constexpr double EPS     = 1.0E-8; // Tolerance for convergence
 
-}
+    template<typename T>
+    T epsilon()
+    {
+        using std::pow;
+        return pow(std::numeric_limits< T >::epsilon(), 2.0 / 3.0);
+    }
+
+    template<typename T>
+    int iterations()
+    {
+        using std::pow;
+        return static_cast< decltype(std::numeric_limits< T >::digits10) >(pow(std::numeric_limits< T >::digits10, 2));
+    }
+
+    template<typename T>
+    T StepSize()
+    {
+        using std::pow;
+        return pow(std::numeric_limits< T >::epsilon(), 1.0 / 3.0);
+    }
+} // namespace nxx
 
 #endif    // NUMERIXX_CONSTANTS_HPP

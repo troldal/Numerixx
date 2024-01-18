@@ -1,8 +1,8 @@
 #==================================================================================================================
 # Preamble
 #==================================================================================================================
-cmake_minimum_required(VERSION 3.24 FATAL_ERROR)
-project(Numerixx.Demos)
+cmake_minimum_required(VERSION 3.26 FATAL_ERROR)
+project(numerixx.samples)
 
 #==============================================================================
 # Set compiler settings
@@ -10,13 +10,17 @@ project(Numerixx.Demos)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include(FetchContent)
-FetchContent_Declare(Format
-        GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-        GIT_TAG        a337011
-        )
+find_package(Boost REQUIRED)
+#find_package(fmt REQUIRED)
 
-FetchContent_MakeAvailable(Format)
+include(FetchContent)
+FetchContent_Declare(fmt
+        GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+        GIT_TAG master
+)
+FetchContent_MakeAvailable(fmt)
+
+
 
 #=================================================================================================================
 # Define targets
@@ -29,7 +33,7 @@ target_sources(DemoRootFinding
         DemoRootFinding.cpp
         )
 
-target_link_libraries(DemoRootFinding PRIVATE fmt numerixx)
+target_link_libraries(DemoRootFinding PRIVATE numerixx::roots fmt::fmt)
 
 # Target: Root searching
 add_executable(DemoRootSearching)
@@ -38,7 +42,7 @@ target_sources(DemoRootSearching
         DemoRootSearching.cpp
         )
 
-target_link_libraries(DemoRootSearching PRIVATE fmt numerixx)
+target_link_libraries(DemoRootSearching PRIVATE numerixx::roots fmt::fmt)
 
 # Target: Function
 add_executable(DemoFunction)
@@ -47,7 +51,7 @@ target_sources(DemoFunction
         DemoFunction.cpp
         )
 
-target_link_libraries(DemoFunction PRIVATE fmt numerixx)
+target_link_libraries(DemoFunction PRIVATE numerixx::func fmt::fmt)
 
 
 # Target: Polynomials
@@ -57,16 +61,7 @@ target_sources(DemoPoly
         DemoPoly.cpp
         )
 
-target_link_libraries(DemoPoly PRIVATE fmt numerixx)
-
-# Target: Matrix and Linear Algebra
-add_executable(DemoMatrix)
-target_sources(DemoMatrix
-        PRIVATE
-        DemoMatrix.cpp
-        )
-
-target_link_libraries(DemoMatrix PRIVATE fmt numerix)
+target_link_libraries(DemoPoly PRIVATE numerixx::poly fmt::fmt)
 
 # Target: Numerical derivatives
 add_executable(DemoDeriv)
@@ -75,17 +70,44 @@ target_sources(DemoDeriv
         DemoDeriv.cpp
         )
 
-target_link_libraries(DemoDeriv PRIVATE fmt numerixx)
+target_link_libraries(DemoDeriv PRIVATE numerixx::deriv fmt::fmt)
+
+# Target: Numerical integration
+add_executable(DemoIntegrate)
+target_sources(DemoIntegrate
+        PRIVATE
+        DemoIntegrate.cpp
+)
+
+target_link_libraries(DemoIntegrate PRIVATE numerixx::integrate fmt::fmt)
+
+# Target: Numerical interpolation
+add_executable(DemoInterpolate)
+target_sources(DemoInterpolate
+        PRIVATE
+        DemoInterpolate.cpp
+)
+
+target_link_libraries(DemoInterpolate PRIVATE numerixx::interpolate fmt::fmt)
+
+# Target: Numerical optimization
+add_executable(DemoOptimize)
+target_sources(DemoOptimize
+        PRIVATE
+        DemoOptimize.cpp
+)
+
+target_link_libraries(DemoOptimize PRIVATE numerixx::optimize fmt::fmt)
+
 
 # Target: Multiple root-finding
-find_package(LAPACK REQUIRED)
 add_executable(DemoMultiroot)
 target_sources(DemoMultiroot
         PRIVATE
         DemoMultiroot.cpp
         )
 
-target_link_libraries(DemoMultiroot PRIVATE  LAPACK::LAPACK numerixx)
+target_link_libraries(DemoMultiroot PRIVATE fmt numerixx::multiroots fmt::fmt)
 
 #=======================================================================================================================
 # COMPILER FLAGS
@@ -96,7 +118,22 @@ list(APPEND OPENXLSX_DEBUG_FLAGS_GNU
         "-Wduplicated-cond"
         "-Wduplicated-branches"
         "-Wlogical-op"
-        "-Wnull-dereference")
+        "-Wnull-dereference"
+        "-Wall"
+        "-Wextra"
+        "-Wshadow"
+        "-Wnon-virtual-dtor"
+        "-Wold-style-cast"
+        "-Wcast-align"
+        "-Wunused"
+        "-Woverloaded-virtual"
+        "-Wpedantic"
+        "-Wconversion"
+        "-Wdouble-promotion"
+        "-Wformat=2"
+        "-Weffc++"
+        "-Wno-unknown-pragmas"
+)
 list(APPEND OPENXLSX_DEBUG_FLAGS_GNUCLANG
         "-Wall"
         "-Wextra"
@@ -111,7 +148,12 @@ list(APPEND OPENXLSX_DEBUG_FLAGS_GNUCLANG
         "-Wdouble-promotion"
         "-Wformat=2"
         "-Weffc++"
-        "-Wno-unknown-pragmas")
+        "-Wno-unknown-pragmas"
+        "-Wno-c++98-compat"
+        "-Wno-c++98-compat-pedantic"
+        "-Wno-documentation"
+        "-Wno-documentation-unknown-command"
+)
 list(APPEND OPENXLSX_DEBUG_FLAGS_MSVC
         "/permissive"
         "/W4"
@@ -135,25 +177,25 @@ list(APPEND OPENXLSX_DEBUG_FLAGS_MSVC
         "/w14906"
         "/w14928"
         "/wd4251"
-        "/wd4275")
+        "/wd4275"
+        "/guard:cf")
 list(APPEND OPENXLSX_RELEASE_FLAGS_MSVC
         "/wd4251"
         "/wd4275")
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     target_compile_options(DemoRootFinding PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNU}>)
+    target_compile_options(DemoRootSearching PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNU}>)
     target_compile_options(DemoPoly PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNU}>)
-    target_compile_options(DemoMatrix PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNU}>)
     target_compile_options(DemoDeriv PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNU}>)
     target_compile_options(DemoMultiroot PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNU}>)
 
 
 elseif (("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR
-("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang") OR
-("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU"))
+("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
     target_compile_options(DemoRootFinding PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNUCLANG}>)
+    target_compile_options(DemoRootSearching PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNUCLANG}>)
     target_compile_options(DemoPoly PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNUCLANG}>)
-    target_compile_options(DemoMatrix PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNUCLANG}>)
     target_compile_options(DemoDeriv PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNUCLANG}>)
     target_compile_options(DemoMultiroot PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_GNUCLANG}>)
 
@@ -162,11 +204,11 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     target_compile_options(DemoRootFinding PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_MSVC}>)
     target_compile_options(DemoRootFinding PRIVATE $<$<CONFIG:Release>:${OPENXLSX_RELEASE_FLAGS_MSVC}>)
 
+    target_compile_options(DemoRootSearching PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_MSVC}>)
+    target_compile_options(DemoRootSearching PRIVATE $<$<CONFIG:Release>:${OPENXLSX_RELEASE_FLAGS_MSVC}>)
+
     target_compile_options(DemoPoly PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_MSVC}>)
     target_compile_options(DemoPoly PRIVATE $<$<CONFIG:Release>:${OPENXLSX_RELEASE_FLAGS_MSVC}>)
-
-    target_compile_options(DemoMatrix PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_MSVC}>)
-    target_compile_options(DemoMatrix PRIVATE $<$<CONFIG:Release>:${OPENXLSX_RELEASE_FLAGS_MSVC}>)
 
     target_compile_options(DemoDeriv PRIVATE $<$<CONFIG:Debug>:${OPENXLSX_DEBUG_FLAGS_MSVC}>)
     target_compile_options(DemoDeriv PRIVATE $<$<CONFIG:Release>:${OPENXLSX_RELEASE_FLAGS_MSVC}>)

@@ -6,13 +6,32 @@
 #include <fmt/format.h>
 #include <iomanip>
 #include <iostream>
-#include <numerixx.hpp>
+#include <iomanip>
+//#include <numerixx.hpp>
+#include <Roots.hpp>
+
+#include <boost/multiprecision/cpp_bin_float.hpp>
+
+using NXX_FLOAT = double;//boost::multiprecision::cpp_bin_float_50;
+
+// template<>
+// struct fmt::formatter< NXX_FLOAT > : fmt::formatter< double >
+// {
+//     auto format(const NXX_FLOAT& d, fmt::format_context& ctx) const
+//     {
+//         return fmt::formatter< double >::format(static_cast< double >(d), ctx);
+//     }
+// };
+
 
 int main()
 {
     using namespace nxx::roots;
     std::cout << std::fixed << std::setprecision(8);
-    auto func = nxx::poly::Polynomial({ -5.0, 0.0, 1.0 });
+    // auto func = nxx::poly::Polynomial({ NXX_FLOAT(-5.0), NXX_FLOAT(0.0), NXX_FLOAT(1.0) });
+    auto func = [](nxx::IsFloat auto x) { return x * x - decltype(x)(5.0); };
+
+    auto xyz = *search< BracketExpandUp >(func, { NXX_FLOAT(1.0), NXX_FLOAT(1.1) });
 
     // ============================================================================================
     // The nxx::roots namespace contains a number of search algorithms, for finding a bracketing
@@ -49,13 +68,13 @@ int main()
 
     auto PrintBounds = [](auto b) { return std::string("(" + std::to_string(b.first) + ", " + std::to_string(b.second) + ")"); };
 
-    std::cout << "\nIdentify the brackets around the root of the polynomial: " << func.asString() << "\n";
-    std::cout << "BracketExpandUp Method:         " << PrintBounds(*search(BracketExpandUp(func), { 1.0, 1.1 })) << std::endl;
-    std::cout << "BracketSearchUp Method:         " << PrintBounds(*search(BracketSearchUp(func), { 1.0, 1.1 })) << std::endl;
-    std::cout << "BracketExpandDown Method:       " << PrintBounds(*search(BracketExpandDown(func), { 4.9, 5.0 })) << std::endl;
-    std::cout << "BracketSearchDown Method:       " << PrintBounds(*search(BracketSearchDown(func), { 4.9, 5.0 })) << std::endl;
-    std::cout << "BracketExpandOut Method:        " << PrintBounds(*search(BracketExpandOut(func), { 1.0, 1.1 })) << std::endl;
-    std::cout << "BracketSubdivide Method:        " << PrintBounds(*search(BracketSubdivide(func), { -5.0, 10.0 })) << std::endl;
+    // std::cout << "\nIdentify the brackets around the root of the polynomial: " << to_string(func) << "\n";
+    std::cout << "BracketExpandUp Method:         " << PrintBounds(*search< BracketExpandUp >(func, { 1.0, 1.1 })) << std::endl;
+    std::cout << "BracketSearchUp Method:         " << PrintBounds(*search< BracketSearchUp >(func, { 1.0, 1.1 })) << std::endl;
+    std::cout << "BracketExpandDown Method:       " << PrintBounds(*search< BracketExpandDown >(func, { 4.9, 5.0 })) << std::endl;
+    std::cout << "BracketSearchDown Method:       " << PrintBounds(*search< BracketSearchDown >(func, { 4.9, 5.0 })) << std::endl;
+    std::cout << "BracketExpandOut Method:        " << PrintBounds(*search< BracketExpandOut >(func, { 1.0, 1.1 })) << std::endl;
+    std::cout << "BracketSubdivide Method:        " << PrintBounds(*search< BracketSubdivide >(func, { -5.0, 10.0 })) << std::endl;
 
     // The given polynomial has two roots, one at x = -2.23606798, and the other at x = 2.23606798. The examples above finds the
     // bracketing interval for the root at x = 2.23606798, except for the BracketSubdivide method, which finds the bracketing
@@ -69,8 +88,8 @@ int main()
     // The following code uses a searchFactor of 2.0, and a maxiter of 10.
 
     std::cout << "\nIdentify the brackets around the root of the polynomial, using a searchFactor of 2.0 and maxiter = 10: "
-              << "\n";
-    std::cout << "BracketExpandUp Method:         " << PrintBounds(*search(BracketExpandUp(func), { 1.0, 1.1 }, 2.0, 10)) << std::endl;
+        << "\n";
+    std::cout << "BracketExpandUp Method:         " << PrintBounds(*search< BracketExpandUp >(func, { 1.0, 1.1 }, 2.0, 10)) << std::endl;
 
     // ============================================================================================
     // As mentioned above, the search() function will return a tl::expected object, which will
@@ -87,21 +106,22 @@ int main()
     };
 
     std::cout << "Initial Bracket:   [5.0, 10.0] (expanding down)\n";
-    auto root = search(BracketExpandDown([](double x) { return std::log(x); }), { 5.0, 10.0 });
+    auto root = search< BracketExpandDown >([](double x) { return std::log(x); }, { 5.0, 10.0 });
     if (!root) print_error(root.error());
 
     std::cout << "Initial Bracket:   [5.0, 10.0] (expanding up)\n";
-    root = search(BracketExpandUp([](double x) { return std::log(x); }), { 5.0, 10.0 }, 1.0, 10);
+    root = search< BracketExpandUp >([](double x) { return std::log(x); }, { 5.0, 10.0 }, 1.0, 10);
     if (!root) print_error(root.error());
 
     // The error object is a subclass of the RootError class, which is a subclass of the std::runtime_error
     // class. This means that the error object can be used in a try-catch block, as shown below.
-    try {
-        throw root.error();
-    }
-    catch (const RootError& e) {
-        std::cout << "Exception caught: " << e.what() << std::endl << std::endl;
-    }
+    // try {
+    //     throw root.error();
+    // }
+    // catch (const RootError& e) {
+    //     std::cout << "Exception caught: " << e.what() << std::endl << std::endl;
+    // }
+    // TODO: This doesn't work on clang-cl
 
     // ============================================================================================
     // If more fine-grained control is needed, the algorithms can be used directly. The algorithms
@@ -112,35 +132,36 @@ int main()
     // ============================================================================================
 
     // Ad hoc lambda function to print the current iteration:
-    auto find_bracket = [](auto solver, std::pair< double, double > bounds) {
+    auto find_bracket = [](auto solver) {
         // Print the header:
         std::cout << "----------------------------------------------------------------\n";
         std::cout << fmt::format("{:>10} | {:>15} | {:>15} | {:>15} ", "Iter", "Lower", "Upper", "Factor") << std::endl;
         std::cout << "----------------------------------------------------------------\n";
 
-        // Initialize the solver:
-        solver.init(bounds);
-
         // Iterate until convergence (or until 100 iterations have been performed):
         for (int i = 0; i <= 100; ++i) {
             // Print the current iteration:
             std::cout << fmt::format("{:10} | {:15.10f} | {:15.10f} | {:15.10f} ",
-                                     i,                         // Iteration number
-                                     solver.bounds().first,     // Lower bound
-                                     solver.bounds().second,    // Upper bound
-                                     solver.factor())           // Expansion factor
-                      << std::endl;
+                                     i,
+                                     // Iteration number
+                                     solver.current().first,
+                                     // Lower bound
+                                     solver.current().second,
+                                     // Upper bound
+                                     solver.ratio()) // Expansion factor
+                << std::endl;
 
             // Check if a root is in the current interval:
-            if (solver.evaluate(solver.bounds().first) * solver.evaluate(solver.bounds().second) < 0.0) break;
+            if (solver.evaluate(solver.current().first) * solver.evaluate(solver.current().second) < 0.0) break;
 
             // Perform one iteration:
             solver.iterate();
         }
 
         // Print the final result:
-        std::cout << std::fixed << std::setprecision(10) << "SUCCESS! Bounds found at: (" << solver.bounds().first << ", "
-                  << solver.bounds().second << ")\n";
+        std::cout << std::fixed << std::setprecision(10)
+            << "SUCCESS! Bounds found at: (" << solver.current().first << ", "
+            << solver.current().second << ")\n";
         std::cout << "----------------------------------------------------------------\n\n";
     };
 
@@ -148,12 +169,22 @@ int main()
               << "\n\n";
 
     std::cout << "BracketExpandUp Method:         " << std::endl;
-    BracketExpandUp solver(func);
-    find_bracket(solver, { 1.0, 1.1 });
+    find_bracket(BracketExpandUp(func, { 1.0, 1.1 }));
+
+    std::cout << "BracketSearchUp Method:         " << std::endl;
+    find_bracket(BracketSearchUp(func, { 1.0, 1.1 }));
+
+    std::cout << "BracketExpandDown Method:         " << std::endl;
+    find_bracket(BracketExpandDown(func, { 4.9, 5.0 }));
+
+    std::cout << "BracketSearchDown Method:         " << std::endl;
+    find_bracket(BracketSearchDown(func, { 4.9, 5.0 }));
+
+    std::cout << "BracketExpandOut Method:         " << std::endl;
+    find_bracket(BracketExpandOut(func, { 1.0, 1.1 }));
 
     std::cout << "BracketSubdivide Method:         " << std::endl;
-    BracketSubdivide solver2(func);
-    find_bracket(solver2, { -50.0, 100.0 });
+    find_bracket(BracketSubdivide(func, { -5.0, 10.0 }));
 
     return 0;
 }

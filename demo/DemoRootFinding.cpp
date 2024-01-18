@@ -3,17 +3,34 @@
 // ================================================================================================
 
 #include <algorithm>
+#include <deque>
 #include <array>
-#include <fmt/format.h>
 #include <iomanip>
 #include <iostream>
-#include <numerixx.hpp>
+#include <Deriv.hpp>
+#include <Roots.hpp>
+#include <concepts>
+#include <fmt/format.h>
+#include <boost/multiprecision/cpp_bin_float.hpp>
+
+using NXX_FLOAT = double;//boost::multiprecision::cpp_bin_float_50;
+
+// template<>
+// struct fmt::formatter< NXX_FLOAT > : fmt::formatter< double >
+// {
+//     auto format(const NXX_FLOAT& d, fmt::format_context& ctx) const
+//     {
+//         return fmt::formatter< double >::format(static_cast< double >(d), ctx);
+//     }
+// };
 
 int main()
 {
     using namespace nxx::roots;
+    using namespace boost::multiprecision;
     std::cout << std::fixed << std::setprecision(8);
-    auto func = [](double x) { return x * x - 5.0; };
+    auto                                    func   = [](nxx::IsFloat auto x) { return x * x - decltype(x)(5.0); };
+    const std::pair< NXX_FLOAT, NXX_FLOAT > bounds = { 0.0, 2.5 };
 
     // ============================================================================================
     // The nxx::roots namespace contains a number of root-finding algorithms, for finding the roots
@@ -48,13 +65,14 @@ int main()
     // contain a value, the result of using the * operator is undefined.
     // ============================================================================================
     std::cout << "\nCompute the root of the polynomial f(x) = x^2 - 5 using bracketing methods:\n";
-    std::cout << "Bisection Method:         " << *fsolve(Bisection(func), { 0.0, 2.5 }, 1.0E-15) << std::endl;
-    std::cout << "Ridder's Method:          " << *fsolve(Ridder(func), { 0.0, 2.5 }, 1.0E-15) << std::endl;
-    std::cout << "Regula Falsi Method:      " << *fsolve(RegulaFalsi(func), { 0.0, 2.5 }, 1.0E-15) << std::endl << std::endl;
+    std::cout << "Bisection Method:         " << *fsolve< Bisection >(func, { 0.0, 2.5 }) << std::endl;
+    std::cout << "Ridder's Method:          " << *fsolve< Ridder >(func, bounds) << std::endl;
+    std::cout << "Regula Falsi Method:      " << *fsolve< RegulaFalsi >(func, bounds) << std::endl << std::endl;
 
     std::cout << "\nCompute the root of the polynomial f(x) = x^2 - 5 using polishing methods:\n";
-    std::cout << "Discrete Newton's Method: " << *fdfsolve(DNewton(func), 1.25, 1.0E-15) << std::endl;
-    std::cout << "Newton's Method:          " << *fdfsolve(Newton(func, derivativeOf(func)), 1.25, 1.0E-15) << std::endl << std::endl;
+    std::cout << "Newton's Method:          " << *fdfsolve< Newton >(func, nxx::deriv::derivativeOf(func), NXX_FLOAT(1.25)) << std::endl <<
+        std::endl;
+
     // Note that the Discrete Newton's Method uses the numerical derivative of the function, while
     // Newton's Method requires a separate function for the derivative.
 
@@ -73,35 +91,34 @@ int main()
         std::cout << "Iterations:        " << error.iterations() << std::endl << std::endl;
     };
 
-    std::cout << "Initial Bracket:   [5.0, 10.0]\n";    // This bracket does not contain a root
-    auto root = fsolve(Bisection([](double x) { return std::log(x); }), { 5.0, 10.0 }, 1.0E-15);
+    auto log_func = [](std::floating_point auto x) { return std::log(x); };
+
+    std::cout << "Initial Bracket:   [5.0, 10.0]\n"; // This bracket does not contain a root
+    auto root = fsolve< Bisection >(log_func, { 5.0, 10.0 });
     if (!root) print_error(root.error());
 
-    std::cout << "Initial Bracket:   [-5.0, 10.0]\n";    // The function is undefined at x <= 0
-    root = fsolve(Bisection([](double x) { return std::log(x); }), { -5.0, 10.0 }, 1.0E-15);
+    std::cout << "Initial Bracket:   [-5.0, 10.0]\n"; // The function is undefined at x <= 0
+    root = fsolve< Bisection >(log_func, { -5.0, 10.0 });
     if (!root) print_error(root.error());
 
     std::cout << "Initial Bracket:   [0.1, 200.0]\n";    // This bracket contains a root, but will require many iterations
-    root = fsolve(Bisection([](double x) { return std::log(x); }), { 0.1, 200.0 }, 1.0E-15, 5);
+    root = fsolve< Bisection >(log_func, { 0.1, 200.0 }, 1.0E-15, 5);
     if (!root) print_error(root.error());
 
     // The error object is a subclass of the RootError class, which is a subclass of the std::runtime_error
     // class. This means that the error object can be used in a try-catch block, as shown below.
-    try {
-        throw root.error();
-    }
-    catch (const RootError& e) {
-        std::cout << "Exception caught: " << e.what() << std::endl << std::endl;
-    }
+    // try { throw root.error(); }
+    // catch (const RootError& e) { std::cout << "Exception caught: " << e.what() << std::endl << std::endl; }
+    // TODO: This doesn't work on clang-cl
 
     // The error object from the fdfsolve() function works in the same way.
     std::cout << "Compute the root of the function f(x) = log(x) using the DNewton method:\n\n";
-    std::cout << "Initial Guess = 0.0:\n";    // The function is undefined at x <= 0
-    root = fdfsolve(DNewton([](double x) { return std::log(x); }), 0.0, 1.0E-15);
+    std::cout << "Initial Guess = 0.0:\n"; // The function is undefined at x <= 0
+    root = fdfsolve< Newton >(log_func, nxx::deriv::derivativeOf(log_func), 0.0, 1.0E-15);
     if (!root.has_value()) print_error(root.error());
 
-    std::cout << "Initial Guess = 1E-3:\n";    // This guess is close to the root, but will require many iterations
-    root = fdfsolve(DNewton([](double x) { return std::log(x); }), 1E-3, 1.0E-15, 5);
+    std::cout << "Initial Guess = 1E-3:\n"; // This guess is close to the root, but will require many iterations
+    root = fdfsolve< Newton >(log_func, nxx::deriv::derivativeOf(log_func), 1E-3, 1.0E-15, 5);
     if (!root.has_value()) print_error(root.error());
 
     // ============================================================================================
@@ -115,25 +132,27 @@ int main()
     // The following code shows how to use the bracketing solvers and the polishing solvers directly.
     // ============================================================================================
 
+
     // Lambda function for printing the results of the bracketing solvers:
-    auto bracket_root = [](auto solver, std::pair< double, double > bounds) {
+    auto bracket_root = [](auto solver) {
+        //, std::pair< double, double > bounds) {
         // Print the header:
         std::cout << "----------------------------------------------------------------------------------\n";
         std::cout << fmt::format("{:>10} | {:>15} | {:>15} | {:>15} | {:>15} ", "Iter", "Upper", "Lower", "Root", "Error") << std::endl;
         std::cout << "----------------------------------------------------------------------------------\n";
 
         // Create variables for the iterations.
-        std::array< decltype(bounds), 2 > guesses;    // Stores the endpoints of the bracketing interval
-        decltype(guesses.begin())         min;        // Stores the endpoint with the smallest absolute value
+        std::array< std::pair< NXX_FLOAT, NXX_FLOAT >, 2 > guesses; // Stores the endpoints of the bracketing interval
+        decltype(guesses.begin())                          min;     // Stores the endpoint with the smallest absolute value
 
         // Initialize the solver:
-        solver.init(bounds);
+        // solver.init(bounds);
 
         // Iterate until convergence (or until 100 iterations have been performed):
-        for (int i = 0; i <= 100; ++i) {
+        for (auto i = 0; i <= nxx::iterations<NXX_FLOAT>(); ++i) {
             // Retrieve the current bracketing interval, and evaluate the function at the endpoints:
-            guesses = { std::make_pair(solver.bounds().first, abs(solver.evaluate(solver.bounds().first))),
-                        std::make_pair(solver.bounds().second, abs(solver.evaluate(solver.bounds().second))) };
+            guesses = { std::make_pair(solver.current().first, abs(solver.evaluate(solver.current().first))),
+                        std::make_pair(solver.current().second, abs(solver.evaluate(solver.current().second))) };
 
             // Find the endpoint which has the smallest error:
             min = std::min_element(guesses.begin(), guesses.end(), [](const auto& a, const auto& b) {
@@ -142,43 +161,50 @@ int main()
 
             // Print the current iteration:
             std::cout << fmt::format("{:10} | {:15.10f} | {:15.10f} | {:15.10f} | {:15.10f} ",
-                                     i,                         // Iteration number
-                                     solver.bounds().first,     // Upper endpoint
-                                     solver.bounds().second,    // Lower endpoint
+                                     i,
+                                     // Iteration number
+                                     solver.current().first,
+                                     // Upper endpoint
+                                     solver.current().second,
+                                     // Lower endpoint
                                      min->first,                // Root
                                      min->second)               // Error
-                      << std::endl;
+                << std::endl;
 
             // Check if convergence has been reached:
-            if (min->second < 1.0E-15) break;
+            if (min->second < nxx::epsilon< typename decltype(solver)::RESULT_T >()) break;
 
             // Perform one iteration:
             solver.iterate();
         }
 
         // Print the final result:
-        std::cout << std::fixed << std::setprecision(20) << "CONVERGED! Root found at: " << min->first << "\n";
+        std::cout << std::fixed << std::setprecision(50) << "CONVERGED! Root found at: " << min->first << "\n";
+        std::cout << std::fixed << std::setprecision(50) << "Function value at root:   " << solver.evaluate(min->first) << "\n";
         std::cout << "----------------------------------------------------------------------------------\n\n";
     };
 
     std::cout << "Manual root-finding using Ridder's method:" << std::endl;
-    bracket_root(Ridder(func), { 0.0, 2.5 });
+    bracket_root(Ridder(func, { 0.0, 2.5 }));
+    bracket_root(Ridder(func, bounds));
 
     std::cout << "Manual root-finding using the bisection method:" << std::endl;
-    bracket_root(Bisection(func), { 0.0, 2.5 });
+    bracket_root(Bisection(func, { 0.0, 2.5 }));
+    bracket_root(Bisection(func, bounds));
 
     std::cout << "Manual root-finding using the regula falsi method:" << std::endl;
-    bracket_root(RegulaFalsi(func), { 0.0, 2.5 });
+    bracket_root(RegulaFalsi(func, { 0.0, 2.5 }));
+    bracket_root(RegulaFalsi(func, bounds));
 
     // Lambda function for printing the results of the polishing solvers:
-    auto polish_root = [](auto solver, double guess) {
+    auto polish_root = [](auto solver, NXX_FLOAT guess) {
         // Print the header:
         std::cout << "------------------------------------------------------------------\n";
         std::cout << fmt::format("{:>10} | {:>25} | {:>25} ", "Iter", "Root", "Error") << std::endl;
         std::cout << "------------------------------------------------------------------\n";
 
         // Initialize the solver:
-        solver.init(guess);
+        // solver.init(guess);
 
         // Iterate until convergence (or until 100 iterations have been performed):
         for (int i = 0; i <= 100; ++i) {
@@ -186,28 +212,34 @@ int main()
 
             // Print the current iteration:
             std::cout << fmt::format("{:10} | {:25.20f} | {:25.20f} ",
-                                     i,                                        // Iteration number
-                                     solver.result(),                          // Current guess
-                                     abs(solver.evaluate(solver.result())))    // Error
-                      << std::endl;
+                                     i,
+                                     // Iteration number
+                                     solver.current(),
+                                     // Current guess
+                                     abs(solver.evaluate(solver.current())))    // Error
+                << std::endl;
 
             // Check if convergence has been reached:
-            if (abs(solver.evaluate(solver.result())) < 1.0E-15) break;
+            if (abs(solver.evaluate(solver.current())) < nxx::epsilon<NXX_FLOAT>()) break;
 
             // Perform one iteration:
             solver.iterate();
         }
 
         // Print the final result:
-        std::cout << std::fixed << std::setprecision(20) << "CONVERGED! Root found at: " << solver.result() << "\n";
+        std::cout << std::fixed << std::setprecision(50) << "CONVERGED! Root found at: " << solver.current() << "\n";
+        std::cout << std::fixed << std::setprecision(50) << "Function value at root:   " << solver.evaluate(solver.current()) << "\n";
         std::cout << "------------------------------------------------------------------\n\n";
     };
 
-    std::cout << "Manual root-finding using the Discrete Newton's method:" << std::endl;
-    polish_root(DNewton(func), 3.0);
+    std::cout << "Manual root-finding using the Newton-Raphson method:" << std::endl;
+    polish_root(Newton(func, nxx::deriv::derivativeOf(func), NXX_FLOAT(1.25)), NXX_FLOAT(1.25));
 
-    std::cout << "Manual root-finding using Newton's method:" << std::endl;
-    polish_root(Newton(func, derivativeOf(func)), 1.25);
+    std::cout << "Manual root-finding using the Secant method:" << std::endl;
+    polish_root(Secant(func, nxx::deriv::derivativeOf(func), NXX_FLOAT(1.25)), NXX_FLOAT(1.25));
+
+    std::cout << "Manual root-finding using the Steffensen method:" << std::endl;
+    polish_root(Steffensen(func, nxx::deriv::derivativeOf(func), NXX_FLOAT(1.25)), NXX_FLOAT(1.25));
 
     return 0;
 }

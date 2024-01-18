@@ -2,15 +2,14 @@
 // This demo shows how to use the nxx:poly::Polynomial class to create polynomial function objects.
 // ================================================================================================
 
-#include "poly/Polyroots.hpp"
-#include <complex>
+#include <Poly.hpp>
 #include <deque>
 #include <iomanip>
 #include <iostream>
 #include <list>
-#include <poly/Polynomial.hpp>
 #include <set>
 #include <unordered_set>
+#include <fmt/format.h>
 
 void printpoly(auto coefficients) {
 
@@ -59,8 +58,9 @@ int main() {
     // the return type will be of std::complex type. If the coefficients are of std::complex type,
     // the return type will always be of std::complex type.
     // ============================================================================================
+
     auto func1 = Polynomial({ 1.0, 2.0, 3.0, 4.0 });
-    std::cout << "Created the polynomial f(x) = " << func1.asString() << std::endl << std::endl;
+    std::cout << "Created the polynomial f(x) = " << func1 << std::endl << std::endl;
 
     std::cout << "Evaluation using function call operator:" << std::endl;
     std::cout << "Evaluation at -1.0: f(x) = " << func1(-1.0) << std::endl;
@@ -104,7 +104,7 @@ int main() {
     // that represents the derivative function.
     // ============================================================================================
     auto d1func1 = derivativeOf(func1);
-    std::cout << "Derivative of the function: f'(x) = " << d1func1.asString() << std::endl;
+    std::cout << "Derivative of the function: f'(x) = " << d1func1 << std::endl;
     std::cout << "\n";
 
     // ============================================================================================
@@ -123,59 +123,63 @@ int main() {
     auto remainder = dividend % divisor;
     auto temp = quotient * divisor + remainder;
 
-    std::cout << "Dividend: " << dividend.asString() << std::endl;
-    std::cout << "Divisor: " << divisor.asString() << std::endl;
-    std::cout << "Quotient: " << quotient.asString() << std::endl;
-    std::cout << "Remainder: " << remainder.asString() << std::endl;
-    std::cout << "Quotient * Divisor + Remainder: " << temp.asString() << std::endl << std::endl;
+    std::cout << "Dividend: " << dividend << std::endl;
+    std::cout << "Divisor: " << divisor << std::endl;
+    std::cout << "Quotient: " << quotient << std::endl;
+    std::cout << "Remainder: " << remainder << std::endl;
+    std::cout << "Quotient * Divisor + Remainder: " << temp << std::endl << std::endl;
 
     // ============================================================================================
     // Finally, the nxx::poly namespace contains function for finding the roots of a polynomial.
-    // The polyroots() function will return a std::vector object with the roots of the polynomial.
-    // this is the easiest way to find the roots of a polynomial, as it will find all the roots
+    // The polyroots() function will return a tl::expected (std::expected) object containint a
+    // std::vector with the roots of the polynomial.
+    // This is the easiest way to find the roots of a polynomial, as it will find all the roots
     // of the polynomial, including complex roots, regardless of the order of the polynomial. In
     // addition, the quadratic() and cubic() functions can be used to find the roots of quadratic
-    // and cubic polynomials, respectively.
+    // and cubic polynomials, respectively. These functions will also return a tl::expected (std::expected)
     //
     // All three functions accepts an optional template argument that specifies the type of the
     // roots. The default type is the same type as the coefficients, but it is possible explicitly
     // specify the type, e.g. double or std::complex<double>. If the type is specified as a floating-
     // point type, the roots comlex roots will be ignored.
+    //
+    // Note that when getting the std::vector contained in the tl::expected object (using the .value()
+    // function or the * operator), the vector will be returned by reference. This can cause problems
+    // if the tl::expected object is a temporary object, as the vector will be destroyed when the
+    // temporary object goes out of scope. This can happen when iterating over the roots using a
+    // range-based for loop. To address this, the range-based for loop with initializer can be used,
+    // as this will extend the lifetime of the temporary object until the end of the loop. The example
+    // below shows how this can be done.
     // ============================================================================================
     auto poly1 = Polynomial({-1.0, 0.0, 0.0, 0.0, 0.0, 1.0}); // Polynomial with real coefficients and complex roots
 
-    std::cout << "Real roots of the polynomial (automatically deduced): " << poly1.asString() << std::endl;
-    for (auto root : polysolve(poly1)) std::cout << root << "\n"; // Will print the real roots (same type as coefficients)
+    std::cout << "Real roots of the polynomial (automatically deduced): " << poly1 << std::endl;
+    for (auto res = polysolve(poly1); auto root : *res) std::cout << root << "\n"; // Will print the real roots (same type as coefficients)
 
-    std::cout << "\nAll roots of the polynomial (specified by template parameter): " << poly1.asString() << std::endl;
-    for (auto root : polysolve<std::complex<double> >(poly1)) std::cout << root << "\n"; // Will print all roots (complex and real)
+    std::cout << "\nAll roots of the polynomial (specified by template parameter): " << poly1 << std::endl;
+    for (auto res = polysolve<std::complex<double> >(poly1); auto root : *res) std::cout << root << "\n"; // Will print all roots (complex and real)
 
-    std::cout << "\nReal roots of the polynomial (specified by template parameter): " << poly1.asString() << std::endl;
-    for (auto root : polysolve<double>(poly1)) std::cout << root << "\n"; // Will print the real roots (as specified by the template argument)
+    std::cout << "\nReal roots of the polynomial (specified by template parameter): " << poly1 << std::endl;
+    for (auto res = polysolve<double>(poly1); auto root : *res) std::cout << root << "\n"; // Will print the real roots (as specified by the template argument)
 
     auto poly2 = Polynomial({-1.0+0i, 0.0+0i, 0.0+0i, 0.0+0i, 0.0+0i, 1.0+0i}); // Polynomial with complex coefficients and complex roots
 
-    std::cout << "\nAll roots of the complex polynomial (automatically deduced): " << poly2.asString() << std::endl;
-    for (auto root : polysolve(poly2)) std::cout << root << "\n"; // Will print all the roots (same type as coefficients)
+    std::cout << "\nAll roots of the complex polynomial (automatically deduced): " << poly2 << std::endl;
+    for (auto res = polysolve(poly2); auto root : *res) std::cout << root << "\n"; // Will print all the roots (same type as coefficients)
 
-    std::cout << "\nAll roots of the complex polynomial (specified by template parameter): " << poly2.asString() << std::endl;
-    for (auto root : polysolve<std::complex<double> >(poly2)) std::cout << root << "\n"; // Will print all roots (as specified by the template argument
+    std::cout << "\nAll roots of the complex polynomial (specified by template parameter): " << poly2 << std::endl;
+    for (auto res = polysolve<std::complex<double>>(poly2); auto root : *res) std::cout << root << "\n"; // Will print all roots (as specified by the template argument
 
-    std::cout << "\nReal roots of the complex polynomial (specified by template parameter): " << poly2.asString() << std::endl;
-    for (auto root : polysolve<double>(poly2)) std::cout << root << "\n"; // Will print the real roots (complex roots will be ignored)
-//
-//    using CoefficientList = std::vector<double>;
-//
-//    auto coefficients = std::vector< CoefficientList > { { 5.7, 1.6, -3.2, 2.5 },
-//                                                         { -1.2, 0.8, -2.7, 4.0 },
-//                                                         { 2.4, -1.8, 3.2, -2.1, 5.3 },
-//                                                         { 3.9, -0.8, 2.6, -1.2, 3.7 },
-//                                                         { -0.9, 0.8, -2.4, 1.6, -3.1, 2.8 },
-//                                                         { 1.7, 0.6, -2.6, 3.2, -1.9, 4.5 },
-//                                                         { 0.7, -1.1, 2.4, -3.2, 1.8, -4.5, 6.2 },
-//                                                         { 0.6, -0.9, 1.8, -2.3, 1.2, -3.7, 2.1 },
-//                                                         { -0.6, 0.8, -1.2, 2.7, -3.5, 1.8, -4.2, 5.5 } };
+    std::cout << "\nReal roots of the complex polynomial (specified by template parameter): " << poly2 << std::endl;
+    for (auto res = polysolve<double>(poly2); auto root : *res) std::cout << root << "\n"; // Will print the real roots (complex roots will be ignored)
 
+    auto err_result = poly2.evaluate(std::nan(""));
+    if (!err_result) {
+        std::cout << err_result.error().log() << std::endl;
+    }
+    else {
+        std::cout << "Evaluation at " << std::nan("") << ": " << *err_result << std::endl;
+    }
 
     return 0;
 }

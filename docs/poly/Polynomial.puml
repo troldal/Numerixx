@@ -1,0 +1,60 @@
+@startuml
+
+class nxx.poly.Polynomial << (T, orchid) template >> {
+    - m_coefficients : std::vector<value_type>
+    + {static} DefaultSerializer
+    __
+    + Polynomial(coefficients : IsCoefficientContainer auto&)
+    + Polynomial(coefficients : std::initializer_list<value_type>)
+    + operator()(value : auto) : auto
+    + evaluate(value : U) : tl::expected<std::common_type_t<value_type, U>, NumerixxError>
+    + coefficients() : const auto&
+    + coefficients<CONTAINER>() : CONTAINER
+    + asString() : std::string
+    + order() : auto
+    + operator+=<U>(rhs : Polynomial<U> const&) : auto&
+    + operator-=<U>(rhs : Polynomial<U> const&) : auto&
+    + operator*=<U>(rhs : Polynomial<U> const&) : auto&
+    + operator/=<U>(rhs : Polynomial<U> const&) : auto&
+    + operator==<U>(rhs : Polynomial<U> const&) : bool
+    + begin() : auto
+    + cbegin() : auto
+    + end() : auto
+    + cend() : auto
+}
+
+note bottom of Polynomial
+    The Polynomial class is templated on the type of the coefficients.
+    The type can be floating point types or a std::complex (or similar),
+    also with the underlying type being floating point
+end note
+
+interface Concepts {
+    + IsComplex<T> : bool
+    + IsPolynomial<T> : bool
+}
+
+note top of Concepts
+  Defines concepts for checking complex number types and polynomials.
+end note
+
+Concepts -[hidden]down-> Polynomial
+
+
+' Helper functions
+interface nxx.poly.Functions {
+    + {static} derivativeOf(func : IsPolynomial auto) : Polynomial
+    + {static} operator+ << (T, U) >> (lhs : Polynomial<T>, rhs : Polynomial<U>) : Polynomial
+    + {static} operator- << (T, U) >> (lhs : Polynomial<T>, rhs : Polynomial<U>) : Polynomial
+    + {static} operator* << (T, U) >> (lhs : Polynomial<T>, rhs : Polynomial<U>) : Polynomial
+    + {static} operator/ << (T, U) >> (lhs : Polynomial<T>, rhs : Polynomial<U>) : Polynomial
+    + {static} operator% << (T, U) >> (lhs : Polynomial<T>, rhs : Polynomial<U>) : Polynomial
+}
+
+note top of Functions
+  Defines free functions for manipulating Polynomial objects
+end note
+
+Functions -[hidden]down-> Polynomial
+
+@enduml

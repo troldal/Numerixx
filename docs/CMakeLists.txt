@@ -2,7 +2,7 @@ find_package(Doxygen REQUIRED)
 find_package(Sphinx REQUIRED)
 
 # Find all the public headers
-get_target_property(NUMERIXX_PUBLIC_HEADER_DIR numerixx INTERFACE_INCLUDE_DIRECTORIES)
+get_target_property(NUMERIXX_PUBLIC_HEADER_DIR nxx_all INTERFACE_INCLUDE_DIRECTORIES)
 file(GLOB_RECURSE NUMERIXX_PUBLIC_HEADERS ${NUMERIXX_PUBLIC_HEADER_DIR}/*.hpp)
 
 set(DOXYGEN_INPUT_DIR ${PROJECT_SOURCE_DIR}/numerixx)
@@ -33,6 +33,6 @@ set(SPHINX_BUILD ${CMAKE_CURRENT_BINARY_DIR}/docs/sphinx)
 add_custom_target(Sphinx ALL DEPENDS ${DOXYGEN_INDEX_FILE}
         # Tell Breathe where to find the Doxygen output
         COMMAND ${SPHINX_EXECUTABLE} -b html -Dbreathe_projects.Numerixx=${DOXYGEN_OUTPUT_DIR} ${SPHINX_SOURCE} ${SPHINX_BUILD}
-        #COMMAND ${SPHINX_EXECUTABLE} -b latex -Dbreathe_projects.numerix=${DOXYGEN_OUTPUT_DIR} ${SPHINX_SOURCE} ${SPHINX_BUILD}
+        COMMAND ${SPHINX_EXECUTABLE} -b latex -Dbreathe_projects.numerix=${DOXYGEN_OUTPUT_DIR} ${SPHINX_SOURCE} ${SPHINX_BUILD}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         COMMENT "Generating documentation with Sphinx")

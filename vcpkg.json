@@ -1,0 +1,40 @@
+{
+  "name" : "numerixx",
+  "version-string" : "1.0.0",
+  "builtin-baseline" : "4a600e9fea71bd7872080cbb716797e04d30e6d3",
+  "dependencies" : [ {
+    "name" : "gcem",
+    "version>=" : "1.16.0",
+    "$comment" : "    # this is heuristically generated, and may not be correct\n\n    find_package(gcem CONFIG REQUIRED)\n\n    target_link_libraries(main PRIVATE gcem)\n"
+  }, {
+    "name" : "tl-expected",
+    "version>=" : "1.1.0"
+  }, {
+    "name" : "lapack",
+    "version>=" : "2022-02-22#2"
+  }, {
+    "name" : "blaze",
+    "version>=" : "3.8.2"
+  }, {
+    "name" : "openblas",
+    "version>=" : "0.3.23#1"
+  }, {
+    "name" : "boost-stacktrace",
+    "version>=" : "1.82.0#2"
+  }, {
+    "name" : "nlohmann-json",
+    "version>=" : "3.11.2"
+  }, {
+    "name" : "boost-multi-array",
+    "version>=" : "1.83.0"
+  }, {
+    "name" : "boost-multiprecision",
+    "version>=" : "1.83.0"
+  }, {
+    "name" : "boost-math",
+    "version>=" : "1.83.0"
+  }, {
+    "name" : "fmt",
+    "version>=" : "10.1.1"
+  } ]
+}

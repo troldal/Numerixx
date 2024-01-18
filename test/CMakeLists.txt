@@ -1,19 +1,19 @@
 #=======================================================================================================================
 # Preamble
 #=======================================================================================================================
-cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
 project(Numerixx.Tests)
 
 #=======================================================================================================================
 # Set up Catch2 library
 #=======================================================================================================================
-#add_subdirectory(Catch2)
-
 include(FetchContent)
-FetchContent_Declare(Catch2
+
+FetchContent_Declare(
+        Catch2
         GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-        GIT_TAG        3f0283d
-        )
+        GIT_TAG v3.4.0 # or a later release
+)
 
 FetchContent_MakeAvailable(Catch2)
 
@@ -25,14 +25,15 @@ target_sources(NumerixxTests
         PRIVATE
         testPolynomials.cpp
         testDerivatives.cpp
-        testRootBracketing.cpp
-        testRootPolishing.cpp
+#        testMatrix.cpp
+#        testRootBracketing.cpp
+#        testRootPolishing.cpp
         )
 
 target_link_libraries(NumerixxTests
-        PRIVATE
-        numerixx
-        Catch2WithMain
+        PUBLIC
+        numerixx::poly
+        Catch2::Catch2WithMain
         )
 
 list(APPEND NUMERIXX_TEST_DEBUG_FLAGS_GNU
@@ -55,7 +56,11 @@ list(APPEND NUMERIXX_TEST_DEBUG_FLAGS_GNUCLANG
         "-Wdouble-promotion"
         "-Wformat=2"
         "-Weffc++"
-        "-Wno-unknown-pragmas")
+        "-Wno-unknown-pragmas"
+        "-Wno-c++98-compat"
+        "-Wno-c++98-compat-pedantic"
+        "-Wno-documentation"
+        "-Wno-documentation-unknown-command")
 list(APPEND NUMERIXX_TEST_DEBUG_FLAGS_MSVC
         "/permissive"
         "/W4"
