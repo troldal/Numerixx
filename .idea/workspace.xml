@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="CMakePresetLoader">{
+  &quot;useNewFormat&quot;: true
+}</component>
+  <component name="CMakeReloadState">
+    <option name="reloaded" value="true" />
+  </component>
+  <component name="CMakeRunConfigurationManager">
+    <generated>
+      <config projectName="Numerixx" targetName="DemoRootSearching" />
+      <config projectName="Numerixx" targetName="DemoFunction" />
+      <config projectName="Numerixx" targetName="DemoMultiroot" />
+      <config projectName="Numerixx" targetName="fmt" />
+      <config projectName="Numerixx" targetName="Sphinx" />
+      <config projectName="Numerixx" targetName="DemoInterpolate" />
+      <config projectName="Numerixx" targetName="DemoRootFinding" />
+      <config projectName="Numerixx" targetName="Doxygen" />
+      <config projectName="Numerixx" targetName="DemoOptimize" />
+      <config projectName="Numerixx" targetName="DemoIntegrate" />
+      <config projectName="Numerixx" targetName="NumerixxTests" />
+      <config projectName="Numerixx" targetName="Catch2WithMain" />
+      <config projectName="Numerixx" targetName="DemoDeriv" />
+      <config projectName="Numerixx" targetName="DemoPoly" />
+      <config projectName="Numerixx" targetName="Catch2" />
+    </generated>
+  </component>
+  <component name="CMakeSettings">
+    <configurations>
+      <configuration PROFILE_NAME="Debug-mingw" ENABLED="true" CONFIG_NAME="Debug" TOOLCHAIN_NAME="mingw" GENERATION_OPTIONS="-DCMAKE_TOOLCHAIN_FILE=C:\Users\kenne\.vcpkg\vcpkg\scripts\buildsystems\vcpkg.cmake" />
+      <configuration PROFILE_NAME="Debug-msvc" ENABLED="true" CONFIG_NAME="Debug" TOOLCHAIN_NAME="msvc" GENERATION_OPTIONS="-DCMAKE_TOOLCHAIN_FILE=C:\Users\kenne\.vcpkg\vcpkg\scripts\buildsystems\vcpkg.cmake" />
+      <configuration PROFILE_NAME="Debug-intel" ENABLED="true" CONFIG_NAME="Debug" TOOLCHAIN_NAME="intel" GENERATION_OPTIONS="-DCMAKE_TOOLCHAIN_FILE=C:\Users\kenne\.vcpkg\vcpkg\scripts\buildsystems\vcpkg.cmake" />
+      <configuration PROFILE_NAME="Debug-clang-cl" ENABLED="true" CONFIG_NAME="Debug" TOOLCHAIN_NAME="clang-cl" GENERATION_OPTIONS="-DCMAKE_CXX_FLAGS=&quot;-openmp&quot; -DCMAKE_TOOLCHAIN_FILE=C:\Users\kenne\.vcpkg\vcpkg\scripts\buildsystems\vcpkg.cmake" />
+      <configuration PROFILE_NAME="Coverage-clang-cl" ENABLED="true" CONFIG_NAME="Debug" TOOLCHAIN_NAME="clang-cl" GENERATION_OPTIONS="-DCMAKE_CXX_FLAGS=&quot;-fcoverage-mapping -fprofile-instr-generate -openmp&quot;  -DCMAKE_C_FLAGS=&quot;-fcoverage-mapping -fprofile-instr-generate&quot; -DCMAKE_TOOLCHAIN_FILE=C:\Users\kenne\.vcpkg\vcpkg\scripts\buildsystems\vcpkg.cmake" />
+    </configurations>
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="b881ed43-a307-4f6b-9ac7-dda5604d11cc" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/Numerixx.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Numerixx.iml" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ExecutionTargetManager" SELECTED_TARGET="CMakeBuildProfile:Debug-clang-cl" />
+  <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="dev" />
+      </map>
+    </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="file://$PROJECT_DIR$/../../../../Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/include/type_traits" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../../Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/include/utility" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/demo/DemoDeriv.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="mock://C:/Users/kenne/CLionProjects/Numerixx/demo/DemoIntegrate.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock://C:/Users/kenne/CLionProjects/Numerixx/demo/DemoMultiroot.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock://C:/Users/kenne/CLionProjects/Numerixx/demo/DemoMultiroot.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock://C:/Users/kenne/CLionProjects/Numerixx/demo/DemoMultiroot.cpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/numerixx/.utils/Concepts.hpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="mock://C:/Users/kenne/CLionProjects/Numerixx/numerixx/Integrate/impl/Integration.hpp" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/numerixx/deriv/impl/Derivatives.hpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/numerixx/multiroots/Multiroots.hpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/numerixx/multiroots/impl/MultiDerivatives.hpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/numerixx/multiroots/impl/Multiroots.hpp" root0="FORCE_HIGHLIGHTING" />
+  </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
+  <component name="ProjectApplicationVersion">
+    <option name="ide" value="CLion" />
+    <option name="majorVersion" value="2023" />
+    <option name="minorVersion" value="3.2" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 7
+}</component>
+  <component name="ProjectId" id="2aRcUXs4kwRHa2wzg0soEL6Q3kk" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "CMake Application.DemoDeriv.executor": "Run",
+    "CMake Application.DemoIntegrate.executor": "Run",
+    "CMake Application.DemoInterpolate.executor": "Run",
+    "CMake Application.DemoMultiroot.executor": "Run",
+    "CMake Application.DemoPoly.executor": "Run",
+    "CMake Application.DemoRootFinding.executor": "Run",
+    "CMake Application.DemoRootSearching.executor": "Run",
+    "CMake Application.Doxygen.executor": "Run",
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.RadMigrateCodeStyle": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "cf.advertisement.text.overridden": "true",
+    "cf.first.check.clang-format": "false",
+    "cidr.known.project.marker": "true",
+    "git-widget-placeholder": "master",
+    "last_opened_file_path": "C:/Users/kenne/Documents/QtDesignStudio/examples/CoffeeMachine",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="RunManager" selected="CMake Application.DemoMultiroot">
+    <configuration default="true" type="CLionExternalRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true">
+      <method v="2">
+        <option name="CLION.EXTERNAL.BUILD" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="NumerixxTests" type="CMakeCatchTestRunConfigurationType" factoryName="Catch Test" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="Numerixx" TARGET_NAME="NumerixxTests" CONFIG_NAME="Debug-msvc" RUN_TARGET_PROJECT_NAME="Numerixx" RUN_TARGET_NAME="NumerixxTests" TEST_MODE="SUITE_TEST">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+        <option name="BeforeTestRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Catch2" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="Numerixx" TARGET_NAME="Catch2" CONFIG_NAME="Debug-msvc">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Catch2WithMain" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="Numerixx" TARGET_NAME="Catch2WithMain" CONFIG_NAME="Debug-msvc">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="DemoDeriv" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="Numerixx" TARGET_NAME="DemoDeriv" CONFIG_NAME="Debug-msvc" RUN_TARGET_PROJECT_NAME="Numerixx" RUN_TARGET_NAME="DemoDeriv">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="DemoFunction" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="Numerixx" TARGET_NAME="DemoFunction" CONFIG_NAME="Debug-msvc" RUN_TARGET_PROJECT_NAME="Numerixx" RUN_TARGET_NAME="DemoFunction">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="DemoIntegrate" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="Numerixx" TARGET_NAME="DemoIntegrate" CONFIG_NAME="Debug-msvc" RUN_TARGET_PROJECT_NAME="Numerixx" RUN_TARGET_NAME="DemoIntegrate">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="DemoInterpolate" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="Numerixx" TARGET_NAME="DemoInterpolate" CONFIG_NAME="Debug-msvc" RUN_TARGET_PROJECT_NAME="Numerixx" RUN_TARGET_NAME="DemoInterpolate">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="DemoMultiroot" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="Numerixx" TARGET_NAME="DemoMultiroot" CONFIG_NAME="Debug-msvc" RUN_TARGET_PROJECT_NAME="Numerixx" RUN_TARGET_NAME="DemoMultiroot">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="DemoOptimize" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="Numerixx" TARGET_NAME="DemoOptimize" CONFIG_NAME="Debug-msvc" RUN_TARGET_PROJECT_NAME="Numerixx" RUN_TARGET_NAME="DemoOptimize">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="DemoPoly" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="Numerixx" TARGET_NAME="DemoPoly" CONFIG_NAME="Debug-msvc" RUN_TARGET_PROJECT_NAME="Numerixx" RUN_TARGET_NAME="DemoPoly">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="DemoRootFinding" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="Numerixx" TARGET_NAME="DemoRootFinding" CONFIG_NAME="Debug-msvc" RUN_TARGET_PROJECT_NAME="Numerixx" RUN_TARGET_NAME="DemoRootFinding">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="DemoRootSearching" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="Numerixx" TARGET_NAME="DemoRootSearching" CONFIG_NAME="Debug-msvc" RUN_TARGET_PROJECT_NAME="Numerixx" RUN_TARGET_NAME="DemoRootSearching">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Doxygen" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="Numerixx" TARGET_NAME="Doxygen" CONFIG_NAME="Debug-mingw">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Sphinx" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="Numerixx" TARGET_NAME="Sphinx" CONFIG_NAME="Debug-mingw">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="fmt" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="Numerixx" TARGET_NAME="fmt" CONFIG_NAME="Debug-msvc">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <list>
+      <item itemvalue="Catch.NumerixxTests" />
+      <item itemvalue="CMake Application.Catch2WithMain" />
+      <item itemvalue="CMake Application.Catch2" />
+      <item itemvalue="CMake Application.DemoDeriv" />
+      <item itemvalue="CMake Application.DemoFunction" />
+      <item itemvalue="CMake Application.DemoIntegrate" />
+      <item itemvalue="CMake Application.DemoInterpolate" />
+      <item itemvalue="CMake Application.DemoMultiroot" />
+      <item itemvalue="CMake Application.DemoOptimize" />
+      <item itemvalue="CMake Application.DemoPoly" />
+      <item itemvalue="CMake Application.DemoRootFinding" />
+      <item itemvalue="CMake Application.DemoRootSearching" />
+      <item itemvalue="CMake Application.Doxygen" />
+      <item itemvalue="CMake Application.Sphinx" />
+      <item itemvalue="CMake Application.fmt" />
+    </list>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="b881ed43-a307-4f6b-9ac7-dda5604d11cc" name="Changes" comment="" />
+      <created>1704284853207</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1704284853207</updated>
+      <workItem from="1704284872401" duration="1004000" />
+      <workItem from="1704286184537" duration="1364000" />
+      <workItem from="1704290701866" duration="481000" />
+      <workItem from="1704291367815" duration="785000" />
+      <workItem from="1704292341034" duration="3620000" />
+      <workItem from="1704303177744" duration="835000" />
+      <workItem from="1704305982461" duration="5095000" />
+      <workItem from="1704359222547" duration="10692000" />
+      <workItem from="1704375644576" duration="976000" />
+      <workItem from="1704462884888" duration="18743000" />
+      <workItem from="1704542620755" duration="5470000" />
+      <workItem from="1704561426716" duration="2143000" />
+      <workItem from="1704566531403" duration="8224000" />
+      <workItem from="1704646864912" duration="5172000" />
+      <workItem from="1704658572008" duration="1349000" />
+      <workItem from="1704694652835" duration="14030000" />
+      <workItem from="1704713519323" duration="1530000" />
+      <workItem from="1704715112395" duration="838000" />
+      <workItem from="1704715984088" duration="12238000" />
+      <workItem from="1704737692769" duration="1914000" />
+      <workItem from="1704742790415" duration="3081000" />
+      <workItem from="1704809987849" duration="5229000" />
+      <workItem from="1704818538195" duration="105000" />
+      <workItem from="1704818701027" duration="2094000" />
+      <workItem from="1704828033222" duration="69000" />
+      <workItem from="1704828361542" duration="3631000" />
+      <workItem from="1704897977725" duration="6314000" />
+      <workItem from="1704914649057" duration="96000" />
+      <workItem from="1704954025634" duration="28664000" />
+      <workItem from="1704992060029" duration="1577000" />
+      <workItem from="1704993731886" duration="21000" />
+      <workItem from="1705058666006" duration="1931000" />
+      <workItem from="1705092213109" duration="2337000" />
+      <workItem from="1705129728314" duration="7912000" />
+      <workItem from="1705235547721" duration="2181000" />
+      <workItem from="1705242351974" duration="12633000" />
+      <workItem from="1705258497184" duration="486000" />
+      <workItem from="1705259331476" duration="9624000" />
+      <workItem from="1705300793642" duration="28451000" />
+      <workItem from="1705350683252" duration="1549000" />
+      <workItem from="1705387841253" duration="600000" />
+      <workItem from="1705407033998" duration="16616000" />
+      <workItem from="1705435832853" duration="529000" />
+      <workItem from="1705563797091" duration="17037000" />
+    </task>
+    <task id="LOCAL-00001" summary="Implemented multiroot finding functionality in C++. Added DynamicFunctionArray and StaticFunctionArray classes in MultiFunction.hpp for managing dynamic and static arrays of functions. Introduced concepts for checking container types and function convertibility. Added DMultiNewton class in Multiroots.hpp for multiroot finding using Newton's method. Implemented multisolve function for solving multiroot problems. Added partial differentiation and Jacobian matrix calculation in MultiDerivatives.hpp.">
+      <option name="closed" value="true" />
+      <created>1704487900298</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1704487900298</updated>
+    </task>
+    <task id="LOCAL-00002" summary="Implemented significant changes to the multi-dimensional root finding functionality. Introduced the FunctionTraits class in `FunctionTraits.hpp` to deduce the return type and argument type of a callable object. Added the MultiFunction class in `MultiFunction.hpp` to encapsulate a multi-dimensional function for root finding, allowing it to be invoked with different types of inputs. Also introduced the ContainerTraits class in `ContainerTraits.hpp` to deduce the value type of a given container. Updated `DemoMultiroot.cpp` to utilize these new classes, improving type safety and flexibility for function inputs. These changes enhance the overall functionality and usability of the code.">
+      <option name="closed" value="true" />
+      <created>1704738032301</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1704738032301</updated>
+    </task>
+    <task id="LOCAL-00003" summary="Enhanced partialdiff functionality in MultiDerivatives.hpp to support various output container types and initializer list for point of differentiation. Added new template overloads to accommodate different container types and initializer lists. Improved flexibility and usability of partial derivative computation in multi-variable functions.">
+      <option name="closed" value="true" />
+      <created>1704985804409</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1704985804409</updated>
+    </task>
+    <task id="LOCAL-00004" summary="This commit includes significant updates to the MultiFunctionArray.hpp and MultiDerivatives.hpp files. The changes aim to improve the readability, efficiency, and flexibility of the code.  In MultiFunctionArray.hpp, the evaluate method has been refactored to use std::transform for applying each function to the input container. This change simplifies the code and potentially improves performance by leveraging STL algorithms.  In MultiDerivatives.hpp, several new methods have been added to compute partial derivatives, Jacobian, and Hessian matrices. These methods provide more flexibility by allowing the user to specify the output container type. Additionally, support for initializer lists has been added to these methods, providing a more concise way to specify the point of differentiation.  Furthermore, the partialdiff_impl method has been updated to improve type safety by changing the type of index from int to size_t. The increment operation (++index) has also been separated from the assignment operation to enhance readability.  These changes are expected to improve the usability and performance of the numerical differentiation functionality in the Numerixx library.">
+      <option name="closed" value="true" />
+      <created>1705325971799</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1705325971799</updated>
+    </task>
+    <task id="LOCAL-00005" summary="This commit includes significant updates to the `Multiroots.hpp` file. The changes are aimed at improving the functionality and efficiency of the multiroot solver.&#10;&#10;- Introduced `DMultiNewton` and `SteepestDescent` classes, which implement different methods for finding roots of multivariate functions.&#10;- Added `MultirootBase` class to provide common functionality for multiroot solvers.&#10;- Implemented `multisolve` function to handle the iteration process and convergence checks.&#10;- Added deduction guides for `DMultiNewton` and `SteepestDescent` classes to simplify their usage.&#10;- Improved error handling by checking for non-finite results during the iteration process.&#10;&#10;These changes should provide more flexibility and robustness when solving multivariate functions.">
+      <option name="closed" value="true" />
+      <created>1705436335910</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1705436335910</updated>
+    </task>
+    <task id="LOCAL-00006" summary="In this commit, we have made significant changes to the Multiroots.hpp file, which primarily involves the refactoring of existing classes and the addition of new methods and classes. Here are the details:  &#10;Refactored the MultirootBase class: The MultirootBase class has been refactored to improve its readability and maintainability. The changes include better use of type aliases and improved documentation for methods and member variables.  &#10;Added MultiNewton class: A new class MultiNewton has been added which implements the Newton-Raphson method for multi-root solving. This class inherits from the MultirootBase class and overrides the function call operator to implement the Newton-Raphson iteration step.  &#10;Added SteepestDescent class: Another new class SteepestDescent has been added which implements the Steepest Descent method for multi-root solving. This class also inherits from the MultirootBase class and overrides the function call operator to implement the Steepest Descent iteration step.  &#10;Added multisolve_impl function: A new function multisolve_impl has been added in the detail namespace. This function takes a solver instance and applies it iteratively to find the roots of a system of equations. It also checks for convergence or non-finite results.  &#10;Added multisolve function templates: Two new function templates multisolve have been added which create a solver instance and call the multisolve_impl function to find roots. These functions take a MultiFunctionArray object, an initial guess, a convergence tolerance, and a maximum number of iterations as parameters.  &#10;These changes aim to enhance the functionality of our multi-root solving capabilities and provide a more robust and flexible framework for solving such problems.">
+      <option name="closed" value="true" />
+      <created>1705578382957</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1705578382957</updated>
+    </task>
+    <task id="LOCAL-00007" summary="In this commit, we have made significant changes to the Multiroots.hpp file, which primarily involves the refactoring of existing classes and the addition of new methods and classes. Here are the details:  &#10;Refactored the MultirootBase class: The MultirootBase class has been refactored to improve its readability and maintainability. The changes include better use of type aliases and improved documentation for methods and member variables.  &#10;Added MultiNewton class: A new class MultiNewton has been added which implements the Newton-Raphson method for multi-root solving. This class inherits from the MultirootBase class and overrides the function call operator to implement the Newton-Raphson iteration step.  &#10;Added SteepestDescent class: Another new class SteepestDescent has been added which implements the Steepest Descent method for multi-root solving. This class also inherits from the MultirootBase class and overrides the function call operator to implement the Steepest Descent iteration step.  &#10;Added multisolve_impl function: A new function multisolve_impl has been added in the detail namespace. This function takes a solver instance and applies it iteratively to find the roots of a system of equations. It also checks for convergence or non-finite results.  &#10;Added multisolve function templates: Two new function templates multisolve have been added which create a solver instance and call the multisolve_impl function to find roots. These functions take a MultiFunctionArray object, an initial guess, a convergence tolerance, and a maximum number of iterations as parameters.  &#10;These changes aim to enhance the functionality of our multi-root solving capabilities and provide a more robust and flexible framework for solving such problems.">
+      <option name="closed" value="true" />
+      <created>1705580300971</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1705580300971</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VCPKGProject">
+    <isAutomaticCheckingOnLaunch value="false" />
+    <isAutomaticFoundErrors value="true" />
+    <isAutomaticReloadCMake value="true" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <option name="CHECK_NEW_TODO" value="false" />
+    <MESSAGE value="Implemented multiroot finding functionality in C++. Added DynamicFunctionArray and StaticFunctionArray classes in MultiFunction.hpp for managing dynamic and static arrays of functions. Introduced concepts for checking container types and function convertibility. Added DMultiNewton class in Multiroots.hpp for multiroot finding using Newton's method. Implemented multisolve function for solving multiroot problems. Added partial differentiation and Jacobian matrix calculation in MultiDerivatives.hpp." />
+    <MESSAGE value="Implemented significant changes to the multi-dimensional root finding functionality. Introduced the FunctionTraits class in `FunctionTraits.hpp` to deduce the return type and argument type of a callable object. Added the MultiFunction class in `MultiFunction.hpp` to encapsulate a multi-dimensional function for root finding, allowing it to be invoked with different types of inputs. Also introduced the ContainerTraits class in `ContainerTraits.hpp` to deduce the value type of a given container. Updated `DemoMultiroot.cpp` to utilize these new classes, improving type safety and flexibility for function inputs. These changes enhance the overall functionality and usability of the code." />
+    <MESSAGE value="Enhanced partialdiff functionality in MultiDerivatives.hpp to support various output container types and initializer list for point of differentiation. Added new template overloads to accommodate different container types and initializer lists. Improved flexibility and usability of partial derivative computation in multi-variable functions." />
+    <MESSAGE value="This commit includes significant updates to the MultiFunctionArray.hpp and MultiDerivatives.hpp files. The changes aim to improve the readability, efficiency, and flexibility of the code.  In MultiFunctionArray.hpp, the evaluate method has been refactored to use std::transform for applying each function to the input container. This change simplifies the code and potentially improves performance by leveraging STL algorithms.  In MultiDerivatives.hpp, several new methods have been added to compute partial derivatives, Jacobian, and Hessian matrices. These methods provide more flexibility by allowing the user to specify the output container type. Additionally, support for initializer lists has been added to these methods, providing a more concise way to specify the point of differentiation.  Furthermore, the partialdiff_impl method has been updated to improve type safety by changing the type of index from int to size_t. The increment operation (++index) has also been separated from the assignment operation to enhance readability.  These changes are expected to improve the usability and performance of the numerical differentiation functionality in the Numerixx library." />
+    <MESSAGE value="This commit includes significant updates to the `Multiroots.hpp` file. The changes are aimed at improving the functionality and efficiency of the multiroot solver.&#10;&#10;- Introduced `DMultiNewton` and `SteepestDescent` classes, which implement different methods for finding roots of multivariate functions.&#10;- Added `MultirootBase` class to provide common functionality for multiroot solvers.&#10;- Implemented `multisolve` function to handle the iteration process and convergence checks.&#10;- Added deduction guides for `DMultiNewton` and `SteepestDescent` classes to simplify their usage.&#10;- Improved error handling by checking for non-finite results during the iteration process.&#10;&#10;These changes should provide more flexibility and robustness when solving multivariate functions." />
+    <MESSAGE value="In this commit, we have made significant changes to the Multiroots.hpp file, which primarily involves the refactoring of existing classes and the addition of new methods and classes. Here are the details:  &#10;Refactored the MultirootBase class: The MultirootBase class has been refactored to improve its readability and maintainability. The changes include better use of type aliases and improved documentation for methods and member variables.  &#10;Added MultiNewton class: A new class MultiNewton has been added which implements the Newton-Raphson method for multi-root solving. This class inherits from the MultirootBase class and overrides the function call operator to implement the Newton-Raphson iteration step.  &#10;Added SteepestDescent class: Another new class SteepestDescent has been added which implements the Steepest Descent method for multi-root solving. This class also inherits from the MultirootBase class and overrides the function call operator to implement the Steepest Descent iteration step.  &#10;Added multisolve_impl function: A new function multisolve_impl has been added in the detail namespace. This function takes a solver instance and applies it iteratively to find the roots of a system of equations. It also checks for convergence or non-finite results.  &#10;Added multisolve function templates: Two new function templates multisolve have been added which create a solver instance and call the multisolve_impl function to find roots. These functions take a MultiFunctionArray object, an initial guess, a convergence tolerance, and a maximum number of iterations as parameters.  &#10;These changes aim to enhance the functionality of our multi-root solving capabilities and provide a more robust and flexible framework for solving such problems." />
+    <option name="LAST_COMMIT_MESSAGE" value="In this commit, we have made significant changes to the Multiroots.hpp file, which primarily involves the refactoring of existing classes and the addition of new methods and classes. Here are the details:  &#10;Refactored the MultirootBase class: The MultirootBase class has been refactored to improve its readability and maintainability. The changes include better use of type aliases and improved documentation for methods and member variables.  &#10;Added MultiNewton class: A new class MultiNewton has been added which implements the Newton-Raphson method for multi-root solving. This class inherits from the MultirootBase class and overrides the function call operator to implement the Newton-Raphson iteration step.  &#10;Added SteepestDescent class: Another new class SteepestDescent has been added which implements the Steepest Descent method for multi-root solving. This class also inherits from the MultirootBase class and overrides the function call operator to implement the Steepest Descent iteration step.  &#10;Added multisolve_impl function: A new function multisolve_impl has been added in the detail namespace. This function takes a solver instance and applies it iteratively to find the roots of a system of equations. It also checks for convergence or non-finite results.  &#10;Added multisolve function templates: Two new function templates multisolve have been added which create a solver instance and call the multisolve_impl function to find roots. These functions take a MultiFunctionArray object, an initial guess, a convergence tolerance, and a maximum number of iterations as parameters.  &#10;These changes aim to enhance the functionality of our multi-root solving capabilities and provide a more robust and flexible framework for solving such problems." />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="../../../../CLionProjects/Numerixx/cmake-build-coverage-clang-cl" NAME="DemoMultiroot Coverage Results" MODIFIED="1704561673523" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="gcov/llvm" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" />
+    <SUITE FILE_PATH="../../../../CLionProjects/Numerixx/cmake-build-coverage-clang-cl" NAME="DemoMultiroot Coverage Results" MODIFIED="1704558103278" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="gcov/llvm" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" />
+    <SUITE FILE_PATH="../../../../CLionProjects/Numerixx/cmake-build-debug-clang-cl-coverage" NAME="DemoMultiroot Coverage Results" MODIFIED="1704557121056" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="gcov/llvm" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" />
+  </component>
+</project>

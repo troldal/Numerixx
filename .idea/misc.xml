@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Black">
+    <option name="sdkName" value="Python 3.11 (Numerixx)" />
+  </component>
+  <component name="CMakeWorkspace" PROJECT_DIR="$PROJECT_DIR$" />
+  <component name="CidrRootsConfiguration">
+    <excludeRoots>
+      <file path="$PROJECT_DIR$/cmake-build-coverage-clang-cl" />
+      <file path="$PROJECT_DIR$/cmake-build-debug-clang" />
+      <file path="$PROJECT_DIR$/cmake-build-debug-clang-cl" />
+      <file path="$PROJECT_DIR$/cmake-build-debug-clang-cl-coverage" />
+      <file path="$PROJECT_DIR$/cmake-build-debug-emscripten" />
+      <file path="$PROJECT_DIR$/cmake-build-debug-gcc" />
+      <file path="$PROJECT_DIR$/cmake-build-debug-intel" />
+      <file path="$PROJECT_DIR$/cmake-build-debug-mingw" />
+      <file path="$PROJECT_DIR$/cmake-build-debug-msvc" />
+      <file path="$PROJECT_DIR$/cmake-build-sanitize-clang-cl" />
+    </excludeRoots>
+  </component>
+</project>
