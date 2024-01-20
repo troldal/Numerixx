@@ -1,3 +1,4 @@
+#include <Deriv.hpp>
 #include <Optim.hpp>
 #include <cmath>
 
@@ -7,19 +8,14 @@
 
 int main()
 {
-    using namespace nxx::optimize;
+    using namespace nxx::optim;
+    using namespace nxx::deriv;
 
     auto myFunc = [](double x) { return x * x * x - 4 * x * x + x - 5; };    // Example function (quadratic)
+        // auto myFunc = [](double x) { return -x*x; };    // Example function (quadratic)
 
-    // Direct optimization
-    GradientDescentOptimizer optimizer(0.01, GradientDescentOptimizer::Mode::Minimize);
-    double                   result1 = optimize(optimizer, myFunc, 4);    // Starting guess is -5
-    std::cout << "Optimized value: " << result1 << std::endl;
-
-    // Using lambda function for optimization
-    auto   optimizeFunc = optimizationOf(optimizer, myFunc);
-    double result2      = optimizeFunc(4);    // Starting guess is 5
-    std::cout << "Optimized value: " << result2 << std::endl;
+    auto result  = optimize<GradientDescent, Minimize>(myFunc, derivativeOf(myFunc), 4.0, 1e-12, 10000);
+    std::cout << "Optimized value: " << result << std::endl;
 
     return 0;
 }

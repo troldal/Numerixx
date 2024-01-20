@@ -76,9 +76,12 @@ namespace nxx::deriv
         class DerivativeFunctor
         {
             ALGO m_algorithm{};
-            FN   m_function{};
+            FN   m_function;
 
         public:
+
+            explicit DerivativeFunctor(FN function) : m_function(std::move(function)) {}
+
             template<IsFloat ARG_T, IsFloat STEPSIZE_T = ARG_T>
             auto operator()(ARG_T      val,
                             STEPSIZE_T stepsize = nxx::StepSize< std::invoke_result_t< FN, ARG_T > >())
@@ -811,7 +814,7 @@ namespace nxx::deriv
     template<typename ALGO = Order1CentralRichardson>
     inline auto derivativeOf(IsFloatInvocable auto function) requires(!poly::IsPolynomial< decltype(function) >)
     {
-        return detail::DerivativeFunctor< ALGO, decltype(function) >{};
+        return detail::DerivativeFunctor< ALGO, decltype(function) >(function);
     }
 } // namespace nxx::deriv
 

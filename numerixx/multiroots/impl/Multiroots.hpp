@@ -36,6 +36,8 @@
 #include <Constants.hpp>
 #include <Deriv.hpp>
 #include <Poly.hpp>
+#include <Interp.hpp>
+#include <Optim.hpp>
 
 // ===== External Includes
 #include <blaze/Blaze.h>
@@ -366,22 +368,42 @@ namespace nxx::multiroots
             const RES_T g2 = computeGFunction(arg2);
             const RES_T g3 = computeGFunction(arg3);
 
-            RES_T stepsize = 0.001;    // A default small step size
+            // auto func = [&](RES_T a) {return computeGFunction(DynamicVector< RES_T >(BASE::m_guess - a * direction)); };
 
-            if (g3 < g1) {
-                RES_T               h1 = (g2 - g1) / (a2 - a1);
-                RES_T               h2 = (g3 - g2) / (a3 - a2);
-                RES_T               h3 = (h2 - h1) / (a3 - a1);
-                Polynomial< RES_T > P  = { g1, (h1 - 0.5 * h3), h3 };
+            // RES_T stepsize = 0.001;    // A default small step size
+            //
+            // if (g3 < g1) {
+            //     RES_T               h1 = (g2 - g1) / (a2 - a1);
+            //     RES_T               h2 = (g3 - g2) / (a3 - a2);
+            //     RES_T               h3 = (h2 - h1) / (a3 - a1);
+            //     Polynomial< RES_T > P  = { g1, (h1 - 0.5 * h3), h3 };
+            //
+            //     auto P_prime = derivativeOf(P);
+            //     if (auto roots = poly::polysolve(P_prime); !roots->empty()) {
+            //         stepsize = roots->front();    // Take the first root as the optimal step size
+            //         if (stepsize < 0 || stepsize > 1) {
+            //             stepsize = 0.001;    // If the root is not in the expected range, revert to default
+            //         }
+            //     }
+            // }
 
-                auto P_prime = derivativeOf(P);
-                if (auto roots = poly::polysolve(P_prime); !roots->empty()) {
-                    stepsize = roots->front();    // Take the first root as the optimal step size
-                    if (stepsize < 0 || stepsize > 1) {
-                        stepsize = 0.001;    // If the root is not in the expected range, revert to default
-                    }
-                }
-            }
+
+            std::vector<std::pair<double, double>> points;
+            points.emplace_back(0.0, g1);
+            points.emplace_back(0.5, g2);
+            points.emplace_back(1.0, g3);
+            auto interp = nxx::interp::makepoly(points);
+
+            if (interp.order() < 2) return 0.0;
+
+            auto stepsize = nxx::poly::polysolve(derivativeOf(interp))->front();
+
+            if (stepsize > 1.0) return 1.0;
+
+            if (stepsize < 0.0) return 0.001;
+
+            // using namespace nxx::optim;
+            // RES_T stepsize = optimize<GradientDescent, Minimize>(func, nxx::deriv::derivativeOf(func), 0.5);
 
             return stepsize;
         }

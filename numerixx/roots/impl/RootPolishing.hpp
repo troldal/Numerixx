@@ -145,7 +145,6 @@ namespace nxx::roots
              */
             RESULT_T current() const
             {
-                // if (!m_initialized) throw NumerixxError("Solver has not been initialized.");
                 return m_guess;
             }
 
