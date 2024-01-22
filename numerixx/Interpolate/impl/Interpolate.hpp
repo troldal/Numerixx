@@ -1,70 +1,229 @@
-//
-// Created by kenne on 13/11/2023.
-//
+/*
+    888b      88  88        88  88b           d88  88888888888  88888888ba   88  8b        d8  8b        d8
+    8888b     88  88        88  888b         d888  88           88      "8b  88   Y8,    ,8P    Y8,    ,8P
+    88 `8b    88  88        88  88`8b       d8'88  88           88      ,8P  88    `8b  d8'      `8b  d8'
+    88  `8b   88  88        88  88 `8b     d8' 88  88aaaaa      88aaaaaa8P'  88      Y88P          Y88P
+    88   `8b  88  88        88  88  `8b   d8'  88  88"""""      88""""88'    88      d88b          d88b
+    88    `8b 88  88        88  88   `8b d8'   88  88           88    `8b    88    ,8P  Y8,      ,8P  Y8,
+    88     `8888  Y8a.    .a8P  88    `888'    88  88           88     `8b   88   d8'    `8b    d8'    `8b
+    88      `888   `"Y8888Y"'   88     `8'     88  88888888888  88      `8b  88  8P        Y8  8P        Y8
 
-#ifndef NUMERIXX_INTERPOLATE_HPP
-#define NUMERIXX_INTERPOLATE_HPP
+    Copyright © 2024 Kenneth Troldal Balslev
 
-//
-// Created by I22696 on 13-11-2023.
-//
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the “Software”), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is furnished
+    to do so, subject to the following conditions:
 
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+    INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+    PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+    OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+#pragma once
+
+// ===== Numerixx Includes
 #include <Concepts.hpp>
+#include <Deriv.hpp>
 #include <Poly.hpp>
-#include <algorithm>
+
+// ===== External Includes
 #include <blaze/Blaze.h>
+
+// ===== Standard Library Includes
+#include <algorithm>
 #include <cassert>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
+#include <optional>
+
+/**
+ * @file Interpolate.hpp
+ * @brief Comprehensive interpolation library for various algorithms and utilities.
+ *
+ * This header file includes a suite of classes and functions designed for interpolation tasks.
+ * It encompasses various interpolation methods, utility functions for creating interpolation
+ * objects, and a function for generating a polynomial that fits a set of points.
+ *
+ * The following components are included:
+ *
+ * 1. Base class for interpolation algorithms (InterpBase) using the CRTP pattern.
+ * 2. Derived classes for specific interpolation methods:
+ *    - Linear interpolation (Linear)
+ *    - Lagrange polynomial interpolation (Lagrange)
+ *    - Steffen interpolation (Steffen)
+ *    - Cubic spline interpolation (Spline)
+ * 3. Utility functions for interpolation:
+ *    - interpolate: Functions to interpolate at a single point using a specified algorithm.
+ *    - interpolationOf: Functions to return interpolation function objects based on given points and an algorithm.
+ *    - makepoly: Function to create a polynomial passing through a set of points.
+ *
+ * Each class and function is documented with details on usage, parameters, and return types.
+ * This library requires the Blaze library for some of the matrix and vector operations.
+ *
+ * @note This library is designed to be flexible and extensible, allowing for easy addition of new interpolation methods.
+ */
 
 namespace nxx::interp
 {
-
-    template< typename DERIVED, template< typename... > class CONTAINER_T, typename POINT_T >
-    requires IsFloatStruct< POINT_T >
-    class InterpolationBase
+    namespace detail
     {
-        friend DERIVED;
 
-        CONTAINER_T< POINT_T > m_points;
+        // =================================================================================================================
+        //
+        //    88                                                           88888888ba
+        //    88                ,d                                         88      "8b
+        //    88                88                                         88      ,8P
+        //    88  8b,dPPYba,  MM88MMM  ,adPPYba,  8b,dPPYba,  8b,dPPYba,   88aaaaaa8P'  ,adPPYYba,  ,adPPYba,   ,adPPYba,
+        //    88  88P'   `"8a   88    a8P_____88  88P'   "Y8  88P'    "8a  88""""""8b,  ""     `Y8  I8[    ""  a8P_____88
+        //    88  88       88   88    8PP"""""""  88          88       d8  88      `8b  ,adPPPPP88   `"Y8ba,   8PP"""""""
+        //    88  88       88   88,   "8b,   ,aa  88          88b,   ,a8"  88      a8P  88,    ,88  aa    ]8I  "8b,   ,aa
+        //    88  88       88   "Y888  `"Ybbd8"'  88          88`YbbdP"'   88888888P"   `"8bbdP"Y8  `"YbbdP"'   `"Ybbd8"'
+        //                                                    88
+        //                                                    88
+        //
+        // =================================================================================================================
 
-    public:
-        static constexpr bool IsInterpolator = true;
-
-    protected:
-        ~InterpolationBase() = default;
-        using VALUE_T        = StructCommonType_t< POINT_T >;
-
-    public:
-        explicit InterpolationBase(const CONTAINER_T< POINT_T >& points)
-            : m_points(points)
+        /**
+         * @brief Provides a CRTP base class for interpolation of a series of points.
+         *
+         * The InterpBase class template is designed to be used as a base class for various interpolation
+         * techniques. It uses the Curiously Recurring Template Pattern (CRTP) to allow derived classes
+         * to specify their interpolation method.
+         *
+         * @tparam DERIVED The derived class implementing the interpolation logic.
+         * @tparam CONTAINER_T The type of container used to store the points.
+         * @tparam POINT_T The type of points stored in the container. Must be a floating point structure.
+         *
+         * @note Requires that POINT_T is a floating point structure.
+         */
+        template< typename DERIVED, template< typename... > class CONTAINER_T, IsFloatStruct POINT_T >
+        class InterpBase
         {
-            if (m_points.size() < 2) throw std::runtime_error("Linear interpolation requires at least two points.");
-            std::sort(m_points.begin(), m_points.end(), [](const auto& p1, const auto& p2) {
-                auto [x1, y1] = p1;
-                auto [x2, y2] = p2;
-                return x1 < x2;
-            });
-        }
+            friend DERIVED;
 
-        VALUE_T operator()(VALUE_T x) const
-        {
-            if (auto [xa, _] = m_points.front(); x < xa) throw std::runtime_error("Interpolation point is out of bounds.");
-            if (auto [xb, _] = m_points.back(); x > xb) throw std::runtime_error("Interpolation point is out of bounds.");
-            return static_cast< const DERIVED& >(*this).interpolate(x);
-        }
-    };
+            CONTAINER_T< POINT_T > m_points;    ///< Container holding the points for interpolation.
 
+        public:
+            static constexpr bool IsInterpolator = true;    ///< Flag to identify interpolator classes.
+
+        protected:
+            ~InterpBase() = default;                          ///< Default destructor.
+            using VALUE_T = StructCommonType_t< POINT_T >;    ///< Common value type derived from POINT_T.
+
+        public:
+            InterpBase(const InterpBase& other)     = default;    ///< Default copy constructor.
+            InterpBase(InterpBase&& other) noexcept = default;    ///< Default move constructor.
+
+            InterpBase& operator=(const InterpBase& other)     = default;    ///< Default copy assignment operator.
+            InterpBase& operator=(InterpBase&& other) noexcept = default;    ///< Default move assignment operator.
+
+            /**
+             * @brief Constructs an interpolation base object with the given points.
+             *
+             * @param points The container of points to be used for interpolation.
+             * @throws std::runtime_error If the number of points is less than 2.
+             */
+            explicit InterpBase(const CONTAINER_T< POINT_T >& points)
+                : m_points(points)
+            {
+                if (m_points.size() < 2) throw std::runtime_error("Interpolation requires at least two points.");
+                std::sort(m_points.begin(), m_points.end(), [](const auto& p1, const auto& p2) {
+                    auto [x1, y1] = p1;
+                    auto [x2, y2] = p2;
+                    return x1 < x2;
+                });
+            }
+
+            /**
+             * @brief Constructs an interpolation base object with the given points.
+             *
+             * @tparam N The number of points in the initializer list.
+             * @param points The initializer list of points to be used for interpolation.
+             * @throws std::runtime_error If the number of points is less than 2.
+             */
+            template< size_t N >
+            requires(N >= 2)
+            explicit InterpBase(const POINT_T (&points)[N])
+                : m_points(points, points + N)
+            {
+                if (m_points.size() < 2) throw std::runtime_error("Interpolation requires at least two points.");
+                std::sort(m_points.begin(), m_points.end(), [](const auto& p1, const auto& p2) {
+                    auto [x1, y1] = p1;
+                    auto [x2, y2] = p2;
+                    return x1 < x2;
+                });
+            }
+
+            /**
+             * @brief Function call operator to perform interpolation.
+             *
+             * This method delegates the actual interpolation task to the derived class by calling
+             * its interpolate method.
+             *
+             * @param x The x-coordinate value for which interpolation is to be performed.
+             * @return VALUE_T The interpolated value at the specified x-coordinate.
+             * @throws std::runtime_error If the interpolation point is out of bounds.
+             */
+            VALUE_T operator()(VALUE_T x) const
+            {
+                if (auto [xa, _] = m_points.front(); x < xa) throw std::runtime_error("Interpolation point is out of bounds.");
+                if (auto [xb, _] = m_points.back(); x > xb) throw std::runtime_error("Interpolation point is out of bounds.");
+                return static_cast< const DERIVED& >(*this).interpolate(x);
+            }
+        };
+    }    // namespace detail
+
+    // =================================================================================================================
+    //
+    //    88           88
+    //    88           ""
+    //    88
+    //    88           88  8b,dPPYba,    ,adPPYba,  ,adPPYYba,  8b,dPPYba,
+    //    88           88  88P'   `"8a  a8P_____88  ""     `Y8  88P'   "Y8
+    //    88           88  88       88  8PP"""""""  ,adPPPPP88  88
+    //    88           88  88       88  "8b,   ,aa  88,    ,88  88
+    //    88888888888  88  88       88   `"Ybbd8"'  `"8bbdP"Y8  88
+    //
+    // =================================================================================================================
+
+    /**
+     * @brief Provides a derived class for linear interpolation using the CRTP pattern.
+     *
+     * The Linear class template extends the InterpBase class for performing linear interpolation
+     * and extrapolation of a series of points.
+     *
+     * @tparam CONTAINER_T The type of container used to store the points.
+     * @tparam POINT_T The type of points stored in the container.
+     */
     template< template< typename... > class CONTAINER_T, typename POINT_T >
-    class Linear : public InterpolationBase< Linear< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >
+    class Linear : public detail::InterpBase< Linear< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >
     {
-        using BASE = InterpolationBase< Linear< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >;
+        using BASE = detail::InterpBase< Linear< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >;
 
     public:
-        using BASE::BASE;
-        using VALUE_T = typename BASE::VALUE_T;
+        using BASE::BASE;                          ///< Inherits constructors from the base class.
+        using VALUE_T = typename BASE::VALUE_T;    ///< Type for value representation, inherited from base class.
 
+        /**
+         * @brief Performs linear interpolation for a given x-value.
+         *
+         * This method finds the interval that the x-value falls into and performs linear interpolation
+         * using the points defining that interval.
+         *
+         * @param x The x-coordinate value for which interpolation is to be performed.
+         * @return VALUE_T The interpolated value at the specified x-coordinate.
+         * @throws std::out_of_range If x is out of the range of the points.
+         */
         VALUE_T interpolate(VALUE_T x) const
         {
             // Find the interval that x falls into
@@ -79,6 +238,7 @@ namespace nxx::interp
                 return y;    // Return the y-value of the last point
             }
 
+            // Assert that the interval is valid
             assert(std::distance(BASE::m_points.begin(), it) >= 1);
             assert(std::distance(it, BASE::m_points.end()) >= 1);
 
@@ -88,13 +248,19 @@ namespace nxx::interp
             return y1 + (y2 - y1) * (x - x1) / (x2 - x1);
         }
 
+        /**
+         * @brief Performs linear extrapolation for a given x-value.
+         *
+         * This method handles cases where the x-value is outside the range of the points,
+         * using linear extrapolation based on the slope of the closest interval.
+         *
+         * @param x The x-coordinate value for which extrapolation is to be performed.
+         * @return VALUE_T The extrapolated value at the specified x-coordinate.
+         * @throws std::runtime_error If the number of points is less than 2.
+         * @throws std::out_of_range If x is out of the range of the points and extrapolation is not possible.
+         */
         VALUE_T extrapolate(VALUE_T x) const
         {
-            // Check if the points array is too small
-            if (BASE::m_points.size() < 2) {
-                throw std::runtime_error("Insufficient points for extrapolation");
-            }
-
             // Handle the case where x is before the first point
             if (x < BASE::m_points.front().first) {
                 auto [x1, y1] = BASE::m_points[0];
@@ -116,75 +282,236 @@ namespace nxx::interp
         }
     };
 
+    /**
+     * @brief Deduction guide for Linear class with a container of POINT_T.
+     *
+     * @tparam CONTAINER_T Container type.
+     * @tparam POINT_T Point type.
+     */
     template< template< typename... > class CONTAINER_T, typename POINT_T >
     Linear(CONTAINER_T< POINT_T >) -> Linear< CONTAINER_T, POINT_T >;
 
-    Linear(std::initializer_list< std::pair< double, double > >) -> Linear< std::vector, std::pair< double, double > >;
+    /**
+     * @brief Deduction guide for Linear class with an initializer list of pairs.
+     *
+     * @tparam N Number of elements in the initializer list.
+     */
+    template< size_t N >
+    requires(N >= 2)
+    Linear(const std::pair< double, double > (&)[N]) -> Linear< std::vector, std::pair< double, double > >;
 
+    // =================================================================================================================
+    //
+    //    88
+    //    88
+    //    88
+    //    88           ,adPPYYba,   ,adPPYb,d8  8b,dPPYba,  ,adPPYYba,  8b,dPPYba,    ,adPPYb,d8   ,adPPYba,
+    //    88           ""     `Y8  a8"    `Y88  88P'   "Y8  ""     `Y8  88P'   `"8a  a8"    `Y88  a8P_____88
+    //    88           ,adPPPPP88  8b       88  88          ,adPPPPP88  88       88  8b       88  8PP"""""""
+    //    88           88,    ,88  "8a,   ,d88  88          88,    ,88  88       88  "8a,   ,d88  "8b,   ,aa
+    //    88888888888  `"8bbdP"Y8   `"YbbdP"Y8  88          `"8bbdP"Y8  88       88   `"YbbdP"Y8   `"Ybbd8"'
+    //                              aa,    ,88                                        aa,    ,88
+    //                               "Y8bbdP"                                          "Y8bbdP"
+    //
+    // =================================================================================================================
+
+    /**
+     * @brief Provides a derived class for Lagrange polynomial interpolation using the CRTP pattern.
+     *
+     * The Lagrange class template extends the InterpBase class for performing Lagrange polynomial
+     * interpolation and extrapolation of a series of points.
+     *
+     * @tparam CONTAINER_T The type of container used to store the points.
+     * @tparam POINT_T The type of points stored in the container.
+     */
     template< template< typename... > class CONTAINER_T, typename POINT_T >
-    class Lagrange : public InterpolationBase< Lagrange< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >
+    class Lagrange : public detail::InterpBase< Lagrange< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >
     {
-        using BASE    = InterpolationBase< Lagrange< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >;
+        using BASE    = detail::InterpBase< Lagrange< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >;
         using VALUE_T = typename BASE::VALUE_T;
 
+        /**
+         * @brief Implements the Lagrange interpolation algorithm.
+         *
+         * This method calculates the Lagrange polynomial based on the provided points
+         * and evaluates it at the given x-coordinate.
+         *
+         * @param x The x-coordinate value for which interpolation is to be performed.
+         * @return VALUE_T The interpolated value at the specified x-coordinate.
+         * @throws std::runtime_error If no points are provided for interpolation.
+         */
         VALUE_T implementation(VALUE_T x) const
         {
-            if (BASE::m_points.empty()) {
-                throw std::runtime_error("No points provided for interpolation.");
-            }
+            // Extrapolate using the slopes between the outer points:
+            //            // Check if x is outside the bounds of the data points
+            //            if (x < BASE::m_points.front().first) {
+            //                // Linear extrapolation using the slope of the first interval
+            //                auto [x0, y0] = BASE::m_points[0];
+            //                auto [x1, y1] = BASE::m_points[1];
+            //                VALUE_T slope = (y1 - y0) / (x1 - x0);
+            //                return y0 + slope * (x - x0);
+            //            } else if (x > BASE::m_points.back().first) {
+            //                // Linear extrapolation using the slope of the last interval
+            //                size_t n = BASE::m_points.size();
+            //                auto [xn_1, yn_1] = BASE::m_points[n - 2];
+            //                auto [xn, yn] = BASE::m_points[n - 1];
+            //                VALUE_T slope = (yn - yn_1) / (xn - xn_1);
+            //                return yn + slope * (x - xn);
+            //            } else {
+            //                // Lagrange interpolation
+            //                VALUE_T result = 0;
+            //                for (size_t j = 0; j < BASE::m_points.size(); ++j) {
+            //                    VALUE_T term = BASE::m_points[j].second;
+            //                    for (size_t m = 0; m < BASE::m_points.size(); ++m) {
+            //                        if (m != j) {
+            //                            term *= (x - BASE::m_points[m].first) / (BASE::m_points[j].first - BASE::m_points[m].first);
+            //                        }
+            //                    }
+            //                    result += term;
+            //                }
+            //                return result;
+            //            }
 
-            VALUE_T result = 0;
-            for (size_t j = 0; j < BASE::m_points.size(); ++j) {
-                VALUE_T term = BASE::m_points[j].second;
-                for (size_t m = 0; m < BASE::m_points.size(); ++m) {
-                    if (m != j) {
-                        term *= (x - BASE::m_points[m].first) / (BASE::m_points[j].first - BASE::m_points[m].first);
-                    }
-                }
-                result += term;
+            // Extrapolate using the slopes of the Lagrange polynomial at the outer points:
+            // Check if x is outside the bounds of the data points
+            if (x < BASE::m_points.front().first) {
+                // Linear extrapolation using the slope of the Lagrange polynomial at the first point
+                VALUE_T x0    = BASE::m_points.front().first;
+                VALUE_T y0    = BASE::m_points.front().second;
+                VALUE_T slope = *nxx::deriv::forward(*this, x0);
+                return y0 + slope * (x - x0);
             }
-            return result;
+            else if (x > BASE::m_points.back().first) {
+                // Linear extrapolation using the slope of the Lagrange polynomial at the last point
+                VALUE_T xn    = BASE::m_points.back().first;
+                VALUE_T yn    = BASE::m_points.back().second;
+                VALUE_T slope = *nxx::deriv::backward(*this, xn);
+                return yn + slope * (x - xn);
+            }
+            else {
+                // Regular Lagrange interpolation
+                VALUE_T result = 0;
+                for (size_t j = 0; j < BASE::m_points.size(); ++j) {
+                    VALUE_T term = BASE::m_points[j].second;
+                    for (size_t m = 0; m < BASE::m_points.size(); ++m) {
+                        if (m != j) {
+                            term *= (x - BASE::m_points[m].first) / (BASE::m_points[j].first - BASE::m_points[m].first);
+                        }
+                    }
+                    result += term;
+                }
+                return result;
+            }
         }
 
     public:
-        using BASE::BASE;
+        using BASE::BASE;    ///< Inherits constructors from the base class.
 
-        VALUE_T interpolate(VALUE_T x) const
-        {
-            auto [x1, y1] = BASE::m_points.front();
-            auto [x2, y2] = BASE::m_points.back();
-            if (x < x1 || x > x2) throw std::runtime_error("Interpolation point is out of bounds.");
-            return implementation(x);
-        }
+        /**
+         * @brief Performs Lagrange interpolation for a given x-value.
+         *
+         * This method checks if the x-value is within the bounds of the points and then
+         * uses the implementation method to perform the interpolation.
+         *
+         * @param x The x-coordinate value for which interpolation is to be performed.
+         * @return VALUE_T The interpolated value at the specified x-coordinate.
+         * @throws std::runtime_error If the interpolation point is out of bounds.
+         */
+        VALUE_T interpolate(VALUE_T x) const { return implementation(x); }
 
+        /**
+         * @brief Performs Lagrange extrapolation for a given x-value.
+         *
+         * This method uses the implementation method to perform extrapolation irrespective
+         * of whether the x-value is within the bounds of the points.
+         *
+         * @param x The x-coordinate value for which extrapolation is to be performed.
+         * @return VALUE_T The extrapolated value at the specified x-coordinate.
+         */
         VALUE_T extrapolate(VALUE_T x) const { return implementation(x); }
     };
 
+    /**
+     * @brief Deduction guide for Lagrange class with a container of POINT_T.
+     *
+     * @tparam CONTAINER_T Container type.
+     * @tparam POINT_T Point type.
+     */
     template< template< typename... > class CONTAINER_T, typename POINT_T >
     Lagrange(CONTAINER_T< POINT_T >) -> Lagrange< CONTAINER_T, POINT_T >;
 
-    Lagrange(std::initializer_list< std::pair< double, double > >) -> Lagrange< std::vector, std::pair< double, double > >;
+    /**
+     * @brief Deduction guide for Lagrange class with an initializer list of pairs.
+     *
+     * @tparam N Number of points.
+     */
+    template< size_t N >
+    requires(N >= 2)
+    Lagrange(const std::pair< double, double > (&)[N]) -> Lagrange< std::vector, std::pair< double, double > >;
 
+    // =================================================================================================================
+    //
+    //     ad88888ba                        ad88     ad88
+    //    d8"     "8b  ,d                  d8"      d8"
+    //    Y8,          88                  88       88
+    //    `Y8aaaaa,  MM88MMM  ,adPPYba,  MM88MMM  MM88MMM  ,adPPYba,  8b,dPPYba,
+    //      `"""""8b,  88    a8P_____88    88       88    a8P_____88  88P'   `"8a
+    //            `8b  88    8PP"""""""    88       88    8PP"""""""  88       88
+    //    Y8a     a8P  88,   "8b,   ,aa    88       88    "8b,   ,aa  88       88
+    //     "Y88888P"   "Y888  `"Ybbd8"'    88       88     `"Ybbd8"'  88       88
+    //
+    // =================================================================================================================
+
+    /**
+     * @brief Provides a derived class for interpolation using the Steffen method.
+     *
+     * The Steffen class template extends the InterpBase class for performing Steffen interpolation
+     * and extrapolation of a series of points. The Steffen method uses a Hermite interpolation
+     * approach to ensure smoothness at the data points.
+     *
+     * @tparam CONTAINER_T The type of container used to store the points.
+     * @tparam POINT_T The type of points stored in the container.
+     */
     template< template< typename... > class CONTAINER_T, typename POINT_T >
-    class Steffen : public InterpolationBase< Steffen< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >
+    class Steffen : public detail::InterpBase< Steffen< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >
     {
-        using BASE    = InterpolationBase< Steffen< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >;
+        using BASE    = detail::InterpBase< Steffen< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >;
         using VALUE_T = typename BASE::VALUE_T;
 
-        mutable std::vector< VALUE_T > slopes;
+        mutable std::optional<std::vector< VALUE_T >> m_slopes;    ///< Slopes at each point for Hermite interpolation.
 
     public:
-        using BASE::BASE;
+        using BASE::BASE;    ///< Inherits constructors from the base class.
 
-        // Constructor to initialize the slopes
-        explicit Steffen(const CONTAINER_T< POINT_T >& points)
-            : BASE(points)
-        {
-            calculateSlopes();
-        }
+        /**
+         * @brief Constructs a Steffen interpolator with the given points and calculates slopes.
+         *
+         * @param points The container of points to be used for interpolation.
+         */
+//        explicit Steffen(const CONTAINER_T< POINT_T >& points)
+//            : BASE(points)
+//        {
+//            calculateSlopes();
+//        }
+//
+//        template< size_t N >
+//        explicit Steffen(const POINT_T (&points)[N])
+//            : BASE(points)
+//        {
+//            calculateSlopes();
+//        }
 
+        /**
+         * @brief Calculates slopes for Hermite interpolation at each point.
+         *
+         * This method computes the slopes used in the Hermite interpolation formula,
+         * ensuring a smooth transition at each point.
+         */
         void calculateSlopes() const
         {
+            m_slopes = std::vector< VALUE_T >{};
+            auto& slopes = m_slopes.value();
+
             size_t n = BASE::m_points.size();
             slopes.resize(n);
 
@@ -204,15 +531,30 @@ namespace nxx::interp
             }
         }
 
+        /**
+         * @brief Performs Steffen interpolation for a given x-value.
+         *
+         * This method uses Hermite interpolation based on the slopes calculated at each point
+         * to interpolate a value at the given x-coordinate.
+         *
+         * @param x The x-coordinate value for which interpolation is to be performed.
+         * @return VALUE_T The interpolated value at the specified x-coordinate.
+         * @throws std::runtime_error If the interpolation point is out of bounds.
+         */
         VALUE_T interpolate(VALUE_T x) const
         {
+//            if (!BASE::isInitialized()) {
+//                calculateSlopes();
+//                BASE::setIsInitialized(true);
+//            }
+
+            if (!m_slopes) calculateSlopes();
+            auto& slopes = m_slopes.value();
+
+
             // Find the interval that x falls into
             auto it =
                 std::upper_bound(BASE::m_points.begin(), BASE::m_points.end(), x, [](double x, const auto& p) { return x < p.first; });
-
-            if (it == BASE::m_points.begin() || it == BASE::m_points.end()) {
-                throw std::runtime_error("Interpolation point is out of bounds.");
-            }
 
             auto [x1, y1]  = *(it - 1);
             auto [x2, y2]  = *it;
@@ -229,23 +571,43 @@ namespace nxx::interp
             return h00 * y1 + h10 * slope1 * (x2 - x1) + h01 * y2 + h11 * slope2 * (x2 - x1);
         }
 
+        /**
+         * @brief Performs Steffen extrapolation for a given x-value.
+         *
+         * This method handles cases where the x-value is outside the range of the points,
+         * using linear extrapolation based on the slope at the closest endpoint.
+         *
+         * @param x The x-coordinate value for which extrapolation is to be performed.
+         * @return VALUE_T The extrapolated value at the specified x-coordinate.
+         */
         VALUE_T extrapolate(VALUE_T x) const
         {
+//            if (!BASE::isInitialized()) {
+//                calculateSlopes();
+//                BASE::setIsInitialized(true);
+//            }
+
+            if (!m_slopes) calculateSlopes();
+            auto& slopes = m_slopes.value();
+
+
             size_t n = BASE::m_points.size();
 
             // Extrapolate at the beginning
-            if (x < BASE::m_points.front().first) {
+            if (x <= BASE::m_points.front().first) {
                 auto [x0, y0] = BASE::m_points[0];
                 auto [x1, y1] = BASE::m_points[1];
-                VALUE_T slope = (y1 - y0) / (x1 - x0);
+                //                VALUE_T slope = (y1 - y0) / (x1 - x0);
+                VALUE_T slope = *nxx::deriv::forward(*this, x0);
                 return y0 + slope * (x - x0);
             }
 
             // Extrapolate at the end
-            if (x > BASE::m_points.back().first) {
+            if (x >= BASE::m_points.back().first) {
                 auto [xn_1, yn_1] = BASE::m_points[n - 2];
                 auto [xn, yn]     = BASE::m_points[n - 1];
-                VALUE_T slope     = (yn - yn_1) / (xn - xn_1);
+                //                VALUE_T slope     = (yn - yn_1) / (xn - xn_1);
+                VALUE_T slope = *nxx::deriv::backward(*this, xn);
                 return yn + slope * (x - xn);
             }
 
@@ -254,123 +616,121 @@ namespace nxx::interp
         }
     };
 
+    /**
+     * @brief Deduction guide for Steffen class with a container of POINT_T.
+     *
+     * @tparam CONTAINER_T Container type.
+     * @tparam POINT_T Point type.
+     */
     template< template< typename... > class CONTAINER_T, typename POINT_T >
     Steffen(CONTAINER_T< POINT_T >) -> Steffen< CONTAINER_T, POINT_T >;
 
-    Steffen(std::initializer_list< std::pair< double, double > >) -> Steffen< std::vector, std::pair< double, double > >;
+    /**
+     * @brief Deduction guide for Steffen class with an initializer list of pairs.
+     *
+     * @tparam N Number of points.
+     */
+    template< size_t N >
+    requires(N >= 2)
+    Steffen(const std::pair< double, double > (&)[N]) -> Steffen< std::vector, std::pair< double, double > >;
 
-template<template<typename...> class CONTAINER_T, typename POINT_T>
-class Spline : public InterpolationBase<Spline<CONTAINER_T, POINT_T>, CONTAINER_T, POINT_T>
-{
-    using BASE = InterpolationBase<Spline<CONTAINER_T, POINT_T>, CONTAINER_T, POINT_T>;
-    using VALUE_T = typename BASE::VALUE_T;
+    // =================================================================================================================
+    //
+    //     ad88888ba                88  88
+    //    d8"     "8b               88  ""
+    //    Y8,                       88
+    //    `Y8aaaaa,    8b,dPPYba,   88  88  8b,dPPYba,    ,adPPYba,
+    //      `"""""8b,  88P'    "8a  88  88  88P'   `"8a  a8P_____88
+    //            `8b  88       d8  88  88  88       88  8PP"""""""
+    //    Y8a     a8P  88b,   ,a8"  88  88  88       88  "8b,   ,aa
+    //     "Y88888P"   88`YbbdP"'   88  88  88       88   `"Ybbd8"'
+    //                 88
+    //                 88
+    //
+    // =================================================================================================================
 
-    struct SplineSegment {
-        VALUE_T a, b, c, d, x;
-    };
-
-    mutable std::vector<SplineSegment> segments;
-
-public:
-    using BASE::BASE;
-
-    Spline(const CONTAINER_T<POINT_T>& points) : BASE(points) {
-        calculateSplineCoefficients();
-    }
-
-    void calculateSplineCoefficients() const {
-        size_t n = BASE::m_points.size() - 1;
-        if (n < 1) {
-            throw std::runtime_error("Not enough points for spline interpolation");
-        }
-
-        blaze::DynamicVector<VALUE_T> h(n), alpha(n), l(n+1), mu(n), z(n+1), c(n+1), b(n), d(n);
-
-        // Compute h and alpha
-        for (size_t i = 0; i < n; ++i) {
-            h[i] = BASE::m_points[i+1].first - BASE::m_points[i].first;
-            alpha[i] = (3 / h[i]) * (BASE::m_points[i+1].second - BASE::m_points[i].second)
-                     - (3 / h[i-1]) * (BASE::m_points[i].second - BASE::m_points[i-1].second);
-        }
-
-        // Compute l, mu, z
-        l[0] = 1;
-        mu[0] = z[0] = 0;
-        for (size_t i = 1; i < n; ++i) {
-            l[i] = 2 * (BASE::m_points[i+1].first - BASE::m_points[i-1].first) - h[i-1] * mu[i-1];
-            mu[i] = h[i] / l[i];
-            z[i] = (alpha[i] - h[i-1] * z[i-1]) / l[i];
-        }
-        l[n] = 1;
-        z[n] = 0;
-
-        // Back substitution loop for the cubic coefficients
-        c[n] = 0; // Natural spline: second derivative of n is zero
-        for (size_t j = n-1; j-- > 0; ) {
-            c[j] = z[j] - mu[j] * c[j+1];
-            b[j] = (BASE::m_points[j+1].second - BASE::m_points[j].second) / h[j]
-                   - h[j] * (c[j+1] + 2 * c[j]) / 3;
-            d[j] = (c[j+1] - c[j]) / (3 * h[j]);
-        }
-
-        // Store coefficients
-        for (size_t i = 0; i < n; ++i) {
-            segments[i] = {BASE::m_points[i].second, b[i], c[i], d[i], BASE::m_points[i].first};
-        }
-    }
-
-    VALUE_T interpolate(VALUE_T x) const {
-        // Find the right segment
-        auto it = std::lower_bound(segments.begin(), segments.end(), x,
-                                   [](const SplineSegment& seg, VALUE_T x) { return seg.x < x; });
-        if (it != segments.begin()) {
-            --it;
-        }
-
-        // Compute the interpolated value
-        VALUE_T dx = x - it->x;
-        return it->a + it->b * dx + it->c * dx * dx + it->d * dx * dx * dx;
-    }
-};
-
+    /**
+     * @brief Provides a derived class for cubic spline interpolation.
+     *
+     * The Spline class template extends the InterpBase class for performing cubic spline
+     * interpolation of a series of points. It computes and stores coefficients for each cubic
+     * spline segment and uses them to interpolate values at arbitrary points.
+     *
+     * @tparam CONTAINER_T The type of container used to store the points.
+     * @tparam POINT_T The type of points stored in the container.
+     */
     template< template< typename... > class CONTAINER_T, typename POINT_T >
-    Spline(CONTAINER_T< POINT_T >) -> Spline< CONTAINER_T, POINT_T >;
-
-    Spline(std::initializer_list< std::pair< double, double > >) -> Spline< std::vector, std::pair< double, double > >;
-
-    struct SplineCoefficients
+    class Spline : public detail::InterpBase< Spline< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >
     {
-        std::vector< double > a, b, c, d;
-    };
+        using BASE    = detail::InterpBase< Spline< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >;
+        using VALUE_T = typename BASE::VALUE_T;
 
-    class CubicSplineInterp
-    {
-    public:
-        template< typename Point >
-        auto operator()(const std::vector< Point >& points) const
+        /**
+         * @struct SplineCoefficients
+         * @brief Structure to store the coefficients of the cubic spline segments.
+         */
+        struct SplineCoefficients
         {
-            if (points.size() < 3) throw std::runtime_error("Cubic spline interpolation requires at least three points.");
+            std::vector< VALUE_T > a;    ///< Coefficients of the zeroth degree.
+            std::vector< VALUE_T > b;    ///< Coefficients of the first degree.
+            std::vector< VALUE_T > c;    ///< Coefficients of the second degree.
+            std::vector< VALUE_T > d;    ///< Coefficients of the third degree.
+        };
 
-            size_t                         n = points.size() - 1;
-            blaze::DynamicVector< double > a(n + 1), b(n), d(n + 1), h(n);
+        mutable std::optional<SplineCoefficients> m_coefficients;    ///< Instance variable to hold the coefficients for the cubic spline.
 
+    public:
+        using BASE::BASE;    ///< Inherits constructors from the base class.
+
+        /**
+         * @brief Constructs a Spline interpolator with the given points and calculates spline coefficients.
+         *
+         * @param points The container of points to be used for interpolation.
+         */
+//        explicit Spline(const CONTAINER_T< POINT_T >& points)
+//            : BASE(points)
+//        {
+//            calculateSplineCoefficients();
+//        }
+
+        /**
+         * @brief Calculates coefficients for the cubic spline.
+         *
+         * This method computes the coefficients for each cubic spline segment based on the provided points.
+         *
+         * @throws std::runtime_error If there are less than three points, which is insufficient for cubic spline interpolation.
+         */
+        void calculateSplineCoefficients() const
+        {
+            m_coefficients = SplineCoefficients{};
+                auto& coefficients = m_coefficients.value();
+
+            size_t n = BASE::m_points.size() - 1;    // Number of intervals
+
+            // Vectors for spline calculation
+            blaze::DynamicVector< VALUE_T > a(n + 1), b(n), d(n + 1), h(n);
+
+            // Initializing 'a' with y-values and calculating 'h' (intervals)
             for (size_t i = 0; i < n; ++i) {
-                a[i] = points[i].second;
-                h[i] = points[i + 1].first - points[i].first;
+                a[i] = BASE::m_points[i].second;
+                h[i] = BASE::m_points[i + 1].first - BASE::m_points[i].first;
             }
-            a[n] = points[n].second;
+            a[n] = BASE::m_points[n].second;
 
-            blaze::DynamicVector< double > alpha(n);
+            // Calculating the alpha vector used in the spline calculation
+            blaze::DynamicVector< VALUE_T > alpha(n);
             for (size_t i = 1; i < n; ++i) {
                 alpha[i] = 3.0 / h[i] * (a[i + 1] - a[i]) - 3.0 / h[i - 1] * (a[i] - a[i - 1]);
             }
 
-            blaze::DynamicVector< double > c(n + 1), l(n + 1), mu(n + 1), z(n + 1);
+            // Vectors used in solving the tridiagonal system for 'c'
+            blaze::DynamicVector< VALUE_T > c(n + 1), l(n + 1), mu(n + 1), z(n + 1);
             l[0]  = 1.0;
             mu[0] = z[0] = 0.0;
 
+            // Forward sweep to solve for 'c'
             for (size_t i = 1; i < n; ++i) {
-                l[i]  = 2.0 * (points[i + 1].first - points[i - 1].first) - h[i - 1] * mu[i - 1];
+                l[i]  = 2.0 * (BASE::m_points[i + 1].first - BASE::m_points[i - 1].first) - h[i - 1] * mu[i - 1];
                 mu[i] = h[i] / l[i];
                 z[i]  = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
             }
@@ -378,80 +738,228 @@ public:
             l[n] = 1.0;
             z[n] = c[n] = 0.0;
 
+            // Backward sweep for 'c', and solving for 'b' and 'd'
             for (int j = n - 1; j >= 0; --j) {
                 c[j] = z[j] - mu[j] * c[j + 1];
                 b[j] = (a[j + 1] - a[j]) / h[j] - h[j] * (c[j + 1] + 2.0 * c[j]) / 3.0;
                 d[j] = (c[j + 1] - c[j]) / (3.0 * h[j]);
             }
 
-            // The coefficients of the cubic splines are in a, b, c, d
-            // For simplicity, only returning 'a', modify as needed
-            // std::vector<double> coefficients(a.begin(), a.end());
-
-            SplineCoefficients coefficients;
-
-            coefficients.a = std::vector< double >(a.begin(), a.end());
-            coefficients.b = std::vector< double >(b.begin(), b.end());
-            coefficients.c = std::vector< double >(c.begin(), c.end());
-            coefficients.d = std::vector< double >(d.begin(), d.end());
-
-            return coefficients;
+            // Storing the calculated coefficients
+            coefficients.a = std::vector< VALUE_T >(a.begin(), a.end());
+            coefficients.b = std::vector< VALUE_T >(b.begin(), b.end());
+            coefficients.c = std::vector< VALUE_T >(c.begin(), c.end());
+            coefficients.d = std::vector< VALUE_T >(d.begin(), d.end());
         }
+
+        /**
+         * @brief Interpolates a value at a given x-coordinate using the spline.
+         *
+         * This method finds the appropriate spline segment for the given x-coordinate and evaluates
+         * the cubic polynomial to find the interpolated value.
+         *
+         * @param x The x-coordinate value for which interpolation is to be performed.
+         * @return VALUE_T The interpolated value at the specified x-coordinate.
+         */
+        VALUE_T interpolate(VALUE_T x) const
+        {
+            if (!m_coefficients) calculateSplineCoefficients();
+
+
+            auto& a = m_coefficients->a;
+            auto& b = m_coefficients->b;
+            auto& c = m_coefficients->c;
+            auto& d = m_coefficients->d;
+
+            // Find the right interval for x
+            size_t interval = BASE::m_points.size() - 2;    // Default to the last interval
+            for (size_t i = 0; i < BASE::m_points.size() - 1; ++i) {
+                if (x <= BASE::m_points[i + 1].first) {
+                    interval = i;
+                    break;
+                }
+            }
+
+            // Calculate the difference between x and the starting x of the interval
+            VALUE_T dx = x - BASE::m_points[interval].first;
+
+            VALUE_T result = a[interval] + b[interval] * dx + c[interval] * dx * dx + d[interval] * dx * dx * dx;
+            return result;
+        }
+
+        /**
+         * @brief Extrapolates a value at a given x-coordinate using the spline.
+         *
+         * Currently, this method behaves the same as interpolate, but it could be extended
+         * for specific extrapolation behavior in the future.
+         *
+         * @param x The x-coordinate value for which extrapolation is to be performed.
+         * @return VALUE_T The extrapolated value at the specified x-coordinate.
+         */
+        VALUE_T extrapolate(VALUE_T x) const { return interpolate(x); }
     };
 
-    double evaluateSpline(const std::vector< std::pair< double, double > >& points,
-                          const std::vector< double >&                      a,
-                          const std::vector< double >&                      b,
-                          const std::vector< double >&                      c,
-                          const std::vector< double >&                      d,
-                          double                                            x)
+    /**
+     * @brief Deduction guide for Spline class with a container of POINT_T.
+     *
+     * @tparam CONTAINER_T Container type.
+     * @tparam POINT_T Point type.
+     */
+    template< template< typename... > class CONTAINER_T, typename POINT_T >
+    Spline(CONTAINER_T< POINT_T >) -> Spline< CONTAINER_T, POINT_T >;
+
+    /**
+     * @brief Deduction guide for Spline class with an initializer list of pairs.
+     *
+     * @tparam N Number of points in the initializer list.
+     */
+    template< size_t N >
+    requires(N >= 2)
+    Spline(const std::pair< double, double > (&)[N]) -> Spline< std::vector, std::pair< double, double > >;
+
+    // =================================================================================================================
+    //
+    //    88                                                                        88
+    //    ""                ,d                                                      88                ,d
+    //                      88                                                      88                88
+    //    88  8b,dPPYba,  MM88MMM  ,adPPYba,  8b,dPPYba,  8b,dPPYba,    ,adPPYba,   88  ,adPPYYba,  MM88MMM  ,adPPYba,
+    //    88  88P'   `"8a   88    a8P_____88  88P'   "Y8  88P'    "8a  a8"     "8a  88  ""     `Y8    88    a8P_____88
+    //    88  88       88   88    8PP"""""""  88          88       d8  8b       d8  88  ,adPPPPP88    88    8PP"""""""
+    //    88  88       88   88,   "8b,   ,aa  88          88b,   ,a8"  "8a,   ,a8"  88  88,    ,88    88,   "8b,   ,aa
+    //    88  88       88   "Y888  `"Ybbd8"'  88          88`YbbdP"'    `"YbbdP"'   88  `"8bbdP"Y8    "Y888  `"Ybbd8"'
+    //                                                    88
+    //                                                    88
+    //
+    // =================================================================================================================
+
+    /**
+     * @brief Interpolates at a single point using a specified interpolation algorithm.
+     *
+     * This function template creates an instance of the specified interpolation algorithm and
+     * uses it to interpolate at the given x-coordinate.
+     *
+     * @tparam ALGO The interpolation algorithm class template.
+     * @tparam CONTAINER_T The type of container used to store the points.
+     * @tparam POINT_T The type of points stored in the container.
+     * @param points The container of points to be used for interpolation.
+     * @param x The x-coordinate value for which interpolation is to be performed.
+     * @return The interpolated value at the specified x-coordinate.
+     *
+     * @note Requires that ALGO< CONTAINER_T, POINT_T > has a static member IsInterpolator set to true.
+     */
+    template< template< template< typename... > class, typename > class ALGO, template< typename... > class CONTAINER_T, typename POINT_T >
+    requires ALGO< CONTAINER_T, POINT_T >::IsInterpolator
+    auto interpolate(const CONTAINER_T< POINT_T >& points, double x)
     {
-        if (points.size() < 2) throw std::runtime_error("Insufficient points for spline evaluation.");
-
-        // Find the right interval for x
-        size_t interval = points.size() - 2;    // Default to the last interval
-        for (size_t i = 0; i < points.size() - 1; ++i) {
-            if (x <= points[i + 1].first) {
-                interval = i;
-                break;
-            }
-        }
-
-        // Calculate the difference between x and the starting x of the interval
-        double dx = x - points[interval].first;
-
-        // Evaluate the cubic polynomial
-        double result = a[interval] + b[interval] * dx + c[interval] * dx * dx + d[interval] * dx * dx * dx;
-        return result;
+        auto algo = ALGO(points);
+        return algo(x);
     }
 
-    template< typename ALGO, typename Point >
-    double interpolate(ALGO algorithm, const std::vector< Point >& points, double x)
+    /**
+     * @brief Interpolates at a single point using a specified interpolation algorithm, with points provided as an initializer list.
+     *
+     * This function template is a specialization for the case where points are provided as an initializer list.
+     * It creates an instance of the specified interpolation algorithm and uses it to interpolate at the given x-coordinate.
+     *
+     * @tparam ALGO The interpolation algorithm class template.
+     * @tparam N The number of points provided in the initializer list.
+     * @param points An initializer list of points to be used for interpolation.
+     * @param x The x-coordinate value for which interpolation is to be performed.
+     * @return The interpolated value at the specified x-coordinate.
+     *
+     * @note Requires that ALGO< std::vector, std::pair< double, double > > has a static member IsInterpolator set to true.
+     */
+    template< template< template< typename... > class, typename > class ALGO, size_t N >
+    requires ALGO< std::vector, std::pair< double, double > >::IsInterpolator
+    auto interpolate(const std::pair< double, double > (&points)[N], double x)
     {
-        return algorithm(points, x);
-    }
-
-    template< typename ALGO, typename Point >
-auto interpolationOf(ALGO algorithm, const std::vector< Point >& points)
-    {
-        return [=](double x) { return algorithm(points, x); };
+        auto algo = ALGO(points);
+        return algo(x);
     }
 
     // =================================================================================================================
     //
-    //                                 88                                              88
-    //                                 88                                              88
-    //                                 88                                              88
-    // 88,dPYba,,adPYba,   ,adPPYYba,  88   ,d8   ,adPPYba,  8b,dPPYba,    ,adPPYba,   88  8b       d8
-    // 88P'   "88"    "8a  ""     `Y8  88 ,a8"   a8P_____88  88P'    "8a  a8"     "8a  88  `8b     d8'
-    // 88      88      88  ,adPPPPP88  8888[     8PP"""""""  88       d8  8b       d8  88   `8b   d8'
-    // 88      88      88  88,    ,88  88`"Yba,  "8b,   ,aa  88b,   ,a8"  "8a,   ,a8"  88    `8b,d8'
-    // 88      88      88  `"8bbdP"Y8  88   `Y8a  `"Ybbd8"'  88`YbbdP"'    `"YbbdP"'   88      Y88'
-    //                                                       88                                d8'
-    //                                                       88                               d8'
+    //    88                                                             ,ad8888ba,       ad88
+    //    ""                ,d                                          d8"'    `"8b     d8"
+    //                      88                                         d8'        `8b    88
+    //    88  8b,dPPYba,  MM88MMM  ,adPPYba,  8b,dPPYba,  8b,dPPYba,   88          88  MM88MMM
+    //    88  88P'   `"8a   88    a8P_____88  88P'   "Y8  88P'    "8a  88          88    88
+    //    88  88       88   88    8PP"""""""  88          88       d8  Y8,        ,8P    88
+    //    88  88       88   88,   "8b,   ,aa  88          88b,   ,a8"   Y8a.    .a8P     88
+    //    88  88       88   "Y888  `"Ybbd8"'  88          88`YbbdP"'     `"Y8888Y"'      88
+    //                                                    88
+    //                                                    88
     //
     // =================================================================================================================
 
+    /**
+     * @brief Returns an interpolation function object based on the given points and algorithm.
+     *
+     * This function template creates an instance of the specified interpolation algorithm with the provided
+     * points. The returned object can be used to perform interpolation at different x-coordinate values.
+     *
+     * @tparam ALGO The interpolation algorithm class template.
+     * @tparam CONTAINER_T The type of container used to store the points.
+     * @tparam POINT_T The type of points stored in the container.
+     * @param points The container of points to be used for creating the interpolation function object.
+     * @return An instance of the specified interpolation algorithm initialized with the given points.
+     *
+     * @note Requires that ALGO< CONTAINER_T, POINT_T > has a static member IsInterpolator set to true.
+     */
+    template< template< template< typename... > class, typename > class ALGO, template< typename... > class CONTAINER_T, typename POINT_T >
+    requires ALGO< CONTAINER_T, POINT_T >::IsInterpolator
+    auto interpolationOf(const CONTAINER_T< POINT_T >& points)
+    {
+        return ALGO(points);
+    }
+
+    /**
+     * @brief Returns an interpolation function object based on the given points and algorithm, with points provided as an initializer list.
+     *
+     * This function template is a specialization for cases where points are provided as an initializer list.
+     * It creates an instance of the specified interpolation algorithm with the provided points.
+     * The returned object can be used to perform interpolation at different x-coordinate values.
+     *
+     * @tparam ALGO The interpolation algorithm class template.
+     * @tparam N The number of points provided in the initializer list.
+     * @param points An initializer list of points to be used for creating the interpolation function object.
+     * @return An instance of the specified interpolation algorithm initialized with the given points.
+     *
+     * @note Requires that ALGO< std::vector, std::pair< double, double > > has a static member IsInterpolator set to true.
+     */
+    template< template< template< typename... > class, typename > class ALGO, size_t N >
+    requires ALGO< std::vector, std::pair< double, double > >::IsInterpolator
+    auto interpolationOf(const std::pair< double, double > (&points)[N])
+    {
+        return ALGO(points);
+    }
+
+    // =================================================================================================================
+    //
+    //                                  88                                              88
+    //                                  88                                              88
+    //                                  88                                              88
+    //  88,dPYba,,adPYba,   ,adPPYYba,  88   ,d8   ,adPPYba,  8b,dPPYba,    ,adPPYba,   88  8b       d8
+    //  88P'   "88"    "8a  ""     `Y8  88 ,a8"   a8P_____88  88P'    "8a  a8"     "8a  88  `8b     d8'
+    //  88      88      88  ,adPPPPP88  8888[     8PP"""""""  88       d8  8b       d8  88   `8b   d8'
+    //  88      88      88  88,    ,88  88`"Yba,  "8b,   ,aa  88b,   ,a8"  "8a,   ,a8"  88    `8b,d8'
+    //  88      88      88  `"8bbdP"Y8  88   `Y8a  `"Ybbd8"'  88`YbbdP"'    `"YbbdP"'   88      Y88'
+    //                                                        88                                d8'
+    //                                                        88                               d8'
+    //
+    // =================================================================================================================
+
+    /**
+     * @brief Creates a polynomial that passes through all the given points.
+     *
+     * This function sets up and solves a linear system to find the coefficients of a polynomial
+     * that passes through the given set of points. It constructs a polynomial using these coefficients.
+     *
+     * @param points A vector of pairs, where each pair represents a point (x, y).
+     * @return An instance of the Polynomial class representing the polynomial that fits all the given points.
+     *
+     * @note This function requires the blaze library for matrix and vector operations.
+     */
     inline auto makepoly(const std::vector< std::pair< double, double > >& points)
     {
         size_t                         n = points.size();
@@ -481,5 +989,3 @@ auto interpolationOf(ALGO algorithm, const std::vector< Point >& points)
     }
 
 }    // namespace nxx::interp
-
-#endif    // NUMERIXX_INTERPOLATE_HPP
