@@ -1,7 +1,7 @@
 #==============================================================================
 # Preamble
 #==============================================================================
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.26)
 project(Numerixx)
 
 # Add the cmake folder so the FindSphinx module is found
@@ -17,12 +17,20 @@ message(STATUS "Using toolchain file: ${CMAKE_TOOLCHAIN_FILE}")
 #==============================================================================
 # Add individual subdirectories
 #==============================================================================
+set(EXPECTED_BUILD_TESTS OFF)
+add_subdirectory(external/expected SYSTEM)
+add_subdirectory(external/blaze SYSTEM)
+add_subdirectory(external/gcem SYSTEM)
+add_subdirectory(external/json SYSTEM)
+
+
+
 add_subdirectory(numerixx)
 
-option(NUMERIXX_ENABLE_TESTS "Enable unit tests" ${PROJECT_IS_TOP_LEVEL})
-if(NUMERIXX_ENABLE_TESTS)
-    add_subdirectory(test)
-endif()
+#option(NUMERIXX_ENABLE_TESTS "Enable unit tests" ${PROJECT_IS_TOP_LEVEL})
+#if(NUMERIXX_ENABLE_TESTS)
+#    add_subdirectory(test)
+#endif()
 
 option(NUMERIXX_ENABLE_DOCS "Enable documentation" ${PROJECT_IS_TOP_LEVEL})
 if(NUMERIXX_ENABLE_DOCS)

@@ -1,7 +1,7 @@
 #==============================================================================
 # Preamble
 #==============================================================================
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.26)
 project(Numerixx.Lib)
 
 #==============================================================================
@@ -13,9 +13,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 #==============================================================================
 # Find dependencies
 #==============================================================================
-find_package(gcem REQUIRED)
-find_package(tl-expected REQUIRED)
-find_package(blaze CONFIG REQUIRED)
+#find_package(gcem REQUIRED)
+#find_package(tl-expected REQUIRED)
+#find_package(blaze CONFIG REQUIRED)
 find_package(LAPACK REQUIRED)
 find_package(Boost REQUIRED)
 
@@ -104,13 +104,13 @@ target_link_libraries(nxx_func INTERFACE nxx_utility gcem tl::expected)
 target_link_libraries(nxx_deriv INTERFACE nxx_utility gcem tl::expected)
 target_link_libraries(nxx_integrate INTERFACE nxx_utility gcem tl::expected)
 target_link_libraries(nxx_interpolate INTERFACE nxx_utility nxx_poly gcem tl::expected)
-target_link_libraries(nxx_interpolate INTERFACE LAPACK::LAPACK blaze::blaze)
+target_link_libraries(nxx_interpolate INTERFACE LAPACK::LAPACK blaze)
 target_link_libraries(nxx_optimize INTERFACE nxx_utility gcem tl::expected)
 target_link_libraries(nxx_poly INTERFACE nxx_utility nxx_deriv nxx_roots gcem tl::expected)
 target_link_libraries(nxx_roots INTERFACE nxx_utility nxx_poly nxx_deriv gcem tl::expected)
-target_link_libraries(nxx_multiroots INTERFACE nxx_utility nxx_deriv nxx_roots nxx_poly gcem tl::expected)
-target_link_libraries(nxx_multiroots INTERFACE LAPACK::LAPACK blaze::blaze)
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+target_link_libraries(nxx_multiroots INTERFACE nxx_utility nxx_deriv nxx_roots nxx_poly nxx_interpolate gcem tl::expected)
+target_link_libraries(nxx_multiroots INTERFACE LAPACK::LAPACK blaze)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")# AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
     find_package(OpenMP REQUIRED)
     target_link_libraries(nxx_multiroots INTERFACE OpenMP::OpenMP_CXX)
     target_link_libraries(nxx_interpolate INTERFACE OpenMP::OpenMP_CXX)

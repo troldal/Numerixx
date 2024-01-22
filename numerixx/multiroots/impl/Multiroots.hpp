@@ -37,7 +37,7 @@
 #include <Deriv.hpp>
 #include <Poly.hpp>
 #include <Interp.hpp>
-#include <Optim.hpp>
+//#include <Optim.hpp>
 
 // ===== External Includes
 #include <blaze/Blaze.h>
