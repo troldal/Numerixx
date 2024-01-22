@@ -1,5 +1,5 @@
 #==============================================================================
-# Preamble
+# PREAMBLE
 #==============================================================================
 cmake_minimum_required(VERSION 3.26)
 project(Numerixx)
@@ -8,23 +8,16 @@ project(Numerixx)
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 #==============================================================================
-# Set compiler settings
+# SET COMPILER SETTINGS
 #==============================================================================
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 add_compile_definitions(NOMINMAX)
 message(STATUS "Using toolchain file: ${CMAKE_TOOLCHAIN_FILE}")
 #==============================================================================
 # Add individual subdirectories
 #==============================================================================
-set(EXPECTED_BUILD_TESTS OFF)
-add_subdirectory(external/expected SYSTEM)
-add_subdirectory(external/blaze SYSTEM)
-add_subdirectory(external/gcem SYSTEM)
-add_subdirectory(external/json SYSTEM)
-
-
-
 add_subdirectory(numerixx)
 
 #option(NUMERIXX_ENABLE_TESTS "Enable unit tests" ${PROJECT_IS_TOP_LEVEL})

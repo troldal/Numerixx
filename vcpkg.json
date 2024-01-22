@@ -23,5 +23,8 @@
   }, {
     "name" : "fmt",
     "version>=" : "10.2.1"
+  }, {
+    "name" : "tl-expected",
+    "version>=" : "1.1.0"
   } ]
 }

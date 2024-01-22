@@ -171,7 +171,7 @@ configure_file ("${CMAKE_CURRENT_LIST_DIR}/cmake/CacheSize.h.in"
 # Configure BLAS
 #==================================================================================================
 
-set(BLAZE_BLAS_MODE OFF CACHE BOOL "Enables/Disable the BLAS mode.")
+set(BLAZE_BLAS_MODE ON CACHE BOOL "Enables/Disable the BLAS mode.")
 
 if (BLAZE_BLAS_MODE)
    find_package (BLAS REQUIRED)

@@ -44,16 +44,6 @@ target_sources(DemoRootSearching
 
 target_link_libraries(DemoRootSearching PRIVATE numerixx::roots fmt::fmt)
 
-# Target: Function
-add_executable(DemoFunction)
-target_sources(DemoFunction
-        PRIVATE
-        DemoFunction.cpp
-        )
-
-target_link_libraries(DemoFunction PRIVATE numerixx::func fmt::fmt)
-
-
 # Target: Polynomials
 add_executable(DemoPoly)
 target_sources(DemoPoly

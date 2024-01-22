@@ -8,6 +8,7 @@
 #include <cmath>
 #include <functional>
 
+#include <Concepts.hpp>
 #include <Deriv.hpp>
 #include <Poly.hpp>
 #include <Interp.hpp>
