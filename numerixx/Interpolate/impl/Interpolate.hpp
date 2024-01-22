@@ -484,24 +484,6 @@ namespace nxx::interp
         using BASE::BASE;    ///< Inherits constructors from the base class.
 
         /**
-         * @brief Constructs a Steffen interpolator with the given points and calculates slopes.
-         *
-         * @param points The container of points to be used for interpolation.
-         */
-//        explicit Steffen(const CONTAINER_T< POINT_T >& points)
-//            : BASE(points)
-//        {
-//            calculateSlopes();
-//        }
-//
-//        template< size_t N >
-//        explicit Steffen(const POINT_T (&points)[N])
-//            : BASE(points)
-//        {
-//            calculateSlopes();
-//        }
-
-        /**
          * @brief Calculates slopes for Hermite interpolation at each point.
          *
          * This method computes the slopes used in the Hermite interpolation formula,
@@ -543,11 +525,6 @@ namespace nxx::interp
          */
         VALUE_T interpolate(VALUE_T x) const
         {
-//            if (!BASE::isInitialized()) {
-//                calculateSlopes();
-//                BASE::setIsInitialized(true);
-//            }
-
             if (!m_slopes) calculateSlopes();
             auto& slopes = m_slopes.value();
 
@@ -582,11 +559,6 @@ namespace nxx::interp
          */
         VALUE_T extrapolate(VALUE_T x) const
         {
-//            if (!BASE::isInitialized()) {
-//                calculateSlopes();
-//                BASE::setIsInitialized(true);
-//            }
-
             if (!m_slopes) calculateSlopes();
             auto& slopes = m_slopes.value();
 
@@ -683,17 +655,6 @@ namespace nxx::interp
         using BASE::BASE;    ///< Inherits constructors from the base class.
 
         /**
-         * @brief Constructs a Spline interpolator with the given points and calculates spline coefficients.
-         *
-         * @param points The container of points to be used for interpolation.
-         */
-//        explicit Spline(const CONTAINER_T< POINT_T >& points)
-//            : BASE(points)
-//        {
-//            calculateSplineCoefficients();
-//        }
-
-        /**
          * @brief Calculates coefficients for the cubic spline.
          *
          * This method computes the coefficients for each cubic spline segment based on the provided points.
@@ -764,7 +725,6 @@ namespace nxx::interp
         VALUE_T interpolate(VALUE_T x) const
         {
             if (!m_coefficients) calculateSplineCoefficients();
-
 
             auto& a = m_coefficients->a;
             auto& b = m_coefficients->b;
