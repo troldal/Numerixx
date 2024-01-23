@@ -106,12 +106,12 @@ namespace nxx::interp
          *
          * @note Requires that POINT_T is a floating point structure.
          */
-        template< typename DERIVED, template< typename... > class CONTAINER_T, IsFloatStruct POINT_T >
+        template< typename DERIVED, IsFloatStruct POINT_T >
         class InterpBase
         {
             friend DERIVED;
 
-            CONTAINER_T< POINT_T > m_points;    ///< Container holding the points for interpolation.
+            std::vector< POINT_T > m_points;    ///< Container holding the points for interpolation.
 
         public:
             static constexpr bool IsInterpolator = true;    ///< Flag to identify interpolator classes.
@@ -133,8 +133,9 @@ namespace nxx::interp
              * @param points The container of points to be used for interpolation.
              * @throws std::runtime_error If the number of points is less than 2.
              */
+            template <template< typename... > class CONTAINER_T >
             explicit InterpBase(const CONTAINER_T< POINT_T >& points)
-                : m_points(points)
+                : m_points(points.begin(), points.end())
             {
                 if (m_points.size() < 2) throw std::runtime_error("Interpolation requires at least two points.");
                 std::sort(m_points.begin(), m_points.end(), [](const auto& p1, const auto& p2) {
@@ -257,10 +258,10 @@ namespace nxx::interp
      * @tparam CONTAINER_T The type of container used to store the points.
      * @tparam POINT_T The type of points stored in the container.
      */
-    template< template< typename... > class CONTAINER_T, typename POINT_T >
-    class Linear : public detail::InterpBase< Linear< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >
+    template< typename POINT_T >
+    class Linear : public detail::InterpBase< Linear< POINT_T >, POINT_T >
     {
-        using BASE = detail::InterpBase< Linear< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >;
+        using BASE = detail::InterpBase< Linear< POINT_T >, POINT_T >;
 
     public:
         using BASE::BASE;                          ///< Inherits constructors from the base class.
@@ -338,18 +339,18 @@ namespace nxx::interp
      * Deduction guides for Linear class with a container of POINT_T.
      */
     template< template< typename... > class CONTAINER_T, typename POINT_T >
-    Linear(CONTAINER_T< POINT_T >) -> Linear< CONTAINER_T, POINT_T >;
+    Linear(CONTAINER_T< POINT_T >) -> Linear< POINT_T >;
 
     template< size_t N >
     requires(N >= 2)
-    Linear(const std::pair< double, double > (&)[N]) -> Linear< std::vector, std::pair< double, double > >;
+    Linear(const std::pair< double, double > (&)[N]) -> Linear< std::pair< double, double > >;
 
     template< template< typename... > class XCONT_T, template< typename... > class YCONT_T, typename XVAL_T, typename YVAL_T >
-    Linear(const XCONT_T< XVAL_T >& x, const YCONT_T< YVAL_T >& y) -> Linear< std::vector, std::pair< XVAL_T, YVAL_T > >;
+    Linear(const XCONT_T< XVAL_T >& x, const YCONT_T< YVAL_T >& y) -> Linear< std::pair< XVAL_T, YVAL_T > >;
 
     template< typename XVAL_T, size_t N, typename YVAL_T, size_t M >
     requires(N == M && N >= 2)
-    Linear(const XVAL_T (&)[N], const YVAL_T (&)[M]) -> Linear< std::vector, std::pair< XVAL_T, YVAL_T > >;
+    Linear(const XVAL_T (&)[N], const YVAL_T (&)[M]) -> Linear< std::pair< XVAL_T, YVAL_T > >;
 
     // =================================================================================================================
     //
@@ -375,10 +376,10 @@ namespace nxx::interp
      * @tparam CONTAINER_T The type of container used to store the points.
      * @tparam POINT_T The type of points stored in the container.
      */
-    template< template< typename... > class CONTAINER_T, typename POINT_T >
-    class Lagrange : public detail::InterpBase< Lagrange< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >
+    template< typename POINT_T >
+    class Lagrange : public detail::InterpBase< Lagrange< POINT_T >, POINT_T >
     {
-        using BASE    = detail::InterpBase< Lagrange< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >;
+        using BASE    = detail::InterpBase< Lagrange< POINT_T >, POINT_T >;
         using VALUE_T = typename BASE::VALUE_T;
 
         /**
@@ -486,18 +487,18 @@ namespace nxx::interp
      * Deduction guides for Lagrange class with a container of POINT_T.
      */
     template< template< typename... > class CONTAINER_T, typename POINT_T >
-    Lagrange(CONTAINER_T< POINT_T >) -> Lagrange< CONTAINER_T, POINT_T >;
+    Lagrange(CONTAINER_T< POINT_T >) -> Lagrange< POINT_T >;
 
     template< size_t N >
     requires(N >= 2)
-    Lagrange(const std::pair< double, double > (&)[N]) -> Lagrange< std::vector, std::pair< double, double > >;
+    Lagrange(const std::pair< double, double > (&)[N]) -> Lagrange< std::pair< double, double > >;
 
     template< template< typename... > class XCONT_T, template< typename... > class YCONT_T, typename XVAL_T, typename YVAL_T >
-    Lagrange(const XCONT_T< XVAL_T >& x, const YCONT_T< YVAL_T >& y) -> Lagrange< std::vector, std::pair< XVAL_T, YVAL_T > >;
+    Lagrange(const XCONT_T< XVAL_T >& x, const YCONT_T< YVAL_T >& y) -> Lagrange< std::pair< XVAL_T, YVAL_T > >;
 
     template< typename XVAL_T, size_t N, typename YVAL_T, size_t M >
     requires(N == M && N >= 2)
-    Lagrange(const XVAL_T (&)[N], const YVAL_T (&)[M]) -> Lagrange< std::vector, std::pair< XVAL_T, YVAL_T > >;
+    Lagrange(const XVAL_T (&)[N], const YVAL_T (&)[M]) -> Lagrange< std::pair< XVAL_T, YVAL_T > >;
 
     // =================================================================================================================
     //
@@ -522,10 +523,10 @@ namespace nxx::interp
      * @tparam CONTAINER_T The type of container used to store the points.
      * @tparam POINT_T The type of points stored in the container.
      */
-    template< template< typename... > class CONTAINER_T, typename POINT_T >
-    class Steffen : public detail::InterpBase< Steffen< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >
+    template< typename POINT_T >
+    class Steffen : public detail::InterpBase< Steffen< POINT_T >, POINT_T >
     {
-        using BASE    = detail::InterpBase< Steffen< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >;
+        using BASE    = detail::InterpBase< Steffen< POINT_T >, POINT_T >;
         using VALUE_T = typename BASE::VALUE_T;
 
         mutable std::optional< std::vector< VALUE_T > > m_slopes;    ///< Slopes at each point for Hermite interpolation.
@@ -633,18 +634,18 @@ namespace nxx::interp
      * Deduction guides for Steffen class with a container of POINT_T.
      */
     template< template< typename... > class CONTAINER_T, typename POINT_T >
-    Steffen(CONTAINER_T< POINT_T >) -> Steffen< CONTAINER_T, POINT_T >;
+    Steffen(CONTAINER_T< POINT_T >) -> Steffen< POINT_T >;
 
     template< size_t N >
     requires(N >= 2)
-    Steffen(const std::pair< double, double > (&)[N]) -> Steffen< std::vector, std::pair< double, double > >;
+    Steffen(const std::pair< double, double > (&)[N]) -> Steffen< std::pair< double, double > >;
 
     template< template< typename... > class XCONT_T, template< typename... > class YCONT_T, typename XVAL_T, typename YVAL_T >
-    Steffen(const XCONT_T< XVAL_T >& x, const YCONT_T< YVAL_T >& y) -> Steffen< std::vector, std::pair< XVAL_T, YVAL_T > >;
+    Steffen(const XCONT_T< XVAL_T >& x, const YCONT_T< YVAL_T >& y) -> Steffen< std::pair< XVAL_T, YVAL_T > >;
 
     template< typename XVAL_T, size_t N, typename YVAL_T, size_t M >
     requires(N == M && N >= 2)
-    Steffen(const XVAL_T (&)[N], const YVAL_T (&)[M]) -> Steffen< std::vector, std::pair< XVAL_T, YVAL_T > >;
+    Steffen(const XVAL_T (&)[N], const YVAL_T (&)[M]) -> Steffen< std::pair< XVAL_T, YVAL_T > >;
 
     // =================================================================================================================
     //
@@ -671,10 +672,10 @@ namespace nxx::interp
      * @tparam CONTAINER_T The type of container used to store the points.
      * @tparam POINT_T The type of points stored in the container.
      */
-    template< template< typename... > class CONTAINER_T, typename POINT_T >
-    class Spline : public detail::InterpBase< Spline< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >
+    template< typename POINT_T >
+    class Spline : public detail::InterpBase< Spline< POINT_T >, POINT_T >
     {
-        using BASE    = detail::InterpBase< Spline< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >;
+        using BASE    = detail::InterpBase< Spline< POINT_T >, POINT_T >;
         using VALUE_T = typename BASE::VALUE_T;
 
         /**
@@ -740,7 +741,7 @@ namespace nxx::interp
             z[n] = c[n] = 0.0;
 
             // Backward sweep for 'c', and solving for 'b' and 'd'
-            for (int j = n - 1; j >= 0; --j) {
+            for (int j = n - 1; j >= 0; --j) { // NOLINT
                 c[j] = z[j] - mu[j] * c[j + 1];
                 b[j] = (a[j + 1] - a[j]) / h[j] - h[j] * (c[j + 1] + 2.0 * c[j]) / 3.0;
                 d[j] = (c[j + 1] - c[j]) / (3.0 * h[j]);
@@ -822,18 +823,18 @@ namespace nxx::interp
      * Deduction guides for Spline class with a container of POINT_T.
      */
     template< template< typename... > class CONTAINER_T, typename POINT_T >
-    Spline(CONTAINER_T< POINT_T >) -> Spline< CONTAINER_T, POINT_T >;
+    Spline(CONTAINER_T< POINT_T >) -> Spline< POINT_T >;
 
     template< size_t N >
     requires(N >= 2)
-    Spline(const std::pair< double, double > (&)[N]) -> Spline< std::vector, std::pair< double, double > >;
+    Spline(const std::pair< double, double > (&)[N]) -> Spline< std::pair< double, double > >;
 
     template< template< typename... > class XCONT_T, template< typename... > class YCONT_T, typename XVAL_T, typename YVAL_T >
-    Spline(const XCONT_T< XVAL_T >& x, const YCONT_T< YVAL_T >& y) -> Spline< std::vector, std::pair< XVAL_T, YVAL_T > >;
+    Spline(const XCONT_T< XVAL_T >& x, const YCONT_T< YVAL_T >& y) -> Spline< std::pair< XVAL_T, YVAL_T > >;
 
     template< typename XVAL_T, size_t N, typename YVAL_T, size_t M >
     requires(N == M && N >= 2)
-    Spline(const XVAL_T (&)[N], const YVAL_T (&)[M]) -> Spline< std::vector, std::pair< XVAL_T, YVAL_T > >;
+    Spline(const XVAL_T (&)[N], const YVAL_T (&)[M]) -> Spline< std::pair< XVAL_T, YVAL_T > >;
 
     // =================================================================================================================
     //
@@ -865,8 +866,8 @@ namespace nxx::interp
      *
      * @note Requires that ALGO< CONTAINER_T, POINT_T > has a static member IsInterpolator set to true.
      */
-    template< template< template< typename... > class, typename > class ALGO, template< typename... > class CONTAINER_T, typename POINT_T >
-    requires ALGO< CONTAINER_T, POINT_T >::IsInterpolator
+    template< template< typename > class ALGO, template< typename... > class CONTAINER_T, typename POINT_T >
+    requires ALGO< POINT_T >::IsInterpolator
     auto interpolate(const CONTAINER_T< POINT_T >& points, double x)
     {
         auto algo = ALGO(points);
@@ -887,8 +888,8 @@ namespace nxx::interp
      *
      * @note Requires that ALGO< std::vector, std::pair< double, double > > has a static member IsInterpolator set to true.
      */
-    template< template< template< typename... > class, typename > class ALGO, size_t N >
-    requires ALGO< std::vector, std::pair< double, double > >::IsInterpolator
+    template< template< typename > class ALGO, size_t N >
+    requires ALGO< std::pair< double, double > >::IsInterpolator
     auto interpolate(const std::pair< double, double > (&points)[N], double x)
     {
         auto algo = ALGO(points);
@@ -915,14 +916,14 @@ namespace nxx::interp
      *
      * @note Requires that ALGO< std::vector, std::pair< XVAL_T, YVAL_T > > has a static member IsInterpolator set to true.
      */
-    template< template< template< typename... > class, typename > class ALGO,
+    template< template< typename > class ALGO,
               template< typename... >
               class XCONT_T,
               template< typename... >
               class YCONT_T,
               typename XVAL_T,
               typename YVAL_T >
-    requires ALGO< std::vector, std::pair< XVAL_T, YVAL_T > >::IsInterpolator
+    requires ALGO< std::pair< XVAL_T, YVAL_T > >::IsInterpolator
     auto interpolate(const XCONT_T< XVAL_T >& x, const YCONT_T< YVAL_T >& y, double xval)
     {
         auto algo = ALGO(x, y);
@@ -949,8 +950,8 @@ namespace nxx::interp
      *
      * @note Requires that ALGO< std::vector, std::pair< XVAL_T, YVAL_T > > has a static member IsInterpolator set to true.
      */
-    template< template< template< typename... > class, typename > class ALGO, typename XVAL_T, size_t N, typename YVAL_T, size_t M >
-    requires ALGO< std::vector, std::pair< XVAL_T, YVAL_T > >::IsInterpolator
+    template< template< typename > class ALGO, typename XVAL_T, size_t N, typename YVAL_T, size_t M >
+    requires ALGO< std::pair< XVAL_T, YVAL_T > >::IsInterpolator
     auto interpolate(const XVAL_T (&x)[N], const YVAL_T (&y)[M], double xval)
     {
         auto algo = ALGO(x, y);
@@ -986,8 +987,8 @@ namespace nxx::interp
      *
      * @note Requires that ALGO< CONTAINER_T, POINT_T > has a static member IsInterpolator set to true.
      */
-    template< template< template< typename... > class, typename > class ALGO, template< typename... > class CONTAINER_T, typename POINT_T >
-    requires ALGO< CONTAINER_T, POINT_T >::IsInterpolator
+    template< template< typename > class ALGO, template< typename... > class CONTAINER_T, typename POINT_T >
+    requires ALGO< POINT_T >::IsInterpolator
     auto interpolationOf(const CONTAINER_T< POINT_T >& points)
     {
         return ALGO(points);
@@ -1007,8 +1008,8 @@ namespace nxx::interp
      *
      * @note Requires that ALGO< std::vector, std::pair< double, double > > has a static member IsInterpolator set to true.
      */
-    template< template< template< typename... > class, typename > class ALGO, size_t N >
-    requires ALGO< std::vector, std::pair< double, double > >::IsInterpolator
+    template< template< typename > class ALGO, size_t N >
+    requires ALGO< std::pair< double, double > >::IsInterpolator
     auto interpolationOf(const std::pair< double, double > (&points)[N])
     {
         return ALGO(points);
@@ -1033,14 +1034,14 @@ namespace nxx::interp
      *
      * @note Requires that ALGO< std::vector, std::pair< XVAL_T, YVAL_T > > has a static member IsInterpolator set to true.
      */
-    template< template< template< typename... > class, typename > class ALGO,
+    template< template< typename > class ALGO,
               template< typename... >
               class XCONT_T,
               template< typename... >
               class YCONT_T,
               typename XVAL_T,
               typename YVAL_T >
-    requires ALGO< std::vector, std::pair< XVAL_T, YVAL_T > >::IsInterpolator
+    requires ALGO< std::pair< XVAL_T, YVAL_T > >::IsInterpolator
     auto interpolationOf(const XCONT_T< XVAL_T >& x, const YCONT_T< YVAL_T >& y)
     {
         return ALGO(x, y);
@@ -1065,8 +1066,8 @@ namespace nxx::interp
      *
      * @note Requires that ALGO< std::vector, std::pair< XVAL_T, YVAL_T > > has a static member IsInterpolator set to true.
      */
-    template< template< template< typename... > class, typename > class ALGO, typename XVAL_T, size_t N, typename YVAL_T, size_t M >
-    requires ALGO< std::vector, std::pair< XVAL_T, YVAL_T > >::IsInterpolator
+    template< template< typename > class ALGO, typename XVAL_T, size_t N, typename YVAL_T, size_t M >
+    requires ALGO< std::pair< XVAL_T, YVAL_T > >::IsInterpolator
     auto interpolationOf(const XVAL_T (&x)[N], const YVAL_T (&y)[M])
     {
         return ALGO(x, y);
