@@ -26,5 +26,8 @@
   }, {
     "name" : "tl-expected",
     "version>=" : "1.1.0"
+  }, {
+    "name" : "sciplot",
+    "version>=" : "0.3.1#1"
   } ]
 }

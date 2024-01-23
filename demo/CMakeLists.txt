@@ -11,6 +11,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Boost REQUIRED)
+find_package(sciplot CONFIG REQUIRED)
 #find_package(fmt REQUIRED)
 
 include(FetchContent)
@@ -78,7 +79,7 @@ target_sources(DemoInterpolate
         DemoInterpolate.cpp
 )
 
-target_link_libraries(DemoInterpolate PRIVATE numerixx::interpolate fmt::fmt)
+target_link_libraries(DemoInterpolate PRIVATE numerixx::interpolate fmt::fmt sciplot::sciplot)
 
 # Target: Numerical optimization
 add_executable(DemoOptimize)

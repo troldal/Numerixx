@@ -42,9 +42,9 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <vector>
-#include <optional>
 
 /**
  * @file Interpolate.hpp
@@ -157,6 +157,58 @@ namespace nxx::interp
                 : m_points(points, points + N)
             {
                 if (m_points.size() < 2) throw std::runtime_error("Interpolation requires at least two points.");
+                std::sort(m_points.begin(), m_points.end(), [](const auto& p1, const auto& p2) {
+                    auto [x1, y1] = p1;
+                    auto [x2, y2] = p2;
+                    return x1 < x2;
+                });
+            }
+
+            /**
+             * @brief Constructs an interpolation base object with the given x- and y-coordinates.
+             *
+             * @tparam XCONT_T The type of container used to store the x-coordinates.
+             * @tparam YCONT_T The type of container used to store the y-coordinates.
+             * @tparam XVAL_T The type of values stored in the x-container.
+             * @tparam YVAL_T The type of values stored in the y-container.
+             * @param x The container of x-coordinates to be used for interpolation.
+             * @param y The container of y-coordinates to be used for interpolation.
+             * @throws std::runtime_error If the number of points is less than 2.
+             * @throws std::runtime_error If the number of x- and y-coordinates are not equal.
+             */
+            template< template< typename... > class XCONT_T, template< typename... > class YCONT_T, typename XVAL_T, typename YVAL_T >
+            InterpBase(const XCONT_T< XVAL_T >& x, const YCONT_T< YVAL_T >& y)
+            {
+                if (x.size() != y.size()) throw std::runtime_error("Interpolation requires equal number of x and y points.");
+                if (x.size() < 2) throw std::runtime_error("Interpolation requires at least two points.");
+                for (size_t i = 0; i < x.size(); ++i) {
+                    m_points.push_back({ x[i], y[i] });
+                }
+                std::sort(m_points.begin(), m_points.end(), [](const auto& p1, const auto& p2) {
+                    auto [x1, y1] = p1;
+                    auto [x2, y2] = p2;
+                    return x1 < x2;
+                });
+            }
+
+            /**
+             * @brief Constructs an interpolation base object with the given x- and y-coordinates.
+             *
+             * @tparam XVAL_T The type of values stored in the x-container.
+             * @tparam YVAL_T The type of values stored in the y-container.
+             * @tparam N The number of points in the initializer list.
+             * @param x The initializer list of x-coordinates to be used for interpolation.
+             * @param y The initializer list of y-coordinates to be used for interpolation.
+             * @throws std::runtime_error If the number of points is less than 2.
+             * @throws std::runtime_error If the number of x- and y-coordinates are not equal.
+             */
+            template< typename XVAL_T, size_t N, typename YVAL_T, size_t M >
+            requires(N == M && N >= 2)
+            InterpBase(const XVAL_T (&x)[N], const YVAL_T (&y)[M])
+            {
+                for (size_t i = 0; i < N; ++i) {
+                    m_points.push_back({ x[i], y[i] });
+                }
                 std::sort(m_points.begin(), m_points.end(), [](const auto& p1, const auto& p2) {
                     auto [x1, y1] = p1;
                     auto [x2, y2] = p2;
@@ -282,23 +334,22 @@ namespace nxx::interp
         }
     };
 
-    /**
-     * @brief Deduction guide for Linear class with a container of POINT_T.
-     *
-     * @tparam CONTAINER_T Container type.
-     * @tparam POINT_T Point type.
+    /*
+     * Deduction guides for Linear class with a container of POINT_T.
      */
     template< template< typename... > class CONTAINER_T, typename POINT_T >
     Linear(CONTAINER_T< POINT_T >) -> Linear< CONTAINER_T, POINT_T >;
 
-    /**
-     * @brief Deduction guide for Linear class with an initializer list of pairs.
-     *
-     * @tparam N Number of elements in the initializer list.
-     */
     template< size_t N >
     requires(N >= 2)
     Linear(const std::pair< double, double > (&)[N]) -> Linear< std::vector, std::pair< double, double > >;
+
+    template< template< typename... > class XCONT_T, template< typename... > class YCONT_T, typename XVAL_T, typename YVAL_T >
+    Linear(const XCONT_T< XVAL_T >& x, const YCONT_T< YVAL_T >& y) -> Linear< std::vector, std::pair< XVAL_T, YVAL_T > >;
+
+    template< typename XVAL_T, size_t N, typename YVAL_T, size_t M >
+    requires(N == M && N >= 2)
+    Linear(const XVAL_T (&)[N], const YVAL_T (&)[M]) -> Linear< std::vector, std::pair< XVAL_T, YVAL_T > >;
 
     // =================================================================================================================
     //
@@ -431,23 +482,22 @@ namespace nxx::interp
         VALUE_T extrapolate(VALUE_T x) const { return implementation(x); }
     };
 
-    /**
-     * @brief Deduction guide for Lagrange class with a container of POINT_T.
-     *
-     * @tparam CONTAINER_T Container type.
-     * @tparam POINT_T Point type.
+    /*
+     * Deduction guides for Lagrange class with a container of POINT_T.
      */
     template< template< typename... > class CONTAINER_T, typename POINT_T >
     Lagrange(CONTAINER_T< POINT_T >) -> Lagrange< CONTAINER_T, POINT_T >;
 
-    /**
-     * @brief Deduction guide for Lagrange class with an initializer list of pairs.
-     *
-     * @tparam N Number of points.
-     */
     template< size_t N >
     requires(N >= 2)
     Lagrange(const std::pair< double, double > (&)[N]) -> Lagrange< std::vector, std::pair< double, double > >;
+
+    template< template< typename... > class XCONT_T, template< typename... > class YCONT_T, typename XVAL_T, typename YVAL_T >
+    Lagrange(const XCONT_T< XVAL_T >& x, const YCONT_T< YVAL_T >& y) -> Lagrange< std::vector, std::pair< XVAL_T, YVAL_T > >;
+
+    template< typename XVAL_T, size_t N, typename YVAL_T, size_t M >
+    requires(N == M && N >= 2)
+    Lagrange(const XVAL_T (&)[N], const YVAL_T (&)[M]) -> Lagrange< std::vector, std::pair< XVAL_T, YVAL_T > >;
 
     // =================================================================================================================
     //
@@ -478,7 +528,7 @@ namespace nxx::interp
         using BASE    = detail::InterpBase< Steffen< CONTAINER_T, POINT_T >, CONTAINER_T, POINT_T >;
         using VALUE_T = typename BASE::VALUE_T;
 
-        mutable std::optional<std::vector< VALUE_T >> m_slopes;    ///< Slopes at each point for Hermite interpolation.
+        mutable std::optional< std::vector< VALUE_T > > m_slopes;    ///< Slopes at each point for Hermite interpolation.
 
     public:
         using BASE::BASE;    ///< Inherits constructors from the base class.
@@ -491,7 +541,7 @@ namespace nxx::interp
          */
         void calculateSlopes() const
         {
-            m_slopes = std::vector< VALUE_T >{};
+            m_slopes     = std::vector< VALUE_T > {};
             auto& slopes = m_slopes.value();
 
             size_t n = BASE::m_points.size();
@@ -528,7 +578,6 @@ namespace nxx::interp
             if (!m_slopes) calculateSlopes();
             auto& slopes = m_slopes.value();
 
-
             // Find the interval that x falls into
             auto it =
                 std::upper_bound(BASE::m_points.begin(), BASE::m_points.end(), x, [](double x, const auto& p) { return x < p.first; });
@@ -559,26 +608,18 @@ namespace nxx::interp
          */
         VALUE_T extrapolate(VALUE_T x) const
         {
-            if (!m_slopes) calculateSlopes();
-            auto& slopes = m_slopes.value();
-
-
             size_t n = BASE::m_points.size();
 
             // Extrapolate at the beginning
             if (x <= BASE::m_points.front().first) {
                 auto [x0, y0] = BASE::m_points[0];
-                auto [x1, y1] = BASE::m_points[1];
-                //                VALUE_T slope = (y1 - y0) / (x1 - x0);
                 VALUE_T slope = *nxx::deriv::forward(*this, x0);
                 return y0 + slope * (x - x0);
             }
 
             // Extrapolate at the end
             if (x >= BASE::m_points.back().first) {
-                auto [xn_1, yn_1] = BASE::m_points[n - 2];
-                auto [xn, yn]     = BASE::m_points[n - 1];
-                //                VALUE_T slope     = (yn - yn_1) / (xn - xn_1);
+                auto [xn, yn] = BASE::m_points[n - 1];
                 VALUE_T slope = *nxx::deriv::backward(*this, xn);
                 return yn + slope * (x - xn);
             }
@@ -588,23 +629,22 @@ namespace nxx::interp
         }
     };
 
-    /**
-     * @brief Deduction guide for Steffen class with a container of POINT_T.
-     *
-     * @tparam CONTAINER_T Container type.
-     * @tparam POINT_T Point type.
+    /*
+     * Deduction guides for Steffen class with a container of POINT_T.
      */
     template< template< typename... > class CONTAINER_T, typename POINT_T >
     Steffen(CONTAINER_T< POINT_T >) -> Steffen< CONTAINER_T, POINT_T >;
 
-    /**
-     * @brief Deduction guide for Steffen class with an initializer list of pairs.
-     *
-     * @tparam N Number of points.
-     */
     template< size_t N >
     requires(N >= 2)
     Steffen(const std::pair< double, double > (&)[N]) -> Steffen< std::vector, std::pair< double, double > >;
+
+    template< template< typename... > class XCONT_T, template< typename... > class YCONT_T, typename XVAL_T, typename YVAL_T >
+    Steffen(const XCONT_T< XVAL_T >& x, const YCONT_T< YVAL_T >& y) -> Steffen< std::vector, std::pair< XVAL_T, YVAL_T > >;
+
+    template< typename XVAL_T, size_t N, typename YVAL_T, size_t M >
+    requires(N == M && N >= 2)
+    Steffen(const XVAL_T (&)[N], const YVAL_T (&)[M]) -> Steffen< std::vector, std::pair< XVAL_T, YVAL_T > >;
 
     // =================================================================================================================
     //
@@ -649,7 +689,7 @@ namespace nxx::interp
             std::vector< VALUE_T > d;    ///< Coefficients of the third degree.
         };
 
-        mutable std::optional<SplineCoefficients> m_coefficients;    ///< Instance variable to hold the coefficients for the cubic spline.
+        mutable std::optional< SplineCoefficients > m_coefficients;    ///< Instance variable to hold the coefficients for the cubic spline.
 
     public:
         using BASE::BASE;    ///< Inherits constructors from the base class.
@@ -663,8 +703,8 @@ namespace nxx::interp
          */
         void calculateSplineCoefficients() const
         {
-            m_coefficients = SplineCoefficients{};
-                auto& coefficients = m_coefficients.value();
+            m_coefficients     = SplineCoefficients {};
+            auto& coefficients = m_coefficients.value();
 
             size_t n = BASE::m_points.size() - 1;    // Number of intervals
 
@@ -756,26 +796,44 @@ namespace nxx::interp
          * @param x The x-coordinate value for which extrapolation is to be performed.
          * @return VALUE_T The extrapolated value at the specified x-coordinate.
          */
-        VALUE_T extrapolate(VALUE_T x) const { return interpolate(x); }
+        VALUE_T extrapolate(VALUE_T x) const
+        {
+            size_t n = BASE::m_points.size();
+
+            // Extrapolate at the beginning
+            if (x <= BASE::m_points.front().first) {
+                auto [x0, y0] = BASE::m_points[0];
+                VALUE_T slope = *nxx::deriv::forward(*this, x0);
+                return y0 + slope * (x - x0);
+            }
+
+            // Extrapolate at the end
+            if (x >= BASE::m_points.back().first) {
+                auto [xn, yn] = BASE::m_points[n - 1];
+                VALUE_T slope = *nxx::deriv::backward(*this, xn);
+                return yn + slope * (x - xn);
+            }
+
+            return interpolate(x);
+        }
     };
 
-    /**
-     * @brief Deduction guide for Spline class with a container of POINT_T.
-     *
-     * @tparam CONTAINER_T Container type.
-     * @tparam POINT_T Point type.
+    /*
+     * Deduction guides for Spline class with a container of POINT_T.
      */
     template< template< typename... > class CONTAINER_T, typename POINT_T >
     Spline(CONTAINER_T< POINT_T >) -> Spline< CONTAINER_T, POINT_T >;
 
-    /**
-     * @brief Deduction guide for Spline class with an initializer list of pairs.
-     *
-     * @tparam N Number of points in the initializer list.
-     */
     template< size_t N >
     requires(N >= 2)
     Spline(const std::pair< double, double > (&)[N]) -> Spline< std::vector, std::pair< double, double > >;
+
+    template< template< typename... > class XCONT_T, template< typename... > class YCONT_T, typename XVAL_T, typename YVAL_T >
+    Spline(const XCONT_T< XVAL_T >& x, const YCONT_T< YVAL_T >& y) -> Spline< std::vector, std::pair< XVAL_T, YVAL_T > >;
+
+    template< typename XVAL_T, size_t N, typename YVAL_T, size_t M >
+    requires(N == M && N >= 2)
+    Spline(const XVAL_T (&)[N], const YVAL_T (&)[M]) -> Spline< std::vector, std::pair< XVAL_T, YVAL_T > >;
 
     // =================================================================================================================
     //
@@ -837,6 +895,68 @@ namespace nxx::interp
         return algo(x);
     }
 
+    /**
+     * @brief Provides a function template for interpolation with separate x and y containers.
+     *
+     * This function template is designed for cases where x and y values are stored in separate containers.
+     * It enables interpolation at a specified x-coordinate using a chosen interpolation algorithm. It combines
+     * the x and y values into pairs, creates an instance of the specified interpolation algorithm with these
+     * pairs, and then performs interpolation at the specified x-coordinate.
+     *
+     * @tparam ALGO The interpolation algorithm class template.
+     * @tparam XCONT_T The type of container used to store the x-coordinate values.
+     * @tparam YCONT_T The type of container used to store the y-coordinate values.
+     * @tparam XVAL_T The type of values stored in the x-coordinates container.
+     * @tparam YVAL_T The type of values stored in the y-coordinates container.
+     * @param x A container of x-coordinate values.
+     * @param y A container of y-coordinate values corresponding to the x-coordinates.
+     * @param xval The x-coordinate value for which interpolation is to be performed.
+     * @return The interpolated value at the specified x-coordinate.
+     *
+     * @note Requires that ALGO< std::vector, std::pair< XVAL_T, YVAL_T > > has a static member IsInterpolator set to true.
+     */
+    template< template< template< typename... > class, typename > class ALGO,
+              template< typename... >
+              class XCONT_T,
+              template< typename... >
+              class YCONT_T,
+              typename XVAL_T,
+              typename YVAL_T >
+    requires ALGO< std::vector, std::pair< XVAL_T, YVAL_T > >::IsInterpolator
+    auto interpolate(const XCONT_T< XVAL_T >& x, const YCONT_T< YVAL_T >& y, double xval)
+    {
+        auto algo = ALGO(x, y);
+        return algo(xval);
+    }
+
+    /**
+     * @brief Provides a function template for interpolation with separate x and y arrays.
+     *
+     * This function template is a specialization for cases where x and y values are stored in separate arrays.
+     * It enables interpolation at a specified x-coordinate using a chosen interpolation algorithm. It combines
+     * the x and y values into pairs, creates an instance of the specified interpolation algorithm with these
+     * pairs, and then performs interpolation at the specified x-coordinate.
+     *
+     * @tparam ALGO The interpolation algorithm class template.
+     * @tparam XVAL_T The type of values stored in the x-coordinates array.
+     * @tparam N The number of elements in the x-coordinates array.
+     * @tparam YVAL_T The type of values stored in the y-coordinates array.
+     * @tparam M The number of elements in the y-coordinates array.
+     * @param x An array of x-coordinate values.
+     * @param y An array of y-coordinate values corresponding to the x-coordinates.
+     * @param xval The x-coordinate value for which interpolation is to be performed.
+     * @return The interpolated value at the specified x-coordinate.
+     *
+     * @note Requires that ALGO< std::vector, std::pair< XVAL_T, YVAL_T > > has a static member IsInterpolator set to true.
+     */
+    template< template< template< typename... > class, typename > class ALGO, typename XVAL_T, size_t N, typename YVAL_T, size_t M >
+    requires ALGO< std::vector, std::pair< XVAL_T, YVAL_T > >::IsInterpolator
+    auto interpolate(const XVAL_T (&x)[N], const YVAL_T (&y)[M], double xval)
+    {
+        auto algo = ALGO(x, y);
+        return algo(xval);
+    }
+
     // =================================================================================================================
     //
     //    88                                                             ,ad8888ba,       ad88
@@ -892,6 +1012,64 @@ namespace nxx::interp
     auto interpolationOf(const std::pair< double, double > (&points)[N])
     {
         return ALGO(points);
+    }
+
+    /**
+     * @brief Returns an interpolation function object based on the given points and algorithm, with points provided as separate x and y
+     * containers.
+     *
+     * This function template is designed for cases where x and y values are stored in separate containers.
+     * It creates an instance of the specified interpolation algorithm with the provided points.
+     * The returned object can be used to perform interpolation at different x-coordinate values.
+     *
+     * @tparam ALGO The interpolation algorithm class template.
+     * @tparam XCONT_T The type of container used to store the x-coordinate values.
+     * @tparam YCONT_T The type of container used to store the y-coordinate values.
+     * @tparam XVAL_T The type of values stored in the x-coordinates container.
+     * @tparam YVAL_T The type of values stored in the y-coordinates container.
+     * @param x A container of x-coordinate values.
+     * @param y A container of y-coordinate values corresponding to the x-coordinates.
+     * @return An instance of the specified interpolation algorithm initialized with the given points.
+     *
+     * @note Requires that ALGO< std::vector, std::pair< XVAL_T, YVAL_T > > has a static member IsInterpolator set to true.
+     */
+    template< template< template< typename... > class, typename > class ALGO,
+              template< typename... >
+              class XCONT_T,
+              template< typename... >
+              class YCONT_T,
+              typename XVAL_T,
+              typename YVAL_T >
+    requires ALGO< std::vector, std::pair< XVAL_T, YVAL_T > >::IsInterpolator
+    auto interpolationOf(const XCONT_T< XVAL_T >& x, const YCONT_T< YVAL_T >& y)
+    {
+        return ALGO(x, y);
+    }
+
+    /**
+     * @brief Returns an interpolation function object based on the given points and algorithm, with points provided as separate x and y
+     * arrays.
+     *
+     * This function template is a specialization for cases where x and y values are stored in separate arrays.
+     * It creates an instance of the specified interpolation algorithm with the provided points.
+     * The returned object can be used to perform interpolation at different x-coordinate values.
+     *
+     * @tparam ALGO The interpolation algorithm class template.
+     * @tparam XVAL_T The type of values stored in the x-coordinates array.
+     * @tparam N The number of elements in the x-coordinates array.
+     * @tparam YVAL_T The type of values stored in the y-coordinates array.
+     * @tparam M The number of elements in the y-coordinates array.
+     * @param x An array of x-coordinate values.
+     * @param y An array of y-coordinate values corresponding to the x-coordinates.
+     * @return An instance of the specified interpolation algorithm initialized with the given points.
+     *
+     * @note Requires that ALGO< std::vector, std::pair< XVAL_T, YVAL_T > > has a static member IsInterpolator set to true.
+     */
+    template< template< template< typename... > class, typename > class ALGO, typename XVAL_T, size_t N, typename YVAL_T, size_t M >
+    requires ALGO< std::vector, std::pair< XVAL_T, YVAL_T > >::IsInterpolator
+    auto interpolationOf(const XVAL_T (&x)[N], const YVAL_T (&y)[M])
+    {
+        return ALGO(x, y);
     }
 
     // =================================================================================================================
