@@ -28,8 +28,7 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef INTEGRATIONTRAITS_HPP
-#define INTEGRATIONTRAITS_HPP
+#pragma once
 
 // ===== Numerixx Includes
 #include <Concepts.hpp>
@@ -115,4 +114,3 @@ namespace nxx::integrate
     } // namespace detail
 }     // namespace nxx::integrate
 
-#endif //INTEGRATIONTRAITS_HPP

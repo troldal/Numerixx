@@ -28,15 +28,14 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef NUMERIXX_DIFFERENTIATION_HPP
-#define NUMERIXX_DIFFERENTIATION_HPP
+#pragma once
 
 // ===== Numerixx Includes
 #include <Concepts.hpp>
 #include <Error.hpp>
 
 // ===== External Includes
-#include <tl/expected.hpp>
+#include "_external.hpp"
 
 // ===== Standard Library Includes
 #include <Constants.hpp>
@@ -817,4 +816,3 @@ namespace nxx::deriv
     }
 } // namespace nxx::deriv
 
-#endif    // NUMERIXX_DIFFERENTIATION_HPP

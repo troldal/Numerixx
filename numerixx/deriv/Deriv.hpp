@@ -28,9 +28,7 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef NUMERIXX_DERIV_HPP
-#define NUMERIXX_DERIV_HPP
+#pragma once
 
 #include "impl/Derivatives.hpp"
 
-#endif    // NUMERIXX_DERIV_HPP

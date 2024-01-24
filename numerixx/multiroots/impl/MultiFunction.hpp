@@ -2,8 +2,7 @@
 // Created by kenne on 08/01/2024.
 //
 
-#ifndef NUMERIXX_MULTIFUNCTION_HPP
-#define NUMERIXX_MULTIFUNCTION_HPP
+#pragma once
 
 #include "ContainerTraits.hpp"
 #include "FunctionTraits.hpp"
@@ -163,4 +162,3 @@ namespace nxx::multiroots
 
 }    // namespace nxx::multiroots
 
-#endif    // NUMERIXX_MULTIFUNCTION_HPP

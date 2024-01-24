@@ -28,8 +28,7 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef NUMERIXX_POLYROOTS_HPP
-#define NUMERIXX_POLYROOTS_HPP
+#pragma once
 
 // ===== Numerixx Includes
 #include "Polynomial.hpp"
@@ -494,4 +493,3 @@ namespace nxx::poly
 
 }    // namespace nxx::poly
 
-#endif    // NUMERIXX_POLYROOTS_HPP

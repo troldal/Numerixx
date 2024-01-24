@@ -3,9 +3,11 @@
 // in the calculus/Derivatives.hpp header.
 // ================================================================================================
 
+#include "_external.hpp"
+
 #include <Deriv.hpp>
 #include <cmath>
-#include <fmt/format.h>
+
 #include <iomanip>
 #include <iostream>
 #include <numbers>

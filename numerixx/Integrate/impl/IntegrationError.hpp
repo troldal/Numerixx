@@ -28,8 +28,7 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef INTEGRATIONERROR_HPP
-#define INTEGRATIONERROR_HPP
+#pragma once
 
 /**
  * @file IntegrationError.hpp
@@ -88,4 +87,3 @@ namespace nxx::integrate::detail
 } // namespace nxx::integrate::detail
 
 
-#endif //INTEGRATIONERROR_HPP

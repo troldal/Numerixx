@@ -28,8 +28,7 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef INTEGRATIONVALIDATION_HPP
-#define INTEGRATIONVALIDATION_HPP
+#pragma once
 
 // ===== Numerixx Includes
 #include <Error.hpp>
@@ -62,5 +61,4 @@ namespace nxx::integrate::detail
     }
 } // namespace nxx::integrate::detail
 
-#endif //INTEGRATIONVALIDATION_HPP
 

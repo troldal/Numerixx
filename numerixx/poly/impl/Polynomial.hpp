@@ -28,15 +28,14 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef NUMERIXX_POLYNOMIAL_HPP
-#define NUMERIXX_POLYNOMIAL_HPP
+#pragma once
 
 // ===== Numerixx Includes
 #include <Concepts.hpp>
 #include <Error.hpp>
 
 // ===== External Includes
-#include <tl/expected.hpp>
+#include "_external.hpp"
 
 // ===== Standard Library Includes
 #include <algorithm>
@@ -1004,4 +1003,3 @@ namespace nxx::poly
 
 }    // namespace nxx::poly
 
-#endif    // NUMERIXX_POLYNOMIAL_HPP

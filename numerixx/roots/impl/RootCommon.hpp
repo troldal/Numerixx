@@ -28,8 +28,7 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef NUMERIXX_ROOTCOMMON_HPP
-#define NUMERIXX_ROOTCOMMON_HPP
+#pragma once
 
 #include <Concepts.hpp>
 
@@ -328,4 +327,3 @@ namespace nxx::roots
     } // namespace impl
 }     // namespace nxx::roots
 
-#endif    // NUMERIXX_ROOTCOMMON_HPP

@@ -28,8 +28,7 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef NUMERIXX_MULTIROOTS_IMPL_HPP
-#define NUMERIXX_MULTIROOTS_IMPL_HPP
+#pragma once
 
 // ===== Numerixx Includes
 #include "MultiDerivatives.hpp"
@@ -40,7 +39,7 @@
 //#include <Optim.hpp>
 
 // ===== External Includes
-#include <blaze/Blaze.h>
+#include "_external.hpp"
 
 // ===== Standard Library Includes
 #include <iostream>
@@ -588,4 +587,3 @@ namespace nxx::multiroots
 
 }    // namespace nxx::multiroots
 
-#endif    // NUMERIXX_MULTIROOTS_IMPL_HPP

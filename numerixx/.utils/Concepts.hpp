@@ -28,11 +28,12 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef NUMERIXX_CONCEPTS_HPP
-#define NUMERIXX_CONCEPTS_HPP
+#pragma once
+
+// ===== External Includes
+#include "_external.hpp"
 
 // ===== Standard Library Includes
-#include <boost/multiprecision/cpp_bin_float.hpp>
 #include <complex>
 #include <span>
 
@@ -197,4 +198,3 @@ namespace nxx::poly
     template< typename POLY >
     concept IsPolynomial = std::same_as< POLY, Polynomial< typename POLY::value_type > >;
 }    // namespace nxx::poly
-#endif    // NUMERIXX_CONCEPTS_HPP

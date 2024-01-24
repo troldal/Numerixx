@@ -2,8 +2,7 @@
 // Created by kenne on 13/11/2023.
 //
 
-#ifndef NUMERIXX_OPTIMIZE_HPP
-#define NUMERIXX_OPTIMIZE_HPP
+#pragma once
 
 #include <cmath>
 #include <functional>
@@ -181,4 +180,3 @@ namespace nxx::optim
 
 }    // namespace nxx::optim
 
-#endif    // NUMERIXX_OPTIMIZE_HPP

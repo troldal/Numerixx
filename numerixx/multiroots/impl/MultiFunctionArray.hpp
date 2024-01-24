@@ -38,8 +38,7 @@
  * and access individual functions.
  */
 
-#ifndef NUMERIXX_MULTIFUNCTIONARRAY_HPP
-#define NUMERIXX_MULTIFUNCTIONARRAY_HPP
+#pragma once
 
 #include <concepts>
 #include <initializer_list>
@@ -326,4 +325,3 @@ namespace nxx::multiroots
 
 }    // namespace nxx::multiroots
 
-#endif    // NUMERIXX_MULTIFUNCTIONARRAY_HPP

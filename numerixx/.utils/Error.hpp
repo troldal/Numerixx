@@ -28,15 +28,13 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef NUMERIXX_ERROR_HPP
-#define NUMERIXX_ERROR_HPP
+#pragma once
 
 //#define BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED
 //#define BOOST_STACKTRACE_USE_WINDBG
 
 // ===== External Includes
-#include <boost/stacktrace.hpp>
-// #include <hwinfo/hwinfo.hpp>
+#include "_external.hpp"
 
 // ===== Standard Library Includes
 #include <optional>
@@ -150,4 +148,3 @@ namespace nxx
 
 }    // namespace nxx
 
-#endif    // NUMERIXX_ERROR_HPP

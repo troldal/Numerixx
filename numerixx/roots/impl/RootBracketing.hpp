@@ -28,8 +28,7 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef NUMERIXX_ROOTBRACKETING_HPP
-#define NUMERIXX_ROOTBRACKETING_HPP
+#pragma once
 
 // ===== Numerixx Includes
 #include "RootCommon.hpp"
@@ -552,4 +551,3 @@ namespace nxx::roots
     }
 }    // namespace nxx::roots
 
-#endif    // NUMERIXX_ROOTBRACKETING_HPP

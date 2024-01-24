@@ -28,8 +28,7 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef NUMERIXX_ROOTS_HPP
-#define NUMERIXX_ROOTS_HPP
+#pragma once
 
 #include <Constants.hpp>
 #include <Concepts.hpp>
@@ -54,4 +53,3 @@ namespace nxx::roots
 #include "impl/RootPolishing.hpp"
 #include "impl/RootSearching.hpp"
 
-#endif    // NUMERIXX_ROOTS_HPP

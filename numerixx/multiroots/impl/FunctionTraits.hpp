@@ -2,8 +2,7 @@
 // Created by kenne on 08/01/2024.
 //
 
-#ifndef NUMERIXX_FUNCTIONTRAITS_HPP
-#define NUMERIXX_FUNCTIONTRAITS_HPP
+#pragma once
 
 namespace nxx::traits
 {
@@ -56,4 +55,3 @@ namespace nxx::traits
     };
 }
 
-#endif    // NUMERIXX_FUNCTIONTRAITS_HPP

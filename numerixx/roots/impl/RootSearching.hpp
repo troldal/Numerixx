@@ -28,15 +28,14 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef NUMERIXX_ROOTSEARCHING_HPP
-#define NUMERIXX_ROOTSEARCHING_HPP
+#pragma once
 
 // ===== Numerixx Includes
 #include "RootCommon.hpp"
 #include <Constants.hpp>
 
 // ===== External Includes
-#include <tl/expected.hpp>
+#include "_external.hpp"
 
 // ===== Standard Library Includes
 #include <numbers>
@@ -783,4 +782,3 @@ namespace nxx::roots
     }
 }    // namespace nxx::roots
 
-#endif    // NUMERIXX_ROOTSEARCHING_HPP

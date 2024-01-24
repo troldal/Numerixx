@@ -28,8 +28,7 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef NUMERIXX_CONSTANTS_HPP
-#define NUMERIXX_CONSTANTS_HPP
+#pragma once
 
 #include <boost/multiprecision/cpp_bin_float.hpp>
 
@@ -60,4 +59,3 @@ namespace nxx
     }
 } // namespace nxx
 
-#endif    // NUMERIXX_CONSTANTS_HPP

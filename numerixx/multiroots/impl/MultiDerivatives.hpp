@@ -38,8 +38,7 @@
  * to compute these derivatives.
  */
 
-#ifndef NUMERIXX_MULTIDERIVATIVES_HPP
-#define NUMERIXX_MULTIDERIVATIVES_HPP
+#pragma once
 
 // ===== Numerixx Includes
 #include "ContainerTraits.hpp"
@@ -47,7 +46,7 @@
 #include <Deriv.hpp>
 
 // ===== External Includes
-#include "blaze/Blaze.h"
+#include "_external.hpp"
 
 namespace nxx::deriv
 {
@@ -505,4 +504,3 @@ namespace nxx::deriv
 
 }    // namespace nxx::deriv
 
-#endif    // NUMERIXX_MULTIDERIVATIVES_HPP

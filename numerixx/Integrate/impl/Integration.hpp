@@ -28,8 +28,7 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef NUMERIXX_INTEGRATION_HPP
-#define NUMERIXX_INTEGRATION_HPP
+#pragma once
 
 // ===== Local Includes
 #include "IntegrationTraits.hpp"
@@ -42,8 +41,7 @@
 #include <Error.hpp>
 
 // ===== External Includes
-#include <tl/expected.hpp>
-#include <boost/multi_array.hpp>
+#include "_external.hpp"
 
 // ===== Standard Library Includes
 #include <algorithm>
@@ -759,4 +757,3 @@ namespace nxx::integrate
     auto integralOf(FN function) { return detail::IntegrationFunctor< ALGO_T, FN >(); }
 } // namespace nxx::integrate
 
-#endif    // NUMERIXX_INTEGRATION_HPP

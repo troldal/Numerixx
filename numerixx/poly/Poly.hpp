@@ -28,10 +28,8 @@
     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef NUMERIXX_POLY_HPP
-#define NUMERIXX_POLY_HPP
+#pragma once
 
 #include "impl/Polynomial.hpp"
 #include "impl/Polyroots.hpp"
 
-#endif    // NUMERIXX_POLY_HPP

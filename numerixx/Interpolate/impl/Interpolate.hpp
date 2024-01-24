@@ -36,7 +36,7 @@
 #include <Poly.hpp>
 
 // ===== External Includes
-#include <blaze/Blaze.h>
+#include "_external.hpp"
 
 // ===== Standard Library Includes
 #include <algorithm>

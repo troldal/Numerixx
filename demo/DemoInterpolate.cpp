@@ -6,7 +6,8 @@
 #include <iomanip>
 #include <iostream>
 #include <numbers>
-#include <sciplot/sciplot.hpp>
+
+#include "_external.hpp"
 
 int main()
 {

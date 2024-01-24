@@ -2,10 +2,9 @@
 // Created by kenne on 08/01/2024.
 //
 
-#ifndef NUMERIXX_CONTAINERTRAITS_HPP
-#define NUMERIXX_CONTAINERTRAITS_HPP
+#pragma once
 
-#include <blaze/Blaze.h>
+#include "_external.hpp"
 
 namespace nxx::traits
 {
@@ -51,4 +50,3 @@ namespace nxx::traits
     using ContainerValueType_t = typename ContainerValueType<Container>::type;
 }
 
-#endif    // NUMERIXX_CONTAINERTRAITS_HPP
