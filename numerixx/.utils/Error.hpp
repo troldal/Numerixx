@@ -37,7 +37,6 @@
 #include "_external.hpp"
 
 // ===== Standard Library Includes
-#include <optional>
 #include <source_location>
 #include <sstream>
 #include <stdexcept>
@@ -55,7 +54,7 @@ namespace nxx
     {
     public:
         explicit NumerixxError(const std::string&            str,
-                               NumerixxErrorType             type  = NumerixxErrorType::General,
+                               const NumerixxErrorType       type  = NumerixxErrorType::General,
                                const std::source_location&   loc   = std::source_location::current(),
                                boost::stacktrace::stacktrace trace = boost::stacktrace::stacktrace())
             : std::runtime_error { str },
@@ -119,7 +118,7 @@ namespace nxx
     {
     public:
         explicit Error(const std::string&            str,
-                       NumerixxErrorType             type  = NumerixxErrorType::General,
+                       const NumerixxErrorType       type  = NumerixxErrorType::General,
                        T                             data  = {},
                        const std::source_location&   loc   = std::source_location::current(),
                        boost::stacktrace::stacktrace trace = boost::stacktrace::stacktrace())
@@ -128,7 +127,7 @@ namespace nxx
         {}
 
         [[nodiscard]]
-        virtual T data() const noexcept
+        T data() const noexcept
         {
             return m_data;
         }

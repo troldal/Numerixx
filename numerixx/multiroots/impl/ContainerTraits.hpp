@@ -16,7 +16,6 @@ namespace nxx::traits
      *          Specializations can be provided for containers that do not follow this standard.
      *
      * @tparam Container The container type for which the value type is being determined.
-     * @tparam <unnamed> An optional, unnamed template parameter for SFINAE.
      */
     template<typename Container, typename = std::void_t<>>
     struct ContainerValueType

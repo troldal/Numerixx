@@ -11,7 +11,6 @@
 #include <iomanip>
 #include <iostream>
 #include <numbers>
-//#include <boost/multiprecision/cpp_bin_float.hpp>
 
 using NXX_FLOAT = double;//boost::multiprecision::cpp_bin_float_100;
 

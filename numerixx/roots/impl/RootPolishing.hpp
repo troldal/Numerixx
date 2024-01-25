@@ -32,7 +32,6 @@
 
 // ===== Numerixx Includes
 #include "RootCommon.hpp"
-#include <Poly.hpp>
 
 // ===== Standard Library Includes
 

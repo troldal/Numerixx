@@ -180,6 +180,7 @@ namespace nxx::poly
      * @tparam RT The desired return type for the roots. Defaults to void, which will return the same type as the
      * polynomial coefficients. If specified, the roots will be of type RT.
      * @param poly A quadratic polynomial, which should satisfy the poly::IsPolynomial concept.
+     * @param tolerance The tolerance used to determine if the imaginary part of a complex root is sufficiently
      *
      * @return A vector containing the roots of the quadratic polynomial. If RT is void, the return type will be
      * a vector of complex numbers if the input polynomial has complex coefficients, or a vector of real numbers
@@ -245,6 +246,7 @@ namespace nxx::poly
      * @tparam RT The desired return type. If not specified, the function will return roots with
      * the same type as the polynomial value type.
      * @param poly The input polynomial. Must be a cubic polynomial.
+     * @param tolerance The tolerance used to determine if the imaginary part of a complex root is
      * @return A vector of roots in the specified return type. If RT is a floating point type,
      * only real roots will be returned.
      *
@@ -306,6 +308,8 @@ namespace nxx::poly
      *
      * @param poly A polynomial, which should satisfy the poly::IsPolynomial concept.
      * @param guess An optional initial guess for a root of the polynomial. Defaults to 1.0.
+     * @param tolerance The tolerance used to determine if the difference between iterations is acceptable.
+     * @param max_iterations The maximum number of iterations to perform. Defaults to 100.
      *
      * @return An approximate root of the polynomial as a std::complex. Even if the polynomial is real,
      * the root may be complex due to the nature of the Laguerre's method.
@@ -409,6 +413,8 @@ namespace nxx::poly
      * the polynomial coefficients. If specified, the roots will be of type RT.
      * @param poly A polynomial, which should satisfy the IsPolynomial concept. The input polynomial can have
      * real or complex coefficients.
+     * @param tolerance The tolerance used to determine if the imaginary part of a complex root is sufficiently low.
+     * @param max_iterations The maximum number of iterations to perform. Defaults to 100.
      *
      * @return A vector containing the roots of the polynomial. If RT is void, the return type will be a
      * vector of complex numbers if the input polynomial has complex coefficients, or a vector of real numbers

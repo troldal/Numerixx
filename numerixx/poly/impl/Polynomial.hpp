@@ -188,17 +188,13 @@ namespace nxx::poly
          * @param coefficients An container of coefficients representing the polynomial.
          *                     The coefficients are expected to be provided in increasing order
          *                     of degree, i.e., {a0, a1, a2, ...}, where a0 is the constant term.
-         * @param serializer   A std::function object that takes a const reference to a vector of
-         *                     coefficients (std::vector<T>) and returns a std::string. This
-         *                     function is used to serialize the polynomial coefficients. If not
-         *                     provided, the DefaultSerializer is used.
          *
          * @throws NumerixxError if the serializer function is not provided.
          */
         explicit Polynomial(const IsCoefficientContainer auto& coefficients)
         {
             // Lambda function to determine if a coefficient is near zero, considering both floating-point and complex numbers.
-            auto is_near_zero = [&](auto val) -> bool {
+            auto is_near_zero = [&](typename std::remove_cvref_t< decltype(coefficients) >::value_type val) -> bool {
                 // Use a different epsilon value based on whether the type is complex or not.
                 if constexpr (IsComplex< decltype(val) >) {
                     // Calculate epsilon for complex numbers.
@@ -239,10 +235,6 @@ namespace nxx::poly
          * @param coefficients An initializer list of coefficients representing the polynomial.
          *                     The coefficients are expected to be provided in increasing order
          *                     of degree, i.e., {a0, a1, a2, ...}, where a0 is the constant term.
-         * @param serializer   A std::function object that takes a const reference to a vector of
-         *                     coefficients (std::vector<T>) and returns a std::string. This
-         *                     function is used to serialize the polynomial coefficients. If not
-         *                     provided, the DefaultSerializer is used.
          *
          * @note If the initializer list is empty, the constructed polynomial will be the zero
          *       polynomial. Also, if the serializer function provided is empty, an exception will
@@ -332,10 +324,10 @@ namespace nxx::poly
             if (order() == 0) [[unlikely]]
                 return m_coefficients.front();
 
-            auto begin = m_coefficients.crbegin();
-            auto end   = m_coefficients.crend();
+            auto coeff_begin = m_coefficients.crbegin();
+            auto coeff_end   = m_coefficients.crend();
 
-            if (m_coefficients.size() <= 1 || begin == end) [[unlikely]]
+            if (m_coefficients.size() <= 1 || coeff_begin == coeff_end) [[unlikely]]
 
                 return tl::unexpected(PolyError("Polynomial error",
                                                 nxx::NumerixxErrorType::Poly,
@@ -343,8 +335,9 @@ namespace nxx::poly
                                                   .coefficients = { m_coefficients.begin(), m_coefficients.end() } }));
 
             // ===== Horner's method implemented in terms of std::accummulate.
-            TYPE result = std::accumulate(begin + 1, end, static_cast< TYPE >(m_coefficients.back()), [value](TYPE curr, TYPE coeff) {
-                return curr * static_cast< TYPE >(value) + coeff;
+            TYPE result =
+                std::accumulate(coeff_begin + 1, coeff_end, static_cast< TYPE >(m_coefficients.back()), [value](TYPE curr, TYPE coeff) {
+                    return curr * static_cast< TYPE >(value) + coeff;
             });
 
             if (!std::isfinite(std::abs(result))) [[unlikely]]
@@ -375,7 +368,6 @@ namespace nxx::poly
          * The container must be constructible from a range of values convertible to T.
          *
          * @tparam CONTAINER The type of the container to use. Must be a container of coefficients.
-         * @param coefficients The container in which to store the coefficients.
          * @return The container of coefficients.
          */
         template< typename CONTAINER >
@@ -581,7 +573,6 @@ namespace nxx::poly
          * This operator compares two polynomials for equality. Two polynomials are equal if all their
          * coefficients are equal.
          *
-         * @param lhs The first polynomial to compare.
          * @param rhs The second polynomial to compare.
          * @return True if the two polynomials are equal, false otherwise.
          */

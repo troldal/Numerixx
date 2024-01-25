@@ -36,10 +36,6 @@
 #include <Deriv.hpp>
 #include <Poly.hpp>
 #include <Interp.hpp>
-//#include <Optim.hpp>
-
-// ===== External Includes
-#include "_external.hpp"
 
 // ===== Standard Library Includes
 #include <iostream>
@@ -391,7 +387,7 @@ namespace nxx::multiroots
             points.emplace_back(0.0, g1);
             points.emplace_back(0.5, g2);
             points.emplace_back(1.0, g3);
-            auto interp = nxx::interp::makepoly(points);
+            const auto interp = nxx::interp::makepoly(points);
 
             if (interp.order() < 2) return 0.0;
 

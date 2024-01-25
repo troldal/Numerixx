@@ -78,7 +78,8 @@ add_executable(DemoOptimize DemoOptimize.cpp)
 target_link_libraries(DemoOptimize
         PRIVATE
         numerixx::optimize
-        fmt::fmt-header-only)
+        fmt::fmt-header-only
+        sciplot::sciplot)
 target_set_warnings(DemoOptimize)
 
 # Target: Multiple root-finding

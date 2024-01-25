@@ -85,10 +85,9 @@ namespace nxx
     template< typename Func >
     concept IsInvocable = detail::is_callable_v< Func >;
 
-
     /**
      * @brief Concept checking whether a type is a callable function object that returns a floating point type.
-     * @tparam FN The type to check.
+     * @tparam Func The type to check.
      */
     template< typename Func >
     concept IsFloatInvocable = requires(Func f) {

@@ -4,24 +4,19 @@
 
 #pragma once
 
+#include "OptimCommon.hpp"
+#include "_external.hpp"
+
 #include <cmath>
 #include <functional>
 
 #include <Concepts.hpp>
-#include <Deriv.hpp>
 #include <Poly.hpp>
 #include <Interp.hpp>
-#include <Roots.hpp>
 
 namespace nxx::optim
 {
 
-    struct Minimize
-    {
-    };
-    struct Maximize
-    {
-    };
 
     template< typename DERIVED, typename FUNCTION_T, typename DERIV_T, typename ARG_T, typename MODE_T >
     class OptimDerivBase
@@ -102,7 +97,7 @@ namespace nxx::optim
             points.emplace_back(0.0, BASE::evaluate(BASE::m_guess));
             points.emplace_back(0.5, BASE::evaluate(BASE::m_guess - gradient * 0.5));
             points.emplace_back(1.0, BASE::evaluate(BASE::m_guess - gradient));
-            auto interp = nxx::interp::makepoly(points);
+            const auto interp = nxx::interp::makepoly(points);
 
             if (interp.order() < 2) return;
 

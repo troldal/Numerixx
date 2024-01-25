@@ -285,7 +285,7 @@ namespace nxx::integrate
             const auto& [lower, upper] = BASE::m_bounds;
 
             // Recalculate the interval based on the iteration number
-            uint64_t divisor = 1 << m_iter;
+            uint64_t divisor = 1LL << m_iter;
             BASE::m_interval = (upper - lower) / divisor;
 
             // Double the number of midpoints for this iteration
@@ -394,12 +394,12 @@ namespace nxx::integrate
             if (m_iter == 1) { R[0][0] = BASE::m_interval * (BASE::evaluate(lower) + BASE::evaluate(upper)) / 2; }
 
             // Halve the step size for this iteration
-            uint64_t divisor = 1 << m_iter;
+            uint64_t divisor = 1LL << m_iter;
             BASE::m_interval = (upper - lower) / divisor;
 
             // Trapezoidal rule: Calculate the sum of the function values at the midpoints
             RESULT_T       sum          = 0.0;
-            const uint64_t numMidpoints = 1 << (m_iter - 1); // 2^(m_iter - 1) using bitwise shift
+            const uint64_t numMidpoints = 1LL << (m_iter - 1);    // 2^(m_iter - 1) using bitwise shift
             for (uint64_t k = 1; k <= numMidpoints; ++k)
                 sum += BASE::evaluate(lower + (2 * k - 1) * BASE::m_interval);
 
@@ -509,7 +509,7 @@ namespace nxx::integrate
             const auto& [lower, upper] = BASE::m_bounds;
 
             // Halve the step size for this iteration
-            uint64_t divisor = 1 << m_iter;
+            uint64_t divisor = 1LL << m_iter;
             BASE::m_interval = (upper - lower) / divisor;
 
             // Double the number of intervals using arithmetic operation

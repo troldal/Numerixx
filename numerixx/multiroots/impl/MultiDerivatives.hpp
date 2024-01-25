@@ -29,7 +29,7 @@
 */
 
 /**
- * @file partialdiff.hpp
+ * @file MultiDerivatives.hpp
  * @brief Provides functionality for computing partial derivatives of multi-variable functions,
  * as well as matrices of derivatives such as the Jacobian and Hessian matrices.
  *

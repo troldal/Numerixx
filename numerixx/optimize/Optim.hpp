@@ -4,6 +4,5 @@
 
 #pragma once
 
+#include "impl/OptimSearch.hpp"
 #include "impl/Optimize.hpp"
-
-#endif    // NUMERIXX_OPTIM_HPP

@@ -41,7 +41,6 @@
 // ===== Standard Library Includes
 #include <algorithm>
 #include <cassert>
-#include <iostream>
 #include <optional>
 #include <stdexcept>
 #include <vector>
@@ -101,7 +100,6 @@ namespace nxx::interp
          * to specify their interpolation method.
          *
          * @tparam DERIVED The derived class implementing the interpolation logic.
-         * @tparam CONTAINER_T The type of container used to store the points.
          * @tparam POINT_T The type of points stored in the container. Must be a floating point structure.
          *
          * @note Requires that POINT_T is a floating point structure.
@@ -133,7 +131,7 @@ namespace nxx::interp
              * @param points The container of points to be used for interpolation.
              * @throws std::runtime_error If the number of points is less than 2.
              */
-            template <template< typename... > class CONTAINER_T >
+            template< template< typename... > class CONTAINER_T >
             explicit InterpBase(const CONTAINER_T< POINT_T >& points)
                 : m_points(points.begin(), points.end())
             {
@@ -255,7 +253,6 @@ namespace nxx::interp
      * The Linear class template extends the InterpBase class for performing linear interpolation
      * and extrapolation of a series of points.
      *
-     * @tparam CONTAINER_T The type of container used to store the points.
      * @tparam POINT_T The type of points stored in the container.
      */
     template< typename POINT_T >
@@ -280,9 +277,9 @@ namespace nxx::interp
         VALUE_T interpolate(VALUE_T x) const
         {
             // Find the interval that x falls into
-            auto it = std::lower_bound(BASE::m_points.begin(), BASE::m_points.end(), x, [](const auto& p, double x) {
+            auto it = std::lower_bound(BASE::m_points.begin(), BASE::m_points.end(), x, [](const auto& p, double val) {
                 auto [x1, _] = p;
-                return x1 <= x;
+                return x1 <= val;
             });
 
             // Check if x is equal to the x-value of the last point
@@ -373,7 +370,6 @@ namespace nxx::interp
      * The Lagrange class template extends the InterpBase class for performing Lagrange polynomial
      * interpolation and extrapolation of a series of points.
      *
-     * @tparam CONTAINER_T The type of container used to store the points.
      * @tparam POINT_T The type of points stored in the container.
      */
     template< typename POINT_T >
@@ -520,7 +516,6 @@ namespace nxx::interp
      * and extrapolation of a series of points. The Steffen method uses a Hermite interpolation
      * approach to ensure smoothness at the data points.
      *
-     * @tparam CONTAINER_T The type of container used to store the points.
      * @tparam POINT_T The type of points stored in the container.
      */
     template< typename POINT_T >
@@ -577,11 +572,11 @@ namespace nxx::interp
         VALUE_T interpolate(VALUE_T x) const
         {
             if (!m_slopes) calculateSlopes();
-            auto& slopes = m_slopes.value();
+            const auto& slopes = m_slopes.value();
 
             // Find the interval that x falls into
             auto it =
-                std::upper_bound(BASE::m_points.begin(), BASE::m_points.end(), x, [](double x, const auto& p) { return x < p.first; });
+                std::upper_bound(BASE::m_points.begin(), BASE::m_points.end(), x, [](double val, const auto& p) { return val < p.first; });
 
             auto [x1, y1]  = *(it - 1);
             auto [x2, y2]  = *it;
@@ -609,7 +604,7 @@ namespace nxx::interp
          */
         VALUE_T extrapolate(VALUE_T x) const
         {
-            size_t n = BASE::m_points.size();
+            const size_t n = BASE::m_points.size();
 
             // Extrapolate at the beginning
             if (x <= BASE::m_points.front().first) {
@@ -669,7 +664,6 @@ namespace nxx::interp
      * interpolation of a series of points. It computes and stores coefficients for each cubic
      * spline segment and uses them to interpolate values at arbitrary points.
      *
-     * @tparam CONTAINER_T The type of container used to store the points.
      * @tparam POINT_T The type of points stored in the container.
      */
     template< typename POINT_T >
@@ -741,7 +735,7 @@ namespace nxx::interp
             z[n] = c[n] = 0.0;
 
             // Backward sweep for 'c', and solving for 'b' and 'd'
-            for (int j = n - 1; j >= 0; --j) { // NOLINT
+            for (int j = n - 1; j >= 0; --j) {    // NOLINT
                 c[j] = z[j] - mu[j] * c[j + 1];
                 b[j] = (a[j + 1] - a[j]) / h[j] - h[j] * (c[j + 1] + 2.0 * c[j]) / 3.0;
                 d[j] = (c[j + 1] - c[j]) / (3.0 * h[j]);
@@ -767,10 +761,10 @@ namespace nxx::interp
         {
             if (!m_coefficients) calculateSplineCoefficients();
 
-            auto& a = m_coefficients->a;
-            auto& b = m_coefficients->b;
-            auto& c = m_coefficients->c;
-            auto& d = m_coefficients->d;
+            const auto& a = m_coefficients->a;
+            const auto& b = m_coefficients->b;
+            const auto& c = m_coefficients->c;
+            const auto& d = m_coefficients->d;
 
             // Find the right interval for x
             size_t interval = BASE::m_points.size() - 2;    // Default to the last interval
@@ -799,7 +793,7 @@ namespace nxx::interp
          */
         VALUE_T extrapolate(VALUE_T x) const
         {
-            size_t n = BASE::m_points.size();
+            const size_t n = BASE::m_points.size();
 
             // Extrapolate at the beginning
             if (x <= BASE::m_points.front().first) {
@@ -1101,15 +1095,15 @@ namespace nxx::interp
      */
     inline auto makepoly(const std::vector< std::pair< double, double > >& points)
     {
-        size_t                         n = points.size();
+        const size_t                   n = points.size();
         blaze::DynamicMatrix< double > A(n, n);
         blaze::DynamicVector< double > b(n);
         blaze::DynamicVector< double > x(n);
 
         // Setting up the system Ax = b
         for (size_t i = 0; i < n; ++i) {
-            double xi = points[i].first;
-            b[i]      = points[i].second;
+            const double xi = points[i].first;
+            b[i]            = points[i].second;
             for (size_t j = 0; j < n; ++j) {
                 A(i, j) = std::pow(xi, j);
             }

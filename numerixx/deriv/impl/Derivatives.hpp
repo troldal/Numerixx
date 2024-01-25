@@ -89,7 +89,7 @@ namespace nxx::deriv
         /**
          * @brief A class defining a function object for computing the derivative of an arbitrary function.
          *
-         * @tparam FN The type of function object to use for computing the derivative.
+         * @tparam ALGO The type of function object to use for computing the derivative.
          */
         template<typename ALGO>
         class DiffSolverTemplate

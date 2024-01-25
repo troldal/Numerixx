@@ -33,6 +33,7 @@
 // ===== Numerixx Includes
 #include "RootCommon.hpp"
 #include <Constants.hpp>
+#include <Functions.hpp>
 
 // ===== External Includes
 #include "_external.hpp"
@@ -72,6 +73,15 @@ namespace nxx::roots
 
     namespace detail
     {
+
+        template< IsFloat ARG1, IsFloat ARG2 >
+        void validateBounds(std::pair< ARG1, ARG2 >& bounds)
+        {
+            auto& [lower, upper] = bounds;
+            if (lower == upper) throw NumerixxError("Invalid bounds.");
+            if (lower > upper) std::swap(lower, upper);
+        }
+
         /**
          * @brief Provides a base class template for search-based algorithms.
          *
@@ -121,9 +131,10 @@ namespace nxx::roots
              */
             SearchBase(FUNCTION_T objective, IsFloatStruct auto bounds, RATIO_T factor = std::numbers::phi)
                 : m_objective { std::move(objective) },
+                  m_bounds(toPair(bounds)),
                   m_ratio { factor }
             {
-                init(bounds, factor);
+                validateBounds(m_bounds);
             }
 
             /**
@@ -137,9 +148,10 @@ namespace nxx::roots
             requires(N == 2)
             SearchBase(FUNCTION_T objective, const ARG_T (&bounds)[N], RATIO_T factor = std::numbers::phi)
                 : m_objective { std::move(objective) },
+                  m_bounds(std::pair { bounds[0], bounds[1] }),
                   m_ratio { factor }
             {
-                init(std::pair { bounds[0], bounds[1] }, factor);
+                validateBounds(m_bounds);
             }
 
             /**
@@ -149,13 +161,8 @@ namespace nxx::roots
              */
             void setBounds(const BOUNDS_T& bounds)
             {
-                auto [lower, upper] = bounds;
-                if (lower == upper) throw NumerixxError("Invalid bounds.");
-
-                if (lower > upper)
-                    m_bounds = BOUNDS_T { upper, lower };
-                else
-                    m_bounds = BOUNDS_T { lower, upper };
+                m_bounds = toPair(bounds);
+                validateBounds(m_bounds);
             }
 
             /**
@@ -173,19 +180,6 @@ namespace nxx::roots
             SearchBase(SearchBase&& other) noexcept            = default; /**< Default move constructor. */
             SearchBase& operator=(const SearchBase& other)     = default; /**< Default copy assignment operator. */
             SearchBase& operator=(SearchBase&& other) noexcept = default; /**< Default move assignment operator. */
-
-            /**
-             * @brief Initializes the search with bounds from a float struct and an optional factor.
-             * @param bounds Struct with exactly two members representing the search bounds.
-             * @param factor The factor influencing the search process, defaults to the golden ratio.
-             * @throws NumerixxError If the factor is invalid.
-             */
-            void init(IsFloatStruct auto bounds, RATIO_T factor = std::numbers::phi)
-            {
-                auto [lower, upper] = bounds;
-                setBounds(BOUNDS_T { lower, upper });
-                setRatio(factor);
-            }
 
             /**
              * @brief Evaluates the objective function at a given value.
@@ -669,7 +663,7 @@ namespace nxx::roots
             using RT = tl::expected< decltype(bounds), ET >; /**< Type for the function return value. */
             using std::isfinite;
 
-            solver.init(bounds, ratio);
+            // solver.init(bounds, ratio);
             auto                      curBounds = solver.current();
             RT                        result    = curBounds;
             typename SOLVER::RESULT_T eval_lower;

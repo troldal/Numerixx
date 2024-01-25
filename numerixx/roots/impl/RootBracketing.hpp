@@ -38,7 +38,6 @@
 // ===== Standard Library Includes
 #include <algorithm>
 #include <array>
-#include <span>
 
 namespace nxx::roots
 {

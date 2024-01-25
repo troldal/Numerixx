@@ -6,9 +6,6 @@
 #include <deque>
 #include <iomanip>
 #include <iostream>
-#include <list>
-#include <set>
-#include <unordered_set>
 #include <fmt/format.h>
 
 void printpoly(auto coefficients) {
@@ -89,13 +86,11 @@ int main() {
     // by passing the type as a template parameter to the function.
     // ============================================================================================
     std::cout << "Getting the polynomial coefficients as a std::vector:" << std::endl;
-    auto coeffVector = func1.coefficients();
-    for (auto c : coeffVector) std::cout << c << " ";
+    for (auto coeffVector = func1.coefficients(); auto c : coeffVector) std::cout << c << " ";
     std::cout << "\n\n";
 
     std::cout << "Getting the polynomial coefficients as a std::deque:" << std::endl;
-    auto coeffDeque = func1.coefficients<std::deque<double>>();
-    for (auto c : coeffDeque) std::cout << c << " ";
+    for (auto coeffDeque = func1.coefficients< std::deque< double > >(); auto c : coeffDeque) std::cout << c << " ";
     std::cout << "\n\n";
 
     // ============================================================================================

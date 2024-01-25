@@ -2,16 +2,15 @@
 // This demo shows how to use the nxx::roots namespace to find the roots of arbitrary functions.
 // ================================================================================================
 
+#include "_external.hpp"
+
 #include <algorithm>
-#include <deque>
 #include <array>
 #include <iomanip>
 #include <iostream>
 #include <Deriv.hpp>
 #include <Roots.hpp>
 #include <concepts>
-#include <fmt/format.h>
-#include <boost/multiprecision/cpp_bin_float.hpp>
 
 using NXX_FLOAT = double;//boost::multiprecision::cpp_bin_float_50;
 
@@ -29,8 +28,8 @@ int main()
     using namespace nxx::roots;
     using namespace boost::multiprecision;
     std::cout << std::fixed << std::setprecision(8);
-    auto                                    func   = [](nxx::IsFloat auto x) { return x * x - decltype(x)(5.0); };
-    const std::pair< NXX_FLOAT, NXX_FLOAT > bounds = { 0.0, 2.5 };
+    auto                                        func   = []< nxx::IsFloat VAL_T >(VAL_T x) { return x * x - decltype(x)(5.0); };
+    constexpr std::pair< NXX_FLOAT, NXX_FLOAT > bounds = { 0.0, 2.5 };
 
     // ============================================================================================
     // The nxx::roots namespace contains a number of root-finding algorithms, for finding the roots
@@ -134,7 +133,7 @@ int main()
 
 
     // Lambda function for printing the results of the bracketing solvers:
-    auto bracket_root = [](auto solver) {
+    auto bracket_root = []< typename SOLVER_T >(SOLVER_T solver) {
         //, std::pair< double, double > bounds) {
         // Print the header:
         std::cout << "----------------------------------------------------------------------------------\n";
@@ -143,7 +142,7 @@ int main()
 
         // Create variables for the iterations.
         std::array< std::pair< NXX_FLOAT, NXX_FLOAT >, 2 > guesses; // Stores the endpoints of the bracketing interval
-        decltype(guesses.begin())                          min;     // Stores the endpoint with the smallest absolute value
+        decltype(guesses.begin())                          min {};     // Stores the endpoint with the smallest absolute value
 
         // Initialize the solver:
         // solver.init(bounds);

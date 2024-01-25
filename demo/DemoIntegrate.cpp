@@ -2,12 +2,13 @@
 //// Created by kenne on 12/11/2023.
 ////
 
+#include "_external.hpp"
+
 #include <Integ.hpp>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <numbers>
-#include <boost/multiprecision/cpp_bin_float.hpp>
 
 using NXX_FLOAT = double; //boost::multiprecision::cpp_bin_float_50;
 
@@ -28,9 +29,9 @@ int main()
     };
 
     // Compute the integrals using the different methods
-    auto f1_bounds = bounds{ 0.0, 2.0 };
-    auto f2_bounds = bounds{ 0.0, std::numbers::pi };
-    auto f3_bounds = bounds{ -10.0, 10.0 };
+    constexpr auto f1_bounds = bounds { 0.0, 2.0 };
+    constexpr auto f2_bounds = bounds { 0.0, std::numbers::pi };
+    constexpr auto f3_bounds = bounds { -10.0, 10.0 };
 
     std::cout << "Integral of x^2 from 0 to 2:\n";
     std::cout << "Romberg (bounds):        " << *integrate< Romberg >(f1, f1_bounds) << "\n";

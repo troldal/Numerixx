@@ -11,7 +11,6 @@
 #include <list>
 #include <numbers>
 #include <span>
-#include <vector>
 
 int main()
 {
@@ -19,15 +18,15 @@ int main()
     using namespace nxx::deriv;
     using namespace nxx::multiroots;
 
-    auto f1 = [](std::span< double > coeffs) { return 3 * coeffs[0] - std::cos(coeffs[1] * coeffs[2]) - 0.5; };
-    auto f2 = [](std::span< double > coeffs) {
+    auto f1 = [](const std::span< double > coeffs) { return 3 * coeffs[0] - std::cos(coeffs[1] * coeffs[2]) - 0.5; };
+    auto f2 = [](const std::span< double > coeffs) {
         return coeffs[0] * coeffs[0] - 81 * std::pow(coeffs[1] + 0.1, 2) + std::sin(coeffs[2]) + 1.06;
     };
-    auto f3 = [](std::span< double > coeffs) {
+    auto f3 = [](const std::span< double > coeffs) {
         return std::exp(-coeffs[0] * coeffs[1]) + 20 * coeffs[2] + (10 * std::numbers::pi - 3) / 3;
     };
 
-    MultiFunctionArray functions { f1, f2, f3 };
+    const MultiFunctionArray functions { f1, f2, f3 };
 
     auto result1 = multisolve<SteepestDescent>(functions, { 2.0, 2.0, 2.0 });
     // auto result2 = multisolve<MultiNewton>(functions, *result1);

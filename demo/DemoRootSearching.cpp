@@ -3,13 +3,12 @@
 // for a root of a function.
 // ================================================================================================
 
-#include <fmt/format.h>
+#include "_external.hpp"
+
 #include <iostream>
 #include <iomanip>
-//#include <numerixx.hpp>
 #include <Roots.hpp>
 
-#include <boost/multiprecision/cpp_bin_float.hpp>
 
 using NXX_FLOAT = double;//boost::multiprecision::cpp_bin_float_50;
 
@@ -27,10 +26,7 @@ int main()
 {
     using namespace nxx::roots;
     std::cout << std::fixed << std::setprecision(8);
-    // auto func = nxx::poly::Polynomial({ NXX_FLOAT(-5.0), NXX_FLOAT(0.0), NXX_FLOAT(1.0) });
-    auto func = [](nxx::IsFloat auto x) { return x * x - decltype(x)(5.0); };
-
-    auto xyz = *search< BracketExpandUp >(func, { NXX_FLOAT(1.0), NXX_FLOAT(1.1) });
+    auto func = []< nxx::IsFloat VAL_T >(VAL_T x) { return x * x - decltype(x)(5.0); };
 
     // ============================================================================================
     // The nxx::roots namespace contains a number of search algorithms, for finding a bracketing
