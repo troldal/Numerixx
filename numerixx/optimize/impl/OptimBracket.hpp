@@ -83,9 +83,9 @@ namespace nxx::optim
     };
 
     template< IsFloatInvocable FN, IsFloat ARG_T = double, typename MODE_T = Minimize >
-    class GoldenSearch final : public OptimSearchBase< GoldenSearch< FN, ARG_T, MODE_T >, FN, ARG_T, MODE_T >
+    class GoldenSearch final : public OptimBracketBase< GoldenSearch< FN, ARG_T, MODE_T >, FN, ARG_T, MODE_T >
     {
-        using BASE    = OptimSearchBase< GoldenSearch< FN, ARG_T, MODE_T >, FN, ARG_T, MODE_T >; /**< Base class alias for readability. */
+        using BASE    = OptimBracketBase< GoldenSearch< FN, ARG_T, MODE_T >, FN, ARG_T, MODE_T >; /**< Base class alias for readability. */
         using POINT_T = std::pair< ARG_T, ARG_T >;
         using RANGE_T = std::array< POINT_T, 4 >;
 
@@ -145,9 +145,9 @@ namespace nxx::optim
     };
 
     template< IsFloatInvocable FN, IsFloat ARG_T = double, typename MODE_T = Minimize >
-    class Parabolic final : public OptimSearchBase< Parabolic< FN, ARG_T, MODE_T >, FN, ARG_T, MODE_T >
+    class Parabolic final : public OptimBracketBase< Parabolic< FN, ARG_T, MODE_T >, FN, ARG_T, MODE_T >
     {
-        using BASE    = OptimSearchBase< Parabolic< FN, ARG_T, MODE_T >, FN, ARG_T, MODE_T >;
+        using BASE    = OptimBracketBase< Parabolic< FN, ARG_T, MODE_T >, FN, ARG_T, MODE_T >;
         using POINT_T = std::pair< ARG_T, ARG_T >;
         using RANGE_T = std::array< POINT_T, 3 >;    // Three points for parabolic interpolation
 
@@ -218,9 +218,9 @@ namespace nxx::optim
     };
 
     template< IsFloatInvocable FN, IsFloat ARG_T = double, typename MODE_T = Minimize >
-    class Brent final : public OptimSearchBase< Brent< FN, ARG_T, MODE_T >, FN, ARG_T, MODE_T >
+    class Brent final : public OptimBracketBase< Brent< FN, ARG_T, MODE_T >, FN, ARG_T, MODE_T >
     {
-        using BASE    = OptimSearchBase< Brent< FN, ARG_T, MODE_T >, FN, ARG_T, MODE_T >;
+        using BASE    = OptimBracketBase< Brent< FN, ARG_T, MODE_T >, FN, ARG_T, MODE_T >;
         using POINT_T = std::pair< ARG_T, ARG_T >;
         using RANGE_T = std::array< POINT_T, 3 >;    // Three points for parabolic interpolation
 
