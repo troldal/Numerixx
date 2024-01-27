@@ -293,7 +293,8 @@ namespace nxx::optim
                     // whew, parabolic fit:
                     delta = p / q;
                     u     = x + delta;
-                    if (((u - lower) < fract2) || ((upper - u) < fract2)) delta = (mid - x) < 0 ? static_cast<ARG_T>(-abs(fract1)) : static_cast<ARG_T>(abs(fract1));
+                    if (((u - lower) < fract2) || ((upper - u) < fract2))
+                        delta = (mid - x) < 0 ? static_cast< ARG_T >(-abs(fract1)) : static_cast< ARG_T >(abs(fract1));
                 }
             }
             else {

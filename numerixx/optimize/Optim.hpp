@@ -4,6 +4,6 @@
 
 #pragma once
 
-#include "impl/OptimSearch.hpp"
 #include "impl/OptimBracket.hpp"
+#include "impl/OptimSearch.hpp"
 #include "impl/Optimize.hpp"

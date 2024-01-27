@@ -16,12 +16,14 @@ int main()
     using namespace nxx::deriv;
     using namespace sciplot;
     namespace rng = std::ranges;
-    
+
     std::cout << std::setprecision(8) << std::fixed;
 
-    auto myFunc = [](double x) { return -x * x * x + 4 * x * x - x - 5; };    // Example function (quadratic)
-           //auto myFunc = [](double x) { return x*x; };    // Example function (quadratic)
-     //auto myFunc = [](double x) { return pow(x,6) - 11*pow(x,3)+17*x*x - 7*x+1; };    // Example function (quadratic)
+    auto myFunc = [](double x) {
+        return -x * x * x + 4 * x * x - x - 5;
+    };    // Example function (quadratic)
+          // auto myFunc = [](double x) { return x*x; };    // Example function (quadratic)
+    // auto myFunc = [](double x) { return pow(x,6) - 11*pow(x,3)+17*x*x - 7*x+1; };    // Example function (quadratic)
 
     auto result = optimize< GradientDescent, Minimize >(myFunc, derivativeOf(myFunc), 0.0, 1e-12, 10000);
     std::cout << "Optimized value: " << result << std::endl;

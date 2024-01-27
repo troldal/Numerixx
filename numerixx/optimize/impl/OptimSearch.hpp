@@ -19,8 +19,6 @@
 namespace nxx::optim
 {
 
-
-
     template< typename DERIVED, IsFloatInvocable FUNCTION_T, IsFloat ARG_T, typename MODE_T >
     // requires...
     class OptimSearchBase
@@ -126,19 +124,18 @@ namespace nxx::optim
         {
             namespace rng = std::ranges;
 
-            const ARG_T eps      = std::sqrt(std::numeric_limits< ARG_T >::epsilon());
-            auto bounds = BASE::current();
+            const ARG_T eps    = std::sqrt(std::numeric_limits< ARG_T >::epsilon());
+            auto        bounds = BASE::current();
 
             if (!m_range) {
-
-                auto lowEval = BASE::evaluate(bounds.first);
+                auto lowEval  = BASE::evaluate(bounds.first);
                 auto highEval = BASE::evaluate(bounds.second);
                 if (lowEval < highEval) std::swap(bounds.first, bounds.second);
 
                 m_range          = RANGE_T {};
                 (*m_range)[LOW]  = calcPoint(bounds.first);
-                (*m_range)[MID] = calcPoint(bounds.second);
-                (*m_range)[HIGH]  = calcPoint(2 * bounds.second - bounds.first);
+                (*m_range)[MID]  = calcPoint(bounds.second);
+                (*m_range)[HIGH] = calcPoint(2 * bounds.second - bounds.first);
             }
 
             auto& range = *m_range;
@@ -155,10 +152,10 @@ namespace nxx::optim
             if (minimum == range.begin() + 1) return;
 
             const ARG_T maxStepSize = (range[MID].first - range[LOW].first) * BASE::ratio();
-            const ARG_T guessStep = x2 + maxStepSize * 2;
+            const ARG_T guessStep   = x2 + maxStepSize * 2;
 
-            const ARG_T quotient = f0*(x1*x1 - x2*x2) + f1*(x2*x2 - x0*x0) + f2*(x0*x0 - x1*x1);
-            const ARG_T remainder = 2.0 * (f0*(x1 - x2) + f1*(x2 - x0) + f2*(x0 - x1));
+            const ARG_T quotient  = f0 * (x1 * x1 - x2 * x2) + f1 * (x2 * x2 - x0 * x0) + f2 * (x0 * x0 - x1 * x1);
+            const ARG_T remainder = 2.0 * (f0 * (x1 - x2) + f1 * (x2 - x0) + f2 * (x0 - x1));
             const ARG_T guessPoly = quotient / std::copysign(std::max(std::abs(remainder), eps), remainder);
 
             const ARG_T guess = std::min(guessStep, guessPoly + eps);
