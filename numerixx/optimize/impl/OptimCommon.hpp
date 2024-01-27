@@ -14,4 +14,12 @@ namespace nxx::optim
     {
     };
 
+    template< IsFloat ARG1, IsFloat ARG2 >
+    void validateBounds(std::pair< ARG1, ARG2 >& bounds)
+    {
+        auto& [lower, upper] = bounds;
+        if (lower == upper) throw NumerixxError("Invalid bounds.");
+        if (lower > upper) std::swap(lower, upper);
+    }
+
 }    // namespace nxx::optim
