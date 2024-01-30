@@ -37,7 +37,7 @@ int main()
             std::cout << "----------------------------------------------------------------\n";
         }
 
-        std::cout << fmt::format("{:10} | {:15.10f} | {:15.10f} | {:15.10f} ", iter, lower, guess,upper) << "\n";
+        std::cout << fmt::format("{:10} | {:15.10f} | {:15.10f} | {:15.10f} ", iter, lower, guess, upper) << "\n";
 
         BracketTerminator term;
 
@@ -51,8 +51,7 @@ int main()
     // auto guess = fminimize<Brent>(myFunc, { -1.0, 1.0 });
 
     std::cout << "Optimized value: " << guess << std::endl;
-    std::cout << "Function value: "<< myFunc(guess) << std::endl;
-
+    std::cout << "Function value: " << myFunc(guess) << std::endl;
 
     auto result = fdfoptimize< Newton, Minimize >(myFunc, guess);
     std::cout << "Optimized value: " << result << std::endl;

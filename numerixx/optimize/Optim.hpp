@@ -5,5 +5,5 @@
 #pragma once
 
 #include "impl/OptimBracket.hpp"
-#include "impl/OptimSearch.hpp"
 #include "impl/OptimPolish.hpp"
+#include "impl/OptimSearch.hpp"

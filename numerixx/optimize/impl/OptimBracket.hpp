@@ -477,15 +477,13 @@ namespace nxx::optim
         auto foptimize_common(FN_T func, const STRUCT_T& bounds, const Args&... args)
         {
             using TUPLE_T = std::tuple< Args... >;
-            using SOLVER = SOLVER_T< FN_T, StructCommonType_t< STRUCT_T >, MODE_T >;
+            using SOLVER  = SOLVER_T< FN_T, StructCommonType_t< STRUCT_T >, MODE_T >;
 
             TUPLE_T args_tuple = std::make_tuple(args...);
             static_assert(std::tuple_size_v< TUPLE_T > <= 2, "Too many arguments passed to foptimize_common");
 
             // Zero arguments are passed...
-            if constexpr (std::tuple_size_v< TUPLE_T > == 0)
-                return detail::foptimize_impl(SOLVER(func, bounds), BracketTerminator {});
-
+            if constexpr (std::tuple_size_v< TUPLE_T > == 0) return detail::foptimize_impl(SOLVER(func, bounds), BracketTerminator {});
 
             // One argument is passed...
             else if constexpr (std::tuple_size_v< TUPLE_T > == 1) {
@@ -495,11 +493,14 @@ namespace nxx::optim
                     return detail::foptimize_impl(SOLVER(func, bounds), BracketTerminator(std::get< 0 >(args_tuple)));
                 }
 
-                else if constexpr(std::is_same_v< std::invoke_result_t< ArgType, IterData< size_t, StructCommonType_t< STRUCT_T > > >, bool >) {
+                else if constexpr (std::is_same_v< std::invoke_result_t< ArgType, IterData< size_t, StructCommonType_t< STRUCT_T > > >,
+                                                   bool >)
+                {
                     return detail::foptimize_impl(SOLVER(func, bounds), std::get< 0 >(args_tuple));
                 }
                 else
-                    []<bool flag = false>(){static_assert(flag, "Invalid argument passed to foptimize_common");}();
+                    []< bool flag = false >() { static_assert(flag, "Invalid argument passed to foptimize_common"); }
+                ();
             }
 
             // Two arguments are passed...
@@ -509,10 +510,12 @@ namespace nxx::optim
                 using ArgType2 = std::tuple_element_t< 1, decltype(args_tuple) >;
                 static_assert(std::is_floating_point_v< ArgType1 > != std::is_floating_point_v< ArgType2 >,
                               "Two arguments must be one floating point and one integral type");
-                return detail::foptimize_impl(SOLVER(func, bounds), BracketTerminator(std::get< 0 >(args_tuple), std::get< 1 >(args_tuple)));
+                return detail::foptimize_impl(SOLVER(func, bounds),
+                                              BracketTerminator(std::get< 0 >(args_tuple), std::get< 1 >(args_tuple)));
             }
             else
-                []<bool flag = false>(){static_assert(flag, "Invalid argument passed to foptimize_common");}();
+                []< bool flag = false >() { static_assert(flag, "Invalid argument passed to foptimize_common"); }
+            ();
         }
 
     }    // namespace detail
