@@ -23,5 +23,4 @@ namespace nxx
         result.val2 = data.second;
         return result;
     }
-
 }    // namespace nxx

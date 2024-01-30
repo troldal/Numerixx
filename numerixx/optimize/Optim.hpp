@@ -6,4 +6,4 @@
 
 #include "impl/OptimBracket.hpp"
 #include "impl/OptimSearch.hpp"
-#include "impl/Optimize.hpp"
+#include "impl/OptimPolish.hpp"

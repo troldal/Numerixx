@@ -603,14 +603,15 @@ namespace nxx::roots
             size_t factor = std::ceil(BASE::ratio());
             auto   diff   = (bounds.second - bounds.first) / factor;
             auto   lower  = bounds.first;
-            auto   upper  = bounds.first + diff;
+            // auto   upper  = std::min(bounds.first + diff, bounds.second);
+            auto   upper  = std::min(bounds.first + diff, bounds.second);
             for (size_t i = 0; i < factor; ++i) {
                 if (BASE::evaluate(lower) * BASE::evaluate(upper) < 0.0) {
                     BASE::setBounds({ lower, upper });
                     return;
                 }
                 lower = upper;
-                upper += diff;
+                upper = std::min(upper + diff, bounds.second);
             }
 
             BASE::setRatio(BASE::ratio() * 2.0);    // Increase the factor to expand the search range

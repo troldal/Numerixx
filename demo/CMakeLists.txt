@@ -78,6 +78,8 @@ add_executable(DemoOptimize DemoOptimize.cpp)
 target_link_libraries(DemoOptimize
         PRIVATE
         numerixx::optimize
+        numerixx::deriv
+        numerixx::roots
         fmt::fmt-header-only
         sciplot::sciplot)
 target_set_warnings(DemoOptimize)

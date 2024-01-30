@@ -2,6 +2,7 @@
 
 #include <Deriv.hpp>
 #include <Optim.hpp>
+#include <Roots.hpp>
 #include <cmath>
 
 #include <algorithm>
@@ -17,34 +18,50 @@ int main()
     using namespace sciplot;
     namespace rng = std::ranges;
 
-    std::cout << std::setprecision(8) << std::fixed;
+    // std::cout << std::setprecision(8) << std::fixed;
 
     auto myFunc = [](double x) {
         return -x * x * x + 4 * x * x - x - 5;
     };    // Example function (quadratic)
-          // auto myFunc = [](double x) { return x*x; };    // Example function (quadratic)
-    // auto myFunc = [](double x) { return pow(x,6) - 11*pow(x,3)+17*x*x - 7*x+1; };    // Example function (quadratic)
 
-    auto result = optimize< GradientDescent, Minimize >(myFunc, derivativeOf(myFunc), 0.0, 1e-12, 10000);
+    // auto myFunc = [](double x) { return x*x; };    // Example function (quadratic)
+    // auto myFunc = [](double x) { return pow(x,6) - 11*pow(x,3)+17*x*x - 7*x+1; };
+
+    std::cout << "Bracketing solver:\n";
+    auto guess = fminimize< Brent >(myFunc, { -1.0, 1.0 }, [](const auto& data) {
+        auto [iter, lower, guess, upper] = data;
+
+        if (iter == 0) {
+            std::cout << "----------------------------------------------------------------\n";
+            std::cout << fmt::format("{:>10} | {:>15} | {:>15} | {:>15} ", "#", "Lower", "Guess", "Upper") << "\n";
+            std::cout << "----------------------------------------------------------------\n";
+        }
+
+        std::cout << fmt::format("{:10} | {:15.10f} | {:15.10f} | {:15.10f} ", iter, lower, guess,upper) << "\n";
+
+        BracketTerminator term;
+
+        if (term(data)) {
+            std::cout << "----------------------------------------------------------------\n";
+            return true;
+        }
+        return false;
+    });
+
+    // auto guess = fminimize<Brent>(myFunc, { -1.0, 1.0 });
+
+    std::cout << "Optimized value: " << guess << std::endl;
+    std::cout << "Function value: "<< myFunc(guess) << std::endl;
+
+
+    auto result = fdfoptimize< Newton, Minimize >(myFunc, guess);
     std::cout << "Optimized value: " << result << std::endl;
-    std::cout << "Function value: " << myFunc(result) << std::endl;
-
-    auto optimizer = Brent< decltype(myFunc), double, Minimize >(myFunc, { -100.0, 1.0 });
-
-    for (int i = 0; i <= 100; ++i) {
-        auto current = optimizer.current();
-        std::cout << "Iteration " << i << ": " << current.first << "\t" << current.second << std::endl;
-        // std::cout << "Iteration " << i << ": ";
-        optimizer.iterate();
-    }
-
-    std::cout << myFunc(optimizer.current().first) << std::endl;
-    std::cout << myFunc(optimizer.current().second) << std::endl;
+    std::cout << "Function value: " << myFunc(result) << std::endl << std::endl;
 
     Vec x = linspace(-1.0, 1.0, 200);
 
     std::vector< double > y_lin;
-    std::transform(begin(x), end(x), std::back_inserter(y_lin), [&](auto val) { return myFunc(val); });
+    rng::transform(x, std::back_inserter(y_lin), [&](auto val) { return myFunc(val); });
 
     Plot2D plot1;
     plot1.palette("paired");

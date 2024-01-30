@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include <boost/multiprecision/cpp_bin_float.hpp>
+#include "_external.hpp"
 
 namespace nxx
 {

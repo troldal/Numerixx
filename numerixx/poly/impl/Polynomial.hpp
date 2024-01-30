@@ -198,15 +198,15 @@ namespace nxx::poly
                 // Use a different epsilon value based on whether the type is complex or not.
                 if constexpr (IsComplex< decltype(val) >) {
                     // Calculate epsilon for complex numbers.
-                    constexpr auto epsilon = std::numeric_limits< typename decltype(val)::value_type >::epsilon();
+                    auto epsilon = 1e-8;//std::numeric_limits< typename decltype(val)::value_type >::epsilon();
                     // Check if the norm of the complex number is within the tolerance defined by epsilon.
-                    return std::norm(val) <= epsilon * epsilon;
+                    return std::norm(val) <= sqrt(epsilon);
                 }
                 else {
                     // Calculate epsilon for floating-point numbers.
-                    constexpr auto epsilon = std::numeric_limits< decltype(val) >::epsilon();
+                    auto epsilon = std::numeric_limits< decltype(val) >::epsilon();
                     // Check if the value is within the tolerance defined by epsilon.
-                    return std::norm(val) <= epsilon * epsilon;
+                    return std::norm(val) <= sqrt(epsilon);
                 }
             };
 
