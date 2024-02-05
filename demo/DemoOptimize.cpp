@@ -28,7 +28,7 @@ int main()
     // auto myFunc = [](double x) { return pow(x,6) - 11*pow(x,3)+17*x*x - 7*x+1; };
 
     std::cout << "Bracketing solver:\n";
-    auto guess = fminimize< Brent >(myFunc, { -1.0, 1.0 }, [](const auto& data) {
+    auto guess = fminimize< GoldenSearch >(myFunc, { -1.0, 1.0 }, [](const auto& data) {
         auto [iter, lower, guess, upper] = data;
 
         if (iter == 0) {
