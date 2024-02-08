@@ -562,20 +562,19 @@ namespace nxx::roots
         template< std::integral ITER_T, IsFloat RESULT_T >
         class BracketSolverResult
         {
-            IterData<ITER_T, RESULT_T> m_iterData;
+            IterData< ITER_T, RESULT_T > m_iterData;
 
         public:
-            explicit BracketSolverResult(IterData<ITER_T, RESULT_T> iterData)
+            explicit BracketSolverResult(IterData< ITER_T, RESULT_T > iterData)
                 : m_iterData(iterData)
             {}
 
-            template<typename OUTPUT_T = RESULT_T>
+            template< typename OUTPUT_T = RESULT_T >
             OUTPUT_T result()
             {
                 return m_iterData.guess;
             }
         };
-
 
         template< typename SOLVER, typename TERMINATOR >
         // requires SOLVER::IsBracketOptimizer
@@ -723,20 +722,13 @@ namespace nxx::roots
     //     return detail::fsolve_impl(solver, eps, maxiter);
     // }
 
-    template< template< typename, typename > class SOLVER_T,
-              IsFloatOrComplexInvocable FN_T,
-              IsFloatStruct             STRUCT_T,
-              typename... ARGS >
+    template< template< typename, typename > class SOLVER_T, IsFloatOrComplexInvocable FN_T, IsFloatStruct STRUCT_T, typename... ARGS >
     auto fsolve(FN_T func, STRUCT_T bounds, ARGS... args)
     {
         return detail::fsolve_common< SOLVER_T >(func, bounds, args...);
     }
 
-    template< template< typename, typename > class SOLVER_T,
-              IsFloatOrComplexInvocable FN_T,
-              IsFloat                   ARG_T,
-              size_t N,
-              typename... ARGS >
+    template< template< typename, typename > class SOLVER_T, IsFloatOrComplexInvocable FN_T, IsFloat ARG_T, size_t N, typename... ARGS >
     requires(N == 2)
     auto fsolve(FN_T func, const ARG_T (&bounds)[N], ARGS... args)
     {

@@ -66,7 +66,7 @@ int main()
 
     auto terminator = [&](const auto& data) {
         auto [iter, lower, guess, upper] = data;
-        auto eval = func(guess);
+        auto eval                        = func(guess);
 
         if (iter == 0) {
             std::cout << "----------------------------------------------------------------------------------\n";
@@ -91,7 +91,8 @@ int main()
     std::cout << "Regula Falsi Method:      \n" << fsolve< RegulaFalsi >(func, bounds, terminator).result() << std::endl << std::endl;
 
     // std::cout << "\nCompute the root of the polynomial f(x) = x^2 - 5 using polishing methods:\n";
-    // std::cout << "Newton's Method:          " << *fdfsolve< Newton >(func, nxx::deriv::derivativeOf(func), NXX_FLOAT(1.25)) << std::endl <<
+    // std::cout << "Newton's Method:          " << *fdfsolve< Newton >(func, nxx::deriv::derivativeOf(func), NXX_FLOAT(1.25)) << std::endl
+    // <<
     //     std::endl;
 
     // Note that the Discrete Newton's Method uses the numerical derivative of the function, while

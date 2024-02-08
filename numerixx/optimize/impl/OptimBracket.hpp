@@ -499,7 +499,8 @@ namespace nxx::optim
                     return detail::foptimize_impl(SOLVER(func, bounds), std::get< 0 >(args_tuple));
                 }
                 else
-                    []< bool flag = false >() { static_assert(flag, "Invalid argument passed to foptimize_common"); }();
+                    []< bool flag = false >() { static_assert(flag, "Invalid argument passed to foptimize_common"); }
+                ();
             }
 
             // Two arguments are passed...
