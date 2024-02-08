@@ -36,6 +36,7 @@
 #include <Deriv.hpp>
 
 // ===== Standard Library Includes
+#include <Functions.hpp>
 #include <algorithm>
 #include <array>
 
@@ -83,6 +84,7 @@ namespace nxx::roots
 
             using RESULT_T = std::invoke_result_t< FUNCTION_T, ARG_T >; /**< Result type of the function. */
             using BOUNDS_T = std::pair< ARG_T, ARG_T >;                 /**< Type for representing the bounds around the root. */
+            using RETURN_T = std::tuple< ARG_T, ARG_T, ARG_T >;
 
         protected:
             ~BracketingBase() = default; /**< Protected destructor to prevent direct instantiation. */
@@ -90,6 +92,7 @@ namespace nxx::roots
         private:
             FUNCTION_T m_func {};   /**< The function object to find the root for. */
             BOUNDS_T   m_bounds {}; /**< Holds the current bounds around the root. */
+            RETURN_T   m_result {};
 
         public:
             /**
@@ -99,9 +102,11 @@ namespace nxx::roots
              * @param bounds Struct with the initial bounds.
              */
             BracketingBase(FUNCTION_T objective, IsFloatStruct auto bounds)
-                : m_func { std::move(objective) }
+                : m_func { std::move(objective) },
+                  m_bounds { toPair(bounds) },
+                  m_result { m_bounds.first, 0.0, m_bounds.second }
             {
-                init(bounds);
+                validateBounds(m_bounds);
             }
 
             /**
@@ -113,9 +118,11 @@ namespace nxx::roots
             template< size_t N >
             requires(N == 2)
             BracketingBase(FUNCTION_T objective, const ARG_T (&bounds)[N])
-                : m_func { std::move(objective) }
+                : m_func { std::move(objective) },
+                  m_bounds { std::pair { bounds[0], bounds[1] } },
+                  m_result { m_bounds.first, 0.0, m_bounds.second }
             {
-                init(std::pair { bounds[0], bounds[1] });
+                validateBounds(m_bounds);
             }
 
             /**
@@ -127,27 +134,31 @@ namespace nxx::roots
             void setBounds(const BOUNDS_T& bounds)
             {
                 // if (!m_isInitialized) throw NumerixxError("Solver has not been initialized!");
-                auto [lower, upper] = bounds;
-                static_assert(nxx::IsFloat< decltype(lower) >);
-                m_bounds = BOUNDS_T { lower, upper };
+                // auto [lower, upper] = bounds;
+                // static_assert(nxx::IsFloat< decltype(lower) >);
+                // m_bounds = BOUNDS_T { lower, upper };
+                m_bounds                = toPair(bounds);
+                std::get< 0 >(m_result) = m_bounds.first;
+                std::get< 2 >(m_result) = m_bounds.second;
+                validateBounds(m_bounds);
             }
 
-            BracketingBase(const BracketingBase& other)                = default; /**< Default copy constructor. */
-            BracketingBase(BracketingBase&& other) noexcept            = default; /**< Default move constructor. */
+            void setBounds(const RETURN_T& range)
+            {
+                // if (!m_isInitialized) throw NumerixxError("Solver has not been initialized!");
+                // auto [lower, upper] = bounds;
+                // static_assert(nxx::IsFloat< decltype(lower) >);
+                // m_bounds = BOUNDS_T { lower, upper };
+                m_result = range;
+                m_bounds = { std::get< 0 >(m_result), std::get< 2 >(m_result) };
+                validateBounds(m_bounds);
+            }
+
+            BracketingBase(const BracketingBase& other)     = default; /**< Default copy constructor. */
+            BracketingBase(BracketingBase&& other) noexcept = default; /**< Default move constructor. */
+
             BracketingBase& operator=(const BracketingBase& other)     = default; /**< Default copy assignment operator. */
             BracketingBase& operator=(BracketingBase&& other) noexcept = default; /**< Default move assignment operator. */
-
-            /**
-             * @brief Initializes the solver with bounds from a float struct.
-             * @tparam STRUCT_T The struct type holding the bounds.
-             * @param bounds Struct with exactly two members representing the bounds.
-             */
-            template< IsFloatStruct STRUCT_T >
-            void init(STRUCT_T bounds)
-            {
-                auto [lower, upper] = bounds;
-                setBounds(BOUNDS_T { lower, upper });
-            }
 
             /**
              * @brief Evaluates the function at a given value.
@@ -162,10 +173,7 @@ namespace nxx::roots
              * @throws NumerixxError If the solver has not been initialized.
              * @return The current bounds of the solver.
              */
-            const BOUNDS_T& current() const
-            {
-                return m_bounds;
-            }
+            const RETURN_T& current() const { return m_result; }
 
             /**
              * @brief Performs a single iteration of the algorithm.
@@ -217,10 +225,10 @@ namespace nxx::roots
         void operator()()
         {
             const auto& bounds = BASE::current();
-            using RT           = std::invoke_result_t< FN, decltype(bounds.first) >;
+            using RT           = std::invoke_result_t< FN, decltype(std::get< 0 >(bounds)) >;
 
-            const RT& x_lo = bounds.first;
-            const RT& x_hi = bounds.second;
+            const RT& x_lo = std::get< 0 >(bounds);
+            const RT& x_hi = std::get< 2 >(bounds);
             RT        f_lo = BASE::evaluate(x_lo);
             RT        f_hi = BASE::evaluate(x_hi);
 
@@ -232,12 +240,18 @@ namespace nxx::roots
             RT  f_new = BASE::evaluate(x_new);
 
             // Update bounds based on the results of Ridder's method.
+            // if (f_mid * f_new < 0.0)
+            //     BASE::setBounds(x_mid < x_new ? std::make_pair(x_mid, x_new) : std::make_pair(x_new, x_mid));
+            // else if (f_hi * f_new < 0.0)
+            //     BASE::setBounds(x_hi < x_new ? std::make_pair(x_hi, x_new) : std::make_pair(x_new, x_hi));
+            // else
+            //     BASE::setBounds(x_lo < x_new ? std::make_pair(x_lo, x_new) : std::make_pair(x_new, x_lo));
             if (f_mid * f_new < 0.0)
-                BASE::setBounds(x_mid < x_new ? std::make_pair(x_mid, x_new) : std::make_pair(x_new, x_mid));
+                BASE::setBounds(x_mid < x_new ? std::make_tuple(x_mid, x_new, x_new) : std::make_tuple(x_new, x_new, x_mid));
             else if (f_hi * f_new < 0.0)
-                BASE::setBounds(x_hi < x_new ? std::make_pair(x_hi, x_new) : std::make_pair(x_new, x_hi));
+                BASE::setBounds(x_hi < x_new ? std::make_tuple(x_hi, x_new, x_new) : std::make_tuple(x_new, x_new, x_hi));
             else
-                BASE::setBounds(x_lo < x_new ? std::make_pair(x_lo, x_new) : std::make_pair(x_new, x_lo));
+                BASE::setBounds(x_lo < x_new ? std::make_tuple(x_lo, x_new, x_new) : std::make_tuple(x_new, x_new, x_lo));
         }
     };
 
@@ -252,7 +266,6 @@ namespace nxx::roots
     template< typename FN, typename BOUNDS_T >
     requires IsFloatInvocable< FN > && IsFloatStruct< BOUNDS_T >
     Ridder(FN, BOUNDS_T) -> Ridder< FN, StructCommonType_t< BOUNDS_T > >;
-
 
     // =================================================================================================================
     //
@@ -295,12 +308,13 @@ namespace nxx::roots
         void operator()()
         {
             const auto& bounds = BASE::current();
-            using RT           = std::invoke_result_t< FN, decltype(bounds.first) >;
+            using RT           = std::invoke_result_t< FN, decltype(std::get< 0 >(bounds)) >;
 
-            if (RT root = (bounds.first + bounds.second) / 2.0; BASE::evaluate(bounds.first) * BASE::evaluate(root) < 0.0)
-                BASE::setBounds({ bounds.first, root });
+            if (RT root = (std::get< 0 >(bounds) + std::get< 2 >(bounds)) / 2.0;
+                BASE::evaluate(std::get< 0 >(bounds)) * BASE::evaluate(root) < 0.0)
+                BASE::setBounds({ std::make_tuple(std::get< 0 >(bounds), (std::get< 0 >(bounds) + root) / 2, root) });
             else
-                BASE::setBounds({ root, bounds.second });
+                BASE::setBounds({ std::make_tuple(root, (root + std::get< 2 >(bounds)) / 2, std::get< 2 >(bounds)) });
         }
     };
 
@@ -359,18 +373,18 @@ namespace nxx::roots
         void operator()()
         {
             const auto& bounds = BASE::current();
-            using RT           = std::invoke_result_t< FN, decltype(bounds.first) >;
+            using RT           = std::invoke_result_t< FN, decltype(std::get< 0 >(bounds)) >;
 
-            RT f_lo = BASE::evaluate(bounds.first);
-            RT f_hi = BASE::evaluate(bounds.second);
+            RT f_lo = BASE::evaluate(std::get< 0 >(bounds));
+            RT f_hi = BASE::evaluate(std::get< 2 >(bounds));
 
-            RT root   = (bounds.first * f_hi - bounds.second * f_lo) / (f_hi - f_lo);
+            RT root   = (std::get< 0 >(bounds) * f_hi - std::get< 2 >(bounds) * f_lo) / (f_hi - f_lo);
             RT f_root = BASE::evaluate(root);
 
             if (f_lo * f_root < 0.0)
-                BASE::setBounds({ bounds.first, root });
+                BASE::setBounds({ std::make_tuple(std::get< 0 >(bounds), root, root) });
             else
-                BASE::setBounds({ root, bounds.second });
+                BASE::setBounds({ std::make_tuple(root, root, std::get< 2 >(bounds)) });
         }
     };
 
@@ -399,8 +413,79 @@ namespace nxx::roots
     //
     // =================================================================================================================
 
+    template< std::integral ITER_T, IsFloat RESULT_T >
+    struct IterData
+    {
+        ITER_T   iter;
+        RESULT_T lower;
+        RESULT_T guess;
+        RESULT_T upper;
+    };
+
+    template< IsFloat EPS_T, std::integral ITER_T >
+    class BracketTerminator
+    {
+        EPS_T  m_eps;
+        ITER_T m_maxiter;
+
+    public:
+        explicit BracketTerminator()
+            : m_eps(epsilon< double >()),
+              m_maxiter(iterations< double >())
+        {}
+
+        explicit BracketTerminator(EPS_T eps, ITER_T maxiter)
+            : m_eps(eps),
+              m_maxiter(maxiter)
+        {}
+
+        explicit BracketTerminator(ITER_T maxiter, EPS_T eps)
+            : m_eps(eps),
+              m_maxiter(maxiter)
+        {}
+
+        explicit BracketTerminator(EPS_T eps)
+            : m_eps(eps),
+              m_maxiter(iterations< double >())
+        {}
+
+        explicit BracketTerminator(ITER_T maxiter)
+            : m_eps(epsilon< double >()),
+              m_maxiter(maxiter)
+        {}
+
+        bool operator()(const auto& data) const
+        {
+            const auto& [iter, lower, x, upper] = data;
+
+            if ((upper - lower) <= m_eps * x + m_eps / 2) return true;
+            if (iter >= m_maxiter) return true;
+
+            return false;
+        }
+    };
+
+    BracketTerminator() -> BracketTerminator< double, size_t >;
+    BracketTerminator(IsFloat auto eps) -> BracketTerminator< decltype(eps), size_t >;
+    BracketTerminator(std::integral auto maxiter) -> BracketTerminator< double, decltype(maxiter) >;
+    BracketTerminator(IsFloat auto eps, std::integral auto maxiter) -> BracketTerminator< decltype(eps), decltype(maxiter) >;
+    BracketTerminator(std::integral auto maxiter, IsFloat auto eps) -> BracketTerminator< decltype(eps), decltype(maxiter) >;
+
     namespace detail
     {
+        // Concept for checking if a type is float or integral
+        template< typename T >
+        concept FloatOrIntegral = std::is_floating_point_v< T > || std::is_integral_v< T >;
+
+        // Concept to check the validity of arguments
+        template< typename... Args >
+        concept ValidArgs =
+            requires {
+                requires(sizeof...(Args) <= 2);
+                requires(sizeof...(Args) == 0) || (sizeof...(Args) == 1 && (FloatOrIntegral< Args > && ...)) ||
+                            (sizeof...(Args) == 2 && ((FloatOrIntegral< Args > && ...) && (std::is_floating_point_v< Args > != ...)));
+            };
+
         /**
          * @brief Implements a generic root finding solver function template for bracketing solvers.
          *
@@ -414,66 +499,155 @@ namespace nxx::roots
          * @tparam SOLVER The type of the solver to be used in root finding. Must conform to the bracketing solver concept.
          */
 
-        template< typename SOLVER >
-        requires SOLVER::IsBracketingSolver
-        auto fsolve_impl(SOLVER solver, IsFloat auto       eps,
-                         std::integral auto maxiter)
+        // template< typename SOLVER >
+        // requires SOLVER::IsBracketingSolver
+        // auto fsolve_impl(SOLVER solver, IsFloat auto eps, std::integral auto maxiter)
+        // {
+        //     using ET = RootErrorImpl< typename SOLVER::RESULT_T >;    /**< Type for error handling. */
+        //     using RT = tl::expected< typename SOLVER::RESULT_T, ET >; /**< Type for the function return value. */
+        //     using std::isfinite;
+        //
+        //     // Declare variables for use in the iteration loop.
+        //     auto curBounds = solver.current();
+        //     RT   result    = (std::get< 0 >(curBounds) + std::get< 2 >(curBounds)) / 2.0;
+        //     std::array< std::pair< typename SOLVER::RESULT_T, typename SOLVER::RESULT_T >, 2 > roots {};
+        //     decltype(roots.begin())                                                            min;
+        //
+        //     // Check for NaN or Inf in the initial bounds.
+        //     if (!isfinite(solver.evaluate(std::get< 0 >(curBounds))) || !isfinite(solver.evaluate(std::get< 2 >(curBounds)))) {
+        //         result = tl::make_unexpected(ET("Invalid initial brackets!", RootErrorType::NumericalError, result.value()));
+        //         return result;
+        //     }
+        //
+        //     // Check for a root in the initial bracket.
+        //     if (solver.evaluate(std::get< 0 >(curBounds)) * solver.evaluate(std::get< 2 >(curBounds)) > 0.0) {
+        //         result = tl::make_unexpected(ET("Root not bracketed!", RootErrorType::NoRootInBracket, result.value()));
+        //         return result;
+        //     }
+        //
+        //     // Begin the iteration loop.
+        //     int iter = 1;
+        //     while (true) {
+        //         curBounds = solver.current();
+        //         roots     = { std::make_pair(std::get< 0 >(curBounds), abs(solver.evaluate(std::get< 0 >(curBounds)))),
+        //                       std::make_pair(std::get< 2 >(curBounds), abs(solver.evaluate(std::get< 2 >(curBounds)))) };
+        //
+        //         // Check for NaN or Inf.
+        //         if (std::any_of(roots.begin(), roots.end(), [](const auto& r) { return !isfinite(r.second); })) {
+        //             result = tl::make_unexpected(ET("Non-finite result!", RootErrorType::NumericalError, result.value(), iter));
+        //             break;
+        //         }
+        //
+        //         // Check for convergence.
+        //         min = std::min_element(roots.begin(), roots.end(), [](const auto& a, const auto& b) { return a.second < b.second; });
+        //         if (min->second < eps) {
+        //             result = min->first;
+        //             break;
+        //         }
+        //
+        //         // Check for maximum number of iterations.
+        //         if (iter >= maxiter) {
+        //             result = tl::make_unexpected(ET("Max. iterations exceeded!", RootErrorType::MaxIterationsExceeded, min->first,
+        //             iter)); break;
+        //         }
+        //
+        //         // Perform one iteration.
+        //         solver.iterate();
+        //         ++iter;
+        //     }
+        //
+        //     return result;
+        // }
+
+        template< std::integral ITER_T, IsFloat RESULT_T >
+        class BracketSolverResult
         {
-            using ET = RootErrorImpl< typename SOLVER::RESULT_T >;    /**< Type for error handling. */
-            using RT = tl::expected< typename SOLVER::RESULT_T, ET >; /**< Type for the function return value. */
-            using std::isfinite;
+            IterData<ITER_T, RESULT_T> m_iterData;
 
-            // Declare variables for use in the iteration loop.
-            auto curBounds = solver.current();
-            RT   result    = (curBounds.first + curBounds.second) / 2.0;
-            std::array< std::pair< typename SOLVER::RESULT_T, typename SOLVER::RESULT_T >, 2 > roots {};
-            decltype(roots.begin())                                                            min;
+        public:
+            explicit BracketSolverResult(IterData<ITER_T, RESULT_T> iterData)
+                : m_iterData(iterData)
+            {}
 
-            // Check for NaN or Inf in the initial bounds.
-            if (!isfinite(solver.evaluate(curBounds.first)) || !isfinite(solver.evaluate(curBounds.second))) {
-                result = tl::make_unexpected(ET("Invalid initial brackets!", RootErrorType::NumericalError, result.value()));
-                return result;
+            template<typename OUTPUT_T = RESULT_T>
+            OUTPUT_T result()
+            {
+                return m_iterData.guess;
             }
+        };
 
-            // Check for a root in the initial bracket.
-            if (solver.evaluate(curBounds.first) * solver.evaluate(curBounds.second) > 0.0) {
-                result = tl::make_unexpected(ET("Root not bracketed!", RootErrorType::NoRootInBracket, result.value()));
-                return result;
-            }
 
-            // Begin the iteration loop.
-            int iter = 1;
+        template< typename SOLVER, typename TERMINATOR >
+        // requires SOLVER::IsBracketOptimizer
+        auto fsolve_impl(const SOLVER& solver, const TERMINATOR& terminator)
+        {
+            SOLVER     _solver     = solver;
+            TERMINATOR _terminator = terminator;
+
+            const auto& [lower, x, upper] = _solver.current();
+            size_t iter                   = 0;
+
+            IterData< size_t, double > iterData { iter, lower, x, upper };
+
             while (true) {
-                curBounds = solver.current();
-                roots     = { std::make_pair(curBounds.first, abs(solver.evaluate(curBounds.first))),
-                              std::make_pair(curBounds.second, abs(solver.evaluate(curBounds.second))) };
+                iterData.iter  = iter;
+                iterData.lower = lower;
+                iterData.guess = x;
+                iterData.upper = upper;
 
-                // Check for NaN or Inf.
-                if (std::any_of(roots.begin(), roots.end(), [](const auto& r) { return !isfinite(r.second); })) {
-                    result = tl::make_unexpected(ET("Non-finite result!", RootErrorType::NumericalError, result.value(), iter));
-                    break;
-                }
-
-                // Check for convergence.
-                min = std::min_element(roots.begin(), roots.end(), [](const auto& a, const auto& b) { return a.second < b.second; });
-                if (min->second < eps) {
-                    result = min->first;
-                    break;
-                }
-
-                // Check for maximum number of iterations.
-                if (iter >= maxiter) {
-                    result = tl::make_unexpected(ET("Max. iterations exceeded!", RootErrorType::MaxIterationsExceeded, min->first, iter));
-                    break;
-                }
-
-                // Perform one iteration.
-                solver.iterate();
+                if (_terminator(iterData)) break;
+                _solver.iterate();
                 ++iter;
             }
 
-            return result;
+            // return std::get< 1 >(_solver.current());
+            return BracketSolverResult(iterData);
         }
+
+        template< template< typename, typename > class SOLVER_T, typename FN_T, typename STRUCT_T, typename... Args >
+        auto fsolve_common(FN_T func, const STRUCT_T& bounds, const Args&... args)
+        {
+            using TUPLE_T = std::tuple< Args... >;
+            using SOLVER  = SOLVER_T< FN_T, StructCommonType_t< STRUCT_T > >;
+
+            TUPLE_T args_tuple = std::make_tuple(args...);
+            static_assert(std::tuple_size_v< TUPLE_T > <= 2, "Too many arguments passed to fsolve_common");
+
+            // Zero arguments are passed...
+            if constexpr (std::tuple_size_v< TUPLE_T > == 0) return detail::fsolve_impl(SOLVER(func, bounds), BracketTerminator {});
+
+            // One argument is passed...
+            else if constexpr (std::tuple_size_v< TUPLE_T > == 1) {
+                using ArgType = std::tuple_element_t< 0, TUPLE_T >;
+
+                if constexpr (std::is_floating_point_v< ArgType > || std::is_integral_v< ArgType >) {
+                    return detail::fsolve_impl(SOLVER(func, bounds), BracketTerminator(std::get< 0 >(args_tuple)));
+                }
+
+                else if constexpr (std::is_same_v< std::invoke_result_t< ArgType, IterData< size_t, StructCommonType_t< STRUCT_T > > >,
+                                                   bool >)
+                {
+                    return detail::fsolve_impl(SOLVER(func, bounds), std::get< 0 >(args_tuple));
+                }
+                else
+                    []< bool flag = false >() { static_assert(flag, "Invalid argument passed to fsolve_common"); }
+                ();
+            }
+
+            // Two arguments are passed...
+            else if constexpr (std::tuple_size_v< TUPLE_T > == 2) {
+                // Unpack and use the two arguments
+                using ArgType1 = std::tuple_element_t< 0, decltype(args_tuple) >;
+                using ArgType2 = std::tuple_element_t< 1, decltype(args_tuple) >;
+                static_assert(std::is_floating_point_v< ArgType1 > != std::is_floating_point_v< ArgType2 >,
+                              "Two arguments must be one floating point and one integral type");
+                return detail::fsolve_impl(SOLVER(func, bounds), BracketTerminator(std::get< 0 >(args_tuple), std::get< 1 >(args_tuple)));
+            }
+            else
+                []< bool flag = false >() { static_assert(flag, "Invalid argument passed to fsolve_common"); }
+            ();
+        }
+
     }    // namespace detail
 
     /**
@@ -497,22 +671,22 @@ namespace nxx::roots
      * @param eps The tolerance for stopping the algorithm.
      * @param maxiter The maximum number of iterations allowed.
      */
-    template< template< typename, typename > class SOLVER_T,
-              IsFloatInvocable FN_T,
-              IsFloatStruct    STRUCT_T,
-              IsFloat          EPS_T  = StructCommonType_t< STRUCT_T >,
-              std::integral    ITER_T = int >
-    auto fsolve(FN_T     function,
-                STRUCT_T bounds,
-                EPS_T    eps     = epsilon< StructCommonType_t< STRUCT_T > >(),
-                ITER_T   maxiter = iterations< StructCommonType_t< STRUCT_T > >())
-    {
-        using ARG_T = StructCommonType_t< STRUCT_T >;            /**< Common type for the bounds. */
-        auto solver = SOLVER_T< FN_T, ARG_T >(function, bounds); /**< Instantiates the solver with the given function. */
-
-        // Delegates the solving process to fsolve_impl, passing in the solver and other parameters.
-        return detail::fsolve_impl(solver, eps, maxiter);
-    }
+    // template< template< typename, typename > class SOLVER_T,
+    //           IsFloatInvocable FN_T,
+    //           IsFloatStruct    STRUCT_T,
+    //           IsFloat          EPS_T  = StructCommonType_t< STRUCT_T >,
+    //           std::integral    ITER_T = int >
+    // auto fsolve(FN_T     function,
+    //             STRUCT_T bounds,
+    //             EPS_T    eps     = epsilon< StructCommonType_t< STRUCT_T > >(),
+    //             ITER_T   maxiter = iterations< StructCommonType_t< STRUCT_T > >())
+    // {
+    //     using ARG_T = StructCommonType_t< STRUCT_T >;            /**< Common type for the bounds. */
+    //     auto solver = SOLVER_T< FN_T, ARG_T >(function, bounds); /**< Instantiates the solver with the given function. */
+    //
+    //     // Delegates the solving process to fsolve_impl, passing in the solver and other parameters.
+    //     return detail::fsolve_impl(solver, eps, maxiter);
+    // }
 
     /**
      * @brief Extends the high-level root finding function template `fsolve` for initializer list bounds.
@@ -533,20 +707,40 @@ namespace nxx::roots
      * @param eps The tolerance for stopping the algorithm.
      * @param maxiter The maximum number of iterations allowed.
      */
+    // template< template< typename, typename > class SOLVER_T,
+    //           IsFloatInvocable FN_T,
+    //           IsFloat          ARG_T,
+    //           IsFloat          EPS_T  = ARG_T,
+    //           std::integral    ITER_T = int,
+    //           size_t           N >
+    // requires(N == 2)
+    // auto fsolve(FN_T function, const ARG_T (&bounds)[N], EPS_T eps = epsilon< ARG_T >(), ITER_T maxiter = iterations< ARG_T >())
+    // {
+    //     auto solver =
+    //         SOLVER_T< FN_T, ARG_T >(function, std::pair(bounds[0], bounds[1])); /**< Instantiates the solver with the given function. */
+    //
+    //     // Delegates the solving process to fsolve_impl, passing in the solver and other parameters.
+    //     return detail::fsolve_impl(solver, eps, maxiter);
+    // }
+
     template< template< typename, typename > class SOLVER_T,
-              IsFloatInvocable FN_T,
-              IsFloat          ARG_T,
-              IsFloat          EPS_T  = ARG_T,
-              std::integral    ITER_T = int,
-              size_t           N >
-    requires(N == 2)
-    auto fsolve(FN_T function, const ARG_T (&bounds)[N], EPS_T eps = epsilon< ARG_T >(), ITER_T maxiter = iterations< ARG_T >())
+              IsFloatOrComplexInvocable FN_T,
+              IsFloatStruct             STRUCT_T,
+              typename... ARGS >
+    auto fsolve(FN_T func, STRUCT_T bounds, ARGS... args)
     {
-        auto solver =
-            SOLVER_T< FN_T, ARG_T >(function, std::pair(bounds[0], bounds[1])); /**< Instantiates the solver with the given function. */
-
-        // Delegates the solving process to fsolve_impl, passing in the solver and other parameters.
-        return detail::fsolve_impl(solver, eps, maxiter);
+        return detail::fsolve_common< SOLVER_T >(func, bounds, args...);
     }
-}    // namespace nxx::roots
 
+    template< template< typename, typename > class SOLVER_T,
+              IsFloatOrComplexInvocable FN_T,
+              IsFloat                   ARG_T,
+              size_t N,
+              typename... ARGS >
+    requires(N == 2)
+    auto fsolve(FN_T func, const ARG_T (&bounds)[N], ARGS... args)
+    {
+        return detail::fsolve_common< SOLVER_T >(func, std::pair { bounds[0], bounds[1] }, args...);
+    }
+
+}    // namespace nxx::roots

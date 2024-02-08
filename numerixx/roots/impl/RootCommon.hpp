@@ -37,6 +37,15 @@
 
 namespace nxx::roots
 {
+
+    template< IsFloat ARG1, IsFloat ARG2 >
+    void validateBounds(std::pair< ARG1, ARG2 >& bounds)
+    {
+        auto& [lower, upper] = bounds;
+        if (lower == upper) throw NumerixxError("Invalid bounds.");
+        if (lower > upper) std::swap(lower, upper);
+    }
+
     // ========================================================================
     // ROOT ERROR/EXCEPTION CLASSES
     // ========================================================================
@@ -57,16 +66,17 @@ namespace nxx::roots
          * @param msg The error message.
          */
         explicit RootError(const char* msg)
-            : std::runtime_error(msg) {}
+            : std::runtime_error(msg)
+        {}
     };
 
     namespace detail
     {
         /**
-              * @brief The RootErrorImpl class is a template class for root-finding errors.
-              * @tparam T The type of the root value.
-              */
-        template<typename T>
+         * @brief The RootErrorImpl class is a template class for root-finding errors.
+         * @tparam T The type of the root value.
+         */
+        template< typename T >
         class RootErrorImpl : public RootError
         {
             RootErrorType m_type;           /*< The type of the error. */
@@ -85,14 +95,18 @@ namespace nxx::roots
                 : RootError(msg),
                   m_type(type),
                   m_value(value),
-                  m_iterations(iter) {}
+                  m_iterations(iter)
+            {}
 
             /**
              * @brief Returns the type of the error.
              * @return The type of the error.
              */
             [[nodiscard]]
-            RootErrorType type() const { return m_type; }
+            RootErrorType type() const
+            {
+                return m_type;
+            }
 
             /**
              * @brief Returns a string representation of the error type.
@@ -118,16 +132,22 @@ namespace nxx::roots
              * @return The value of the root.
              */
             [[nodiscard]]
-            auto value() const { return m_value; }
+            auto value() const
+            {
+                return m_value;
+            }
 
             /**
              * @brief Returns the number of iterations performed before the error was thrown.
              * @return The number of iterations performed before the error was thrown.
              */
             [[nodiscard]]
-            auto iterations() const { return m_iterations; }
+            auto iterations() const
+            {
+                return m_iterations;
+            }
         };
-    } // namespace impl
+    }    // namespace detail
 
     // ========================================================================
     // TRAITS CLASSES FOR ROOT-FINDING WITHOUT DERIVATIVES
@@ -136,19 +156,19 @@ namespace nxx::roots
     /*
      * Forward declaration of the Ridders class.
      */
-    template<IsFloatInvocable FN, nxx::IsFloat ARG_T>
+    template< IsFloatInvocable FN, nxx::IsFloat ARG_T >
     class Ridder;
 
     /*
      * Forward declaration of the Bisection class.
      */
-    template<IsFloatInvocable FN, nxx::IsFloat ARG_T>
+    template< IsFloatInvocable FN, nxx::IsFloat ARG_T >
     class Bisection;
 
     /*
      * Forward declaration of the RegulaFalsi class.
      */
-    template<IsFloatInvocable FN, nxx::IsFloat ARG_T>
+    template< IsFloatInvocable FN, nxx::IsFloat ARG_T >
     class RegulaFalsi;
 
     /*
@@ -159,42 +179,42 @@ namespace nxx::roots
         /*
          * Forward declaration of the BracketingTraits class.
          */
-        template<typename FN>
+        template< typename FN >
         struct BracketingTraits;
 
         /*
          * Specialization of the BracketingTraits class for Ridders<FN>
          */
-        template<typename FN, typename T>
+        template< typename FN, typename T >
         struct BracketingTraits< Ridder< FN, T > >
         {
             using FUNCTION_T = FN;
-            using ARG_T = T;
-            using RETURN_T = std::invoke_result_t< FN, ARG_T >;
+            using ARG_T      = T;
+            using RETURN_T   = std::invoke_result_t< FN, ARG_T >;
         };
 
         /*
          * Specialization of the BracketingTraits class for Bisection<FN>
          */
-        template<typename FN, typename T>
+        template< typename FN, typename T >
         struct BracketingTraits< Bisection< FN, T > >
         {
             using FUNCTION_T = FN;
-            using ARG_T = T;
-            using RETURN_T = std::invoke_result_t< FN, ARG_T >;
+            using ARG_T      = T;
+            using RETURN_T   = std::invoke_result_t< FN, ARG_T >;
         };
 
         /*
          * Specialization of the BracketingTraits class for RegulaFalsi<FN>
          */
-        template<typename FN, typename T>
+        template< typename FN, typename T >
         struct BracketingTraits< RegulaFalsi< FN, T > >
         {
             using FUNCTION_T = FN;
-            using ARG_T = T;
-            using RETURN_T = std::invoke_result_t< FN, ARG_T >;
+            using ARG_T      = T;
+            using RETURN_T   = std::invoke_result_t< FN, ARG_T >;
         };
-    } // namespace impl
+    }    // namespace detail
 
     // ========================================================================
     // TRAITS CLASSES FOR ROOT-FINDING WITH DERIVATIVES
@@ -203,13 +223,13 @@ namespace nxx::roots
     /*
      * Forward declaration of the Newton class.
      */
-    template<IsFloatOrComplexInvocable FN, IsFloatOrComplexInvocable DFN, IsFloatOrComplex ARG_T>
+    template< IsFloatOrComplexInvocable FN, IsFloatOrComplexInvocable DFN, IsFloatOrComplex ARG_T >
     class Newton;
 
-    template<IsFloatOrComplexInvocable FN, IsFloatOrComplexInvocable DFN, IsFloatOrComplex ARG_T>
+    template< IsFloatOrComplexInvocable FN, IsFloatOrComplexInvocable DFN, IsFloatOrComplex ARG_T >
     class Secant;
 
-    template<IsFloatOrComplexInvocable FN, IsFloatOrComplexInvocable DFN, IsFloatOrComplex ARG_T>
+    template< IsFloatOrComplexInvocable FN, IsFloatOrComplexInvocable DFN, IsFloatOrComplex ARG_T >
     class Steffensen;
 
     namespace detail
@@ -217,56 +237,56 @@ namespace nxx::roots
         /*
          * Forward declaration of the PolishingTraits class.
          */
-        template<typename... ARGS>
+        template< typename... ARGS >
         struct PolishingTraits;
 
         /*
          * Specialization of the PolishingTraits class for Newton<FN, DFN>
          */
-        template<typename FN, typename DFN, typename T>
+        template< typename FN, typename DFN, typename T >
         struct PolishingTraits< Newton< FN, DFN, T > >
         {
-            using FUNCTION_T = FN;
-            using DERIV_T = DFN;
+            using FUNCTION_T        = FN;
+            using DERIV_T           = DFN;
             using FUNCTION_RETURN_T = std::invoke_result_t< FN, double >;
-            using DERIV_RETURN_T = std::invoke_result_t< DFN, double >;
+            using DERIV_RETURN_T    = std::invoke_result_t< DFN, double >;
         };
 
-        template<typename FN, typename DFN, typename T>
+        template< typename FN, typename DFN, typename T >
         struct PolishingTraits< Secant< FN, DFN, T > >
         {
-            using FUNCTION_T = FN;
-            using DERIV_T = DFN;
+            using FUNCTION_T        = FN;
+            using DERIV_T           = DFN;
             using FUNCTION_RETURN_T = std::invoke_result_t< FN, double >;
-            using DERIV_RETURN_T = std::invoke_result_t< DFN, double >;
+            using DERIV_RETURN_T    = std::invoke_result_t< DFN, double >;
         };
 
-        template<typename FN, typename DFN, typename T>
+        template< typename FN, typename DFN, typename T >
         struct PolishingTraits< Steffensen< FN, DFN, T > >
         {
-            using FUNCTION_T = FN;
-            using DERIV_T = DFN;
+            using FUNCTION_T        = FN;
+            using DERIV_T           = DFN;
             using FUNCTION_RETURN_T = std::invoke_result_t< FN, double >;
-            using DERIV_RETURN_T = std::invoke_result_t< DFN, double >;
+            using DERIV_RETURN_T    = std::invoke_result_t< DFN, double >;
         };
-    } // namespace impl
+    }    // namespace detail
 
-    template<IsFloatInvocable FN, IsFloat ARG_T>
+    template< IsFloatInvocable FN, IsFloat ARG_T >
     class BracketSearchUp;
 
-    template<IsFloatInvocable FN, IsFloat ARG_T>
+    template< IsFloatInvocable FN, IsFloat ARG_T >
     class BracketSearchDown;
 
-    template<IsFloatInvocable FN, IsFloat ARG_T>
+    template< IsFloatInvocable FN, IsFloat ARG_T >
     class BracketExpandUp;
 
-    template<IsFloatInvocable FN, IsFloat ARG_T>
+    template< IsFloatInvocable FN, IsFloat ARG_T >
     class BracketExpandDown;
 
-    template<IsFloatInvocable FN, IsFloat ARG_T>
+    template< IsFloatInvocable FN, IsFloat ARG_T >
     class BracketExpandOut;
 
-    template<IsFloatInvocable FN, IsFloat ARG_T>
+    template< IsFloatInvocable FN, IsFloat ARG_T >
     class BracketSubdivide;
 
     /*
@@ -277,53 +297,52 @@ namespace nxx::roots
         /*
          * Forward declaration of the BracketingTraits class.
          */
-        template<typename... ARGS>
+        template< typename... ARGS >
         struct SearchingTraits;
 
         /*
          * Specialization of the BracketingTraits class for Ridders<FN>
          */
-        template<typename FN, typename ARG_T>
+        template< typename FN, typename ARG_T >
         struct SearchingTraits< BracketSearchUp< FN, ARG_T > >
         {
             using FUNCTION_T = FN;
-            using RETURN_T = std::invoke_result_t< FN, double >;
+            using RETURN_T   = std::invoke_result_t< FN, double >;
         };
 
-        template<typename FN, typename ARG_T>
+        template< typename FN, typename ARG_T >
         struct SearchingTraits< BracketSearchDown< FN, ARG_T > >
         {
             using FUNCTION_T = FN;
-            using RETURN_T = std::invoke_result_t< FN, double >;
+            using RETURN_T   = std::invoke_result_t< FN, double >;
         };
 
-        template<typename FN, typename ARG_T>
+        template< typename FN, typename ARG_T >
         struct SearchingTraits< BracketExpandUp< FN, ARG_T > >
         {
             using FUNCTION_T = FN;
-            using RETURN_T = std::invoke_result_t< FN, double >;
+            using RETURN_T   = std::invoke_result_t< FN, double >;
         };
 
-        template<typename FN, typename ARG_T>
+        template< typename FN, typename ARG_T >
         struct SearchingTraits< BracketExpandDown< FN, ARG_T > >
         {
             using FUNCTION_T = FN;
-            using RETURN_T = std::invoke_result_t< FN, double >;
+            using RETURN_T   = std::invoke_result_t< FN, double >;
         };
 
-        template<typename FN, typename ARG_T>
+        template< typename FN, typename ARG_T >
         struct SearchingTraits< BracketExpandOut< FN, ARG_T > >
         {
             using FUNCTION_T = FN;
-            using RETURN_T = std::invoke_result_t< FN, double >;
+            using RETURN_T   = std::invoke_result_t< FN, double >;
         };
 
-        template<typename FN, typename ARG_T>
+        template< typename FN, typename ARG_T >
         struct SearchingTraits< BracketSubdivide< FN, ARG_T > >
         {
             using FUNCTION_T = FN;
-            using RETURN_T = std::invoke_result_t< FN, double >;
+            using RETURN_T   = std::invoke_result_t< FN, double >;
         };
-    } // namespace impl
-}     // namespace nxx::roots
-
+    }    // namespace detail
+}    // namespace nxx::roots
