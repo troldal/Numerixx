@@ -41,7 +41,7 @@ namespace nxx
     T epsilon()
     {
         using std::pow;
-        return pow(std::numeric_limits< T >::epsilon(), 2.0 / 3.0);
+        return pow(std::numeric_limits< T >::epsilon(), 1.0 / 2.0);
     }
 
     template<typename T>
