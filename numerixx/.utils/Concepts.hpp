@@ -40,7 +40,8 @@
 namespace nxx
 {
     template< typename T >
-    concept IsFloat = std::floating_point< T > || boost::multiprecision::is_number< T >::value || std::convertible_to< T, double >;
+    concept IsFloat = (!std::integral<T>)&&(
+        std::floating_point<T> || boost::multiprecision::is_number<T>::value || std::convertible_to<T, double>);
 
     //    template<typename T, typename F>
     //    concept IsFloatFunction = requires(F f, const std::vector<T>& v) {

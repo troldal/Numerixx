@@ -2,8 +2,11 @@
 Welcome to the Numerixx Documentation!
 **************************************
 
+Table of Contents
+=================
+
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
    docIntro
    docError

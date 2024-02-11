@@ -45,10 +45,10 @@ namespace nxx
     }
 
     template<typename T>
-    int iterations()
+    size_t iterations()
     {
         using std::pow;
-        return static_cast< decltype(std::numeric_limits< T >::digits10) >(pow(std::numeric_limits< T >::digits10, 2));
+        return static_cast<size_t>(pow(std::numeric_limits<T>::digits10, 2));
     }
 
     template<typename T>

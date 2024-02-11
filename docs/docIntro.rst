@@ -6,6 +6,8 @@ The Numerixx library is a collection of functions and classes for numerical comp
 
 Emphasis have been put on the architecture of the library, so that it is easy to maintain and easy to extend. In many cases, it will be possible for users to use their own custom algorithms, and plug them in to the Numerixx library. Each section will provide guidance for how to extend the library with custom algorithms.
 
+While performance is always a concern, the primary focus of the library is to provide correct and reliable numerical algorithms, with an intuitive interface. Performance is a secondary concern, and the library is not intended to be used for high-performance computing. So if you intend to implement the next-generation weather forecast model, you should probably look elsewhere.
+
 License and Warranty
 ====================
 
@@ -15,7 +17,7 @@ Please note, however, that the Numerixx library has no warranty, and is provided
 
 MIT License
 
-Copyright (c) 2023 Kenneth Troldal Balslev
+Copyright (c) 2024 Kenneth Troldal Balslev and KinetiQ.dev
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

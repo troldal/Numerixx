@@ -7,14 +7,14 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'Numerixx'
-copyright = '2023, TheCodeOwl.com'
-author = 'Troldal'
+copyright = '2024, KinetiQ.dev'
+# author = 'Troldal'
 release = '0.0.1'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ["breathe"]
+extensions = ["breathe", "sphinx.ext.githubpages"]
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
@@ -24,15 +24,15 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-#html_theme = 'furo'
-#html_theme = 'sphinx_rtd_theme'
-#html_theme = 'sphinx_book_theme'
-#html_theme = 'press'
-#html_theme = 'sphinx_material'
-#html_theme = 'pydata_sphinx_theme'
-html_theme = 'piccolo_theme'
-#html_theme = 'sphinx_nefertiti'
-#html_theme = 'renku'
+# html_theme = 'furo'
+# html_theme = 'sphinx_rtd_theme'
+html_theme = 'sphinx_book_theme'
+# html_theme = 'press'
+# html_theme = 'sphinx_material'
+# html_theme = 'pydata_sphinx_theme'
+# html_theme = 'piccolo_theme'
+# html_theme = 'sphinx_nefertiti'
+# html_theme = 'renku'
 html_static_path = ['_static']
 
 # Breathe Configuration

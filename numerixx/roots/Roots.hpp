@@ -35,17 +35,17 @@
 
 namespace nxx::roots
 {
-    template<template< typename, typename, typename > class SOLVER_T,
-        IsFloatOrComplexInvocable FN_T,
-        IsFloatOrComplexInvocable DERIV_T,
-        IsFloatOrComplex GUESS_T,
-        IsFloat EPS_T = GUESS_T,
-        std::integral ITER_T = int>
-    auto fdfsolve(FN_T    function,
-                  DERIV_T derivative,
-                  GUESS_T guess,
-                  EPS_T   eps     = epsilon< GUESS_T >(),
-                  ITER_T  maxiter = iterations< GUESS_T >());
+    // template<template< typename, typename, typename > class SOLVER_T,
+    //     IsFloatOrComplexInvocable FN_T,
+    //     IsFloatOrComplexInvocable DERIV_T,
+    //     IsFloatOrComplex GUESS_T,
+    //     IsFloat EPS_T = GUESS_T,
+    //     std::integral ITER_T = int>
+    // auto fdfsolve(FN_T    function,
+    //               DERIV_T derivative,
+    //               GUESS_T guess,
+    //               EPS_T   eps     = epsilon< GUESS_T >(),
+    //               ITER_T  maxiter = iterations< GUESS_T >());
 }
 
 
