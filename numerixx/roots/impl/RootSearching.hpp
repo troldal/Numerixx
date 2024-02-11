@@ -663,7 +663,214 @@ namespace nxx::roots {
     //
     // =================================================================================================================
 
+    template<std::integral ITER_T, IsFloat RESULT_T>
+    struct SearchIterData
+    {
+        ITER_T iter; /**< The current iteration count. */
+        RESULT_T lower; /**< The lower bound around the root. */
+        RESULT_T upper; /**< The upper bound around the root. */
+    };
+
+    template<IsFloatInvocable FN_T, IsFloat RATIO_T, std::integral ITER_T>
+    class SearchStopToken
+    {
+        FN_T m_fn; /**< The function for which the root is being searched. */
+        RATIO_T m_ratio; /**< The epsilon value for the termination condition. */
+        ITER_T m_maxiter; /**< The maximum iteration count for the termination condition. */
+
+      public:
+        /**
+         * @brief Default constructor. Initializes the epsilon value and maximum iteration count to default values.
+         */
+        explicit SearchStopToken() : m_ratio(std::numbers::phi), m_maxiter(iterations<double>()) {}
+
+        /**
+         * @brief Constructor. Initializes the epsilon value and maximum iteration count to the specified values.
+         * @param eps The epsilon value for the termination condition.
+         * @param maxiter The maximum iteration count for the termination condition.
+         */
+        explicit SearchStopToken(RATIO_T ratio, ITER_T maxiter) : m_ratio(ratio), m_maxiter(maxiter) {}
+
+        /**
+         * @brief Constructor. Initializes the epsilon value and maximum iteration count to the specified values.
+         * @param maxiter The maximum iteration count for the termination condition.
+         * @param eps The epsilon value for the termination condition.
+         */
+        explicit SearchStopToken(ITER_T maxiter, RATIO_T ratio) : m_ratio(ratio), m_maxiter(maxiter) {}
+
+        /**
+         * @brief Constructor. Initializes the epsilon value to the specified value and the maximum iteration count to a
+         * default value.
+         * @param eps The epsilon value for the termination condition.
+         */
+        explicit SearchStopToken(RATIO_T ratio) : m_ratio(ratio), m_maxiter(iterations<double>()) {}
+
+        /**
+         * @brief Constructor. Initializes the maximum iteration count to the specified value and the epsilon value to a
+         * default value.
+         * @param maxiter The maximum iteration count for the termination condition.
+         */
+        explicit SearchStopToken(ITER_T maxiter) : m_ratio(std::numbers::phi), m_maxiter(maxiter) {}
+
+        /**
+         * @brief Checks if the termination condition is met.
+         * @param data The current iteration data.
+         * @return true if the termination condition is met, false otherwise.
+         */
+        bool operator()(const auto &data) const
+        {
+            const auto &[iter, lower, upper] = data;
+
+            if (m_fn(lower) * m_fn(upper) <= 0.0) return true;
+            if (iter >= m_maxiter) return true;
+
+            return false;
+        }
+    };
+
+    /**
+     * @brief Deduction guides for the BracketStopToken class template.
+     * Allows the type of BracketStopToken to be deduced from the constructor parameters.
+     */
+    //    SearchStopToken() -> SearchStopToken<double, size_t>;
+    //    SearchStopToken(IsFloat auto eps) -> SearchStopToken<decltype(eps), size_t>;
+    //    SearchStopToken(std::integral auto maxiter) -> SearchStopToken<double, decltype(maxiter)>;
+    //    SearchStopToken(IsFloat auto eps, std::integral auto maxiter)
+    //        -> SearchStopToken<decltype(eps), decltype(maxiter)>;
+    //    SearchStopToken(std::integral auto maxiter, IsFloat auto eps)
+    //        -> SearchStopToken<decltype(eps), decltype(maxiter)>;
+
+
     namespace detail {
+
+        template<std::integral ITER_T, IsFloat RESULT_T>
+        class SearchResult
+        {
+            SearchIterData<ITER_T, RESULT_T>
+                m_iterData; /**< The IterData object holding the result of the root-finding problem. */
+
+          public:
+            /**
+             * @brief Constructs the BracketSolverResult with an IterData object.
+             * @param iterData The IterData object holding the result of the root-finding problem.
+             */
+            explicit SearchResult(SearchIterData<ITER_T, RESULT_T> iterData) : m_iterData(iterData) {}
+
+            SearchResult(const SearchResult &) = delete; // No copy constructor
+            SearchResult(SearchResult &&) = delete; // No move constructor
+
+            SearchResult &operator=(const SearchResult &) = delete; // No copy assignment
+            SearchResult &operator=(SearchResult &&) = delete; // No move assignment
+
+            /**
+             * @brief Returns the result of the root-finding problem.
+             * @tparam OUTPUT_T The type of the output. Defaults to the type of the result of the root-finding problem.
+             * @return The result of the root-finding problem. If OUTPUT_T is a class, it is constructed with the
+             * IterData object. Otherwise, the guess from the IterData object is returned.
+             * @note This method is only available for rvalue references.
+             */
+            template<typename OUTPUT_T = RESULT_T>
+            auto result() &&
+            {
+                if constexpr (std::is_class_v<OUTPUT_T>)
+                    return OUTPUT_T{}(m_iterData);
+                else
+                    //                    return m_iterData.guess;
+                    return std::make_pair(m_iterData.lower, m_iterData.upper);
+            }
+
+            /**
+             * @brief Returns the result of the root-finding problem using a specified outputter.
+             * @tparam OUTPUTTER_T The type of the outputter. Must be a callable object that accepts an IterData object.
+             * @param outputter The outputter to use to format the result.
+             * @return The result of the root-finding problem, formatted by the outputter.
+             * @note This method is only available for rvalue references.
+             */
+            template<typename OUTPUTTER_T>
+            auto result(OUTPUTTER_T outputter) &&
+            {
+                return outputter(m_iterData);
+            }
+        };
+
+        template<typename ITER_T, typename RESULT_T>
+        SearchResult(BracketIterData<ITER_T, RESULT_T>) -> SearchResult<ITER_T, RESULT_T>;
+
+        template<typename SOLVER, typename TOKEN_T>
+        requires SOLVER::IsBracketingSearcher
+        auto search_impl(const SOLVER &solver, const TOKEN_T &terminator)
+        {
+            SOLVER _solver = solver;
+            TOKEN_T _terminator = terminator;
+            using ARG_T = typename SOLVER::RESULT_T;
+
+            const auto &[lower, upper] = _solver.current();
+            size_t iter = 0;
+
+            SearchIterData<size_t, ARG_T> iterData{ iter, lower, upper };
+
+            while (true) {
+                iterData.iter = iter;
+                iterData.lower = lower;
+                iterData.upper = upper;
+
+                if (_terminator(iterData)) break;
+                _solver.iterate();
+                ++iter;
+            }
+
+            return SearchResult(iterData);
+        }
+
+
+        template<template<typename, typename> class SOLVER_T, typename FN_T, typename STRUCT_T, typename... Args>
+        requires(sizeof...(Args) <= 2)
+        auto search_common(FN_T func, const STRUCT_T &bounds, const Args &...args)
+        {
+            using TUPLE_T = std::tuple<Args...>;
+            using SOLVER = SOLVER_T<FN_T, StructCommonType_t<STRUCT_T>>;
+            using ITERDATA_T = BracketIterData<size_t, StructCommonType_t<STRUCT_T>>;
+
+            TUPLE_T args_tuple = std::make_tuple(args...);
+
+            // Zero arguments are passed...
+            if constexpr (std::tuple_size_v<TUPLE_T> == 0)
+                return detail::search_impl(SOLVER(func, bounds), SearchStopToken<FN_T, double, size_t>{});
+
+            // One argument is passed...
+            else if constexpr (std::tuple_size_v<TUPLE_T> == 1) {
+                using ArgType = std::tuple_element_t<0, TUPLE_T>;
+
+                // If the argument is a floating point or integral type, use it as maxiter/eps
+                if constexpr (std::is_floating_point_v<ArgType> || std::is_integral_v<ArgType>)
+                    return detail::search_impl(SOLVER(func, bounds), SearchStopToken(std::get<0>(args_tuple)));
+
+                // If the argument is a callable, use as a stop token
+                // TODO: Should be able to accept functors that take any king of argument, not just references.
+                else if constexpr (std::same_as<std::invoke_result_t<ArgType, ITERDATA_T &>, bool>)
+                    return detail::search_impl(SOLVER(func, bounds), std::get<0>(args_tuple));
+
+                else
+                    std::invoke(
+                        []<bool flag = false>() { static_assert(flag, "Invalid argument passed to search_common"); });
+            }
+
+            // Two arguments are passed...
+            else if constexpr (std::tuple_size_v<TUPLE_T> == 2) {
+                // Unpack and use the two arguments
+                using ArgType1 = std::tuple_element_t<0, decltype(args_tuple)>;
+                using ArgType2 = std::tuple_element_t<1, decltype(args_tuple)>;
+                static_assert(std::is_floating_point_v<ArgType1> != std::is_floating_point_v<ArgType2>,
+                    "Two arguments must be one floating point and "
+                    "one integral type");
+                return detail::search_impl(
+                    SOLVER(func, bounds), SearchStopToken(std::get<0>(args_tuple), std::get<1>(args_tuple)));
+            } else
+                std::invoke(
+                    []<bool flag = false>() { static_assert(flag, "Invalid argument passed to fsolve_common"); });
+        }
+
+
         /**
          * @brief Implements a generic search solver function template for bracketing searchers.
          *
@@ -752,24 +959,25 @@ namespace nxx::roots {
      * @tparam FACTOR_T The type of the search factor, defaulted based on STRUCT_T.
      * @tparam ITER_T The type of the maximum iterations count, defaulted to int.
      */
-    template<template<typename, typename> class SOLVER_T,
-        IsFloatInvocable FN_T,
-        IsFloatStruct STRUCT_T,
-        IsFloat FACTOR_T = StructCommonType_t<STRUCT_T>,
-        std::integral ITER_T = int>
-    auto search(FN_T function,
-        STRUCT_T bounds,
-        FACTOR_T ratio = std::numbers::phi,
-        ITER_T maxiter = iterations<StructCommonType_t<STRUCT_T>>())
-    {
-        auto [lo, hi] = bounds; /**< Extract lower and upper bounds from the struct. */
-
-        using ARG_T = StructCommonType_t<STRUCT_T>; /**< Common type for the bounds. */
-        auto solver = SOLVER_T<FN_T, ARG_T>(function, bounds); /**< Instantiates the solver with the given function. */
-
-        // Delegates the search process to search_impl, passing in the solver and other parameters.
-        return detail::search_impl(solver, std::pair<ARG_T, ARG_T>{ lo, hi }, ratio, maxiter);
-    }
+    //    template<template<typename, typename> class SOLVER_T,
+    //        IsFloatInvocable FN_T,
+    //        IsFloatStruct STRUCT_T,
+    //        IsFloat FACTOR_T = StructCommonType_t<STRUCT_T>,
+    //        std::integral ITER_T = int>
+    //    auto search(FN_T function,
+    //        STRUCT_T bounds,
+    //        FACTOR_T ratio = std::numbers::phi,
+    //        ITER_T maxiter = iterations<StructCommonType_t<STRUCT_T>>())
+    //    {
+    //        auto [lo, hi] = bounds; /**< Extract lower and upper bounds from the struct. */
+    //
+    //        using ARG_T = StructCommonType_t<STRUCT_T>; /**< Common type for the bounds. */
+    //        auto solver = SOLVER_T<FN_T, ARG_T>(function, bounds); /**< Instantiates the solver with the given
+    //        function. */
+    //
+    //        // Delegates the search process to search_impl, passing in the solver and other parameters.
+    //        return detail::search_impl(solver, std::pair<ARG_T, ARG_T>{ lo, hi }, ratio, maxiter);
+    //    }
 
     /**
      * @brief Extends the high-level search function template `search` for initializer list bounds.
@@ -785,22 +993,68 @@ namespace nxx::roots {
      * @tparam FACTOR_T The type of the search factor, defaulted based on ARG_T.
      * @tparam ITER_T The type of the maximum iterations count, defaulted to int.
      */
-    template<template<typename, typename> class SOLVER_T,
-        IsFloatInvocable FN_T,
-        IsFloat ARG_T,
-        IsFloat FACTOR_T = ARG_T,
-        std::integral ITER_T = int,
-        size_t N>
-    requires(N == 2)
-    auto search(FN_T function,
-        const ARG_T (&bounds)[N],
-        FACTOR_T ratio = std::numbers::phi,
-        ITER_T maxiter = iterations<ARG_T>())
-    {
-        auto solver = SOLVER_T<FN_T, ARG_T>(
-            function, std::pair(bounds[0], bounds[1])); /**< Instantiates the solver with the given function. */
+    //    template<template<typename, typename> class SOLVER_T,
+    //        IsFloatInvocable FN_T,
+    //        IsFloat ARG_T,
+    //        IsFloat FACTOR_T = ARG_T,
+    //        std::integral ITER_T = int,
+    //        size_t N>
+    //    requires(N == 2)
+    //    auto search(FN_T function,
+    //        const ARG_T (&bounds)[N],
+    //        FACTOR_T ratio = std::numbers::phi,
+    //        ITER_T maxiter = iterations<ARG_T>())
+    //    {
+    //        auto solver = SOLVER_T<FN_T, ARG_T>(
+    //            function, std::pair(bounds[0], bounds[1])); /**< Instantiates the solver with the given function. */
+    //
+    //        // Delegates the search process to search_impl, passing in the solver and other parameters.
+    //        return detail::search_impl(solver, std::pair(bounds[0], bounds[1]), ratio, maxiter);
+    //    }
 
-        // Delegates the search process to search_impl, passing in the solver and other parameters.
-        return detail::search_impl(solver, std::pair(bounds[0], bounds[1]), ratio, maxiter);
+    template<template<typename, typename> class SOLVER_T,
+        IsFloatOrComplexInvocable FN_T,
+        IsFloatStruct STRUCT_T,
+        typename... ARGS>
+    auto search(FN_T func, STRUCT_T bounds, ARGS... args)
+    {
+        return detail::search_common<SOLVER_T>(func, bounds, args...);
     }
+
+    template<template<typename, typename> class SOLVER_T,
+        typename TOKEN_T,
+        IsFloatOrComplexInvocable FN_T,
+        IsFloatStruct STRUCT_T>
+    // TODO: Should be able to accept functors that take any king of argument, not just references.
+    requires std::invocable<TOKEN_T, BracketIterData<size_t, StructCommonType_t<STRUCT_T>> &>
+    auto search(FN_T func, STRUCT_T bounds)
+    {
+        return detail::search_common<SOLVER_T>(func, bounds, TOKEN_T{});
+    }
+
+    template<template<typename, typename> class SOLVER_T,
+        IsFloatOrComplexInvocable FN_T,
+        IsFloat ARG_T,
+        size_t N,
+        typename... ARGS>
+    requires(N == 2)
+    auto search(FN_T func, const ARG_T (&bounds)[N], ARGS... args)
+    {
+        return detail::search_common<SOLVER_T>(func, std::pair{ bounds[0], bounds[1] }, args...);
+    }
+
+    template<template<typename, typename> class SOLVER_T,
+        typename TOKEN_T,
+        IsFloatOrComplexInvocable FN_T,
+        IsFloat ARG_T,
+        size_t N>
+    // TODO: Should be able to accept functors that take any king of argument, not just references.
+    requires(N == 2) && std::invocable<TOKEN_T, BracketIterData<size_t, ARG_T> &>
+    auto search(FN_T func, const ARG_T (&bounds)[N])
+    {
+        auto bounds_ = std::span(bounds); // Mostly needed to suppress compiler warning.
+        return detail::search_common<SOLVER_T>(func, std::pair{ bounds_.front(), bounds_.back() }, TOKEN_T{});
+    }
+
+
 } // namespace nxx::roots
