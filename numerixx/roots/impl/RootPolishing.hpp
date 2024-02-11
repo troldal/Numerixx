@@ -396,7 +396,7 @@ namespace nxx::roots {
      * @tparam ITER_T The type of the iteration count. Must be an integral type.
      * @tparam RESULT_T The type of the root estimate. Must be a floating point type.
      */
-    template<std::integral ITER_T, IsFloat RESULT_T>
+    template<std::integral ITER_T, IsFloatOrComplex RESULT_T>
     struct PolishingIterData
     {
         ITER_T iter; /**< The current iteration count. */
@@ -464,7 +464,7 @@ namespace nxx::roots {
         {
             const auto &[iter, guess, previous] = data;
 
-            if (!previous.empty() && abs(guess - previous.back()) <= m_eps * guess + m_eps / 2) return true;
+            if (!previous.empty() && abs(guess - previous.back()) <= m_eps * abs(guess) + m_eps / 2) return true;
             if (iter >= m_maxiter) return true;
 
             return false;
@@ -494,7 +494,7 @@ namespace nxx::roots {
          * @tparam ITER_T The type of the iteration count. Must be an integral type.
          * @tparam RESULT_T The type of the root estimate. Must be a floating point type.
          */
-        template<std::integral ITER_T, IsFloat RESULT_T>
+        template<std::integral ITER_T, IsFloatOrComplex RESULT_T>
         class PolishingSolverResult
         {
             PolishingIterData<ITER_T, RESULT_T>
@@ -522,7 +522,7 @@ namespace nxx::roots {
             template<typename OUTPUT_T = RESULT_T>
             auto result() &&
             {
-                if constexpr (std::is_class_v<OUTPUT_T>)
+                if constexpr (!std::constructible_from<OUTPUT_T, RESULT_T>)
                     return OUTPUT_T{}(m_iterData);
                 else
                     return m_iterData.guess;

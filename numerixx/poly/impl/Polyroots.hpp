@@ -44,27 +44,27 @@
 #include <random>
 #include <vector>
 
-namespace nxx::poly
-{
-    namespace impl
-    {
+namespace nxx::poly {
+    namespace impl {
 
         void validateTolerance(std::floating_point auto tolerance)
         {
             if (tolerance <= 0)
-                throw NumerixxError("Invalid tolerance value: " + std::to_string(tolerance) + ". Tolerance must be a positive number.");
+                throw NumerixxError(
+                    "Invalid tolerance value: " + std::to_string(tolerance) + ". Tolerance must be a positive number.");
         }
 
         void validateMaxIterations(std::integral auto max_iterations)
         {
             if (max_iterations < 1)
-                throw NumerixxError("Invalid maximum number of iterations: " + std::to_string(max_iterations) +
-                                    ". Maximum number of iterations must be greater than zero.");
+                throw NumerixxError("Invalid maximum number of iterations: " + std::to_string(max_iterations)
+                                    + ". Maximum number of iterations must be greater than zero.");
         }
 
         void validatePolynomialOrder(std::integral auto order, std::integral auto min_order)
         {
-            if (order < min_order) throw NumerixxError("Polynomial must have order of at least " + std::to_string(min_order) + ".");
+            if (order < min_order)
+                throw NumerixxError("Polynomial must have order of at least " + std::to_string(min_order) + ".");
         }
 
         /**
@@ -89,11 +89,11 @@ namespace nxx::poly
          * @note The sorting is stable for complex roots and is based on the norm of the complex numbers.
          *       For real roots, the sort is based on the natural ordering of the numbers.
          */
-        template< typename RT >
-        requires(std::floating_point< RT > || IsComplex< RT >)
+        template<typename RT>
+        requires(std::floating_point<RT> || IsComplex<RT>)
         inline auto sortRoots(auto roots, auto tolerance)
-            requires IsComplex< typename decltype(roots)::value_type > &&
-                     std::same_as< decltype(roots), std::vector< typename decltype(roots)::value_type > >
+        requires IsComplex<typename decltype(roots)::value_type>
+                 && std::same_as<decltype(roots), std::vector<typename decltype(roots)::value_type>>
         {
             validateTolerance(tolerance);
 
@@ -102,29 +102,32 @@ namespace nxx::poly
 
             // If the type RT is not complex, filter out roots with an imaginary part
             // greater or equal to the square root of the given tolerance
-            if constexpr (!IsComplex< RT >) {
-                std::erase_if(roots, [toleranceSqrt](const auto& elem) { return std::abs(elem.imag()) >= toleranceSqrt; });
+            if constexpr (!IsComplex<RT>) {
+                std::erase_if(
+                    roots, [toleranceSqrt](const auto &elem) { return std::abs(elem.imag()) >= toleranceSqrt; });
             }
 
             // Sorting function
-            auto sortingFunc = [toleranceSqrt](const auto& root1, const auto& root2) {
-                return std::abs(root2.real() - root1.real()) < toleranceSqrt ? root1.imag() < root2.imag() : root1.real() < root2.real();
+            auto sortingFunc = [toleranceSqrt](const auto &root1, const auto &root2) {
+                return std::abs(root2.real() - root1.real()) < toleranceSqrt ? root1.imag() < root2.imag()
+                                                                             : root1.real() < root2.real();
             };
 
             // Sort the roots
             std::sort(roots.begin(), roots.end(), sortingFunc);
 
             // If the type RT is complex, return the roots as they are. If not, return only the real parts of the roots.
-            if constexpr (IsComplex< RT >) {
+            if constexpr (IsComplex<RT>) {
                 return roots;
-            }
-            else {
-                std::vector< RT > realroots;
-                std::transform(roots.begin(), roots.end(), std::back_inserter(realroots), [](const auto& elem) { return elem.real(); });
+            } else {
+                std::vector<RT> realroots;
+                std::transform(roots.begin(), roots.end(), std::back_inserter(realroots), [](const auto &elem) {
+                    return elem.real();
+                });
                 return realroots;
             }
         }
-    }    // namespace impl
+    } // namespace impl
 
     /**
      * @brief Finds the root of a linear polynomial (monomial) using basic algebraic manipulation.
@@ -145,27 +148,28 @@ namespace nxx::poly
      * @note The function checks if the input polynomial is linear by verifying its order.
      * If the order is not equal to 1, an std::invalid_argument exception is thrown.
      */
-    template< typename RT = void >
-    inline auto linear(IsPolynomial auto poly, typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance = nxx::EPS)
+    template<typename RT = void>
+    inline auto linear(IsPolynomial auto poly,
+        typename PolynomialTraits<decltype(poly)>::fundamental_type tolerance = nxx::EPS)
     {
         impl::validateTolerance(tolerance);
         impl::validatePolynomialOrder(poly.order(), 1ull);
 
         // Define type aliases for readability
-        using POLY_T    = PolynomialTraits< decltype(poly) >;
-        using VALUE_T   = typename POLY_T::value_type;
-        using FLOAT_T   = typename POLY_T::fundamental_type;
-        using COMPLEX_T = std::complex< FLOAT_T >;
+        using POLY_T = PolynomialTraits<decltype(poly)>;
+        using VALUE_T = typename POLY_T::value_type;
+        using FLOAT_T = typename POLY_T::fundamental_type;
+        using COMPLEX_T = std::complex<FLOAT_T>;
 
         // Calculate the root of the linear polynomial
-        std::vector< COMPLEX_T > root;
+        std::vector<COMPLEX_T> root;
         root.emplace_back(-poly.coefficients().front() / poly.coefficients().back());
 
         // Define the return type based on the template parameter RT
-        using RETURN_T = std::conditional_t< std::same_as< RT, void >, VALUE_T, RT >;
+        using RETURN_T = std::conditional_t<std::same_as<RT, void>, VALUE_T, RT>;
 
         // Sort the root and return it
-        tl::expected< std::vector< RETURN_T >, NumerixxError > result = impl::sortRoots< RETURN_T >(root, tolerance);
+        tl::expected<std::vector<RETURN_T>, NumerixxError> result = impl::sortRoots<RETURN_T>(root, tolerance);
         return result;
     }
 
@@ -196,28 +200,29 @@ namespace nxx::poly
      * the return type is complex, all roots will be returned. If the return type is real, only roots with
      * imaginary parts smaller than a specified tolerance (1e-6) will be returned.
      */
-    template< typename RT = void >
-    inline auto quadratic(IsPolynomial auto poly, typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance = nxx::EPS)
+    template<typename RT = void>
+    inline auto quadratic(IsPolynomial auto poly,
+        typename PolynomialTraits<decltype(poly)>::fundamental_type tolerance = nxx::EPS)
     {
         impl::validateTolerance(tolerance);
         impl::validatePolynomialOrder(poly.order(), 2ull);
 
         // Define type aliases for readability
-        using POLY_T     = PolynomialTraits< decltype(poly) >;
-        using VALUE_T    = typename POLY_T::value_type;
-        using FLOAT_T    = typename POLY_T::fundamental_type;
-        using COMPLEX_T  = std::complex< FLOAT_T >;
-        using RETURN_T   = std::conditional_t< std::same_as< RT, void >, VALUE_T, RT >;
-        using EXPECTED_T = tl::expected< std::vector< RETURN_T >, NumerixxError >;
+        using POLY_T = PolynomialTraits<decltype(poly)>;
+        using VALUE_T = typename POLY_T::value_type;
+        using FLOAT_T = typename POLY_T::fundamental_type;
+        using COMPLEX_T = std::complex<FLOAT_T>;
+        using RETURN_T = std::conditional_t<std::same_as<RT, void>, VALUE_T, RT>;
+        using EXPECTED_T = tl::expected<std::vector<RETURN_T>, NumerixxError>;
 
         // Extract the coefficients of the polynomial
-        const auto& coeffs = poly.coefficients();
-        const auto& a      = coeffs[2];
-        const auto& b      = coeffs[1];
-        const auto& c      = coeffs[0];
+        const auto &coeffs = poly.coefficients();
+        const auto &a = coeffs[2];
+        const auto &b = coeffs[1];
+        const auto &c = coeffs[0];
 
         // Calculate the discriminant
-        const COMPLEX_T discriminant   = sqrt(b * b - 4.0 * a * c);
+        const COMPLEX_T discriminant = sqrt(b * b - 4.0 * a * c);
         const COMPLEX_T sqrt_component = std::conj(b) * discriminant;
 
         // Calculate the roots of the quadratic polynomial
@@ -228,10 +233,10 @@ namespace nxx::poly
             return EXPECTED_T(tl::unexpected(NumerixxError("Quadratic polynomial is ill formed.")));
 
         // Calculate the roots
-        std::vector< COMPLEX_T > roots = { q / a, c / q };
+        std::vector<COMPLEX_T> roots = { q / a, c / q };
 
         // Sort the roots and return them
-        EXPECTED_T result = impl::sortRoots< RETURN_T >(roots, tolerance);
+        EXPECTED_T result = impl::sortRoots<RETURN_T>(roots, tolerance);
         return result;
     }
 
@@ -258,18 +263,19 @@ namespace nxx::poly
      * the return type is complex, all roots will be returned. If the return type is real, only roots with
      * imaginary parts smaller than a specified tolerance (1e-6) will be returned.
      */
-    template< typename RT = void >
-    inline auto cubic(IsPolynomial auto poly, typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance = nxx::EPS)
+    template<typename RT = void>
+    inline auto cubic(IsPolynomial auto poly,
+        typename PolynomialTraits<decltype(poly)>::fundamental_type tolerance = nxx::EPS)
     {
         impl::validateTolerance(tolerance);
         impl::validatePolynomialOrder(poly.order(), 3ull);
 
-        using POLY_T     = PolynomialTraits< decltype(poly) >;
-        using VALUE_T    = typename POLY_T::value_type;
-        using FLOAT_T    = typename POLY_T::fundamental_type;
-        using COMPLEX_T  = std::complex< FLOAT_T >;
-        using RETURN_T   = std::conditional_t< std::same_as< RT, void >, VALUE_T, RT >;
-        using EXPECTED_T = tl::expected< std::vector< RETURN_T >, NumerixxError >;
+        using POLY_T = PolynomialTraits<decltype(poly)>;
+        using VALUE_T = typename POLY_T::value_type;
+        using FLOAT_T = typename POLY_T::fundamental_type;
+        using COMPLEX_T = std::complex<FLOAT_T>;
+        using RETURN_T = std::conditional_t<std::same_as<RT, void>, VALUE_T, RT>;
+        using EXPECTED_T = tl::expected<std::vector<RETURN_T>, NumerixxError>;
 
         using std::sqrt;
         using namespace std::numbers;
@@ -279,23 +285,26 @@ namespace nxx::poly
         auto cbrt = [](COMPLEX_T x) { return std::pow(x, 1.0 / 3.0); };
 
         auto coeff = poly.coefficients();
-        std::transform(coeff.cbegin(), coeff.cend(), coeff.begin(), [&coeff](auto elem) { return elem / coeff.back(); });
+        std::transform(
+            coeff.cbegin(), coeff.cend(), coeff.begin(), [&coeff](auto elem) { return elem / coeff.back(); });
 
-        const auto& a = coeff[2];
-        const auto& b = coeff[1];
-        const auto& c = coeff[0];
+        const auto &a = coeff[2];
+        const auto &b = coeff[1];
+        const auto &c = coeff[0];
 
         const COMPLEX_T Q = (a * a - 3.0 * b) / 9.0;
         const COMPLEX_T R = (2.0 * a * a * a - 9.0 * a * b + 27.0 * c) / 54.0;
         const COMPLEX_T A =
-            -cbrt(R + ((std::conj(R) * sqrt(R * R - Q * Q * Q)).real() >= 0.0 ? sqrt(R * R - Q * Q * Q) : -sqrt(R * R - Q * Q * Q)));
+            -cbrt(R
+                  + ((std::conj(R) * sqrt(R * R - Q * Q * Q)).real() >= 0.0 ? sqrt(R * R - Q * Q * Q)
+                                                                            : -sqrt(R * R - Q * Q * Q)));
         const COMPLEX_T B = (abs(A) == 0.0 ? 0.0 : Q / A);
 
-        std::vector< COMPLEX_T > roots = { A + B - a / 3.0,
-                                           -0.5 * (A + B) - a / 3.0 + 0.5 * sqrt(3.0) * (A - B) * 1.0i,
-                                           -0.5 * (A + B) - a / 3.0 - 0.5 * sqrt(3.0) * (A - B) * 1.0i };
+        std::vector<COMPLEX_T> roots = { A + B - a / 3.0,
+            -0.5 * (A + B) - a / 3.0 + 0.5 * sqrt(3.0) * (A - B) * 1.0i,
+            -0.5 * (A + B) - a / 3.0 - 0.5 * sqrt(3.0) * (A - B) * 1.0i };
 
-        return EXPECTED_T(impl::sortRoots< RETURN_T >(roots, tolerance));
+        return EXPECTED_T(impl::sortRoots<RETURN_T>(roots, tolerance));
     }
 
     /**
@@ -320,25 +329,25 @@ namespace nxx::poly
      * polynomials. However, it may fail to converge for certain ill-conditioned polynomials. In such cases,
      * using a different root-finding method may be necessary.
      */
-    template< typename POLY >
-    requires IsPolynomial< POLY >
-    inline auto laguerre(POLY                                                                          poly,
-                         std::complex< typename PolynomialTraits< decltype(poly) >::fundamental_type > guess          = 0.0,
-                         typename PolynomialTraits< decltype(poly) >::fundamental_type                 tolerance      = nxx::EPS,
-                         int                                                                           max_iterations = nxx::MAXITER)
+    template<typename POLY>
+    requires IsPolynomial<POLY>
+    inline auto laguerre(POLY poly,
+        std::complex<typename PolynomialTraits<decltype(poly)>::fundamental_type> guess = 0.0,
+        typename PolynomialTraits<decltype(poly)>::fundamental_type tolerance = nxx::EPS,
+        int max_iterations = nxx::MAXITER)
     {
         impl::validateTolerance(tolerance);
         impl::validateMaxIterations(max_iterations);
         impl::validatePolynomialOrder(poly.order(), 4ull);
 
         // Define type aliases for readability
-        using POLY_T     = PolynomialTraits< decltype(poly) >;
-        using FLOAT_T    = typename POLY_T::fundamental_type;
-        using COMPLEX_T  = std::complex< FLOAT_T >;
-        using EXPECTED_T = tl::expected< std::vector< COMPLEX_T >, NumerixxError >;
-        using OPTIONAL_T = std::optional< COMPLEX_T >;
+        using POLY_T = PolynomialTraits<decltype(poly)>;
+        using FLOAT_T = typename POLY_T::fundamental_type;
+        using COMPLEX_T = std::complex<FLOAT_T>;
+        using EXPECTED_T = tl::expected<std::vector<COMPLEX_T>, NumerixxError>;
+        using OPTIONAL_T = std::optional<COMPLEX_T>;
 
-        const COMPLEX_T order = static_cast< FLOAT_T >(poly.order());
+        const COMPLEX_T order = static_cast<FLOAT_T>(poly.order());
 
         // Define a lambda function for computing the Laguerre step.
         auto laguerrestep = [&](COMPLEX_T g_param, COMPLEX_T h_param) -> OPTIONAL_T {
@@ -348,9 +357,9 @@ namespace nxx::poly
         };
 
         // Initialize the root with the guess
-        COMPLEX_T  root = guess;
-        COMPLEX_T  G;
-        COMPLEX_T  H;
+        COMPLEX_T root = guess;
+        COMPLEX_T G;
+        COMPLEX_T H;
         OPTIONAL_T step;
 
         // Get function objects for the first and second derivatives of the polynomial
@@ -358,22 +367,24 @@ namespace nxx::poly
         auto d2poly = derivativeOf(d1poly);
 
         // Initialize a random number generator to perturb the step size every 10 iterations.
-        std::random_device                        rd;
-        std::mt19937                              mt(rd());
-        std::uniform_real_distribution< FLOAT_T > dist(0.0, 1.0);
+        std::random_device rd;
+        std::mt19937 mt(rd());
+        std::uniform_real_distribution<FLOAT_T> dist(0.0, 1.0);
 
         // Perform the Laguerre iterations.
         int i = 0;
         while (true) {
-            // If the absolute value of the polynomial evaluated at the root is less than the tolerance, return the root.
+            // If the absolute value of the polynomial evaluated at the root is less than the tolerance, return the
+            // root.
             if (abs(poly(root)) < tolerance) break;
 
             // Return an error if the maximum number of iterations is reached.
-            if (i >= max_iterations) return EXPECTED_T(tl::unexpected(NumerixxError("Maximum number of iterations reached.")));
+            if (i >= max_iterations)
+                return EXPECTED_T(tl::unexpected(NumerixxError("Maximum number of iterations reached.")));
 
             // Calculate G and H for the Laguerre step
-            G    = d1poly(root) / poly(root);
-            H    = G * G - d2poly(root) / poly(root);
+            G = d1poly(root) / poly(root);
+            H = G * G - d2poly(root) / poly(root);
             step = laguerrestep(G, H);
 
             // If the step is invalid, use a small value.
@@ -393,11 +404,11 @@ namespace nxx::poly
         }
 
         // ===== Polish the root on the original polynomial using Newton's method
-        const auto polished_root = roots::fdfsolve< roots::Newton >(poly, derivativeOf(poly), root, tolerance / 10, max_iterations);
-        if (polished_root) root = *polished_root;
+        root = roots::fdfsolve<roots::Newton>(poly, derivativeOf(poly), root, tolerance / 10, max_iterations).result();
+        //        if (polished_root) root = *polished_root;
 
         // Return the root
-        return EXPECTED_T(std::vector { root });
+        return EXPECTED_T(std::vector{ root });
     }
 
     /**
@@ -429,10 +440,10 @@ namespace nxx::poly
      * imaginary parts smaller than the specified tolerance will be returned.
      */
     // Template function to solve polynomial equations of various orders.
-    template< typename RT = void >
-    inline auto polysolve(IsPolynomial auto                                             poly,
-                          typename PolynomialTraits< decltype(poly) >::fundamental_type tolerance      = nxx::EPS,
-                          int                                                           max_iterations = nxx::MAXITER)
+    template<typename RT = void>
+    inline auto polysolve(IsPolynomial auto poly,
+        typename PolynomialTraits<decltype(poly)>::fundamental_type tolerance = nxx::EPS,
+        int max_iterations = nxx::MAXITER)
     {
         // Validate input parameters: tolerance, max_iterations, and polynomial order.
         impl::validateTolerance(tolerance);
@@ -440,37 +451,37 @@ namespace nxx::poly
         impl::validatePolynomialOrder(poly.order(), 1ull);
 
         // Define types for readability and flexibility.
-        using POLY_T     = PolynomialTraits< decltype(poly) >;                             // Traits of the input polynomial.
-        using VALUE_T    = typename POLY_T::value_type;                                    // Value type of the polynomial.
-        using FLOAT_T    = typename POLY_T::fundamental_type;                              // Fundamental type, used for complex numbers.
-        using COMPLEX_T  = std::complex< FLOAT_T >;                                        // Complex type based on the fundamental type.
-        using RETURN_T   = std::conditional_t< std::same_as< RT, void >, VALUE_T, RT >;    // Return type.
-        using EXPECTED_T = tl::expected< std::vector< RETURN_T >, NumerixxError >;         // Expected return type.
+        using POLY_T = PolynomialTraits<decltype(poly)>; // Traits of the input polynomial.
+        using VALUE_T = typename POLY_T::value_type; // Value type of the polynomial.
+        using FLOAT_T = typename POLY_T::fundamental_type; // Fundamental type, used for complex numbers.
+        using COMPLEX_T = std::complex<FLOAT_T>; // Complex type based on the fundamental type.
+        using RETURN_T = std::conditional_t<std::same_as<RT, void>, VALUE_T, RT>; // Return type.
+        using EXPECTED_T = tl::expected<std::vector<RETURN_T>, NumerixxError>; // Expected return type.
 
         // Convert input polynomial to complex type and initialize a vector for roots.
-        auto polynomial = Polynomial< COMPLEX_T >(std::vector< COMPLEX_T > { poly.begin(), poly.end() });
-        auto original   = Polynomial< COMPLEX_T >(std::vector< COMPLEX_T > { poly.begin(), poly.end() });
-        auto roots      = std::vector< COMPLEX_T > {};
+        auto polynomial = Polynomial<COMPLEX_T>(std::vector<COMPLEX_T>{ poly.begin(), poly.end() });
+        auto original = Polynomial<COMPLEX_T>(std::vector<COMPLEX_T>{ poly.begin(), poly.end() });
+        auto roots = std::vector<COMPLEX_T>{};
 
         // Lambda function to find roots based on the order of the polynomial.
-        auto findRoots = [&](Polynomial< COMPLEX_T > p) {
+        auto findRoots = [&](Polynomial<COMPLEX_T> p) {
             switch (p.order()) {
-                case 1:    // Linear polynomial.
-                    return linear< COMPLEX_T >(p);
-                case 2:    // Quadratic polynomial.
-                    return quadratic< COMPLEX_T >(p);
-                case 3:    // Cubic polynomial.
-                    return cubic< COMPLEX_T >(p);
-                default:    // Higher-order polynomials.
-                    return laguerre(p, 1.0, tolerance, max_iterations);
+            case 1: // Linear polynomial.
+                return linear<COMPLEX_T>(p);
+            case 2: // Quadratic polynomial.
+                return quadratic<COMPLEX_T>(p);
+            case 3: // Cubic polynomial.
+                return cubic<COMPLEX_T>(p);
+            default: // Higher-order polynomials.
+                return laguerre(p, 1.0, tolerance, max_iterations);
             }
         };
 
         // Loop to solve and deflate the polynomial until its order is reduced to 3 or less.
         size_t order;
         do {
-            order                  = polynomial.order();       // Current order of the polynomial.
-            const auto roots_found = findRoots(polynomial);    // Find roots.
+            order = polynomial.order(); // Current order of the polynomial.
+            const auto roots_found = findRoots(polynomial); // Find roots.
 
             // Check if roots are found, return an error if not.
             if (!roots_found) [[unlikely]]
@@ -481,21 +492,17 @@ namespace nxx::poly
 
             // If its order is greater than 3, polish the root an deflate the polynomial.
             if (polynomial.order() > 3) {
-                const auto polished_root = nxx::roots::fdfsolve< roots::Newton >(original,
-                                                                                 derivativeOf(original),
-                                                                                 roots.back(),
-                                                                                 tolerance / 10,
-                                                                                 max_iterations);
-                if (polished_root) roots.back() = *polished_root;
+                roots.back() = nxx::roots::fdfsolve<roots::Newton>(
+                    original, derivativeOf(original), roots.back(), tolerance / 10, max_iterations)
+                                   .result();
+                //                if (polished_root) roots.back() = polished_root;
 
-                polynomial /= Polynomial< COMPLEX_T > { -roots.back(), 1.0 };
+                polynomial /= Polynomial<COMPLEX_T>{ -roots.back(), 1.0 };
             }
-        }
-        while (order > 3);    // Continue until the polynomial is of order 3 or less.
+        } while (order > 3); // Continue until the polynomial is of order 3 or less.
 
         // Sort the roots and return them as the expected return type.
-        return EXPECTED_T(impl::sortRoots< RETURN_T >(roots, tolerance));
+        return EXPECTED_T(impl::sortRoots<RETURN_T>(roots, tolerance));
     }
 
-}    // namespace nxx::poly
-
+} // namespace nxx::poly
