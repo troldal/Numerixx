@@ -53,4 +53,3 @@ namespace nxx::roots
 #include "impl/Bracketing.impl.hpp"
 #include "impl/Polishing.impl.hpp"
 #include "impl/Searching.impl.hpp"
-

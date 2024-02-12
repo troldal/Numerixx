@@ -6,7 +6,7 @@
 
 namespace nxx::roots {
 
-  template<std::integral ITER_T, typename... ARGS>
-  using IterData = std::tuple<ITER_T, ARGS...>;
+    template<std::integral ITER_T, typename... ARGS>
+    using IterData = std::tuple<ITER_T, ARGS...>;
 
 }

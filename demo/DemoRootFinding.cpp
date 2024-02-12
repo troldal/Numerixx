@@ -110,7 +110,7 @@ int main()
               << std::endl;
 
     std::cout << "Newton's Method:          \n"
-          << fdfsolve<Newton>(func, 1.25, token).result<Expected>().error() << std::endl;
+              << fdfsolve<Newton>(func, 1.25, token).result<Expected>().error() << std::endl;
     std::cout << "Newton's Method:          \n"
               << fdfsolve<Newton, Token>(func, 1.25).result<Expected>().error() << std::endl;
     // std::cout << "Secant Method:            \n"

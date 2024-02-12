@@ -4,10 +4,10 @@
 
 #pragma once
 
-#include <Constants.hpp>
 #include <Concepts.hpp>
+#include <Constants.hpp>
 
-#include "fwd/Common.fwd.hpp"
 #include "fwd/Bracketing.fwd.hpp"
+#include "fwd/Common.fwd.hpp"
 #include "fwd/Polishing.fwd.hpp"
 #include "fwd/Searching.fwd.hpp"

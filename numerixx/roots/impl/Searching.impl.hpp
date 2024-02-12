@@ -796,7 +796,7 @@ namespace nxx::roots {
             size_t iter = 0;
 
             SearchIterData<size_t, ARG_T> iterData{ iter, lower, upper };
-            auto& [_iter, _lower, _upper] = iterData;
+            auto &[_iter, _lower, _upper] = iterData;
 
             while (true) {
                 _iter = iter;

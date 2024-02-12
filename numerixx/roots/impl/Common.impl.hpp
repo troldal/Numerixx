@@ -119,7 +119,7 @@ namespace nxx::roots {
         TUPLE_T args_tuple = std::make_tuple(args...);
 
         if constexpr (sizeof...(Args) == 1 && !IsFloat<decltype(std::get<0>(args_tuple))>
-                          && !std::integral<decltype(std::get<0>(args_tuple))>)
+                      && !std::integral<decltype(std::get<0>(args_tuple))>)
             return std::get<0>(args_tuple);
         else
             return TOKEN_T<Args...>(args...);
@@ -129,7 +129,7 @@ namespace nxx::roots {
     class ResultProxy
     {
         ITERDATA_T
-            m_iterData; /**< The IterData object holding the result of the root-finding problem. */
+        m_iterData; /**< The IterData object holding the result of the root-finding problem. */
 
         using ITER_T = decltype(std::get<IterIndex>(m_iterData));
         using RESULT_T = decltype(std::get<ResultIndex>(m_iterData));

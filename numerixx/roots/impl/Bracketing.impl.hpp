@@ -570,8 +570,8 @@ namespace nxx::roots {
         typename... ARGS>
     auto fsolve(FN_T func, STRUCT_T bounds, ARGS... args)
     {
-      using SOLVER = SOLVER_T<FN_T, StructCommonType_t<STRUCT_T>>;
-      return detail::fsolve_impl(SOLVER(func, bounds), makeToken<BracketStopToken>(args...));
+        using SOLVER = SOLVER_T<FN_T, StructCommonType_t<STRUCT_T>>;
+        return detail::fsolve_impl(SOLVER(func, bounds), makeToken<BracketStopToken>(args...));
     }
 
     /**
@@ -603,8 +603,8 @@ namespace nxx::roots {
     requires std::invocable<TOKEN_T, BracketIterData<size_t, StructCommonType_t<STRUCT_T>> &>
     auto fsolve(FN_T func, STRUCT_T bounds)
     {
-      using SOLVER = SOLVER_T<FN_T, StructCommonType_t<STRUCT_T>>;
-      return detail::fsolve_impl(SOLVER(func, bounds), TOKEN_T{});
+        using SOLVER = SOLVER_T<FN_T, StructCommonType_t<STRUCT_T>>;
+        return detail::fsolve_impl(SOLVER(func, bounds), TOKEN_T{});
     }
 
     /**
@@ -635,8 +635,9 @@ namespace nxx::roots {
     requires(N == 2)
     auto fsolve(FN_T func, const ARG_T (&bounds)[N], ARGS... args)
     {
-      using SOLVER = SOLVER_T<FN_T, ARG_T>;
-      return detail::fsolve_impl(SOLVER(func, std::pair{ bounds[0], bounds[1] }), makeToken<BracketStopToken>(args...));
+        using SOLVER = SOLVER_T<FN_T, ARG_T>;
+        return detail::fsolve_impl(
+            SOLVER(func, std::pair{ bounds[0], bounds[1] }), makeToken<BracketStopToken>(args...));
     }
 
     /**
@@ -667,8 +668,8 @@ namespace nxx::roots {
     requires(N == 2) && std::invocable<TOKEN_T, BracketIterData<size_t, ARG_T> &>
     auto fsolve(FN_T func, const ARG_T (&bounds)[N])
     {
-      using SOLVER = SOLVER_T<FN_T, ARG_T>;
-      return detail::fsolve_impl(SOLVER(func, std::pair{ bounds[0], bounds[1] }), TOKEN_T{});
+        using SOLVER = SOLVER_T<FN_T, ARG_T>;
+        return detail::fsolve_impl(SOLVER(func, std::pair{ bounds[0], bounds[1] }), TOKEN_T{});
     }
 
 } // namespace nxx::roots
