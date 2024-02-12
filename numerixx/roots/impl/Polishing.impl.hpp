@@ -369,7 +369,8 @@ namespace nxx::roots {
 
                 ARG_T denominator = fx1 - fx;
                 if (abs(denominator) < std::numeric_limits<ARG_T>::epsilon()) {
-                    throw std::runtime_error("Division by near-zero in Steffensen's method.");
+                    return;
+                    // throw std::runtime_error("Division by near-zero in Steffensen's method.");
                     // TODO: Return a tl::expected instead of throwing an exception.
                 }
 

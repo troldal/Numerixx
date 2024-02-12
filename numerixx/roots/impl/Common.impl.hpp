@@ -173,7 +173,10 @@ namespace nxx::roots {
         template<typename OUTPUT_T = RESULT_T>
         auto result() &&
         {
-            if constexpr (std::is_class_v<OUTPUT_T>)
+            // if constexpr (std::is_class_v<OUTPUT_T>)
+            if constexpr (std::constructible_from<OUTPUT_T, decltype(std::get<ResultIndex>(m_iterData))>)
+                return OUTPUT_T{std::get<ResultIndex>(m_iterData)};
+            else if constexpr (std::is_class_v<OUTPUT_T>)
                 return OUTPUT_T{}(m_iterData);
             else
                 return std::get<ResultIndex>(m_iterData);
