@@ -31,11 +31,8 @@
 #pragma once
 
 // ===== Numerixx Includes
-#include "RootCommon.hpp"
-
+#include <Deriv.hpp>
 #include <impl/Polynomial.hpp>
-
-// ===== Standard Library Includes
 
 namespace nxx::roots {
     // =================================================================================================================
@@ -56,6 +53,23 @@ namespace nxx::roots {
      * Private implementation details.
      */
     namespace detail {
+
+        template<typename>
+        struct PolishingTraits; // Forward declaration with variadic template parameters
+
+        // Generic specialization of PolishingTraits
+        template<template<typename, typename, typename> class Method, // Template template parameter for the method
+            typename FN,
+            typename DFN,
+            typename T>
+        struct PolishingTraits<Method<FN, DFN, T>>
+        {
+            using FUNCTION_T = FN;
+            using DERIV_T = DFN;
+            using FUNCTION_RETURN_T = std::invoke_result_t<FN, double>;
+            using DERIV_RETURN_T = std::invoke_result_t<DFN, double>;
+        };
+
         /**
          * @brief Provides a base class template for root polishing algorithms.
          *
@@ -241,7 +255,7 @@ namespace nxx::roots {
         using BASE =
             detail::PolishingBase<Secant<FN, DFN, ARG_T>, FN, DFN, ARG_T>; /**< Base class alias for readability. */
 
-        ARG_T m_prevGuess; /**< Stores the previous guess for the root. */
+        ARG_T m_prevGuess{}; /**< Stores the previous guess for the root. */
         bool m_hasPrevGuess{ false }; /**< Flag to indicate whether a previous guess is available. */
         bool m_firstStep{ true }; /**< Flag to indicate whether the first step is to be taken. */
 
@@ -351,7 +365,7 @@ namespace nxx::roots {
 
                 ARG_T x1 = x + fx;
                 ARG_T fx1 = BASE::evaluate(x1);
-                ARG_T x2 = x1 + fx1;
+                // ARG_T x2 = x1 + fx1;
 
                 ARG_T denominator = fx1 - fx;
                 if (abs(denominator) < std::numeric_limits<ARG_T>::epsilon()) {
@@ -386,167 +400,27 @@ namespace nxx::roots {
     //
     // =================================================================================================================
 
-    /**
-     * @brief A struct template that holds the iteration data for a root finding problem.
-     *
-     * The PolishingIterData struct template is designed to store the current iteration count
-     * and the current guess for the root in a root finding problem. It is used in conjunction
-     * with root polishing algorithms to keep track of the current state of the algorithm.
-     *
-     * @tparam ITER_T The type of the iteration count. Must be an integral type.
-     * @tparam RESULT_T The type of the root estimate. Must be a floating point type.
-     */
     template<std::integral ITER_T, IsFloatOrComplex RESULT_T>
-    struct PolishingIterData
+    using PolishingIterData = std::tuple<ITER_T, RESULT_T, std::vector<RESULT_T>>;
+
+    struct PolishingBehavior
     {
-        ITER_T iter; /**< The current iteration count. */
-        RESULT_T guess; /**< The current guess for the root. */
-        std::vector<RESULT_T> previous{};
-    };
-
-    /**
-     * @brief A class template that defines a termination condition for root polishing algorithms.
-     *
-     * The PolishingStopToken class template provides a mechanism to define when a root polishing
-     * algorithm should stop iterating. It encapsulates an epsilon value and a maximum iteration count,
-     * and provides a callable interface to check if the termination condition is met. The termination
-     * condition is met when the current iteration count exceeds the maximum iteration count.
-     *
-     * @tparam EPS_T The type of the epsilon value. Must be a floating point type.
-     * @tparam ITER_T The type of the iteration count. Must be an integral type.
-     */
-    template<IsFloat EPS_T, std::integral ITER_T>
-    class PolishingStopToken
-    {
-        EPS_T m_eps; /**< The epsilon value for the termination condition. */
-        ITER_T m_maxiter; /**< The maximum iteration count for the termination condition. */
-
-      public:
-        /**
-         * @brief Default constructor. Initializes the epsilon value and maximum iteration count to default values.
-         */
-        explicit PolishingStopToken() : m_eps(epsilon<double>()), m_maxiter(iterations<double>()) {}
-
-        /**
-         * @brief Constructor. Initializes the epsilon value and maximum iteration count to the specified values.
-         * @param eps The epsilon value for the termination condition.
-         * @param maxiter The maximum iteration count for the termination condition.
-         */
-        explicit PolishingStopToken(EPS_T eps, ITER_T maxiter) : m_eps(eps), m_maxiter(maxiter) {}
-
-        /**
-         * @brief Constructor. Initializes the epsilon value and maximum iteration count to the specified values.
-         * @param maxiter The maximum iteration count for the termination condition.
-         * @param eps The epsilon value for the termination condition.
-         */
-        explicit PolishingStopToken(ITER_T maxiter, EPS_T eps) : m_eps(eps), m_maxiter(maxiter) {}
-
-        /**
-         * @brief Constructor. Initializes the epsilon value to the specified value and the maximum iteration count to a
-         * default value.
-         * @param eps The epsilon value for the termination condition.
-         */
-        explicit PolishingStopToken(EPS_T eps) : m_eps(eps), m_maxiter(iterations<double>()) {}
-
-        /**
-         * @brief Constructor. Initializes the maximum iteration count to the specified value and the epsilon value to a
-         * default value.
-         * @param maxiter The maximum iteration count for the termination condition.
-         */
-        explicit PolishingStopToken(ITER_T maxiter) : m_eps(epsilon<double>()), m_maxiter(maxiter) {}
-
-        /**
-         * @brief Checks if the termination condition is met.
-         * @param data The current iteration data.
-         * @return true if the termination condition is met, false otherwise.
-         */
-        bool operator()(const auto &data) const
+        template<typename ITER_T, typename EPS_T>
+        bool operator()(PolishingIterData<ITER_T, EPS_T> iterData, std::integral auto maxiter, IsFloat auto eps) const
         {
-            const auto &[iter, guess, previous] = data;
+            const auto &[iter, guess, previous] = iterData;
 
-            if (!previous.empty() && abs(guess - previous.back()) <= m_eps * abs(guess) + m_eps / 2) return true;
-            if (iter >= m_maxiter) return true;
+            if (!previous.empty() && abs(guess - previous.back()) <= eps * abs(guess) + eps / 2) return true;
+            if (iter >= maxiter) return true;
 
             return false;
         }
     };
 
-    // Deduction guides for PolishingStopToken class.
-    PolishingStopToken() -> PolishingStopToken<double, size_t>;
-    PolishingStopToken(IsFloat auto eps) -> PolishingStopToken<decltype(eps), size_t>;
-    PolishingStopToken(std::integral auto maxiter) -> PolishingStopToken<double, decltype(maxiter)>;
-    PolishingStopToken(IsFloat auto eps, std::integral auto maxiter)
-        -> PolishingStopToken<decltype(eps), decltype(maxiter)>;
-    PolishingStopToken(std::integral auto maxiter, IsFloat auto eps)
-        -> PolishingStopToken<decltype(eps), decltype(maxiter)>;
+    template<typename... Args>
+    using PolishingStopToken = StopToken<PolishingBehavior, Args...>;
 
     namespace detail {
-
-        /**
-         * @brief A class template that encapsulates the result of a root finding problem.
-         *
-         * The PolishingSolverResult class template is designed to hold the result of a root finding problem
-         * solved using a polishing solver. It stores an IterData object that contains the final iteration count
-         * and the final root estimate. The class provides methods to retrieve the result in different formats,
-         * depending on the needs of the user. The class is non-copyable and non-movable to ensure the integrity
-         * of the result data.
-         *
-         * @tparam ITER_T The type of the iteration count. Must be an integral type.
-         * @tparam RESULT_T The type of the root estimate. Must be a floating point type.
-         */
-        template<std::integral ITER_T, IsFloatOrComplex RESULT_T>
-        class PolishingSolverResult
-        {
-            PolishingIterData<ITER_T, RESULT_T>
-                m_iterData; /**< The IterData object holding the result of the root-finding problem. */
-
-          public:
-            /**
-             * @brief Constructor that initializes the IterData object with the provided data.
-             * @param iterData The IterData object that contains the final iteration count and root estimate.
-             */
-            explicit PolishingSolverResult(PolishingIterData<ITER_T, RESULT_T> iterData) : m_iterData(iterData) {}
-
-            PolishingSolverResult(const PolishingSolverResult &) = delete; // No copy constructor
-            PolishingSolverResult(PolishingSolverResult &&) = delete; // No move constructor
-
-            PolishingSolverResult &operator=(const PolishingSolverResult &) = delete; // No copy assignment
-            PolishingSolverResult &operator=(PolishingSolverResult &&) = delete; // No move assignment
-
-            /**
-             * @brief Retrieves the result of the root finding problem.
-             * @tparam OUTPUT_T The type in which to return the result. Defaults to the type of the root estimate.
-             * @return The root estimate. If OUTPUT_T is a class type, an object of that type is constructed with the
-             * IterData.
-             */
-            template<typename OUTPUT_T = RESULT_T>
-            auto result() &&
-            {
-                if constexpr (!std::constructible_from<OUTPUT_T, RESULT_T>)
-                    return OUTPUT_T{}(m_iterData);
-                else
-                    return m_iterData.guess;
-            }
-
-            /**
-             * @brief Retrieves the result of the root finding problem using a provided outputter function.
-             * @tparam OUTPUTTER_T The type of the outputter function.
-             * @param outputter The function to use to output the result.
-             * @return The result of the root finding problem, outputted using the provided function.
-             */
-            template<typename OUTPUTTER_T>
-            auto result(OUTPUTTER_T outputter) &&
-            {
-                return outputter(m_iterData);
-            }
-        };
-
-        /**
-         * @brief Deduction guide for PolishingSolverResult class.
-         * Allows the type of PolishingSolverResult class to be deduced from the constructor parameters.
-         */
-        template<typename ITER_T, typename RESULT_T>
-        PolishingSolverResult(PolishingSolverResult<ITER_T, RESULT_T>) -> PolishingSolverResult<ITER_T, RESULT_T>;
 
         /**
          * @brief Implements the root finding process for a given solver and termination token.
@@ -579,97 +453,21 @@ namespace nxx::roots {
             const auto &x = _solver.current();
             size_t iter = 0;
 
-            PolishingIterData<size_t, ARG_T> iterData{ iter, x };
+            PolishingIterData<size_t, ARG_T> iterData{ iter, x, {} };
+            auto &[_iter, _guess, _previous] = iterData;
 
             while (true) {
-                iterData.iter = iter;
-                iterData.guess = x;
+                _iter = iter;
+                _guess = x;
 
 
                 if (_terminator(iterData)) break;
-                // if (iter >= 100) break;
-                iterData.previous.push_back(x);
+                _previous.push_back(x);
                 _solver.iterate();
                 ++iter;
             }
 
-            return PolishingSolverResult(iterData);
-        }
-
-        /**
-         * @brief A function template that provides a common implementation for root finding algorithms.
-         *
-         * This function template, `fdfsolve_common`, provides a generic implementation for root finding
-         * algorithms that utilize polishing solvers. It is designed to work with solvers that conform
-         * to the requirements of polishing solvers. The function handles initialization, iteration, and
-         * convergence checking, returning the result along with any potential errors encountered during
-         * the solving process.
-         *
-         * @tparam SOLVER_T The template class of the solver to be used. Must be a valid polishing solver type.
-         * @tparam FN_T The type of the function for which the root is being refined.
-         * @tparam DERIV_T The type of the derivative function of FN_T.
-         * @tparam ARG_T The type of the initial guess for the root.
-         * @tparam Args The type of additional arguments passed to the function.
-         *
-         * @param func The function for which the root is being refined.
-         * @param derivative The derivative of the function.
-         * @param point The initial guess for the root.
-         * @param args Additional arguments passed to the function.
-         *
-         * @return The result of the root finding process.
-         *
-         * @note This function requires the termination token to be a callable object that accepts an IterData object.
-         */
-        template<template<typename, typename, typename> class SOLVER_T,
-            typename FN_T,
-            typename DERIV_T,
-            typename ARG_T,
-            typename... Args>
-        requires(sizeof...(Args) <= 2)
-        auto fdfsolve_common(FN_T func, DERIV_T derivative, const ARG_T &point, const Args &...args)
-        {
-            using TUPLE_T = std::tuple<Args...>;
-            using SOLVER = SOLVER_T<FN_T, DERIV_T, ARG_T>;
-            using ITERDATA_T = PolishingIterData<size_t, ARG_T>;
-
-            TUPLE_T args_tuple = std::make_tuple(args...);
-
-            // Zero arguments are passed...
-            if constexpr (std::tuple_size_v<TUPLE_T> == 0)
-                return detail::fdfsolve_impl(SOLVER(func, derivative, point), PolishingStopToken{});
-
-            // One argument is passed...
-            else if constexpr (std::tuple_size_v<TUPLE_T> == 1) {
-                using ArgType = std::tuple_element_t<0, TUPLE_T>;
-
-                // If the argument is a floating point or integral type, use it as maxiter/eps
-                if constexpr (std::is_floating_point_v<ArgType> || std::is_integral_v<ArgType>)
-                    return detail::fdfsolve_impl(
-                        SOLVER(func, derivative, point), PolishingStopToken(std::get<0>(args_tuple)));
-
-                // If the argument is a callable, use as a stop token
-                // TODO: Should be able to accept functors that take any king of argument, not just references.
-                else if constexpr (std::same_as<std::invoke_result_t<ArgType, ITERDATA_T &>, bool>)
-                    return detail::fdfsolve_impl(SOLVER(func, derivative, point), std::get<0>(args_tuple));
-
-                else
-                    std::invoke(
-                        []<bool flag = false>() { static_assert(flag, "Invalid argument passed to fsolve_common"); });
-            }
-
-            // Two arguments are passed...
-            else if constexpr (std::tuple_size_v<TUPLE_T> == 2) {
-                // Unpack and use the two arguments
-                using ArgType1 = std::tuple_element_t<0, decltype(args_tuple)>;
-                using ArgType2 = std::tuple_element_t<1, decltype(args_tuple)>;
-                static_assert(std::is_floating_point_v<ArgType1> != std::is_floating_point_v<ArgType2>,
-                    "Two arguments must be one floating point and "
-                    "one integral type");
-                return detail::fdfsolve_impl(SOLVER(func, derivative, point),
-                    PolishingStopToken(std::get<0>(args_tuple), std::get<1>(args_tuple)));
-            } else
-                std::invoke(
-                    []<bool flag = false>() { static_assert(flag, "Invalid argument passed to fsolve_common"); });
+            return ResultProxy<PolishingIterData<size_t, ARG_T>, 0, 1>(iterData);
         }
     } // namespace detail
 
@@ -703,9 +501,31 @@ namespace nxx::roots {
         typename... ARGS>
     auto fdfsolve(FN_T func, DERIV_T derivative, GUESS_T guess, ARGS... args)
     {
-        return detail::fdfsolve_common<SOLVER_T>(func, derivative, guess, args...);
+        using SOLVER = SOLVER_T<FN_T, DERIV_T, GUESS_T>;
+        return detail::fdfsolve_impl(SOLVER(func, derivative, guess), makeToken<PolishingStopToken>(args...));
     }
 
+    /**
+     * @brief A function template that solves a root finding problem using a specified solver.
+     *
+     * This function template, `fdfsolve`, provides a generic implementation for root finding
+     * algorithms that utilize polishing solvers. It is designed to work with solvers that conform
+     * to the requirements of polishing solvers, such as having a defined `IsPolishingSolver` static member,
+     * initialization, and iteration methods. The function handles initialization, iteration, and
+     * convergence checking, returning the result along with any potential errors encountered during
+     * the solving process.
+     *
+     * @tparam SOLVER_T The template class of the solver to be used. Must be a valid polishing solver type.
+     * @tparam FN_T The type of the function for which the root is being refined.
+     * @tparam GUESS_T The type of the initial guess for the root.
+     * @tparam ARGS The type of additional arguments passed to the function.
+     *
+     * @param func The function for which the root is being refined.
+     * @param guess The initial guess for the root.
+     * @param args Additional arguments passed to the function.
+     *
+     * @return The result of the root finding process.
+     */
     template<template<typename, typename, typename> class SOLVER_T,
         IsFloatOrComplexInvocable FN_T,
         IsFloatOrComplex GUESS_T,
@@ -715,9 +535,8 @@ namespace nxx::roots {
         using nxx::deriv::derivativeOf;
         using nxx::poly::derivativeOf;
 
-        return detail::fdfsolve_common<SOLVER_T>(func, derivativeOf(func), guess, args...);
+        return fdfsolve<SOLVER_T>(func, derivativeOf(func), guess, args...);
     }
-
 
     /**
      * @brief A function template that solves a root finding problem using a specified solver and termination token.
@@ -749,12 +568,35 @@ namespace nxx::roots {
         IsFloatOrComplexInvocable DERIV_T,
         IsFloatOrComplex GUESS_T>
     // TODO: Should be able to accept functors that take any king of argument, not just references.
-    requires std::invocable<TOKEN_T, PolishingIterData<size_t, GUESS_T> &>
+    requires std::invocable<TOKEN_T, PolishingIterData<size_t, GUESS_T>>
     auto fdfsolve(FN_T func, DERIV_T derivative, GUESS_T guess)
     {
-        return detail::fdfsolve_common<SOLVER_T>(func, derivative, guess, TOKEN_T{});
+        using SOLVER = SOLVER_T<FN_T, DERIV_T, GUESS_T>;
+        return detail::fdfsolve_impl(SOLVER(func, derivative, guess), TOKEN_T{});
     }
 
+    /**
+     * @brief A function template that solves a root finding problem using a specified solver and termination token.
+     *
+     * This function template, `fdfsolve`, provides a generic implementation for root finding
+     * algorithms that utilize polishing solvers. It is designed to work with solvers that conform
+     * to the requirements of polishing solvers, such as having a defined `IsPolishingSolver` static member,
+     * initialization, and iteration methods. The function handles initialization, iteration, and
+     * convergence checking, returning the result along with any potential errors encountered during
+     * the solving process.
+     *
+     * @tparam SOLVER_T The template class of the solver to be used. Must be a valid polishing solver type.
+     * @tparam TOKEN_T The type of the termination token. Must be a callable object that accepts an IterData object.
+     * @tparam FN_T The type of the function for which the root is being refined.
+     * @tparam GUESS_T The type of the initial guess for the root.
+     *
+     * @param func The function for which the root is being refined.
+     * @param guess The initial guess for the root.
+     *
+     * @return The result of the root finding process.
+     *
+     * @note This function requires the termination token to be a callable object that accepts an IterData object.
+     */
     template<template<typename, typename, typename> class SOLVER_T,
         typename TOKEN_T,
         IsFloatOrComplexInvocable FN_T,
@@ -766,7 +608,7 @@ namespace nxx::roots {
         using nxx::deriv::derivativeOf;
         using nxx::poly::derivativeOf;
 
-        return detail::fdfsolve_common<SOLVER_T>(func, derivativeOf(func), guess, TOKEN_T{});
+        return fdfsolve<SOLVER_T>(func, derivativeOf(func), guess, TOKEN_T{});
     }
 
 

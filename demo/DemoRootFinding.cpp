@@ -64,7 +64,7 @@ int main()
     // contain a value, the result of using the * operator is undefined.
     // ============================================================================================
 
-    auto token = [](const auto &data) {
+    auto token = [](const PolishingIterData<size_t, double> &data) {
         auto [iter, guess, previous] = data;
         auto function = []<nxx::IsFloat VAL_T>(VAL_T x) { return x * x - decltype(x)(5.0); };
         auto eval = function(guess);
@@ -86,7 +86,7 @@ int main()
         return false;
     };
 
-    auto outputter = [](const auto &data) -> tl::expected<decltype(data.guess), std::string> {
+    auto outputter = [](const auto &data) -> tl::expected<double, std::string> {
         auto [iter, guess, previous] = data;
         using expected = tl::expected<decltype(guess), std::string>;
 
@@ -110,12 +110,14 @@ int main()
               << std::endl;
 
     std::cout << "Newton's Method:          \n"
+          << fdfsolve<Newton>(func, 1.25, token).result<Expected>().error() << std::endl;
+    std::cout << "Newton's Method:          \n"
               << fdfsolve<Newton, Token>(func, 1.25).result<Expected>().error() << std::endl;
-    std::cout << "Secant Method:            \n"
-              << fdfsolve<Secant, Token>(func, 1.25).result<Expected>().error() << std::endl;
-    std::cout << "Steffensen's Method:      \n"
-              << fdfsolve<Steffensen, Token>(func, 1.25).result<Expected>().error() << std::endl
-              << std::endl;
+    // std::cout << "Secant Method:            \n"
+    //           << fdfsolve<Secant, Token>(func, 1.25).result<Expected>().error() << std::endl;
+    // std::cout << "Steffensen's Method:      \n"
+    //           << fdfsolve<Steffensen, Token>(func, 1.25).result<Expected>().error() << std::endl
+    //           << std::endl;
 
     // ============================================================================================
     // If more fine-grained control is needed, the algorithms can be used directly. Both the bracketing

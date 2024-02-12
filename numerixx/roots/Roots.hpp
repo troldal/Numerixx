@@ -48,8 +48,9 @@ namespace nxx::roots
     //               ITER_T  maxiter = iterations< GUESS_T >());
 }
 
+#include "Roots.Fwd.hpp"
 
-#include "impl/RootBracketing.hpp"
-#include "impl/RootPolishing.hpp"
-#include "impl/RootSearching.hpp"
+#include "impl/Bracketing.impl.hpp"
+#include "impl/Polishing.impl.hpp"
+#include "impl/Searching.impl.hpp"
 

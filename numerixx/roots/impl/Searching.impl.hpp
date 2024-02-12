@@ -31,7 +31,7 @@
 #pragma once
 
 // ===== Numerixx Includes
-#include "RootCommon.hpp"
+#include "Common.impl.hpp"
 #include <Constants.hpp>
 #include <Functions.hpp>
 
@@ -72,25 +72,18 @@ namespace nxx::roots {
 
     namespace detail {
 
-        /**
-         * @brief Validates the bounds for the search algorithm.
-         *
-         * This function checks if the lower and upper bounds are valid for the search algorithm.
-         * If the lower and upper bounds are equal, it throws a NumerixxError indicating invalid bounds.
-         * If the lower bound is greater than the upper bound, it swaps the two values to correct the bounds.
-         *
-         * @tparam ARG1 The type of the lower bound. Must be a floating point type.
-         * @tparam ARG2 The type of the upper bound. Must be a floating point type.
-         * @param bounds A pair representing the lower and upper bounds for the search algorithm.
-         * @throws NumerixxError If the lower and upper bounds are equal.
-         */
-        template<IsFloat ARG1, IsFloat ARG2>
-        void validateBounds(std::pair<ARG1, ARG2> &bounds)
+        template<typename>
+        struct SearchingTraits; // Forward declaration with variadic template parameters
+
+        // Generic specialization of SearchingTraits
+        template<template<typename, typename> class SearchMethod, // Template template parameter for the search method
+            typename FN,
+            typename ARG_T>
+        struct SearchingTraits<SearchMethod<FN, ARG_T>>
         {
-            auto &[lower, upper] = bounds;
-            if (lower == upper) throw NumerixxError("Invalid bounds.");
-            if (lower > upper) std::swap(lower, upper);
-        }
+            using FUNCTION_T = FN;
+            using RETURN_T = std::invoke_result_t<FN, double>;
+        };
 
         /**
          * @brief Provides a base class template for search-based algorithms.
@@ -664,12 +657,7 @@ namespace nxx::roots {
     // =================================================================================================================
 
     template<std::integral ITER_T, IsFloat RESULT_T>
-    struct SearchIterData
-    {
-        ITER_T iter; /**< The current iteration count. */
-        RESULT_T lower; /**< The lower bound around the root. */
-        RESULT_T upper; /**< The upper bound around the root. */
-    };
+    using SearchIterData = std::tuple<ITER_T, RESULT_T, RESULT_T>;
 
     template<IsFloatInvocable FN_T, IsFloat RATIO_T, std::integral ITER_T>
     class SearchStopToken
@@ -776,7 +764,7 @@ namespace nxx::roots {
                     return OUTPUT_T{}(m_iterData);
                 else
                     //                    return m_iterData.guess;
-                    return std::make_pair(m_iterData.lower, m_iterData.upper);
+                    return std::make_pair(std::get<1>(m_iterData), std::get<2>(m_iterData));
             }
 
             /**
@@ -808,11 +796,12 @@ namespace nxx::roots {
             size_t iter = 0;
 
             SearchIterData<size_t, ARG_T> iterData{ iter, lower, upper };
+            auto& [_iter, _lower, _upper] = iterData;
 
             while (true) {
-                iterData.iter = iter;
-                iterData.lower = lower;
-                iterData.upper = upper;
+                _iter = iter;
+                _lower = lower;
+                _upper = upper;
 
                 if (_terminator(iterData)) break;
                 _solver.iterate();
@@ -869,148 +858,8 @@ namespace nxx::roots {
                 std::invoke(
                     []<bool flag = false>() { static_assert(flag, "Invalid argument passed to fsolve_common"); });
         }
-
-
-        /**
-         * @brief Implements a generic search solver function template for bracketing searchers.
-         *
-         * This function template, `search_impl`, provides a generic implementation for search operations
-         * using various bracketing searcher algorithms. It is designed to work with solvers that conform
-         * to the requirements of bracketing searchers, such as having a defined `IsBracketingSearcher` static member,
-         * initialization, and iteration methods. The function handles initialization, iteration, and
-         * checking for a successful bracketing of the root, returning the result along with any potential errors
-         * encountered during the searching process.
-         *
-         * @tparam SOLVER The type of the solver to be used in search operations. Must conform to the bracketing
-         * searcher concept.
-         */
-        template<typename SOLVER>
-        requires SOLVER::IsBracketingSearcher
-        auto search_impl(SOLVER solver, IsFloatStruct auto bounds, IsFloat auto ratio, std::integral auto maxiter)
-        {
-            using ET = RootErrorImpl<decltype(bounds)>; /**< Type for error handling. */
-            using RT = tl::expected<decltype(bounds), ET>; /**< Type for the function return value. */
-            using std::isfinite;
-
-            // solver.init(bounds, ratio);
-            auto curBounds = solver.current();
-            RT result = curBounds;
-            typename SOLVER::RESULT_T eval_lower;
-            typename SOLVER::RESULT_T eval_upper;
-
-            // Check for NaN or Inf in the initial bounds.
-            if (!isfinite(solver.evaluate(curBounds.first)) || !isfinite(solver.evaluate(curBounds.second))) {
-                result =
-                    tl::make_unexpected(ET("Invalid initial brackets!", RootErrorType::NumericalError, result.value()));
-                return result;
-            }
-
-            int iter = 1;
-            while (true) {
-                curBounds = solver.current();
-                eval_lower = solver.evaluate(curBounds.first);
-                eval_upper = solver.evaluate(curBounds.second);
-
-                // Check for non-finite results.
-                if (!isfinite(curBounds.first) || !isfinite(curBounds.second) || !isfinite(eval_lower)
-                    || !isfinite(eval_upper)) {
-                    result =
-                        tl::make_unexpected(ET("Non-finite result!", RootErrorType::NumericalError, curBounds, iter));
-                    break;
-                }
-
-                // Check if the root is bracketed by the bounds. If yes, return the bounds.
-                if (eval_lower * eval_upper < 0.0) {
-                    result = curBounds;
-                    break;
-                }
-
-                // Check for maximum number of iterations.
-                if (iter >= maxiter) {
-                    result = tl::make_unexpected(ET("Maximum number of iterations exceeded!",
-                        RootErrorType::MaxIterationsExceeded,
-                        curBounds,
-                        iter));
-                    break;
-                }
-
-                // Otherwise, iterate the solver
-                solver.iterate();
-                ++iter;
-            }
-
-            return result;
-        }
     } // namespace detail
 
-    /**
-     * @brief Defines a high-level search function template `search` using bracketing searchers.
-     *
-     * The `search` function template provides a convenient interface for performing search operations
-     * using various bracketing searcher algorithms. It abstracts the creation and configuration of the
-     * solver instance and then delegates the actual search process to `search_impl`. This function is templated
-     * to accept a solver type, the function, bounds for the search, a search factor for controlling the search
-     * process, and a maximum number of iterations. It supports different types of bracketing searchers, making it
-     * versatile for various search needs.
-     *
-     * @tparam SOLVER_T The template class of the solver to be used. Must be a valid bracketing searcher type.
-     * @tparam FN_T The type of the function for which the search is being conducted.
-     * @tparam STRUCT_T The struct type holding the bounds for the search.
-     * @tparam FACTOR_T The type of the search factor, defaulted based on STRUCT_T.
-     * @tparam ITER_T The type of the maximum iterations count, defaulted to int.
-     */
-    //    template<template<typename, typename> class SOLVER_T,
-    //        IsFloatInvocable FN_T,
-    //        IsFloatStruct STRUCT_T,
-    //        IsFloat FACTOR_T = StructCommonType_t<STRUCT_T>,
-    //        std::integral ITER_T = int>
-    //    auto search(FN_T function,
-    //        STRUCT_T bounds,
-    //        FACTOR_T ratio = std::numbers::phi,
-    //        ITER_T maxiter = iterations<StructCommonType_t<STRUCT_T>>())
-    //    {
-    //        auto [lo, hi] = bounds; /**< Extract lower and upper bounds from the struct. */
-    //
-    //        using ARG_T = StructCommonType_t<STRUCT_T>; /**< Common type for the bounds. */
-    //        auto solver = SOLVER_T<FN_T, ARG_T>(function, bounds); /**< Instantiates the solver with the given
-    //        function. */
-    //
-    //        // Delegates the search process to search_impl, passing in the solver and other parameters.
-    //        return detail::search_impl(solver, std::pair<ARG_T, ARG_T>{ lo, hi }, ratio, maxiter);
-    //    }
-
-    /**
-     * @brief Extends the high-level search function template `search` for initializer list bounds.
-     *
-     * This version of the `search` function template allows for specifying the bounds using an initializer list.
-     * It is particularly useful when the bounds are known at compile time or for concise inline specifications.
-     * The function checks the size of the initializer list to ensure exactly two elements are provided for the
-     * bounds. It then creates a solver instance and delegates the search process to `search_impl`.
-     *
-     * @tparam SOLVER_T The template class of the solver to be used. Must be a valid bracketing searcher type.
-     * @tparam FN_T The type of the function for which the search is being conducted.
-     * @tparam ARG_T The type of the bounds and the argument to the function.
-     * @tparam FACTOR_T The type of the search factor, defaulted based on ARG_T.
-     * @tparam ITER_T The type of the maximum iterations count, defaulted to int.
-     */
-    //    template<template<typename, typename> class SOLVER_T,
-    //        IsFloatInvocable FN_T,
-    //        IsFloat ARG_T,
-    //        IsFloat FACTOR_T = ARG_T,
-    //        std::integral ITER_T = int,
-    //        size_t N>
-    //    requires(N == 2)
-    //    auto search(FN_T function,
-    //        const ARG_T (&bounds)[N],
-    //        FACTOR_T ratio = std::numbers::phi,
-    //        ITER_T maxiter = iterations<ARG_T>())
-    //    {
-    //        auto solver = SOLVER_T<FN_T, ARG_T>(
-    //            function, std::pair(bounds[0], bounds[1])); /**< Instantiates the solver with the given function. */
-    //
-    //        // Delegates the search process to search_impl, passing in the solver and other parameters.
-    //        return detail::search_impl(solver, std::pair(bounds[0], bounds[1]), ratio, maxiter);
-    //    }
 
     template<template<typename, typename> class SOLVER_T,
         IsFloatOrComplexInvocable FN_T,
@@ -1025,8 +874,8 @@ namespace nxx::roots {
         typename TOKEN_T,
         IsFloatOrComplexInvocable FN_T,
         IsFloatStruct STRUCT_T>
-    // TODO: Should be able to accept functors that take any king of argument, not just references.
-    requires std::invocable<TOKEN_T, BracketIterData<size_t, StructCommonType_t<STRUCT_T>> &>
+    // TODO: Should be able to accept functors that take any kind of argument, not just references.
+    requires std::invocable<TOKEN_T, SearchIterData<size_t, StructCommonType_t<STRUCT_T>> &>
     auto search(FN_T func, STRUCT_T bounds)
     {
         return detail::search_common<SOLVER_T>(func, bounds, TOKEN_T{});
@@ -1048,8 +897,8 @@ namespace nxx::roots {
         IsFloatOrComplexInvocable FN_T,
         IsFloat ARG_T,
         size_t N>
-    // TODO: Should be able to accept functors that take any king of argument, not just references.
-    requires(N == 2) && std::invocable<TOKEN_T, BracketIterData<size_t, ARG_T> &>
+    // TODO: Should be able to accept functors that take any kingd of argument, not just references.
+    requires(N == 2) && std::invocable<TOKEN_T, SearchIterData<size_t, ARG_T> &>
     auto search(FN_T func, const ARG_T (&bounds)[N])
     {
         auto bounds_ = std::span(bounds); // Mostly needed to suppress compiler warning.

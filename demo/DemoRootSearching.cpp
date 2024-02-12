@@ -90,8 +90,8 @@ int main()
 
     std::cout << "\nIdentify the brackets around the root of the polynomial, using a searchFactor of 2.0 and maxiter = 10: "
         << "\n";
-    //    std::cout << "BracketExpandUp Method:         " << PrintBounds(search< BracketExpandUp >(func, { 1.0, 1.1
-    //    }, 2.0, 10).result()) << std::endl;
+    // std::cout << "BracketExpandUp Method:         " << PrintBounds(search< BracketExpandUp >(func, { 1.0, 1.1
+    // }, 2.0, 10).result()) << std::endl;
 
     // ============================================================================================
     // As mentioned above, the search() function will return a tl::expected object, which will
