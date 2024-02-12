@@ -35,9 +35,6 @@
 #include <Constants.hpp>
 #include <Functions.hpp>
 
-// ===== External Includes
-#include "_external.hpp"
-
 // ===== Standard Library Includes
 #include <numbers>
 

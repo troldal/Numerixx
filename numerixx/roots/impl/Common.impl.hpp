@@ -85,27 +85,40 @@ namespace nxx::roots {
         ITER_T m_maxiter; /**< The maximum iteration count for the termination condition. */
 
       public:
-        explicit StopToken() : m_eps(epsilon<double>()), m_maxiter(iterations<double>()) {}
-
+        // Adjust the constructor to properly handle 0, 1, or 2 arguments.
         constexpr explicit StopToken(Args... args)
-        requires(sizeof...(Args) <= 2)
-          : m_eps(std::tuple_size_v<decltype(std::make_tuple(args...))> == 2
-                      ? std::get<EPS_T>(std::make_tuple(args...))
-                      : (std::same_as<decltype(std::get<0>(std::make_tuple(args...))), EPS_T>
-                                ? std::get<0>(std::make_tuple(args...))
-                                : epsilon<double>())),
-            m_maxiter(std::tuple_size_v<decltype(std::make_tuple(args...))> == 2
-                          ? std::get<ITER_T>(std::make_tuple(args...))
-                          : (std::same_as<decltype(std::get<0>(std::make_tuple(args...))), ITER_T>
-                                    ? std::get<0>(std::make_tuple(args...))
-                                    : iterations<double>()))
+          : m_eps([&]() -> EPS_T {
+                if constexpr (sizeof...(Args) == 2) {
+                    return std::get<0>(std::make_tuple(args...)); // Assuming the first arg is EPS_T
+                } else if constexpr (sizeof...(Args) == 1) {
+                    auto tuple = std::make_tuple(args...);
+                    if constexpr (std::is_same_v<decltype(std::get<0>(tuple)), EPS_T>) {
+                        return std::get<0>(tuple);
+                    } else {
+                        return epsilon<double>(); // Default or deduced EPS_T
+                    }
+                } else {
+                    return epsilon<double>(); // Default EPS_T for 0 arguments
+                }
+            }()),
+            m_maxiter([&]() -> ITER_T {
+                if constexpr (sizeof...(Args) == 2) {
+                    return std::get<1>(std::make_tuple(args...)); // Assuming the second arg is ITER_T
+                } else if constexpr (sizeof...(Args) == 1) {
+                    auto tuple = std::make_tuple(args...);
+                    if constexpr (std::is_same_v<decltype(std::get<0>(tuple)), ITER_T>) {
+                        return std::get<0>(tuple);
+                    } else {
+                        return iterations<double>(); // Default or deduced ITER_T
+                    }
+                } else {
+                    return iterations<double>(); // Default ITER_T for 0 arguments
+                }
+            }())
         {}
 
-        /**
-         * @brief Checks if the termination condition is met.
-         * @param data The current iteration data.
-         * @return true if the termination condition is met, false otherwise.
-         */
+        // Simplify default constructor if needed, or keep as is if the logic above is sufficient.
+
         bool operator()(const auto &data) const { return m_impl(data, m_maxiter, m_eps); }
 
         EPS_T eps() const { return m_eps; }
@@ -118,11 +131,14 @@ namespace nxx::roots {
         using TUPLE_T = std::tuple<Args...>;
         TUPLE_T args_tuple = std::make_tuple(args...);
 
-        if constexpr (sizeof...(Args) == 1 && !IsFloat<decltype(std::get<0>(args_tuple))>
-                      && !std::integral<decltype(std::get<0>(args_tuple))>)
+        if constexpr (sizeof...(Args) != 1)
+            return TOKEN_T<Args...>(args...);
+        else if constexpr (sizeof...(Args) == 1 && !IsFloat<decltype(std::get<0>(args_tuple))>
+                           && !std::integral<decltype(std::get<0>(args_tuple))>)
             return std::get<0>(args_tuple);
         else
-            return TOKEN_T<Args...>(args...);
+            []<bool flag = false> { static_assert(flag, "Invalid arguments for token."); }
+        ();
     }
 
     template<typename ITERDATA_T, size_t IterIndex, size_t ResultIndex>

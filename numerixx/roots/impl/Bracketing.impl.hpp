@@ -633,11 +633,11 @@ namespace nxx::roots {
         size_t N,
         typename... ARGS>
     requires(N == 2)
-    auto fsolve(FN_T func, const ARG_T (&bounds)[N], ARGS... args)
+    auto fsolve(FN_T func, const ARG_T (&bounds)[N], ARGS &&...args)
     {
         using SOLVER = SOLVER_T<FN_T, ARG_T>;
         return detail::fsolve_impl(
-            SOLVER(func, std::pair{ bounds[0], bounds[1] }), makeToken<BracketStopToken>(args...));
+            SOLVER(func, std::pair{ bounds[0], bounds[1] }), makeToken<BracketStopToken>(std::forward<ARGS>(args)...));
     }
 
     /**

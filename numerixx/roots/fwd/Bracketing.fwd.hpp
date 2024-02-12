@@ -56,7 +56,7 @@ namespace nxx::roots {
         size_t N,
         typename... ARGS>
     requires(N == 2)
-    auto fsolve(FN_T func, const ARG_T (&bounds)[N], ARGS... args);
+    auto fsolve(FN_T func, const ARG_T (&bounds)[N], ARGS &&...args);
 
     template<template<typename, typename> class SOLVER_T,
         typename TOKEN_T,

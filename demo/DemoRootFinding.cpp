@@ -98,16 +98,15 @@ int main()
     using Token = decltype(token);
 
     std::cout << "\nCompute the root of the polynomial f(x) = x^2 - 5 using bracketing methods:\n";
-    std::cout << "Bisection Method:         " << fsolve<Bisection>(func, { 0.0, 2.5 }, 1e-6, 100).result() << std::endl;
-    std::cout << "Ridder's Method:          " << fsolve<Ridder>(func, bounds, 1e-6, 100).result() << std::endl;
+    std::cout << "Bisection Method:         " << fsolve<Bisection>(func, { 0.0, 2.5 }).result() << std::endl;
+    std::cout << "Ridder's Method:          " << fsolve<Ridder>(func, bounds).result() << std::endl;
     std::cout << "Regula Falsi Method:      " << fsolve<RegulaFalsi>(func, bounds, 1e-6, 100).result() << std::endl
               << std::endl;
 
     std::cout << "\nCompute the root of the polynomial f(x) = x^2 - 5 using polishing methods:\n";
-    std::cout << "Newton's Method:          " << fdfsolve<Newton>(func, 1.25, 1e-6, 100).result() << std::endl;
-    std::cout << "Secant Method:            " << fdfsolve<Secant>(func, 1.25, 1e-6, 100).result() << std::endl;
-    std::cout << "Steffensen's Method:      " << fdfsolve<Steffensen>(func, 1.25, 1e-6, 100).result() << std::endl
-              << std::endl;
+    std::cout << "Newton's Method:          " << fdfsolve<Newton>(func, 1.25).result() << std::endl;
+    std::cout << "Secant Method:            " << fdfsolve<Secant>(func, 1.25).result() << std::endl;
+    std::cout << "Steffensen's Method:      " << fdfsolve<Steffensen>(func, 1.25).result() << std::endl << std::endl;
 
     std::cout << "Newton's Method:          \n"
               << fdfsolve<Newton>(func, 1.25, token).result<Expected>().error() << std::endl;
