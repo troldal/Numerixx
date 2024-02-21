@@ -29,10 +29,10 @@ int main()
     const MultiFunctionArray functions { f1, f2, f3 };
 
     auto result1 = multisolve<SteepestDescent>(functions, { 2.0, 2.0, 2.0 });
-    // auto result2 = multisolve<MultiNewton>(functions, *result1);
+    auto result2 = multisolve<MultiNewton>(functions, *result1);
 
-    std::cout << "Root:\n" << *result1 << std::endl;
-    std::cout << "Result:\n" << functions(*result1) << std::endl;
+    std::cout << "Root:\n" << *result2 << std::endl;
+    std::cout << "Result:\n" << functions(*result2) << std::endl;
 
     // auto               f1 = [](std::span< double > coeffs) { return 1 - coeffs[0]; };
     // auto               f2 = [](std::span< double > coeffs) { return 10 * (coeffs[1] - coeffs[0] * coeffs[0]); };

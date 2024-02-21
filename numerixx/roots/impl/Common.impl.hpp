@@ -137,8 +137,7 @@ namespace nxx::roots {
                            && !std::integral<decltype(std::get<0>(args_tuple))>)
             return std::get<0>(args_tuple);
         else
-            []<bool flag = false> { static_assert(flag, "Invalid arguments for token."); }
-        ();
+            return TOKEN_T<Args...>(args...);
     }
 
     template<typename ITERDATA_T, size_t IterIndex, size_t ResultIndex>
@@ -175,7 +174,7 @@ namespace nxx::roots {
         {
             // if constexpr (std::is_class_v<OUTPUT_T>)
             if constexpr (std::constructible_from<OUTPUT_T, decltype(std::get<ResultIndex>(m_iterData))>)
-                return OUTPUT_T{std::get<ResultIndex>(m_iterData)};
+                return OUTPUT_T(std::get<ResultIndex>(m_iterData));
             else if constexpr (std::is_class_v<OUTPUT_T>)
                 return OUTPUT_T{}(m_iterData);
             else
