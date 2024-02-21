@@ -55,7 +55,7 @@ namespace nxx
     T StepSize()
     {
         using std::pow;
-        return pow(std::numeric_limits< T >::epsilon(), 1.0 / 3.0);
+        return pow(std::numeric_limits<T>::epsilon(), 1.0 / 2.0);
     }
 } // namespace nxx
 

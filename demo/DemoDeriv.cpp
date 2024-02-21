@@ -223,6 +223,10 @@ int main()
     test3.emplace_back(s9, v9, r9, [&](NXX_FLOAT val){return *backward(f9, val);});
     print(test3);
 
+    auto mf = [](std::pair<double, double> p) { return p.first * p.first * p.second * p.second; };
+
+    std::cout << mdiff<Order2Mixed5Point>(mf, { 1.0, 1.0 }) << std::endl;
+
     return 0;
 }
 
