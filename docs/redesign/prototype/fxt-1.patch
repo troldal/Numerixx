@@ -1,0 +1,26 @@
+--- a/include/fxt/concepts/IsExpected.hpp	2026-09-18 22:09:36.859741400 +0200
++++ b/include/fxt/concepts/IsExpected.hpp	2026-09-27 19:13:02.041611400 +0200
+@@ -84,8 +84,8 @@
+         // std::move(t): the lvalue overloads of transform/and_then build their error
+         // path from `E&`, requiring error_type to be copy-constructible, which would
+         // wrongly reject expected-likes with a move-only error_type.
+-        std::move(t).transform([](auto&&) -> typename T::value_type { throw 0; });
+-        std::move(t).and_then([](auto&&) -> T { throw 0; });
++        std::move(t).transform([](auto&&) -> typename T::value_type { std::unreachable(); });
++        std::move(t).and_then([](auto&&) -> T { std::unreachable(); });
+     } && std::is_same_v<std::decay_t<T>, T>; // Ensure we work with decayed types
+ 
+     /**
+--- a/include/fxt/concepts/IsOptional.hpp	2026-09-18 22:09:36.860742000 +0200
++++ b/include/fxt/concepts/IsOptional.hpp	2026-09-27 19:13:02.043639500 +0200
+@@ -73,8 +73,8 @@
+         // actually constructed, the body just throws) is the only portable probe.
+         // Probe the rvalue-qualified overloads via std::move(t), mirroring
+         // expected_like, so move-only value_types are supported.
+-        std::move(t).transform([](auto&&) -> typename T::value_type { throw 0; });
+-        std::move(t).and_then([](auto&&) -> T { throw 0; });
++        std::move(t).transform([](auto&&) -> typename T::value_type { std::unreachable(); });
++        std::move(t).and_then([](auto&&) -> T { std::unreachable(); });
+ 
+     } && std::is_same_v<std::decay_t<T>, T> // Ensure we work with decayed types
+       && !requires(T t) { t.error(); };     // Must NOT have .error() member
