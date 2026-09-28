@@ -1,0 +1,196 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "NUMERIXX_BUILD_TESTS": "ON",
+        "NUMERIXX_BUILD_EXAMPLES": "ON",
+        "NUMERIXX_WARNINGS_AS_ERRORS": "ON"
+      }
+    },
+    {
+      "name": "windows",
+      "hidden": true,
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" },
+      "description": "Short object paths on CMake >= 4.2 (Windows MAX_PATH). The setting only works as a cache variable; CMake < 4.2 does not know it, so the unused-variable warning is switched off.",
+      "cacheVariables": { "CMAKE_INTERMEDIATE_DIR_STRATEGY": "SHORT" },
+      "warnings": { "unusedCli": false }
+    },
+    {
+      "name": "msvc",
+      "inherits": [ "base", "windows" ],
+      "displayName": "MSVC (cl, /std:c++latest); run from a Developer PowerShell",
+      "cacheVariables": { "CMAKE_CXX_COMPILER": "cl" }
+    },
+    {
+      "name": "clang-cl",
+      "inherits": [ "base", "windows" ],
+      "displayName": "clang-cl with the MSVC standard library; run from a Developer PowerShell",
+      "cacheVariables": { "CMAKE_CXX_COMPILER": "clang-cl" }
+    },
+    {
+      "name": "gcc",
+      "inherits": "base",
+      "displayName": "GCC + libstdc++ with library assertions (also builds the benchmarks)",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_CXX_FLAGS": "-D_GLIBCXX_ASSERTIONS",
+        "NUMERIXX_BUILD_BENCHMARKS": "ON"
+      }
+    },
+    {
+      "name": "clang",
+      "inherits": "base",
+      "displayName": "Clang + libc++",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_CXX_FLAGS": "-stdlib=libc++",
+        "CMAKE_EXE_LINKER_FLAGS": "-stdlib=libc++"
+      }
+    },
+    {
+      "name": "clang-asan",
+      "inherits": "clang",
+      "displayName": "Clang + libc++ with AddressSanitizer, UndefinedBehaviorSanitizer and libc++ debug hardening",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_FLAGS": "-stdlib=libc++ -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_DEBUG",
+        "NUMERIXX_SANITIZE": "address;undefined"
+      }
+    },
+    {
+      "name": "gcc-noexcept",
+      "inherits": "gcc",
+      "displayName": "GCC, -fno-exceptions (FXT pipes off until FXT-1 is pinned)",
+      "description": "GCC rejects the 'throw 0;' in FXT's concept probes under -fno-exceptions even in system headers; FXT-1 (DESIGN §8.2) fixes it. Until the FXT pin includes FXT-1, this leg builds without numerixx::pipes.",
+      "cacheVariables": {
+        "NUMERIXX_NO_EXCEPTIONS": "ON",
+        "NUMERIXX_WITH_FXT": "OFF",
+        "NUMERIXX_BUILD_BENCHMARKS": "OFF"
+      }
+    },
+    {
+      "name": "gcc-noexcept-pipes",
+      "inherits": "gcc-noexcept",
+      "displayName": "GCC, -fno-exceptions, with the FXT pipes (fails until the FXT pin includes FXT-1)",
+      "description": "The canary for FXT-1: CI runs it with continue-on-error, and it turns green once the pinned FXT commit replaces 'throw 0;' in its concept probes.",
+      "cacheVariables": { "NUMERIXX_WITH_FXT": "ON" }
+    },
+    {
+      "name": "gcc-multiprecision",
+      "inherits": "gcc",
+      "displayName": "GCC + standalone Boost.Multiprecision adapter and Boost.Math oracles",
+      "cacheVariables": {
+        "NUMERIXX_WITH_MULTIPRECISION": "ON",
+        "NUMERIXX_TEST_ORACLES": "ON",
+        "NUMERIXX_BUILD_BENCHMARKS": "OFF"
+      }
+    },
+    {
+      "name": "emscripten",
+      "inherits": "base",
+      "displayName": "Emscripten, wasm exceptions (tests run under node; needs EMSDK from emsdk_env)",
+      "toolchainFile": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_FLAGS": "-fwasm-exceptions",
+        "CMAKE_EXE_LINKER_FLAGS": "-fwasm-exceptions"
+      }
+    },
+    {
+      "name": "emscripten-jsexcept",
+      "inherits": "emscripten",
+      "displayName": "Emscripten, JavaScript-based exceptions (-fexceptions)",
+      "cacheVariables": { "CMAKE_CXX_FLAGS": "-fexceptions", "CMAKE_EXE_LINKER_FLAGS": "-fexceptions" }
+    },
+    {
+      "name": "emscripten-noexcept",
+      "inherits": "emscripten",
+      "displayName": "Emscripten, -fno-exceptions",
+      "cacheVariables": { "CMAKE_CXX_FLAGS": "", "CMAKE_EXE_LINKER_FLAGS": "", "NUMERIXX_NO_EXCEPTIONS": "ON" }
+    },
+    {
+      "name": "emscripten-pthread",
+      "inherits": "emscripten",
+      "displayName": "Emscripten, wasm exceptions and -pthread",
+      "cacheVariables": {
+        "CMAKE_CXX_FLAGS": "-fwasm-exceptions -pthread",
+        "CMAKE_EXE_LINKER_FLAGS": "-fwasm-exceptions -pthread"
+      }
+    },
+    {
+      "name": "integration",
+      "inherits": "base",
+      "displayName": "Consumer-build scenarios only (CPM and FetchContent parents, scalar-only, installed package)",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": null,
+        "NUMERIXX_BUILD_TESTS": "OFF",
+        "NUMERIXX_BUILD_EXAMPLES": "OFF",
+        "NUMERIXX_BUILD_INTEGRATION_TESTS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "msvc", "configurePreset": "msvc" },
+    { "name": "clang-cl", "configurePreset": "clang-cl" },
+    { "name": "gcc", "configurePreset": "gcc" },
+    { "name": "clang", "configurePreset": "clang" },
+    { "name": "clang-asan", "configurePreset": "clang-asan" },
+    { "name": "gcc-noexcept", "configurePreset": "gcc-noexcept" },
+    { "name": "gcc-noexcept-pipes", "configurePreset": "gcc-noexcept-pipes" },
+    { "name": "gcc-multiprecision", "configurePreset": "gcc-multiprecision" },
+    { "name": "emscripten", "configurePreset": "emscripten" },
+    { "name": "emscripten-jsexcept", "configurePreset": "emscripten-jsexcept" },
+    { "name": "emscripten-noexcept", "configurePreset": "emscripten-noexcept" },
+    { "name": "emscripten-pthread", "configurePreset": "emscripten-pthread" },
+    { "name": "integration", "configurePreset": "integration" }
+  ],
+  "testPresets": [
+    {
+      "name": "test-base",
+      "hidden": true,
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error", "stopOnFailure": false, "jobs": 8 }
+    },
+    { "name": "msvc", "inherits": "test-base", "configurePreset": "msvc" },
+    { "name": "clang-cl", "inherits": "test-base", "configurePreset": "clang-cl" },
+    { "name": "gcc", "inherits": "test-base", "configurePreset": "gcc" },
+    { "name": "clang", "inherits": "test-base", "configurePreset": "clang" },
+    { "name": "clang-asan", "inherits": "test-base", "configurePreset": "clang-asan" },
+    { "name": "gcc-noexcept", "inherits": "test-base", "configurePreset": "gcc-noexcept" },
+    { "name": "gcc-noexcept-pipes", "inherits": "test-base", "configurePreset": "gcc-noexcept-pipes" },
+    { "name": "gcc-multiprecision", "inherits": "test-base", "configurePreset": "gcc-multiprecision" },
+    { "name": "emscripten", "inherits": "test-base", "configurePreset": "emscripten" },
+    { "name": "emscripten-jsexcept", "inherits": "test-base", "configurePreset": "emscripten-jsexcept" },
+    { "name": "emscripten-noexcept", "inherits": "test-base", "configurePreset": "emscripten-noexcept" },
+    { "name": "emscripten-pthread", "inherits": "test-base", "configurePreset": "emscripten-pthread" },
+    {
+      "name": "integration",
+      "inherits": "test-base",
+      "configurePreset": "integration",
+      "execution": { "noTestsAction": "error", "stopOnFailure": false, "jobs": 1 }
+    }
+  ],
+  "workflowPresets": [
+    { "name": "msvc", "steps": [ { "type": "configure", "name": "msvc" }, { "type": "build", "name": "msvc" }, { "type": "test", "name": "msvc" } ] },
+    { "name": "clang-cl", "steps": [ { "type": "configure", "name": "clang-cl" }, { "type": "build", "name": "clang-cl" }, { "type": "test", "name": "clang-cl" } ] },
+    { "name": "gcc", "steps": [ { "type": "configure", "name": "gcc" }, { "type": "build", "name": "gcc" }, { "type": "test", "name": "gcc" } ] },
+    { "name": "clang", "steps": [ { "type": "configure", "name": "clang" }, { "type": "build", "name": "clang" }, { "type": "test", "name": "clang" } ] },
+    { "name": "clang-asan", "steps": [ { "type": "configure", "name": "clang-asan" }, { "type": "build", "name": "clang-asan" }, { "type": "test", "name": "clang-asan" } ] },
+    { "name": "gcc-noexcept", "steps": [ { "type": "configure", "name": "gcc-noexcept" }, { "type": "build", "name": "gcc-noexcept" }, { "type": "test", "name": "gcc-noexcept" } ] },
+    { "name": "gcc-noexcept-pipes", "steps": [ { "type": "configure", "name": "gcc-noexcept-pipes" }, { "type": "build", "name": "gcc-noexcept-pipes" }, { "type": "test", "name": "gcc-noexcept-pipes" } ] },
+    { "name": "gcc-multiprecision", "steps": [ { "type": "configure", "name": "gcc-multiprecision" }, { "type": "build", "name": "gcc-multiprecision" }, { "type": "test", "name": "gcc-multiprecision" } ] },
+    { "name": "emscripten", "steps": [ { "type": "configure", "name": "emscripten" }, { "type": "build", "name": "emscripten" }, { "type": "test", "name": "emscripten" } ] },
+    { "name": "emscripten-jsexcept", "steps": [ { "type": "configure", "name": "emscripten-jsexcept" }, { "type": "build", "name": "emscripten-jsexcept" }, { "type": "test", "name": "emscripten-jsexcept" } ] },
+    { "name": "emscripten-noexcept", "steps": [ { "type": "configure", "name": "emscripten-noexcept" }, { "type": "build", "name": "emscripten-noexcept" }, { "type": "test", "name": "emscripten-noexcept" } ] },
+    { "name": "emscripten-pthread", "steps": [ { "type": "configure", "name": "emscripten-pthread" }, { "type": "build", "name": "emscripten-pthread" }, { "type": "test", "name": "emscripten-pthread" } ] },
+    { "name": "integration", "steps": [ { "type": "configure", "name": "integration" }, { "type": "build", "name": "integration" }, { "type": "test", "name": "integration" } ] }
+  ]
+}

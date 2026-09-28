@@ -1,56 +1,98 @@
-# Numerixx: A Header-Only C++ Library for Numerical Computations
+# Numerixx
 
-Numerixx is a header-only C++ library that prioritizes ease of use and encapsulation, providing a collection of numerical computation algorithms for common tasks. While performance is important, the primary focus is on offering user-friendly interfaces and easy extensibility. The library covers algorithms for numerical derivatives, polynomials, one-dimensional root finding, root searching, and multi-dimensional root finding. Additional algorithms will be added in the future.
+A general-purpose, header-only numerical library for C++23, in the spirit of GSL but with a smaller scope:
+numerical differentiation, root finding, minimisation, polynomials, systems of nonlinear equations, quadrature and
+interpolation, done carefully, generically and composably.
 
-## Features
+- **Solvers are values.** A configured solver is a small immutable object; solvers compose (`first_of` tries the
+  next solver if one fails, `then` stages search, solve and polish).
+- **No exceptions.** Every result is a `std::expected` that carries the estimate, or the best estimate so far with
+  the reason for the failure and the iteration and evaluation counts.
+- **Illegal states do not compile** where the type system can express it, and are validated once at the boundary
+  where it cannot.
+- **Portable.** GCC, Clang, MSVC, clang-cl and Emscripten (WebAssembly). MIT licence.
 
-- User-friendly interfaces: Easily integrate numerical computations into your projects with intuitive function calls and classes.
-- Polynomial operations: Evaluate, differentiate, integrate, and manipulate polynomials with ease.
-- One-dimensional root finding: Quickly find roots of functions using both bracketing and polishing methods.
-- Root searching: Identify brackets where roots may be found for further root-finding iterations.
-- Multidimensional root finding: Solve systems of equations to find multidimensional roots.
+> **Status: Numerixx 2 is being rebuilt.** This branch contains the new build system and an empty library skeleton
+> (roadmap phase 0). The modules are ported phase by phase; see [the plan](docs/redesign/PLAN.md) and
+> [the design reference](docs/redesign/DESIGN.md). The previous API is preserved at the tags `v1.0.0` (master) and
+> `v1.1.0-legacy` (the last development branch); [MIGRATION.md](MIGRATION.md) maps it to the new one.
 
-## Getting Started
+## Requirements
 
-1. Clone the Numerixx repository:
+- A C++23 compiler: GCC ≥ 14, Clang ≥ 18 with libc++, MSVC 19.51 (`/std:c++latest`), clang-cl, or Emscripten ≥ 6.0.8.
+- CMake ≥ 3.25 (≥ 3.30 recommended on Windows) and Ninja.
 
-   ```bash
-   git clone https://github.com/troldal/numerixx.git
-    ```
-2. Add the `include` directory to your project's include path.
-3. Include the desired header files in your source code.
+Dependencies are fetched by [CPM.cmake](https://github.com/cpm-cmake/CPM.cmake), pinned by version and SHA256.
+The scalar modules need only the standard library.
 
-## Example Usage
+| Dependency | Needed by | Option (default) |
+|---|---|---|
+| [FXT](https://github.com/troldal/FXT) | `numerixx::pipes` (FXT pipe syntax for results) | `NUMERIXX_WITH_FXT` (ON) |
+| [Eigen](https://eigen.tuxfamily.org) 5.0.1 | `numerixx::linalg`, `numerixx::multiroots` | `NUMERIXX_WITH_LINALG` (ON) |
+| Boost.Multiprecision 1.92 (standalone) | `numerixx::multiprecision` adapter | `NUMERIXX_WITH_MULTIPRECISION` (OFF) |
+| doctest 2.5.3, google/benchmark 1.9.5, Boost.Math 1.92 | tests, benchmarks, test oracles | development only |
 
-```cpp
-#include <iostream>
-#include "numerixx/numerixx.hpp"
+## Using Numerixx
 
-int main() {
-// Calculate the derivative of a function
-double result = numerixx::derivative([](double x) { return x * x; }, 2.0);
+With CPM (declare it as `NAME Numerixx`, so that `-DCPM_Numerixx_SOURCE=<path>` can substitute a local checkout):
 
-    std::cout << "Derivative at x = 2: " << result << std::endl;
-
-    // Find a root of a function
-    double root = numerixx::findRoot([](double x) { return x * x - 4.0; }, 0.0, 3.0);
-
-    std::cout << "Root: " << root << std::endl;
-
-    // ... More examples ...
-    
-    return 0;
-}
+```cmake
+CPMAddPackage(NAME Numerixx GITHUB_REPOSITORY troldal/Numerixx GIT_TAG <commit-or-tag>)
+target_link_libraries(my_target PRIVATE numerixx::numerixx)   # every module, or link single ones: numerixx::roots
 ```
 
-## Documentation
-For detailed usage instructions, function references, and examples, please refer to the Numerixx Documentation.
+With FetchContent:
 
-## Contributing
-Contributions to Numerixx are welcome! If you find any issues or want to add new features, please submit a pull request or open an issue in the repository.
+```cmake
+include(FetchContent)
+FetchContent_Declare(numerixx GIT_REPOSITORY https://github.com/troldal/Numerixx.git GIT_TAG <commit-or-tag>)
+FetchContent_MakeAvailable(numerixx)
+```
 
-## License
-This project is licensed under the MIT License.
+As an installed package:
 
-## Acknowledgments
-Numerixx is inspired by the need for efficient and reliable numerical computation tools in C++. It draws inspiration from various numerical analysis textbooks and open-source libraries.
+```cmake
+find_package(numerixx 2.0 CONFIG REQUIRED)
+```
+
+Each module has its own target and header: `numerixx::roots` and `<numerixx/roots.hpp>`, and so on.
+`numerixx::numerixx` links every module, including the Eigen-backed `linalg` and `multiroots` when
+`NUMERIXX_WITH_LINALG` is ON (the default), and `numerixx::pipes` when `NUMERIXX_WITH_FXT` is ON. The umbrella
+header `<numerixx/numerixx.hpp>` includes the scalar modules (and the pipes) but never the Eigen-backed ones, so
+Eigen's compile cost is paid only where `<numerixx/linalg.hpp>` or `<numerixx/multiroots.hpp>` is included. A user
+of the scalar modules only can set `NUMERIXX_WITH_FXT=OFF` and `NUMERIXX_WITH_LINALG=OFF` and downloads neither
+dependency.
+
+If the parent project uses FXT or Eigen itself:
+
+- **CPM parents:** declare FXT as `NAME FXT` (with `FXT_USE_TL_EXPECTED` and `FXT_USE_TL_OPTIONAL` OFF) and Eigen as
+  `NAME Eigen3`. CPM deduplicates them in either order: declared first, Numerixx reuses the parent's `fxt::fxt` and
+  `Eigen3::Eigen`; declared after Numerixx, the parent gets those targets from Numerixx.
+- **FetchContent parents:** either fetch FXT and Eigen before Numerixx and define `fxt::fxt` and `Eigen3::Eigen`,
+  which Numerixx then reuses, or add Numerixx first and use the `fxt::fxt` and `Eigen3::Eigen` targets it defines.
+  After Numerixx, do not fetch FXT or Eigen again, define those targets again, or add FXT's or Eigen's own CMake
+  project: that is either an error (the target already exists) or a second copy of the library.
+
+## Building and testing
+
+Every configuration is a CMake preset; `cmake --workflow --preset <name>` configures, builds and tests it.
+
+| Preset | Toolchain |
+|---|---|
+| `gcc`, `gcc-noexcept`, `gcc-multiprecision` | GCC + libstdc++ with library assertions; without exceptions; with the multiprecision adapter and Boost.Math oracles |
+| `gcc-noexcept-pipes` | without exceptions but with the FXT pipes; fails until the FXT pin includes FXT-1 (an allowed failure in CI) |
+| `clang`, `clang-asan` | Clang + libc++; with AddressSanitizer, UndefinedBehaviorSanitizer and libc++ debug hardening |
+| `msvc`, `clang-cl` | MSVC and clang-cl (run from a Developer PowerShell) |
+| `emscripten`, `emscripten-jsexcept`, `emscripten-noexcept`, `emscripten-pthread` | Emscripten with wasm, JavaScript or no exceptions, and with `-pthread`; tests run under node (activate emsdk first) |
+| `integration` | the consumer-build scenarios: CPM and FetchContent parents, a scalar-only parent, an installed package |
+
+On Windows, keep the CPM cache and build directories short, because long paths lose files silently. Workflow
+presets accept no `-D` options, so set the cache location through the environment (or a `CMakeUserPresets.json`):
+
+```bash
+CPM_SOURCE_CACHE=C:/cpm cmake --workflow --preset gcc
+```
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).

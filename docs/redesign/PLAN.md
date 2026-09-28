@@ -263,7 +263,7 @@ The details and the full CMake sketch are in §4.
 | Eigen 5.0.1 | CPM, `DOWNLOAD_ONLY`, own target (skipped if a parent provides `Eigen3::Eigen`) | `numerixx::linalg`, `numerixx::multiroots` | `NUMERIXX_WITH_LINALG=ON` (turn off for scalar-only use) |
 | Boost.Config + Multiprecision 1.92 (standalone) | CPM, non-`Boost` package names | `numerixx::multiprecision` adapter | OFF |
 | Boost.Math 1.92 (standalone) | CPM | oracle tests only | OFF |
-| Catch2 3.16 | CPM, hash-pinned | tests | top-level only |
+| doctest 2.5.3 | CPM, hash-pinned | tests | top-level only |
 | google/benchmark 1.9.5 | CPM, hash-pinned | benchmarks | OFF |
 
 - **Deleted:** `vcpkg.json`, gcem, tl-expected, Blaze, LAPACK, OpenBLAS, OpenMP, nlohmann-json, fmt, hwinfo, Boost.Stacktrace, Boost.MultiArray, the 172-file vendored Google Benchmark copy, and the `.idea` toolchain paths.

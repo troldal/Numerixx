@@ -8,9 +8,8 @@ AlignEscapedNewlines: Left
 AlignOperands: Align
 AlignTrailingComments: true
 AllowAllArgumentsOnNextLine: false
-#AllowAllConstructorInitializersOnNextLine: false
-PackConstructorInitializers: Never
-AllowAllParametersOfDeclarationOnNextLine: false
+AllowAllConstructorInitializersOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: true
 AllowShortBlocksOnASingleLine: Always
 AllowShortCaseLabelsOnASingleLine: false
 AllowShortEnumsOnASingleLine: true
@@ -43,15 +42,13 @@ BraceWrapping:
   SplitEmptyFunction: false
   SplitEmptyNamespace: true
   SplitEmptyRecord: true
-BreakAfterAttributes: Always
 BreakAfterJavaFieldAnnotations: true
 BreakBeforeBinaryOperators: None
-BreakBeforeConceptDeclarations: Always
 #BreakBeforeInheritanceComma: true
 BreakBeforeTernaryOperators: true
 BreakConstructorInitializers: BeforeColon
 #BreakConstructorInitializersBeforeComma: false
-BreakInheritanceList: AfterComma
+BreakInheritanceList: BeforeColon
 BreakStringLiterals: true
 ColumnLimit: 140
 CommentPragmas: '^ IWYU pragma:'
@@ -95,8 +92,6 @@ ObjCBlockIndentWidth: 7
 ObjCSpaceAfterProperty: true
 ObjCSpaceBeforeProtocolList: false
 PointerAlignment: Left
-RequiresClausePosition: WithPreceding
-RequiresExpressionIndentation: Keyword
 ReflowComments: true
 SortIncludes: CaseSensitive
 SortUsingDeclarations: true
@@ -113,7 +108,7 @@ SpaceBeforeSquareBrackets: false
 SpaceInEmptyBlock: false
 SpaceInEmptyParentheses: false
 SpacesBeforeTrailingComments: 4
-SpacesInAngles: true
+SpacesInAngles: false
 SpacesInCStyleCastParentheses: false
 SpacesInConditionalStatement: false
 SpacesInContainerLiterals: false

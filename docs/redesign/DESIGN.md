@@ -168,7 +168,7 @@ Status legend: **v2.0** = in the first release; **planned** = scheduled in §10.
 | D25 | CMake and CPM | CMake ≥ 3.25 (3.30+ recommended on Windows). CPM 0.43.2 committed, with a wrapper that reuses a parent's CPM. `set(CMAKE_POLICY_DEFAULT_CMP0168 NEW)` before CPM. | vcpkg; plain FetchContent | Verified: plain `cmake_policy(SET …)` does not reach CPM. |
 | D26 | FXT fetch | `NAME FXT`, pinned SHA + SHA256, `DOWNLOAD_ONLY`, own `fxt::fxt` shim only if no parent provides it; `-DCPM_FXT_SOURCE=` override. Fetched when `NUMERIXX_WITH_FXT` (default ON). | Running FXT's own CMake | FXT's CMake downloads unhashed CPM and TL repositories that fail under MAX_PATH. |
 | D27 | Boost | None in the library. Standalone boostorg `config` + `multiprecision` (+ `math` for oracles) 1.92.0 under non-`Boost` package names, OFF by default. | Full Boost; vcpkg | The library needs none, so no user pays for Boost headers in every TU (measured: in Numerixx 1.x, the deriv header alone brought about 477 Boost headers into every TU that included it). Claiming the common package name `Boost` would clash with a parent project that declares its own (possibly partial) Boost, where the first declaration wins (R-B4). |
-| D28 | Tests | Catch2 3.16.0 via CPM. Corpus + property + compile-fail (control twins, reason-string checks) + `static_assert` suites; header self-containment; layering; EH-mode legs; scalar matrix (`float`, `double`, `long double`, `cpp_bin_float_50`); determinism; oracles (Boost.Math, Eigen `HybridNonLinearSolver`). | FetchContent Catch2 3.4 | Only 2 of 4 test files compile today. |
+| D28 | Tests | doctest 2.5.3 via CPM (the author's choice). Corpus + property + compile-fail (control twins, reason-string checks) + `static_assert` suites; header self-containment; layering; EH-mode legs; scalar matrix (`float`, `double`, `long double`, `cpp_bin_float_50`); determinism; oracles (Boost.Math, Eigen `HybridNonLinearSolver`). | Catch2 3.16 via CPM; FetchContent Catch2 3.4 (today) | Only 2 of 4 test files compile today. doctest is a single header with a small compile-time footprint and detects `-fno-exceptions` by itself. |
 | D29 | Defaults | `roots::solve(f, bracket)`: the corpus-chosen bracketing solver (Brent provisionally). `solve(f, x0)`: `then(expand, brent)`. `solve(f, df, x0)`: `then(expand, rtsafe)`. `optimize::minimize`: Brent-min. `integrate::quad`: adaptive G7K15. `deriv::central`: optimal relative step. `multiroots::solve`: dogleg with Broyden updates once it passes the phase-5 corpus; until then damped Newton with an FD Jacobian. | TOMS748 by fiat | Choose by mean and worst-case evaluation counts on the §9.2 corpus, recorded in phase 3 and re-run in phase 8 when TOMS748 and ITP arrive. |
 | D30 | Polynomial roots | Deterministic Aberth–Ehrlich with polishing of every root; sum types for the closed forms; no dependency on `roots` | Laguerre with `random_device` | Reproducible results. Breaks the roots↔poly cycle. |
 | D31 | Migration | Tags `v1.0.0` and `v1.1.0-legacy` let existing users pin the old API; `MIGRATION.md` maps old calls to new ones; no compatibility shim (§10.4). | A compatibility shim | A shim would reproduce removed bugs: unchecked results, success at maxiter, the O(1)-wrong default second and mixed derivatives. |
@@ -277,7 +277,7 @@ Rules:
 
 ### 4.1 Principles (verified in build experiments)
 
-1. The core needs only the standard library. FXT is needed only by `numerixx::pipes`, and Eigen only by `numerixx::linalg` and `numerixx::multiroots`. Everything else is optional (Boost) or development-only (Catch2, benchmark, Doxygen).
+1. The core needs only the standard library. FXT is needed only by `numerixx::pipes`, and Eigen only by `numerixx::linalg` and `numerixx::multiroots`. Everything else is optional (Boost) or development-only (doctest, benchmark, Doxygen).
 2. **Be a good subproject.** Tests, examples, benchmarks and docs are OFF when not top-level. No global flags, no `export(PACKAGE)`, no REQUIRED `find_package`. Reuse any CPM, FXT, Eigen or Boost targets a parent provides. Never claim a common CPM package name such as `Boost` (D27). Tested with a CPM parent and a FetchContent parent, in both declaration orders (§9.4). Documented for parents:
    - declare Numerixx as `CPMAddPackage(NAME Numerixx …)`, so that `CPM_Numerixx_SOURCE` can replace it with a local checkout;
    - a parent that uses FXT itself declares it as `NAME FXT` with `FXT_USE_TL_EXPECTED` and `FXT_USE_TL_OPTIONAL` OFF (their defaults); CPM then deduplicates it with Numerixx's declaration, and Numerixx reuses the parent's `fxt::fxt` (D26).
@@ -294,7 +294,7 @@ Rules:
 | **Eigen** | 5.0.1, SHA256 `e9c326dc…3dec` (fallback `GIT_TAG 5.0.1`) | `DOWNLOAD_ONLY` + own INTERFACE target, unless a parent provides `Eigen3::Eigen` | `numerixx::linalg`, `numerixx::multiroots`; the `HybridNonLinearSolver` oracle tests | `NUMERIXX_WITH_LINALG=ON` |
 | Boost.Config + Boost.Multiprecision | boost-1.92.0 (SHA256 `b4171037…a0`, `9da99784…01d0`) | standalone boostorg repos, `BOOST_MP_STANDALONE ON`; package names `boost_config`/`boost_multiprecision`; guarded by `if(NOT TARGET Boost::multiprecision)` | `numerixx::multiprecision` adapter | OFF |
 | Boost.Math | boost-1.92.0 (SHA256 `aa84eec6…2c48`) | standalone, `BOOST_MATH_STANDALONE ON` | oracle tests only (roots, minima, quadrature; §9.1) | OFF (`NUMERIXX_TEST_ORACLES`) |
-| Catch2 | v3.16.0, SHA256 `0957cae5…af34` | URL + hash, fetched inside `tests/` | tests | top-level only |
+| doctest | v2.5.3, SHA256 `174ebc4e…1331` | URL + hash, fetched inside `tests/`; the test main is built by Numerixx (C++23, the tests' exception model) | tests | top-level only |
 | google/benchmark | v1.9.5, SHA256 `9631341c…a340` | URL + hash | benchmarks | OFF |
 | Doxygen / Sphinx / Breathe | system | `find_package` without REQUIRED | docs | OFF |
 
@@ -306,7 +306,7 @@ Rules:
 
 | Option | Default | Meaning |
 |---|---|---|
-| `NUMERIXX_BUILD_TESTS` | `PROJECT_IS_TOP_LEVEL` | Catch2 suite, header check, compile-fail, layering |
+| `NUMERIXX_BUILD_TESTS` | `PROJECT_IS_TOP_LEVEL` | doctest suite, header check, compile-fail, layering |
 | `NUMERIXX_BUILD_EXAMPLES` | OFF | examples, registered as smoke tests |
 | `NUMERIXX_BUILD_BENCHMARKS` | OFF | ignored under Emscripten |
 | `NUMERIXX_BUILD_DOCS` | OFF | skipped with a message if the tools are missing |
@@ -318,6 +318,7 @@ Rules:
 | `NUMERIXX_NO_EXCEPTIONS` | OFF | tests/examples with `-fno-exceptions` or `/EHs-c- /D_HAS_EXCEPTIONS=0` |
 | `NUMERIXX_WARNINGS_AS_ERRORS` | OFF (ON in presets) | `-Werror` / `/WX` on owned targets |
 | `NUMERIXX_SANITIZE` | "" | e.g. `address;undefined` (tests only) |
+| `NUMERIXX_BUILD_INTEGRATION_TESTS` | OFF | register the consumer-build scenarios of §9.4 as CTest tests (`tests/integration`, preset `integration`); host builds only |
 
 ### 4.4 CMake sketch (condensed from verified build experiments; the linalg wiring is [sketch])
 
@@ -360,7 +361,8 @@ if(NUMERIXX_WITH_LINALG)
                   URL_HASH SHA256=${NUMERIXX_EIGEN_SHA256} DOWNLOAD_ONLY YES)   # fallback: GIT_TAG 5.0.1
     add_library(numerixx_eigen INTERFACE)
     target_include_directories(numerixx_eigen SYSTEM INTERFACE
-      $<BUILD_INTERFACE:${Eigen_SOURCE_DIR}> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/eigen3>)
+      $<BUILD_INTERFACE:${Eigen_SOURCE_DIR}> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/numerixx-deps/eigen3>)
+    # (the implementation installs fetched FXT and Eigen below include/numerixx-deps, never over another installation)
     set(NUMERIXX_EIGEN_TARGET numerixx_eigen)
   endif()
 endif()
@@ -405,7 +407,7 @@ The install/export (`numerixx-config.cmake`, `SameMinorVersion`, a `find_depende
 
 ### 4.5 Presets, Emscripten and Windows
 
-- **Presets** (`CMakePresets.json` v6, verified to parse on CMake 3.29 and 4.3): `msvc`, `clang-cl`, `gcc`, `clang` (libc++), `clang-asan`, `gcc-noexcept`, `gcc-multiprecision`, `emscripten` (`-fwasm-exceptions`), `emscripten-jsexcept` (JavaScript-based `-fexceptions`), `emscripten-noexcept`, `emscripten-pthread` (`-fwasm-exceptions -pthread`), and workflow presets.
+- **Presets** (`CMakePresets.json` v6, verified to parse on CMake 3.29 and 4.3): `msvc`, `clang-cl`, `gcc`, `clang` (libc++), `clang-asan`, `gcc-noexcept`, `gcc-noexcept-pipes` (the FXT-1 canary, an allowed failure until the FXT pin includes FXT-1), `gcc-multiprecision`, `integration` (the consumer-build scenarios), `emscripten` (`-fwasm-exceptions`), `emscripten-jsexcept` (JavaScript-based `-fexceptions`), `emscripten-noexcept`, `emscripten-pthread` (`-fwasm-exceptions -pthread`), and workflow presets.
 - **Emscripten.**
   - Test link flags: `-sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=1MB -sEXIT_RUNTIME=1 -sNODERAWFS=1`.
   - `long double` on wasm32 is software quad.
@@ -1576,7 +1578,7 @@ Once FXT-4..7 exist, Numerixx's `first_of_t` can delegate to `fxt::first_of_with
 
 | Layer | Mechanism |
 |---|---|
-| Unit and property | Catch2 v3 `TEST_CASE`/`TEMPLATE_TEST_CASE`/`GENERATE`; one executable per module, linking only that module; `catch_discover_tests(... DISCOVERY_MODE PRE_TEST ADD_TAGS_AS_LABELS)`, fixed `--rng-seed` |
+| Unit and property | doctest `TEST_CASE`/`TEST_CASE_TEMPLATE`/`SUBCASE` inside `TEST_SUITE`s; one executable per module, linking only that module; `doctest_discover_tests`, one CTest test per test case, labelled with its module. Without exceptions a failed `REQUIRE` reports but does not end the test case, so no test relies on `REQUIRE` to guard a dereference: results are compared whole (`CHECK(r == 3)` on an `expected`). doctest has no generators, so property tests loop over samples drawn from a `std::mt19937` with a fixed seed |
 | Compile-time contracts | `static_assert` on concepts and traits; constexpr solves where portable (1-D); **regularity** (`std::copyable` for every solver, chain, `_fn` and `any_solver`; `semiregular` when parts are default-constructible); **defaults achievable for every T** (§3.5). Result sizes are printed, not asserted |
 | Compile-fail | `WILL_FAIL` builds, each with a `NUMERIXX_CF_CONTROL` twin that must compile; `RESOURCE_LOCK`. **On GCC and Clang, `PASS_REGULAR_EXPRESSION` checks that the reason string appears in the first error**; MSVC checks only that the build fails. Line counts are recorded, not gated: GCC 16's nested explanations alone make 77 lines for the `then` contract **[prototyped]**. Cases: bisection given a guess; int guess; `first_of` without `.on`; open method → bracket solver in `then`; run-time `bracket{}` literal; wrong-length fixed-size guess; `x_tol` on a bracketing solver; `f_tol` on a minimiser; Newton without a derivative; mixed callback error types; an `any_solver` from a solver with a different result type. Plus the documented MSVC-only `WILL_FAIL` for the P2564 escalation probe. |
 | Structural | header self-containment (every header compiled twice); layering against the DAG allow-list (Eigen only under linalg/multiroots); **consumer TU with `/W4 /WX` (MSVC) and `-Wall -Wextra -Werror` defining a global `f`** |
@@ -1686,7 +1688,7 @@ Use a fresh tree on this redesign branch, which descends from master. Port algor
 ### 10.2 The first de-risking spike (3–4 days; right after phase 0)
 
 Already proven:
-- **Build experiments:** the CPM 0.43.2 bootstrap with parent reuse; FXT `DOWNLOAD_ONLY` + shim + override; Eigen and standalone Boost fetched `DOWNLOAD_ONLY` with own targets; Catch2 discovery (including under node); compile-fail with controls; header self-containment; layering; install + `find_package`; CPM and FetchContent parents; presets.
+- **Build experiments:** the CPM 0.43.2 bootstrap with parent reuse; FXT `DOWNLOAD_ONLY` + shim + override; Eigen and standalone Boost fetched `DOWNLOAD_ONLY` with own targets; test discovery (including under node; verified with Catch2 before the switch to doctest in phase 0); compile-fail with controls; header self-containment; layering; install + `find_package`; CPM and FetchContent parents; presets.
 - **Linear-algebra research:** Eigen 5.0.1 under em++ 6.0.8, including `-fno-exceptions`, and with `cpp_bin_float_50` scalars.
 - **Exploratory solver prototypes:** constexpr solves; ITP; N-D Newton.
 - **Prototype [prototyped]:**

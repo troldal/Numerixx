@@ -1,0 +1,129 @@
+# Numerixx CI (DESIGN §9.4). Every leg runs a CMake workflow preset from CMakePresets.json, so a leg can be
+# reproduced locally with `cmake --workflow --preset <name>`.
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:   # run on any branch from the Actions tab
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2025-vs2026
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [msvc, clang-cl]
+    env:
+      CPM_SOURCE_CACHE: 'C:\cpm'   # short on purpose: long paths lose files silently (Windows MAX_PATH)
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v4
+        with:
+          path: 'C:\cpm'
+          key: cpm-windows-${{ hashFiles('cmake/NumerixxDependencies.cmake', 'tests/CMakeLists.txt', 'benchmarks/CMakeLists.txt') }}
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756   # v1.13.0; cl and VS clang-cl on PATH
+      - run: cmake --workflow --preset ${{ matrix.preset }}
+
+  linux-clang:
+    runs-on: ubuntu-26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [clang, clang-asan]
+    env:
+      CPM_SOURCE_CACHE: ${{ github.workspace }}/.cpm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v4
+        with:
+          path: .cpm
+          key: cpm-linux-${{ hashFiles('cmake/NumerixxDependencies.cmake', 'tests/CMakeLists.txt', 'benchmarks/CMakeLists.txt') }}
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang-22 libc++-22-dev libc++abi-22-dev libclang-rt-22-dev
+      - run: cmake --preset ${{ matrix.preset }} -DCMAKE_CXX_COMPILER=clang++-22
+      - run: cmake --build --preset ${{ matrix.preset }}
+      - run: ctest --preset ${{ matrix.preset }}
+
+  linux-gcc:
+    runs-on: ubuntu-latest
+    container: gcc:16
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [gcc, gcc-noexcept, gcc-noexcept-pipes, gcc-multiprecision]
+    # gcc-noexcept-pipes is the FXT-1 canary: it fails until the pinned FXT commit replaces 'throw 0;' (DESIGN §8.2).
+    continue-on-error: ${{ matrix.preset == 'gcc-noexcept-pipes' }}
+    env:
+      CPM_SOURCE_CACHE: /__w/.cpm
+    steps:
+      - run: apt-get update && apt-get install -y cmake ninja-build
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v4
+        with:
+          path: /__w/.cpm
+          key: cpm-gcc-${{ hashFiles('cmake/NumerixxDependencies.cmake', 'tests/CMakeLists.txt', 'benchmarks/CMakeLists.txt') }}
+      - run: cmake --workflow --preset ${{ matrix.preset }}
+
+  emscripten:
+    runs-on: ubuntu-26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [emscripten, emscripten-jsexcept, emscripten-noexcept, emscripten-pthread]
+    env:
+      CPM_SOURCE_CACHE: ${{ github.workspace }}/.cpm
+      EMSDK_VERSION: '6.0.10'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v4
+        with:
+          path: ~/emsdk
+          key: emsdk-${{ env.EMSDK_VERSION }}-${{ matrix.preset }}   # each exception mode builds its own system libraries
+          restore-keys: emsdk-${{ env.EMSDK_VERSION }}-
+      - uses: actions/cache@v4
+        with:
+          path: .cpm
+          key: cpm-emscripten-${{ hashFiles('cmake/NumerixxDependencies.cmake', 'tests/CMakeLists.txt') }}
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - run: |
+          [ -d ~/emsdk ] || git clone --depth 1 https://github.com/emscripten-core/emsdk.git ~/emsdk
+          ~/emsdk/emsdk install "$EMSDK_VERSION"
+          ~/emsdk/emsdk activate "$EMSDK_VERSION"
+      - run: |
+          source ~/emsdk/emsdk_env.sh
+          cmake --workflow --preset ${{ matrix.preset }}
+
+  consumers:
+    # CPM and FetchContent parents in both declaration orders, a parent with its own "Boost" package, a scalar-only
+    # parent that must not download FXT or Eigen, and find_package on an installed Numerixx (tests/integration).
+    runs-on: ubuntu-26.04
+    env:
+      CPM_SOURCE_CACHE: ${{ github.workspace }}/.cpm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v4
+        with:
+          path: .cpm
+          key: cpm-consumers-${{ hashFiles('cmake/NumerixxDependencies.cmake', 'tests/integration/**') }}
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - run: cmake --workflow --preset integration
+
+  format:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: sudo apt-get update && sudo apt-get install -y clang-format-22
+      - run: |
+          find include tests examples benchmarks -name '*.hpp' -o -name '*.cpp' \
+            | grep -v '/fake_boost/' \
+            | xargs clang-format-22 --dry-run -Werror
