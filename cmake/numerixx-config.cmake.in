@@ -1,0 +1,26 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Dependencies that the installed targets link but that were not installed with Numerixx: an Eigen and a Boost that
+# were found as installed packages when Numerixx was built.
+if(@NUMERIXX_CONFIG_FIND_EIGEN@ AND NOT TARGET Eigen3::Eigen)
+  find_dependency(Eigen3 @NUMERIXX_CONFIG_EIGEN_VERSION@ CONFIG)
+endif()
+if(@NUMERIXX_CONFIG_FIND_BOOST@)
+  if(NOT TARGET Boost::config)
+    find_dependency(boost_config CONFIG)
+  endif()
+  if(NOT TARGET Boost::multiprecision)
+    find_dependency(boost_multiprecision CONFIG)
+  endif()
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/numerixx-targets.cmake")
+
+# The FXT headers installed with Numerixx are exported as numerixx::fxt; offer the usual name too.
+if(TARGET numerixx::fxt AND NOT TARGET fxt::fxt)
+  add_library(fxt::fxt ALIAS numerixx::fxt)
+endif()
+
+check_required_components(numerixx)

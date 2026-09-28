@@ -1,0 +1,23 @@
+# nxx_check_parent_boost(<parent boost dir>)
+# Checks, after both the parent's "Boost" package and Numerixx (with NUMERIXX_WITH_MULTIPRECISION) were added, that
+# "Boost" is registered exactly once and points at the parent's source, and that Numerixx provided its adapter
+# through its own, differently named standalone packages.
+function(nxx_check_parent_boost parent_dir)
+  set(boost_entries ${CPM_PACKAGES})
+  list(FILTER boost_entries INCLUDE REGEX "^Boost$")
+  list(LENGTH boost_entries count)
+  if(NOT count EQUAL 1)
+    message(FATAL_ERROR "expected exactly one CPM package named Boost, found ${count} (${CPM_PACKAGES})")
+  endif()
+  file(REAL_PATH "${parent_dir}" expected)
+  file(REAL_PATH "${CPM_PACKAGE_Boost_SOURCE_DIR}" actual)
+  if(NOT actual STREQUAL expected)
+    message(FATAL_ERROR "the Boost package points at '${actual}', not at the parent's '${expected}'")
+  endif()
+  if(NOT "boost_multiprecision" IN_LIST CPM_PACKAGES)
+    message(FATAL_ERROR "Numerixx did not add its standalone boost_multiprecision package (${CPM_PACKAGES})")
+  endif()
+  if(NOT TARGET Boost::multiprecision OR NOT TARGET numerixx::multiprecision)
+    message(FATAL_ERROR "Numerixx did not provide Boost::multiprecision and numerixx::multiprecision")
+  endif()
+endfunction()

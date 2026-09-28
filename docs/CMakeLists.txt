@@ -1,38 +1,16 @@
-find_package(Doxygen REQUIRED)
-find_package(Sphinx REQUIRED)
+# API documentation (NUMERIXX_BUILD_DOCS, OFF by default). Skipped with a message when Doxygen is missing.
+# The user documentation is rewritten in phase 9 (DESIGN §10.3); docs/redesign holds the design documents.
+find_package(Doxygen)
+if(NOT DOXYGEN_FOUND)
+  message(STATUS "Numerixx: Doxygen not found; the numerixx_docs target is not available")
+  return()
+endif()
 
-# Find all the public headers
-get_target_property(NUMERIXX_PUBLIC_HEADER_DIR nxx_all INTERFACE_INCLUDE_DIRECTORIES)
-file(GLOB_RECURSE NUMERIXX_PUBLIC_HEADERS ${NUMERIXX_PUBLIC_HEADER_DIR}/*.hpp)
-
-set(DOXYGEN_INPUT_DIR ${PROJECT_SOURCE_DIR}/numerixx)
-set(DOXYGEN_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/docs/doxygen)
-set(DOXYGEN_INDEX_FILE ${DOXYGEN_OUTPUT_DIR}/html/index.html)
-set(DOXYFILE_IN ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in)
-set(DOXYFILE_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
-
-#Replace variables inside @@ with the current values
-configure_file(${DOXYFILE_IN} ${DOXYFILE_OUT} @ONLY)
-
-# Create the Doxygen output directory, and define a custom command that will run the Doxygen application
-# every time the index.html file is accessed by subsequent target builds.
-file(MAKE_DIRECTORY ${DOXYGEN_OUTPUT_DIR}) #Doxygen won't create this for us
-add_custom_command(
-        OUTPUT ${DOXYGEN_INDEX_FILE}
-        DEPENDS ${NUMERIXX_PUBLIC_HEADERS}
-        COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYFILE_OUT}
-        MAIN_DEPENDENCY ${DOXYFILE_OUT} ${DOXYFILE_IN}
-        COMMENT "Generating docs")
-
-# Target for running the Doxygen application. When run, it will also run the previous custom command.
-add_custom_target(Doxygen ALL DEPENDS ${DOXYGEN_INDEX_FILE})
-
-set(SPHINX_SOURCE ${CMAKE_CURRENT_SOURCE_DIR})
-set(SPHINX_BUILD ${CMAKE_CURRENT_BINARY_DIR}/docs/sphinx)
-
-add_custom_target(Sphinx ALL DEPENDS ${DOXYGEN_INDEX_FILE}
-        # Tell Breathe where to find the Doxygen output
-        COMMAND ${SPHINX_EXECUTABLE} -b html -Dbreathe_projects.Numerixx=${DOXYGEN_OUTPUT_DIR} ${SPHINX_SOURCE} ${SPHINX_BUILD}
-        COMMAND ${SPHINX_EXECUTABLE} -b latex -Dbreathe_projects.numerix=${DOXYGEN_OUTPUT_DIR} ${SPHINX_SOURCE} ${SPHINX_BUILD}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        COMMENT "Generating documentation with Sphinx")
+set(DOXYGEN_PROJECT_NAME "Numerixx")
+set(DOXYGEN_PROJECT_NUMBER "${PROJECT_VERSION}")
+set(DOXYGEN_EXTRACT_ALL YES)
+set(DOXYGEN_RECURSIVE YES)
+set(DOXYGEN_GENERATE_LATEX NO)
+set(DOXYGEN_STRIP_FROM_INC_PATH "${PROJECT_SOURCE_DIR}/include")
+doxygen_add_docs(numerixx_docs "${PROJECT_SOURCE_DIR}/include/numerixx"
+                 COMMENT "Generating the Numerixx API documentation")

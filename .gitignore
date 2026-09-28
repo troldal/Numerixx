@@ -35,8 +35,18 @@
 venv*/
 
 # Build directories
+build/
 cmake-build-*/
 out/
+docs/_build/
+
+# CMake and CPM
+CMakeUserPresets.json
+compile_commands.json
+.cpm/
+.cache/
 
 # IDEs and editors
 .vs/
+.idea/
+.vscode/

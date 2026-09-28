@@ -1,0 +1,65 @@
+# Nightly legs (DESIGN §9.4): the compiler floors and toolchains that are common in practice but too slow or too
+# rare for every push.
+name: nightly
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gcc-floor:
+    runs-on: ubuntu-latest
+    container: gcc:14
+    steps:
+      - run: apt-get update && apt-get install -y cmake ninja-build
+      - uses: actions/checkout@v5
+      - run: cmake --workflow --preset gcc
+
+  clang-floor:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build clang-18 libc++-18-dev libc++abi-18-dev
+      - run: cmake --preset clang -DCMAKE_CXX_COMPILER=clang++-18
+      - run: cmake --build --preset clang
+      - run: ctest --preset clang
+
+  clang-cl-noexcept:
+    runs-on: windows-2025-vs2026
+    env:
+      CPM_SOURCE_CACHE: 'C:\cpm'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756   # v1.13.0
+      - run: cmake --preset clang-cl -DNUMERIXX_NO_EXCEPTIONS=ON
+      - run: cmake --build --preset clang-cl
+      - run: ctest --preset clang-cl
+
+  mingw-gcc:
+    runs-on: windows-2025-vs2026
+    defaults:
+      run:
+        shell: msys2 {0}
+    env:
+      CPM_SOURCE_CACHE: 'C:\cpm'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e   # v2.33.0
+        with:
+          msystem: UCRT64
+          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
+      - run: cmake --workflow --preset gcc
+
+  intel-icx:
+    runs-on: ubuntu-latest
+    container: intel/oneapi-hpckit:latest
+    steps:
+      - run: apt-get update && apt-get install -y ninja-build
+      - uses: actions/checkout@v5
+      - run: cmake --preset gcc -DCMAKE_CXX_COMPILER=icpx
+      - run: cmake --build --preset gcc
+      - run: ctest --preset gcc
