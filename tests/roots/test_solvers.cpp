@@ -576,13 +576,22 @@ TEST_SUITE("roots")
         const double hi = opaque(2.0);
 
         const auto check_forms = [&](const auto& solver) {
-            const auto fixed    = solver(sq2, nxx::bracket { 1.0, 2.0 });    // the literal, checked at compile time
-            const auto braced   = solver(sq2, { lo, hi });
-            const auto paired   = solver(sq2, std::pair { lo, hi });
-            const auto made     = solver(sq2, nxx::bracket<double>::make(lo, hi));
-            const auto reversed = solver(sq2, std::pair { hi, lo });    // make() re-orders
-            const auto made_rev = solver(sq2, nxx::bracket<double>::make(hi, lo));
-            const auto curried  = solver.on({ lo, hi })(sq2);
+            const auto   fixed    = solver(sq2, nxx::bracket { 1.0, 2.0 });    // the literal, checked at compile time
+            const auto   braced   = solver(sq2, { lo, hi });
+            const auto   paired   = solver(sq2, std::pair { lo, hi });
+            const auto   made     = solver(sq2, nxx::bracket<double>::make(lo, hi));
+            const auto   reversed = solver(sq2, std::pair { hi, lo });    // make() re-orders
+            const auto   made_rev = solver(sq2, nxx::bracket<double>::make(hi, lo));
+            const auto   curried  = solver.on({ lo, hi })(sq2);
+            const double arr[2]   = { lo, hi };    // an lvalue C array, by reference and by .on (cl once found both ambiguous)
+            const auto   from_arr = solver(sq2, arr);
+            const auto   on_arr   = solver.on(arr)(sq2);
+            CHECK(from_arr.has_value());
+            CHECK(on_arr.has_value());
+            if (from_arr && on_arr && fixed) {
+                CHECK(from_arr->x == fixed->x);
+                CHECK(on_arr->x == fixed->x);
+            }
             CHECK(fixed.has_value());
             CHECK(braced.has_value());
             CHECK(paired.has_value());
@@ -618,6 +627,24 @@ TEST_SUITE("roots")
         const auto   newres = nr::newton {}.with_derivative(dsq2)(sq2, x0);
         CHECK(secres.has_value());
         CHECK(newres.has_value());
+    }
+
+    TEST_CASE("solvers: an open method started at an exact root stops at once with an unknown uncertainty")
+    {
+        const auto check_start = [](const auto& res, nxx::algo id) {
+            if (res) {
+                CHECK(res->by == id);
+                CHECK(res->how == nxx::stop_reason::exact_zero);
+                CHECK(res->x == 2.0);
+                CHECK(res->used.iterations == 0u);
+                CHECK(std::isinf(res->uncertainty));    // no step was taken: unknown, not 0
+            }
+            else
+                FAIL_CHECK("a solve from an exact root failed");
+        };
+        const auto shifted = [](double x) { return x - 2.0; };
+        check_start(nr::secant {}(shifted, 2.0), nr::algos::secant);
+        check_start(nr::newton {}.with_derivative([](double) { return 1.0; })(shifted, 2.0), nr::algos::newton);
     }
 
     TEST_CASE("solvers: invalid run-time inputs fail in-band at zero cost")
@@ -777,7 +804,8 @@ TEST_SUITE("roots")
             CHECK(err.used == nxx::counters { 60, 62 });
             if (err.best) {
                 CHECK(err.best->fx == positive(err.best->x));
-                CHECK(err.best->x > 0.0);    // lo moved towards 0 by lo / 1.6, keeping the smaller |f|
+                CHECK(std::isinf(err.best->uncertainty));    // neither an enclosure nor a step: unknown, not the width
+                CHECK(err.best->x > 0.0);                    // lo moved towards 0 by lo / 1.6, keeping the smaller |f|
                 CHECK(err.best->x < 1.0);
             }
             else
@@ -814,6 +842,8 @@ TEST_SUITE("roots")
         if (!none) {
             CHECK(none.error().code == nxx::errc::stalled);
             CHECK(none.error().used.iterations < 60u);
+            CHECK(none.error().best.has_value());
+            if (none.error().best) CHECK(std::isinf(none.error().best->uncertainty));
         }
     }
 
@@ -835,6 +865,69 @@ TEST_SUITE("roots")
     }
 
     // ---- 16. Invocability -------------------------------------------------------------------------------------------
+
+    // A root_estimate needs x and f(x): an open method starts from its fx without evaluating f, so a value-initialised
+    // fx (root_estimate{1.0}) would pass for an exact zero that was never evaluated.
+    static_assert(!std::is_constructible_v<nr::root_estimate<double>, double>);
+    static_assert(!std::is_default_constructible_v<nr::root_estimate<double>>);
+    static_assert(std::is_constructible_v<nr::root_estimate<double>, double, double>);
+
+    // min_iterations is a guard: every solver's constructor and rebuild reject it alone or under ||, and accept it under
+    // && with a convergence test (the with_stop and CTAD paths are compile-fail cases).
+    using guard_t    = nxx::min_iterations;
+    using guard_or_t = decltype(nxx::x_tol { 1e-12 } || nxx::min_iterations { 2 });
+    using guarded_t  = decltype(nxx::x_tol { 1e-12 } && nxx::min_iterations { 2 });
+    using width_or_t = decltype(nxx::width_tol { 1e-12 } || nxx::min_iterations { 2 });
+    static_assert(!std::is_constructible_v<nr::secant<nxx::options<guard_t>>, guard_t>);
+    static_assert(!std::is_constructible_v<nr::secant<nxx::options<guard_or_t>>, guard_or_t>);
+    static_assert(std::is_constructible_v<nr::secant<nxx::options<guarded_t>>, guarded_t>);
+    static_assert(!std::is_constructible_v<nr::newton<nxx::options<guard_t>>, guard_t>);
+    static_assert(!std::is_constructible_v<nr::newton<nxx::options<guard_or_t>>, guard_or_t>);
+    static_assert(std::is_constructible_v<nr::newton<nxx::options<guarded_t>>, guarded_t>);
+    static_assert(!std::is_constructible_v<nr::bisection<nxx::options<guard_t>>, guard_t>);
+    static_assert(!std::is_constructible_v<nr::bisection<nxx::options<width_or_t>>, width_or_t>);
+    template<class S, class O>
+    concept rebuilds_with = requires(const S& s, O o) { s.rebuild(o); };
+    static_assert(!rebuilds_with<nr::secant<>, nxx::options<guard_t>>);
+    static_assert(!rebuilds_with<nr::newton<>, nxx::options<guard_or_t>>);
+    static_assert(!rebuilds_with<nr::bisection<>, nxx::options<guard_t>>);
+    static_assert(!rebuilds_with<nr::brent<>, nxx::options<guard_t>>);
+    static_assert(rebuilds_with<nr::secant<>, nxx::options<guarded_t>>);
+    static_assert(rebuilds_with<nr::brent<>, nxx::options<nxx::never>>);
+    // A searcher has no configurable stop criterion, on the rebuild path too: any other criterion could stop on a state
+    // without a sign change, and estimate() would forge a sign_bracket.
+    static_assert(!rebuilds_with<nr::expand<>, nxx::options<nxx::x_tol<double>>>);
+    static_assert(!rebuilds_with<nr::expand<>, nxx::options<guarded_t>>);
+    static_assert(rebuilds_with<nr::expand<>, nxx::options<nxx::never>>);
+
+    // A braced list is a bracket only with two ends of a real type: {x} was once taken as {x, 0} and solved on [0, x].
+    template<class S, class F>
+    concept takes_one_end = requires(const S& s, const F& fn) { s(fn, { 1.0 }); };
+    template<class S, class F>
+    concept takes_three_ends = requires(const S& s, const F& fn) { s(fn, { 1.0, 2.0, 3.0 }); };
+    template<class S, class F>
+    concept takes_int_ends = requires(const S& s, const F& fn) { s(fn, { 1, 2 }); };
+    template<class S, class F>
+    concept takes_two_ends = requires(const S& s, const F& fn) { s(fn, { 1.0, 2.0 }); };
+    template<class S>
+    concept binds_one_end = requires(const S& s) { s.on({ 1.0 }); };
+    template<class S>
+    concept binds_pointer = requires(const S& s, const double* p) { s.on(p); };
+    struct line_t
+    {
+        double operator()(double x) const { return x; }
+    };
+    static_assert(!takes_one_end<nr::brent<>, line_t> && !takes_one_end<nr::bisection<>, line_t> && !takes_one_end<nr::expand<>, line_t>);
+    static_assert(!takes_three_ends<nr::brent<>, line_t> && !takes_int_ends<nr::brent<>, line_t>);
+    static_assert(takes_two_ends<nr::brent<>, line_t> && takes_two_ends<nr::expand<>, line_t>);
+    static_assert(!binds_one_end<nr::bisection<>> && !binds_one_end<nr::expand<>>);
+    static_assert(!binds_pointer<nr::brent<>> && !binds_pointer<nr::expand<>>);
+
+    // best_x needs a solution with an x; a search result is a sign_bracket, with two ends.
+    template<class R>
+    concept has_best_x = requires(const R& r) { nxx::best_x(r); };
+    static_assert(has_best_x<nxx::result<nr::root_estimate<double>>>);
+    static_assert(!has_best_x<std::expected<nxx::solution<nr::sign_bracket<double>>, nxx::failure<nr::root_estimate<double>>>>);
 
     TEST_CASE("solvers: the facades accept exactly their inputs")
     {

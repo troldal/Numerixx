@@ -17,6 +17,7 @@
 #include <numerixx/core/refined.hpp>
 #include <numerixx/core/scalar.hpp>
 
+#include <cstddef>
 #include <expected>
 #include <functional>
 #include <type_traits>
@@ -81,7 +82,8 @@ namespace nxx
         { return static_cast<X>(std::invoke(*projection, x)); }
     };
 
-    // The builders shared by every solver. A solver provides options(), rebuild(options) and the kind of its views,
+    // The builders shared by every solver. A solver provides options(), rebuild(options) (constrained on
+    // stop_criterion_for_v, like its constructors) and the kind of its views,
     // static constexpr view_kind views (named so because view(s) is the protocol function).
     struct solver_facade
     {
@@ -108,7 +110,7 @@ namespace nxx
         }
 
         template<class Self, class C>
-            requires criterion_for_v<C, Self::views>
+            requires stop_criterion_for_v<C, Self::views>
         constexpr auto with_stop(this const Self& self, C stop)
         {
             const auto& o = self.options();
@@ -119,9 +121,14 @@ namespace nxx
 
         template<class Self, class C>
             requires(!criterion_for_v<C, Self::views>)
-        void with_stop(this const Self&, C)
-            NXX_DELETE("this criterion does not apply to this solver: bracketing methods converge on the enclosure "
-                       "(width_tol, floored_width), open methods on successive iterates (x_tol, step_tol)");
+        void with_stop(this const Self&, C) NXX_DELETE("this criterion does not apply to this solver: bracketing methods "
+                                                       "converge on the enclosure (width_tol, floored_width), open methods on "
+                                                       "successive iterates (x_tol, step_tol)");
+
+        template<class Self, class C>
+            requires(criterion_for_v<C, Self::views> && detail::guard_only_v<C>)
+        void with_stop(this const Self&, C) NXX_DELETE("min_iterations only guards another criterion: combine it with a "
+                                                       "convergence test using && (your_test && min_iterations{n})");
 
         template<class Self, class D>
             requires Self::uses_derivative
@@ -150,8 +157,9 @@ namespace nxx
 
         template<class Self, class P>
             requires(!Self::projects)
-        void with_projection(this const Self&, P)
-            NXX_DELETE("projection applies to open methods (secant, newton): a bracketing method keeps every iterate inside its bracket");
+        void with_projection(this const Self&, P) NXX_DELETE("projection applies to open methods (secant, newton): a "
+                                                             "bracketing method keeps every iterate inside its "
+                                                             "bracket");
 
         // Called with the view of every iterate: logging without polluting the stop criteria.
         template<class Self, class Ob>
@@ -220,34 +228,54 @@ namespace nxx
         constexpr auto operator()(this const Self& self, const F& fn, const In& in)
         { return detail::run(self, fn, in); }
 
-        template<class Self, class F, real T>
-            requires(detail::ready_v<Self, F> && detail::input_callable_v<Self, F, std::pair<T, T>>)
-        constexpr auto operator()(this const Self& self, const F& fn, const T (&lo_hi)[2])
+        // A braced list or a C array: N is deduced, so {x} is not taken as {x, 0} and {a, b, c} is not cut short.
+        template<class Self, class F, real T, std::size_t N>
+            requires(N == 2 && detail::ready_v<Self, F> && detail::input_callable_v<Self, F, std::pair<T, T>>)
+        constexpr auto operator()(this const Self& self, const F& fn, const T (&lo_hi)[N])
         { return detail::run(self, fn, std::pair<T, T> { lo_hi[0], lo_hi[1] }); }
+
+        template<class Self, class F, real T, std::size_t N>
+            requires(N == 2 && detail::ready_v<Self, F> && !detail::input_callable_v<Self, F, std::pair<T, T>>)
+        void operator()(this const Self&, const F&, const T (&)[N]) NXX_DELETE("the function cannot be called with the "
+                                                                               "scalar type of the bracket");
+
+        template<class Self, class F, class T, std::size_t N>
+            requires(N != 2 || !real<T>)
+        void operator()(this const Self&, const F&, const T (&)[N]) NXX_DELETE("a bracket has two ends of a real type: "
+                                                                               "write {lo, hi}, for example {1.0, 2.0}");
 
         template<class Self, class F, class In>
             requires detail::rejected_v<Self, In>
-        void operator()(this const Self&, const F&, const In&)
-            NXX_DELETE("bracketing solvers need a bracket: pass {lo, hi}, nxx::bracket<T>::make(a, b), or a search result");
+        void operator()(this const Self&, const F&, const In&) NXX_DELETE("bracketing solvers need a bracket: pass "
+                                                                          "{lo, hi}, nxx::bracket<T>::make(a, b), or a "
+                                                                          "search result");
 
         template<class Self, class F, class In>
             requires(detail::accepts_v<Self, In> && detail::ready_v<Self, F> && !detail::input_callable_v<Self, F, In>)
-        void operator()(this const Self&, const F&, const In&)
-            NXX_DELETE("the function cannot be called with the scalar type of the bracket");
+        void operator()(this const Self&, const F&, const In&) NXX_DELETE("the function cannot be called with the "
+                                                                          "scalar type of the bracket");
 
         template<class Self, class In>
             requires detail::accepts_v<Self, In>
         constexpr auto on(this const Self& self, In in)
         { return bound<Self, In> { self, std::move(in) }; }
 
-        template<class Self, real T>
-        constexpr auto on(this const Self& self, const T (&lo_hi)[2])
+        template<class Self, real T, std::size_t N>
+            requires(N == 2)
+        constexpr auto on(this const Self& self, const T (&lo_hi)[N])
         { return bound<Self, std::pair<T, T>> { self, std::pair<T, T> { lo_hi[0], lo_hi[1] } }; }
 
+        template<class Self, class T, std::size_t N>
+            requires(N != 2 || !real<T>)
+        void on(this const Self&, const T (&)[N]) NXX_DELETE("a bracket has two ends of a real type: write {lo, hi}, "
+                                                             "for example {1.0, 2.0}");
+
+        // A forwarding reference: by value, a C array would decay to a pointer, which cl cannot order against the array
+        // overloads; rejected_v leaves arrays to them, so a pointer still gets the reason.
         template<class Self, class In>
-            requires detail::rejected_v<Self, In>
-        void on(this const Self&, In)
-            NXX_DELETE("bracketing solvers need a bracket: pass {lo, hi}, nxx::bracket<T>::make(a, b), or a search result");
+            requires detail::rejected_v<Self, std::remove_cvref_t<In>>
+        void on(this const Self&, In&&) NXX_DELETE("bracketing solvers need a bracket: pass {lo, hi}, "
+                                                   "nxx::bracket<T>::make(a, b), or a search result");
     };
 
     // Open methods: a guess of a real type, or a root estimate (seeded with its x and f(x): no re-evaluation).
@@ -260,8 +288,9 @@ namespace nxx
 
         template<class Self, class F, class In>
             requires(detail::rejected_v<Self, In> && !std::is_integral_v<std::remove_cvref_t<In>>)
-        void operator()(this const Self&, const F&, const In&)
-            NXX_DELETE("open methods take a guess of a real type or a root estimate; bracketing solvers take {lo, hi}");
+        void operator()(this const Self&, const F&, const In&) NXX_DELETE("open methods take a guess of a real type or "
+                                                                          "a root estimate; bracketing solvers take "
+                                                                          "{lo, hi}");
 
         template<class Self, class F, class I>
             requires std::is_integral_v<std::remove_cvref_t<I>>
@@ -278,8 +307,8 @@ namespace nxx
 
         template<class Self, class In>
             requires(detail::rejected_v<Self, In> && !std::is_integral_v<std::remove_cvref_t<In>>)
-        void on(this const Self&, In)
-            NXX_DELETE("open methods take a guess of a real type or a root estimate; bracketing solvers take {lo, hi}");
+        void on(this const Self&, In) NXX_DELETE("open methods take a guess of a real type or a root estimate; "
+                                                 "bracketing solvers take {lo, hi}");
 
         template<class Self, class I>
             requires std::is_integral_v<std::remove_cvref_t<I>>
@@ -291,18 +320,29 @@ namespace nxx
     struct search_facade : solver_facade
     {
         template<class Self, class C>
-        void with_stop(this const Self&, C)
-            NXX_DELETE("searchers have no configurable stop criterion: they stop at the first sign change or when the budget runs out");
+        void with_stop(this const Self&, C) NXX_DELETE("searchers have no configurable stop criterion: they stop at "
+                                                       "the first sign change or when the budget runs out");
 
         template<class Self, class F, class In>
             requires(detail::accepts_v<Self, In> && detail::ready_v<Self, F> && detail::input_callable_v<Self, F, In>)
         constexpr auto operator()(this const Self& self, const F& fn, const In& in)
         { return detail::run(self, fn, in); }
 
-        template<class Self, class F, real T>
-            requires(detail::ready_v<Self, F> && detail::input_callable_v<Self, F, std::pair<T, T>>)
-        constexpr auto operator()(this const Self& self, const F& fn, const T (&lo_hi)[2])
+        // A braced list or a C array: N is deduced, so {x} is not taken as {x, 0} and {a, b, c} is not cut short.
+        template<class Self, class F, real T, std::size_t N>
+            requires(N == 2 && detail::ready_v<Self, F> && detail::input_callable_v<Self, F, std::pair<T, T>>)
+        constexpr auto operator()(this const Self& self, const F& fn, const T (&lo_hi)[N])
         { return detail::run(self, fn, std::pair<T, T> { lo_hi[0], lo_hi[1] }); }
+
+        template<class Self, class F, real T, std::size_t N>
+            requires(N == 2 && detail::ready_v<Self, F> && !detail::input_callable_v<Self, F, std::pair<T, T>>)
+        void operator()(this const Self&, const F&, const T (&)[N]) NXX_DELETE("the function cannot be called with the "
+                                                                               "scalar type of the window");
+
+        template<class Self, class F, class T, std::size_t N>
+            requires(N != 2 || !real<T>)
+        void operator()(this const Self&, const F&, const T (&)[N]) NXX_DELETE("a window has two ends of a real type: "
+                                                                               "write {lo, hi}, for example {1.0, 2.0}");
 
         template<class Self, class F, class In>
             requires detail::rejected_v<Self, In>
@@ -310,21 +350,28 @@ namespace nxx
 
         template<class Self, class F, class In>
             requires(detail::accepts_v<Self, In> && detail::ready_v<Self, F> && !detail::input_callable_v<Self, F, In>)
-        void operator()(this const Self&, const F&, const In&)
-            NXX_DELETE("the function cannot be called with the scalar type of the window");
+        void operator()(this const Self&, const F&, const In&) NXX_DELETE("the function cannot be called with the "
+                                                                          "scalar type of the window");
 
         template<class Self, class In>
             requires detail::accepts_v<Self, In>
         constexpr auto on(this const Self& self, In in)
         { return bound<Self, In> { self, std::move(in) }; }
 
-        template<class Self, real T>
-        constexpr auto on(this const Self& self, const T (&lo_hi)[2])
+        template<class Self, real T, std::size_t N>
+            requires(N == 2)
+        constexpr auto on(this const Self& self, const T (&lo_hi)[N])
         { return bound<Self, std::pair<T, T>> { self, std::pair<T, T> { lo_hi[0], lo_hi[1] } }; }
 
+        template<class Self, class T, std::size_t N>
+            requires(N != 2 || !real<T>)
+        void on(this const Self&, const T (&)[N]) NXX_DELETE("a window has two ends of a real type: write {lo, hi}, "
+                                                             "for example {1.0, 2.0}");
+
+        // A forwarding reference, for the reason given in bracketing_facade.
         template<class Self, class In>
-            requires detail::rejected_v<Self, In>
-        void on(this const Self&, In) NXX_DELETE("searchers take a start window or a guess");
+            requires detail::rejected_v<Self, std::remove_cvref_t<In>>
+        void on(this const Self&, In&&) NXX_DELETE("searchers take a start window or a guess");
     };
 }    // namespace nxx
 

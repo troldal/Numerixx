@@ -1,5 +1,5 @@
-# cmake -DBUILD_DIR=<dir> -DTARGET=<target> -DCONFIG=<config> [-DEXPECT=<regex> -DCHECK_REASON=ON] [-DREPORT=<file>]
-#       -P RunCompileFail.cmake
+# cmake -DBUILD_DIR=<dir> -DTARGET=<target> -DCONFIG=<config> [-DEXPECT=<regex> -DCHECK_REASON=ON [-DREASON_IN_MESSAGE=ON]]
+#       [-DREPORT=<file>] -P RunCompileFail.cmake
 #
 # Builds TARGET, which must fail to compile: the build must fail with a compiler diagnostic ("error:"), not merely
 # fail (a missing target or a build-tool error does not count). With CHECK_REASON, EXPECT must match the first
@@ -78,7 +78,29 @@ if(REPORT)
   file(APPEND "${REPORT}" "${TARGET}: ${diagnostic_lines} diagnostic lines, first error ${first_error_lines} lines\n")
 endif()
 
-if(CHECK_REASON AND NOT first_error MATCHES "${EXPECT}")
+# With REASON_IN_MESSAGE (deletion reasons, which GCC 15+ and Clang 19+ print in the message), the reason must be in
+# the compiler's own text, not in a source line it quotes: a note such as "declared here" echoes the NXX_DELETE("...")
+# line, which would match even if the compiler printed no reason. GCC and Clang quote source as "  123 | code",
+# followed by a caret line "      |   ^~~"; both are left out of the match. A rejected consteval literal is different:
+# GCC names the failing Tag::reject() and quotes its source line, which holds the reason, so there the quote counts.
+string(REPLACE "[" "<nxx-lb>" first_masked "${first_error}")
+string(REPLACE "]" "<nxx-rb>" first_masked "${first_masked}")
+string(REPLACE ";" "<nxx-sc>" first_masked "${first_masked}")
+string(REGEX REPLACE "\n" ";" first_lines "${first_masked}")
+set(first_error_text "")
+foreach(line IN LISTS first_lines)
+  if(NOT line MATCHES "^ *[0-9]* \\|")
+    string(APPEND first_error_text "${line}\n")
+  endif()
+endforeach()
+string(REPLACE "<nxx-lb>" "[" first_error_text "${first_error_text}")
+string(REPLACE "<nxx-rb>" "]" first_error_text "${first_error_text}")
+string(REPLACE "<nxx-sc>" ";" first_error_text "${first_error_text}")
+
+if(NOT REASON_IN_MESSAGE)
+  set(first_error_text "${first_error}")
+endif()
+if(CHECK_REASON AND NOT first_error_text MATCHES "${EXPECT}")
   message(FATAL_ERROR "compile-fail: the first error of '${TARGET}' does not match '${EXPECT}':\n${first_error}")
 endif()
 message(STATUS "compile-fail: '${TARGET}' failed to compile, as required (${diagnostic_lines} diagnostic lines, first error "

@@ -235,6 +235,18 @@ TEST_SUITE("core")
                       nxx::criterion_for_v<nxx::min_iterations, S>);
         static_assert(nxx::criterion_for_v<nxx::never, P> && nxx::criterion_for_v<nxx::never, E> && nxx::criterion_for_v<nxx::never, S>);
 
+        // min_iterations is a guard: it applies everywhere, but a solver takes it only under && with a real test.
+        using guarded     = decltype(nxx::x_tol { 1e-6 } && nxx::min_iterations { 3 });
+        using guard_or    = decltype(nxx::x_tol { 1e-6 } || nxx::min_iterations { 3 });
+        using two_guards  = decltype(nxx::min_iterations { 2 } && nxx::min_iterations { 3 });
+        using guard_limit = decltype((nxx::x_tol { 1e-6 } && nxx::min_iterations { 3 }) || nxx::max_evaluations { 50 });
+        static_assert(!nxx::stop_criterion_for_v<nxx::min_iterations, P> && !nxx::stop_criterion_for_v<nxx::min_iterations, E>);
+        static_assert(nxx::stop_criterion_for_v<guarded, P>);
+        static_assert(!nxx::stop_criterion_for_v<guard_or, P>);    // || can stop on the guard alone
+        static_assert(!nxx::stop_criterion_for_v<two_guards, P>);
+        static_assert(nxx::stop_criterion_for_v<guard_limit, P>);
+        static_assert(nxx::stop_criterion_for_v<nxx::never, P> && nxx::stop_criterion_for_v<nxx::floored_width, E>);
+
         // cv-ref qualified criteria, combinations, and non-criteria.
         static_assert(nxx::criterion_for_v<const nxx::floored_width&, E>);
         using x_or_budget = decltype(nxx::x_tol { 1e-6 } || nxx::max_evaluations { 10 });

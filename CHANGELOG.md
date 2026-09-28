@@ -46,14 +46,15 @@ one.
   projection (`clamp_to`); the pole check.
 - First cut of numerical differentiation (`<numerixx/deriv.hpp>`): stencils as integer data, `optimal`/`relative`/
   `absolute` steps, `diff`, `central`, `derivative_of` and the `numeric` policy.
-- Tests: 154 doctest cases (criterion soundness, determinism with a golden table of 22 solves that is bit-identical on
+- Tests: 155 doctest cases (criterion soundness, determinism with a golden table of 22 solves that is bit-identical on
   GCC, Clang, MSVC, clang-cl and em++, run-time chains equal to static chains, evaluation counts equal to instrumented
-  calls, poles, extreme brackets, the canonical calls with run-time inputs, regularity, composition), 24 compile-fail
+  calls, poles, extreme brackets, the canonical calls with run-time inputs, regularity, composition), 29 compile-fail
   cases, each with a control that must compile, whose reason must appear in the first error on GCC and Clang
-  (diagnostic line counts are written to `compile_fail_report.txt` and recorded in DESIGN Appendix D), the MSVC-only
-  P2564 probe, a strict-warnings consumer TU that instantiates the library with a global `f`, and compile-time
-  measurements (the umbrella header is guarded at 2 s on GCC; measured 0.58 s on GCC 16, 0.46 s on Clang 22, 0.55 s
-  on MSVC, 0.53 s on clang-cl). All 12 presets pass.
+  (diagnostic line counts are written to `compile_fail_report.txt` and recorded in DESIGN Appendix D), two harness
+  self-tests (one of which the harness must reject), the P2564 probe (it must fail on MSVC with C7595), a
+  strict-warnings consumer TU that instantiates the library with a global `f`, and compile-time measurements (the
+  umbrella header is guarded at 2 s on GCC; measured 0.58 s on GCC 16, 0.46 s on Clang 22, 0.55 s on MSVC, 0.53 s on
+  clang-cl). All 12 presets pass: 224 CTest tests on most, 222 on MSVC, 233 with multiprecision, 8 on integration.
 - Found and fixed by the spike (recorded in DESIGN): Clang's default floating-point contraction made solver paths
   platform-dependent, so the headers turn it off for library code; `better_than` was not transitive, so the best
   estimate of a chain depended on how it was grouped; the solver constant for the view kind is spelled `views`;
@@ -71,6 +72,26 @@ one.
   which gives the one-line "did you forget .on(input)?" diagnostic. `any_solver` is no
   longer a conversion target for every type. `evaluation_budget` rejects a negative literal instead of wrapping it.
   MSVC: C-array brackets are no longer ambiguous, and plain functions no longer trigger warning C4180.
+  `root_estimate<double>{1.0}` gave an `exact_zero` success without evaluating f; a `root_estimate` now needs x and
+  f(x). `min_iterations` alone (or under `||`) reported success after n iterations; it is now a guard that a solver
+  accepts only as `test && min_iterations{n}`, and anything else is deleted with a reason. `best_x` no longer
+  hard-errors on a search result (it is constrained away). The best estimate of a failure with neither an enclosure
+  nor a step reports an unknown (infinite) uncertainty instead of the window width. The compile-fail harness now
+  requires a deletion reason in the compiler's own message, not in a source line it quotes, and the MSVC P2564 probe
+  must fail with C7595. The minor findings left open are listed in DESIGN Appendix D.
+- Found by an audit of the spike's documentation against the code, and fixed: `expand`'s public `rebuild(options)`
+  accepted a stop criterion, which could forge a sign bracket without a sign change (it now takes only `never{}`,
+  and every solver's `rebuild` rejects a bare `min_iterations`); secant started at an exact root reported an
+  uncertainty of 0 (now inf, as Newton does); a braced `{lo, hi}` with a function of the wrong signature now gets the
+  facade's reason; a one-element braced list `{x}` bound to the two-element array overload as `{x, 0}` and was solved
+  on [0, x], so a list or array is now a bracket only with two ends of a real type (anything else is deleted with a
+  reason); `.on(C array)` is no longer ambiguous on MSVC, and `.on(pointer)` keeps its reason; `NXX_DELETE` now starts on the declarator's own
+  line, where cl's note points; the Clang header brackets now save and restore the floating-point setting on RISC-V,
+  PowerPC and SystemZ too. The audit also found that GCC contracts `a * b + c` by default in C++, ISO mode included,
+  and that the headers cannot stop it; DESIGN §5.3 documents this (build with `-ffp-contract=off` for bit-identical
+  results on FMA targets), and phase 1 decides whether the GCC interface flags should add it.
+- `examples/quick_tour.cpp`: a tour of the library as it is now, built with the strict warning flags and run as a
+  smoke test.
 - Known limits, documented in DESIGN §7.2: `expand` from a window on one side of 0 cannot cross 0 (phase 3), and a
   large but finite initial sample can hide a pole from the pole check (add `&& f_tol{…}` for a residual guarantee).
 - Deferred to phases 1-3: the progress window and step-length cap of the open methods, the representation-space

@@ -106,8 +106,10 @@ namespace nxx
     template<class Est, class UE = none>
     using result = std::expected<solution<Est>, failure<Est, UE>>;
 
-    // The solution's x, or the failure's best->x, or nothing.
+    // The solution's x, or the failure's best->x, or nothing. Only for results whose solution has an x: a search result
+    // (a sign_bracket) has two ends and no single x.
     template<class R>
+        requires requires(const R& r) { r->x; }
     constexpr auto best_x(const R& r)
     {
         using X = std::remove_cvref_t<decltype(r->x)>;

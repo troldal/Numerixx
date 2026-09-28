@@ -3,8 +3,9 @@
 // tol1 = max(threshold / 2, 2 eps |b|), where threshold is the tolerance's enclosure form (width_tol: abs + rel
 // min(|lo|, |hi|)) and 2 eps |b| is Brent's resolution floor (a smaller step would not move b). Its intrinsic stop
 // (|c - b| / 2 <= tol1) therefore meets the threshold whenever the threshold is attainable, and reports
-// stop_reason::criterion exactly then, as every width criterion guarantees (DESIGN §9.3); a tolerance below the floor
-// ends as stop_reason::resolution_limit, with width <= 4 eps |b|. The external stop defaults to never{}, so there are not two sources of
+// stop_reason::criterion exactly then, as every width criterion guarantees (DESIGN §9.3). With a tolerance below the
+// floor it stops at the floor, with width <= 4 eps |b|: stop_reason::criterion if that width still meets the threshold,
+// stop_reason::resolution_limit otherwise. The external stop defaults to never{}, so there are not two sources of
 // truth. It bisects while a sample is infinite (log(x) on [0, 2]) and runs the pole check. Budget 100.
 #pragma once
 
@@ -109,7 +110,10 @@ namespace nxx::roots
         constexpr const Opt& options() const noexcept { return opt_; }
         constexpr const Tol& tolerance() const noexcept { return tol_; }
 
+        // Only options whose stop criterion can stop this solver: rebuild is public, so it must not be a way around the
+        // constructors and with_stop (a bare min_iterations guard would report success without testing accuracy).
         template<class O2>
+            requires stop_criterion_for_v<typename O2::stop_type, views>
         constexpr auto rebuild(O2 o) const
         { return brent<Tol, O2> { nxx::detail::from_options, std::move(o), tol_ }; }
 

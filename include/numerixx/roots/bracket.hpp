@@ -33,6 +33,11 @@ namespace nxx::roots
         template<real T>
         constexpr bool opposite(const T& a, const T& b) noexcept
         { return (a <= T(0) && b >= T(0)) || (a >= T(0) && b <= T(0)); }
+
+        // The uncertainty of an estimate that has neither an enclosure nor a step.
+        template<real T>
+        constexpr T unknown() noexcept
+        { return std::numeric_limits<T>::infinity(); }
     }    // namespace detail
 
     template<real T>
@@ -83,6 +88,18 @@ namespace nxx::roots
         T                              fx;
         T                              uncertainty;    // enclosure width (a bound) or |x_k - x_{k-1}| (an indicator); inf if unknown
         std::optional<sign_bracket<T>> enclosure;      // with samples: a bracketing successor starts without re-evaluating
+
+        // x and f(x) are both required: an open method starts from the estimate's fx without evaluating f again, so a
+        // value-initialised fx (root_estimate{1.0}) would pass for an exact zero that was never evaluated.
+        constexpr root_estimate(T                              x_,
+                                T                              fx_,
+                                T                              uncertainty_ = detail::unknown<T>(),
+                                std::optional<sign_bracket<T>> enclosure_   = std::nullopt)
+            : x(x_),
+              fx(fx_),
+              uncertainty(uncertainty_),
+              enclosure(std::move(enclosure_))
+        {}
 
         friend constexpr bool operator==(const root_estimate&, const root_estimate&) = default;
     };
@@ -183,10 +200,6 @@ namespace nxx::roots
 
     namespace detail
     {
-        template<real T>
-        constexpr T unknown() noexcept
-        { return std::numeric_limits<T>::infinity(); }
-
         // Accepted inputs of the bracketing methods (DESIGN §6.5). kind: 0 bracket, 1 sampled (sign_bracket or a
         // search result), 2 braced {lo, hi} or std::pair, 3 the result of bracket<T>::make.
         template<class In>
@@ -310,8 +323,8 @@ namespace nxx::roots
             const std::uint32_t used = one + cost_of(fn);
             if (!detail::opposite(*flo, *fhi)) {
                 const root_estimate<T> best = math::abs(*flo) <= math::abs(*fhi)
-                                                  ? root_estimate<T> { b.lo(), *flo, b.width(), std::nullopt }
-                                                  : root_estimate<T> { b.hi(), *fhi, b.width(), std::nullopt };
+                                                  ? root_estimate<T> { b.lo(), *flo, unknown<T>(), std::nullopt }
+                                                  : root_estimate<T> { b.hi(), *fhi, unknown<T>(), std::nullopt };
                 return std::unexpected(Fail { errc::no_sign_change, id, counters { 0, used }, best, {} });
             }
             return problem<F, sign_bracket<T>> { fn, sign_bracket<T> { nxx::detail::trust_me {}, b.lo(), *flo, b.hi(), *fhi }, used };

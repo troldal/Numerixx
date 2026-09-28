@@ -53,7 +53,11 @@ namespace nxx::roots
 
         constexpr const Opt& options() const noexcept { return opt_; }
 
+        // Only options with never{} as the stop criterion: a searcher stops at the first sign change or when the budget
+        // runs out. rebuild is public, so it must not be a way around the deleted with_stop: any other criterion could
+        // stop on a state without a sign change, and estimate() would then forge a sign_bracket.
         template<class O2>
+            requires std::same_as<typename O2::stop_type, never>
         constexpr auto rebuild(O2 o) const
         { return expand<O2> { nxx::detail::from_options, std::move(o) }; }
 
@@ -131,8 +135,8 @@ namespace nxx::roots
         template<real T>
         constexpr root_estimate<T> best(const expand_state<T>& s) const noexcept
         {
-            return math::abs(s.flo) <= math::abs(s.fhi) ? root_estimate<T> { s.lo, s.flo, s.hi - s.lo, std::nullopt }
-                                                        : root_estimate<T> { s.hi, s.fhi, s.hi - s.lo, std::nullopt };
+            return math::abs(s.flo) <= math::abs(s.fhi) ? root_estimate<T> { s.lo, s.flo, detail::unknown<T>(), std::nullopt }
+                                                        : root_estimate<T> { s.hi, s.fhi, detail::unknown<T>(), std::nullopt };
         }
 
         template<real T>

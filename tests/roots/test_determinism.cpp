@@ -22,6 +22,7 @@
 #include <iterator>
 #include <limits>
 #include <ranges>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -127,7 +128,7 @@ namespace
     // Bit-for-bit equality of two records (+0.0 and -0.0 differ; so would NaN payloads).
     void check_identical(const record& got, const record& want)
     {
-        INFO(want.name);
+        INFO(std::string { want.name });    // a const char* would be logged as an address
         CHECK(got.ok == want.ok);
         CHECK(got.by == want.by);
         CHECK(got.how == want.how);
@@ -151,7 +152,7 @@ namespace
     void check_repeatable(const char* name, bool expect_ok, const S& s, const Other& other, const A&... args)
     {
         const record first = observe(name, s(args...));
-        INFO(name);
+        INFO(std::string { name });
         CHECK(first.ok == expect_ok);
         check_identical(observe(name, s(args...)), first);
         const S copy = s;
@@ -387,7 +388,7 @@ TEST_SUITE("roots")
             { "bisection budget 10 root [0, 10]", false, algos::bisection, stop_reason{}, errc::budget_exhausted, 10, 12, true,
               { 0x1.72p+1, 0x1.817c2bb578p-13, 0x1.4p-7, true, 0x1.70cp+1, -0x1.60a7d17bdc4p-9, 0x1.72p+1, 0x1.817c2bb578p-13 } },
             { "bisection no sign change cubic [3, 4]", false, algos::bisection, stop_reason{}, errc::no_sign_change, 0, 2, true,
-              { 0x1.8p+1, -0x1.b8a3d70a3d70ap+5, 0x1p+0, false, 0x0p+0, 0x0p+0, 0x0p+0, 0x0p+0 } },
+              { 0x1.8p+1, -0x1.b8a3d70a3d70ap+5, inf, false, 0x0p+0, 0x0p+0, 0x0p+0, 0x0p+0 } },
             { "brent sqrt2 [1, 2]", true, algos::brent, stop_reason::criterion, errc{}, 6, 8, true,
               { 0x1.6a09e667f3bcdp+0, 0x1p-52, 0x1.8p-51, true, 0x1.6a09e667f3bcap+0, -0x1.4p-50, 0x1.6a09e667f3bcdp+0, 0x1p-52 } },
             { "brent width_tol{1e-10} cubic [-3, 0]", true, algos::brent, stop_reason::criterion, errc{}, 9, 11, true,

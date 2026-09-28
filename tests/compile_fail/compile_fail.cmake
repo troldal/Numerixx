@@ -18,6 +18,9 @@ set(_nxx_cf "${CMAKE_CURRENT_SOURCE_DIR}/compile_fail")
 numerixx_add_compile_fail_test(${_nxx_cf}/harness_selftest.cpp
   LINK numerixx::core
   EXPECT "compile-fail harness self-test")
+numerixx_add_compile_fail_test(${_nxx_cf}/harness_quoted_reason.cpp
+  LINK numerixx::core
+  EXPECT "this reason is visible only in quoted source" DELETE_REASON HARNESS_REJECTS)
 
 # ---- Solver/input mismatches -------------------------------------------------------------------------------------
 numerixx_add_compile_fail_test(${_nxx_cf}/bisection_given_guess.cpp
@@ -43,6 +46,21 @@ numerixx_add_compile_fail_test(${_nxx_cf}/bisection_step_tol.cpp
 numerixx_add_compile_fail_test(${_nxx_cf}/bisection_with_stop_x_tol.cpp
   LINK numerixx::roots
   EXPECT "this criterion does not apply to this solver" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/bracket_one_end.cpp
+  LINK numerixx::roots
+  EXPECT "a bracket has two ends of a real type" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/bisection_on_pointer.cpp
+  LINK numerixx::roots
+  EXPECT "bracketing solvers need a bracket" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/brent_braced_wrong_function.cpp
+  LINK numerixx::roots
+  EXPECT "the function cannot be called with the scalar type of the bracket" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/secant_min_iterations_alone.cpp
+  LINK numerixx::roots
+  EXPECT "min_iterations only guards another criterion" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/bisection_min_iterations_or.cpp
+  LINK numerixx::roots
+  EXPECT "min_iterations only guards another criterion" DELETE_REASON)
 numerixx_add_compile_fail_test(${_nxx_cf}/brent_x_tol.cpp
   LINK numerixx::roots
   EXPECT "brent's tolerance is a width criterion" DELETE_REASON)
@@ -99,5 +117,5 @@ numerixx_add_compile_fail_test(${_nxx_cf}/rel_tolerance_as_tolerance.cpp
   LINK numerixx::core
   EXPECT "rel_tolerance.*to 'refined<(nxx::)?tag::positive_tolerance")
 
-# ---- The P2564 escalation probe (DESIGN §6.2 FLAG): compiles on GCC, Clang and clang-cl; WILL_FAIL on cl ----------
+# ---- The P2564 escalation probe (DESIGN §6.2 FLAG): compiles on GCC, Clang and clang-cl; fails on cl with C7595 ----
 numerixx_add_msvc_escalation_probe(${_nxx_cf}/probe_p2564_escalation.cpp LINK numerixx::roots)

@@ -175,7 +175,7 @@ later:  multimin ─► optimize, multiroots;  fit ─► multiroots (+ poly onc
 
 ### 5.3 What it looks like
 
-The spellings below are the design's (§6.11). The prototype compiled and ran the same chain and pipeline on all nine configurations, including inside a `static_assert`. It used older spellings: `r::secant{nxx::default_step{}, 5}`, and `r::bisection{nxx::x_tol{1e-4}}`, which the design now rejects. The spike compiles and runs this snippet as written (checked with GCC 16), and its tests cover each part on every preset (spike exit criterion 8).
+The spellings below are the design's (§6.11). The prototype compiled and ran the same chain and pipeline on all nine configurations, including inside a `static_assert`. It used older spellings: `r::secant{nxx::default_step{}, 5}`, `r::expand_out` and `r::bisection{nxx::x_tol{1e-4}}`. The design rejects the first and the last, and names the searcher `r::expand`. The spike compiles and runs this snippet as written (checked with GCC 16), and its tests cover each part on every preset (spike exit criterion 8).
 
 ```cpp
 #include <numerixx/roots.hpp>
@@ -216,12 +216,12 @@ nxx::interpolate::make_cubic_spline(xs, ys);              // expected<cubic_spli
 nxx::multiroots::solve(F, std::array{1.0, 0.5});          // damped Newton with an FD Jacobian until dogleg + Broyden pass the phase-5 corpus
 ```
 
-Misuse is rejected at compile time with a reason. On GCC ≥ 15 and Clang ≥ 19 the reason is designed to appear in the first error; spike exit criterion 9 and the compile-fail tests check this. On the floor compilers and MSVC, a deleted overload shows the deleted declaration, whose source line holds the reason:
+Misuse is rejected at compile time with a reason. On GCC ≥ 15 and Clang ≥ 19 the reason is designed to appear in the first error; spike exit criterion 9 and the compile-fail tests check this. On the floor compilers and MSVC, the error names the file and line of the deleted declaration, and the reason starts on that line (`NXX_DELETE` is written on the declarator's own line; MSVC prints the location, not the source):
 
 ```cpp
 r::newton{}(f, 1.0);                  // "newton needs a derivative: .with_derivative(df), .with_derivative(deriv::numeric{}), ..."
 r::bisection{}(f, 1.0);               // "bracketing solvers need a bracket: pass {lo, hi}, nxx::bracket<T>::make(a, b), ..."
-r::bisection{nxx::x_tol{1e-9}};       // "x_tol compares successive iterates; bracketing methods converge on the enclosure: use width_tol"
+r::bisection{nxx::x_tol{1e-9}};       // "x_tol and step_tol compare successive iterates; bracketing methods converge on the enclosure: use width_tol{abs[, rel]} or floored_width{}"
 nxx::bracket{2.0, 1.0};               // invalid literal
 ```
 

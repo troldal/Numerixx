@@ -47,9 +47,14 @@ namespace nxx::roots
         {}
 
         constexpr explicit secant(stop_type stop)
-            requires(criterion_for_v<stop_type, view_kind::point> && std::same_as<Opt, nxx::options<stop_type>>)
+            requires(stop_criterion_for_v<stop_type, view_kind::point> && std::same_as<Opt, nxx::options<stop_type>>)
             : opt_ { stop, max_iterations { 50 } }
         {}
+
+        template<class C>
+            requires(criterion_for_v<C, view_kind::point> && nxx::detail::guard_only_v<C>)
+        explicit secant(C) NXX_DELETE("min_iterations only guards another criterion: combine it with a convergence test "
+                                      "using && (your_test && min_iterations{n})");
 
         template<class C>
             requires(is_criterion_v<C> && !criterion_for_v<C, view_kind::point>)
@@ -59,7 +64,10 @@ namespace nxx::roots
 
         constexpr const Opt& options() const noexcept { return opt_; }
 
+        // Only options whose stop criterion can stop this solver: rebuild is public, so it must not be a way around the
+        // constructors and with_stop (a bare min_iterations guard would report success without testing accuracy).
         template<class O2>
+            requires stop_criterion_for_v<typename O2::stop_type, views>
         constexpr auto rebuild(O2 o) const
         { return secant<O2> { nxx::detail::from_options, std::move(o) }; }
 
@@ -83,7 +91,9 @@ namespace nxx::roots
                 f0   = *y;
                 used = cost_of(p.f);
             }
-            if (f0 == T(0)) return secant_state<T> { x0, f0, x0, f0, T(0), used };    // exact zero: intrinsic stop at once
+            // An exact zero: the intrinsic test stops at once. No step was taken, so its length is unknown (inf). A real
+            // step has a finite length unless |proposed - x1| overflows, and then inf is still an honest uncertainty.
+            if (f0 == T(0)) return secant_state<T> { x0, f0, x0, f0, detail::unknown<T>(), used };
 
             // The second point: x0 + h, or x0 - h where that overflows or the projection pins x0 + h to x0.
             const T h    = math::pow2<T>(-10) * (std::max)(math::abs(x0), T(1));
@@ -128,7 +138,12 @@ namespace nxx::roots
 
         template<real T>
         constexpr root_estimate<T> estimate(const secant_state<T>& s) const noexcept
-        { return root_estimate<T> { s.x1, s.f1, math::abs(s.x1 - s.x0), std::nullopt }; }
+        {
+            // |x1 - x0|, or unknown when the solve stopped at its start (an exact zero at x0): no step was taken. x1 == x0
+            // alone does not say that, because a real step can round to 0.
+            const T uncertainty = math::isfinite(s.step) ? math::abs(s.x1 - s.x0) : detail::unknown<T>();
+            return root_estimate<T> { s.x1, s.f1, uncertainty, std::nullopt };
+        }
 
         template<real T>
         constexpr root_estimate<T> best(const secant_state<T>& s) const noexcept

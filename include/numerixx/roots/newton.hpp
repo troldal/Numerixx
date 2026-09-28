@@ -88,9 +88,14 @@ namespace nxx::roots
         {}
 
         constexpr explicit newton(stop_type stop)
-            requires(criterion_for_v<stop_type, view_kind::point> && std::same_as<Opt, nxx::options<stop_type>>)
+            requires(stop_criterion_for_v<stop_type, view_kind::point> && std::same_as<Opt, nxx::options<stop_type>>)
             : opt_ { stop, max_iterations { 30 } }
         {}
+
+        template<class C>
+            requires(criterion_for_v<C, view_kind::point> && nxx::detail::guard_only_v<C>)
+        explicit newton(C) NXX_DELETE("min_iterations only guards another criterion: combine it with a convergence test "
+                                      "using && (your_test && min_iterations{n})");
 
         template<class C>
             requires(is_criterion_v<C> && !criterion_for_v<C, view_kind::point>)
@@ -100,15 +105,19 @@ namespace nxx::roots
 
         constexpr const Opt& options() const noexcept { return opt_; }
 
+        // Only options whose stop criterion can stop this solver: rebuild is public, so it must not be a way around the
+        // constructors and with_stop (a bare min_iterations guard would report success without testing accuracy).
         template<class O2>
+            requires stop_criterion_for_v<typename O2::stop_type, views>
         constexpr auto rebuild(O2 o) const
         { return newton<O2> { nxx::detail::from_options, std::move(o) }; }
 
         template<class Self, class F, class In>
             requires(nxx::detail::accepts_v<Self, In> && !nxx::detail::ready_v<Self, F>)
-        void operator()(this const Self&, const F&, const In&)
-            NXX_DELETE("newton needs a derivative: .with_derivative(df), .with_derivative(deriv::numeric{}), "
-                       "a callable with .derivative(), or use secant");
+        void operator()(this const Self&, const F&, const In&) NXX_DELETE("newton needs a derivative: "
+                                                                          ".with_derivative(df), "
+                                                                          ".with_derivative(deriv::numeric{}), a "
+                                                                          "callable with .derivative(), or use secant");
         using open_facade::operator();
 
         template<class F, class In>

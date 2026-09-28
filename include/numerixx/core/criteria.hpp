@@ -48,6 +48,24 @@ namespace nxx
             return false;
     }();
 
+    namespace detail
+    {
+        // A guard (min_iterations) delays convergence but never establishes it: alone, or under ||, it would stop a
+        // solver after n iterations and report success without any accuracy test.
+        template<class C>
+        inline constexpr bool guard_only_v = [] {
+            if constexpr (requires { std::remove_cvref_t<C>::guard_only; })
+                return bool(std::remove_cvref_t<C>::guard_only);
+            else
+                return false;
+        }();
+    }    // namespace detail
+
+    // Whether C can stop a solver whose views are of kind K: it applies to them and is not a bare guard. Solvers
+    // constrain their stop criterion on this, with reasoned deletions for the rest.
+    template<class C, view_kind K>
+    inline constexpr bool stop_criterion_for_v = criterion_for_v<C, K> && !detail::guard_only_v<C>;
+
     template<class A, class B>
     struct any_of_t;
     template<class A, class B>
@@ -74,6 +92,7 @@ namespace nxx
     struct any_of_t : criterion_base
     {
         static constexpr view_kind applies_to = A::applies_to & B::applies_to;
+        static constexpr bool      guard_only = detail::guard_only_v<A> || detail::guard_only_v<B>;    // either may stop alone
         A                          a;
         B                          b;
 
@@ -90,6 +109,7 @@ namespace nxx
     struct all_of_t : criterion_base
     {
         static constexpr view_kind applies_to = A::applies_to & B::applies_to;
+        static constexpr bool      guard_only = detail::guard_only_v<A> && detail::guard_only_v<B>;    // both must converge
         A                          a;
         B                          b;
 
@@ -318,13 +338,15 @@ namespace nxx
         { return c.evaluations >= n_ ? verdict::exhausted : verdict::proceed; }
     };
 
-    // Converged once n iterations have run; combine with &&.
+    // Converged once n iterations have run. A guard: solvers accept it only under && with a convergence test, because
+    // alone, or under ||, it would report success after n iterations without testing accuracy.
     class min_iterations : public criterion_base
     {
         std::uint32_t n_;
 
     public:
         static constexpr view_kind applies_to = all_views;
+        static constexpr bool      guard_only = true;    // solvers take it only as `test && min_iterations{n}`
 
         constexpr min_iterations(max_iterations n) noexcept : n_(n.value()) {}
         constexpr std::uint32_t value() const noexcept { return n_; }

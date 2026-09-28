@@ -45,9 +45,14 @@ namespace nxx::roots
         {}
 
         constexpr explicit bisection(stop_type stop)
-            requires(criterion_for_v<stop_type, view_kind::enclosure> && std::same_as<Opt, nxx::options<stop_type>>)
+            requires(stop_criterion_for_v<stop_type, view_kind::enclosure> && std::same_as<Opt, nxx::options<stop_type>>)
             : opt_ { stop, max_iterations { 200 } }
         {}
+
+        template<class C>
+            requires(criterion_for_v<C, view_kind::enclosure> && nxx::detail::guard_only_v<C>)
+        explicit bisection(C) NXX_DELETE("min_iterations only guards another criterion: combine it with a convergence "
+                                         "test using && (your_test && min_iterations{n})");
 
         template<class C>
             requires(is_criterion_v<C> && !criterion_for_v<C, view_kind::enclosure>)
@@ -58,7 +63,10 @@ namespace nxx::roots
 
         constexpr const Opt& options() const noexcept { return opt_; }
 
+        // Only options whose stop criterion can stop this solver: rebuild is public, so it must not be a way around the
+        // constructors and with_stop (a bare min_iterations guard would report success without testing accuracy).
         template<class O2>
+            requires stop_criterion_for_v<typename O2::stop_type, views>
         constexpr auto rebuild(O2 o) const
         { return bisection<O2> { nxx::detail::from_options, std::move(o) }; }
 

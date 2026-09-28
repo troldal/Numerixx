@@ -13,3 +13,4 @@ function(numerixx_add_example name source)
 endfunction()
 
 numerixx_add_example(version version.cpp LINK numerixx::numerixx)
+numerixx_add_example(quick_tour quick_tour.cpp LINK numerixx::roots numerixx::deriv)

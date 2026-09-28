@@ -13,8 +13,10 @@ interpolation, done carefully, generically and composably.
 - **Portable.** GCC, Clang, MSVC, clang-cl and Emscripten (WebAssembly). MIT licence.
 
 > **Status: Numerixx 2 is being rebuilt.** This branch contains the new build system, a first cut of the core
-> vocabulary, 1-D root finding and `derivative_of` (the de-risking spike, roadmap phase S); the other modules are
-> still empty. The modules are ported phase by phase; see [the plan](docs/redesign/PLAN.md) and
+> vocabulary, 1-D root finding, numerical derivatives and the FXT pipe syntax for results (the de-risking spike,
+> roadmap phase S); the other modules (optimize, poly, integrate, interpolate, linalg, multiroots and the
+> multiprecision adapter) are still empty. [examples/quick_tour.cpp](examples/quick_tour.cpp) shows what works today. The modules are ported
+> phase by phase; see [the plan](docs/redesign/PLAN.md) and
 > [the design reference](docs/redesign/DESIGN.md). The previous API is preserved at the tags `v1.0.0` (master) and
 > `v1.1.0-legacy` (the last development branch); [MIGRATION.md](MIGRATION.md) maps it to the new one.
 
