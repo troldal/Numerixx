@@ -1,7 +1,7 @@
 # Numerixx 2: redesign plan
 
 - **Date:** 2026-09-27
-- **Status:** Approved on 2026-09-28, with every default in section 10 (and DESIGN §12) accepted. Phase 0 is done; the de-risking spike is next.
+- **Status:** Approved on 2026-09-28, with every default in section 10 (and DESIGN §12) accepted. Phase 0 is done. The de-risking spike meets its 11 exit criteria locally on all 12 presets (DESIGN §10.2 status, Appendix D), and awaits hosted CI and merge; phase 1 is next.
 - **Companion documents:**
   - [`DESIGN.md`](DESIGN.md): the detailed design reference, covering every decision, the code sketches, per-module algorithm tables, CMake, the test strategy and the full roadmap. Section numbers there are stable; "§n" below refers to them.
   - [`prototype/`](prototype/): a throwaway feasibility prototype. It compiles and runs on nine configurations: GCC 16 and Clang 22 + libc++, each with and without `-fno-exceptions`; em++ 6.0.8 with `-fexceptions`, `-fno-exceptions` and `-fwasm-exceptions`; MSVC 19.51; and clang-cl 22.
@@ -175,7 +175,7 @@ later:  multimin ─► optimize, multiroots;  fit ─► multiroots (+ poly onc
 
 ### 5.3 What it looks like
 
-The spellings below are the design's (§6.11). The prototype compiled and ran the same chain and pipeline on all nine configurations, including inside a `static_assert`. It used older spellings: `r::secant{nxx::default_step{}, 5}`, and `r::bisection{nxx::x_tol{1e-4}}`, which the design now rejects. The builder and criterion spellings shown here, and the run-time-input lines, are still sketches (spike exit criterion 8).
+The spellings below are the design's (§6.11). The prototype compiled and ran the same chain and pipeline on all nine configurations, including inside a `static_assert`. It used older spellings: `r::secant{nxx::default_step{}, 5}`, and `r::bisection{nxx::x_tol{1e-4}}`, which the design now rejects. The spike compiles and runs this snippet as written (checked with GCC 16), and its tests cover each part on every preset (spike exit criterion 8).
 
 ```cpp
 #include <numerixx/roots.hpp>
