@@ -12,7 +12,7 @@ project(Numerixx
 
 # ---- Options (DESIGN §4.3). Development options are OFF when Numerixx is not the top-level project. -------------
 option(NUMERIXX_BUILD_TESTS             "Build the test suite"                                   ${PROJECT_IS_TOP_LEVEL})
-option(NUMERIXX_BUILD_EXAMPLES          "Build the examples (registered as smoke tests)"          OFF)
+option(NUMERIXX_BUILD_EXAMPLES          "Build the examples (registered as smoke tests)"          ON)
 option(NUMERIXX_BUILD_BENCHMARKS        "Build the google/benchmark benchmarks"                   OFF)
 option(NUMERIXX_BUILD_DOCS              "Build the API documentation (needs Doxygen)"             OFF)
 option(NUMERIXX_BUILD_INTEGRATION_TESTS "Register the consumer-build scenarios as tests"          OFF)
