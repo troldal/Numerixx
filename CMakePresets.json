@@ -80,7 +80,7 @@
       "name": "gcc-noexcept-pipes",
       "inherits": "gcc-noexcept",
       "displayName": "GCC, -fno-exceptions, with the FXT pipes (fails until the FXT pin includes FXT-1)",
-      "description": "The canary for FXT-1: CI runs it with continue-on-error, and it turns green once the pinned FXT commit replaces 'throw 0;' in its concept probes.",
+      "description": "The canary for FXT-1: it fails until the pinned FXT commit replaces 'throw 0;' in its concept probes. CI reports that failure as a warning and fails on any other error.",
       "cacheVariables": { "NUMERIXX_WITH_FXT": "ON" }
     },
     {

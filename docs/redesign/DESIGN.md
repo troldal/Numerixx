@@ -407,7 +407,7 @@ The install/export (`numerixx-config.cmake`, `SameMinorVersion`, a `find_depende
 
 ### 4.5 Presets, Emscripten and Windows
 
-- **Presets** (`CMakePresets.json` v6, verified to parse on CMake 3.29 and 4.3): `msvc`, `clang-cl`, `gcc`, `clang` (libc++), `clang-asan`, `gcc-noexcept`, `gcc-noexcept-pipes` (the FXT-1 canary, an allowed failure until the FXT pin includes FXT-1), `gcc-multiprecision`, `integration` (the consumer-build scenarios), `emscripten` (`-fwasm-exceptions`), `emscripten-jsexcept` (JavaScript-based `-fexceptions`), `emscripten-noexcept`, `emscripten-pthread` (`-fwasm-exceptions -pthread`), and workflow presets.
+- **Presets** (`CMakePresets.json` v6, verified to parse on CMake 3.29 and 4.3): `msvc`, `clang-cl`, `gcc`, `clang` (libc++), `clang-asan`, `gcc-noexcept`, `gcc-noexcept-pipes` (the FXT-1 canary: it fails until the FXT pin includes FXT-1, and CI reports that failure as a warning while any other error fails the job), `gcc-multiprecision`, `integration` (the consumer-build scenarios), `emscripten` (`-fwasm-exceptions`), `emscripten-jsexcept` (JavaScript-based `-fexceptions`), `emscripten-noexcept`, `emscripten-pthread` (`-fwasm-exceptions -pthread`), and workflow presets.
 - **Emscripten.**
   - Test link flags: `-sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=1MB -sEXIT_RUNTIME=1 -sNODERAWFS=1`.
   - `long double` on wasm32 is software quad.
@@ -1666,7 +1666,7 @@ Once FXT-4..7 exist, Numerixx's `first_of_t` can delegate to `fxt::first_of_with
 |---|---|---|
 | windows | `windows-2025-vs2026` (VS 18.9, MSVC 14.51, clang-cl) | `msvc`, `clang-cl` (`CPM_SOURCE_CACHE=C:\cpm`); `/W4 /WX` consumer TU; P2564 probe `WILL_FAIL` on `msvc` |
 | linux-clang | `ubuntu-26.04` | `clang` (libc++ 22), `clang-asan` |
-| linux-gcc | container `gcc:16` | `gcc`, `gcc-noexcept` (`continue-on-error` for pipes until the FXT-1 pin), `gcc-multiprecision` |
+| linux-gcc | container `gcc:16` | `gcc`, `gcc-noexcept`, `gcc-noexcept-pipes` (the FXT-1 canary: the expected failure is a warning, any other error fails the job), `gcc-multiprecision` |
 | emscripten | `ubuntu-26.04` + emsdk 6.0.10 | `emscripten` (wasm EH), `emscripten-jsexcept` (JS EH), `emscripten-noexcept`, `emscripten-pthread` (wasm EH with `-pthread`); node runs the tests |
 | consumers | `ubuntu-26.04` | a CPM parent with an older CPM and a parent `fxt::fxt`, and a FetchContent parent, each in both declaration orders (the parent declares FXT and Eigen first, or Numerixx first); a parent that declares its own `Boost` package; a scalar-only parent (`NUMERIXX_WITH_FXT=OFF`, `NUMERIXX_WITH_LINALG=OFF`, asserting that neither FXT nor Eigen is downloaded); install + `find_package` |
 | format | `ubuntu-26.04` | clang-format 22 dry run |

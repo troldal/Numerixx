@@ -80,7 +80,7 @@ Every configuration is a CMake preset; `cmake --workflow --preset <name>` config
 | Preset | Toolchain |
 |---|---|
 | `gcc`, `gcc-noexcept`, `gcc-multiprecision` | GCC + libstdc++ with library assertions; without exceptions; with the multiprecision adapter and Boost.Math oracles |
-| `gcc-noexcept-pipes` | without exceptions but with the FXT pipes; fails until the FXT pin includes FXT-1 (an allowed failure in CI) |
+| `gcc-noexcept-pipes` | without exceptions but with the FXT pipes; fails until the FXT pin includes FXT-1 (CI reports that failure as a warning and fails on any other error) |
 | `clang`, `clang-asan` | Clang + libc++; with AddressSanitizer, UndefinedBehaviorSanitizer and libc++ debug hardening |
 | `msvc`, `clang-cl` | MSVC and clang-cl (run from a Developer PowerShell) |
 | `emscripten`, `emscripten-jsexcept`, `emscripten-noexcept`, `emscripten-pthread` | Emscripten with wasm, JavaScript or no exceptions, and with `-pthread`; tests run under node (activate emsdk first) |
