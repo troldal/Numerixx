@@ -14,10 +14,12 @@ set(NUMERIXX_INSTALL_DEPS_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/numerixx-deps"
 # FXT: only for numerixx::pipes (D18, D26).
 # DOWNLOAD_ONLY, because FXT's own CMake downloads an unhashed CPM and the TartanLlama expected/optional
 # repositories. Parents that use FXT themselves declare it as `NAME FXT` too, so CPM deduplicates it.
+# The pin carries the FXT-1 probe fix (DESIGN §8.2), which lets FXT's concepts compile with -fno-exceptions. It is
+# the head of the fix branch of troldal/FXT#1; move it to the commit on FXT's main once that pull request is merged.
 # ---------------------------------------------------------------------------------------------------------------
-set(NUMERIXX_FXT_REF    "9208e597156b196dd5cbf55ab8460ffb2cead30b"
+set(NUMERIXX_FXT_REF    "9570f44d45416fd2706f46ace53f683590d1be23"
     CACHE STRING "FXT commit fetched by Numerixx (FXT has no release tags yet)")
-set(NUMERIXX_FXT_SHA256 "dcd46f5cce7973ecdda69088cab4f2e364fbdbbc285e03bc7eee5799b689397d"
+set(NUMERIXX_FXT_SHA256 "90887c11e8ceb091bdf16c4df16cbb573ac1a61fa6b40a7a031311f4b4740521"
     CACHE STRING "SHA256 of the GitHub archive of NUMERIXX_FXT_REF")
 
 if(NUMERIXX_WITH_FXT)

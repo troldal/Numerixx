@@ -1,10 +1,10 @@
 # Numerixx 2 — Design Reference
 
 - **Date:** 2026-09-27
-- **Status:** Draft for review
+- **Status:** Approved on 2026-09-28, with every §12 default accepted
 - **Scope:** every module of Numerixx (core, deriv, poly, roots, optimize, linalg + multiroots, integrate, interpolate), the build system, tests and CI, upstream work in FXT, migration from Numerixx 1.x, and the families planned after v2.0 (§1.1, §10.5).
 
-**Purpose.** This is the detailed companion to [`docs/redesign/PLAN.md`](PLAN.md), the short plan. It records the library's scope and positioning, every design decision with its rationale and the alternatives considered, the principles behind them, the build and dependency design, the core abstractions with code sketches, the per-module algorithm tables (including the bugs that must not be ported), the testing and CI design, the roadmap with phase sizes and acceptance criteria, the risks, and the open decisions with their defaults. Section numbers are stable, so other documents and code comments can cite them (for example "DESIGN §6.8"). Requirement IDs (R-B1, R-E3, R-A5, …) are listed in Appendix B.
+**Purpose.** This is the detailed companion to [`docs/redesign/PLAN.md`](PLAN.md), the short plan. It records the library's scope and positioning, every design decision with its rationale and the alternatives considered, the principles behind them, the build and dependency design, the core abstractions with code sketches, the per-module algorithm tables (including the bugs that must not be ported), the testing and CI design, the roadmap with phase sizes and acceptance criteria, the risks, and the decisions that were open until 2026-09-28, with their defaults (all accepted). Section numbers are stable, so other documents and code comments can cite them (for example "DESIGN §6.8"). Requirement IDs (R-B1, R-E3, R-A5, …) are listed in Appendix B.
 
 **Evidence markers.**
 - **[prototyped]**: compiled and run in the feasibility prototype preserved at [`docs/redesign/prototype/`](prototype/), on 9 configurations with bit-identical output: GCC 16.1 and Clang 22 + libc++, each with and without `-fno-exceptions`; em++ 6.0.8 with `-fexceptions`, `-fno-exceptions` and `-fwasm-exceptions`; MSVC 19.51; clang-cl 22. MSVC and clang-cl also passed with `/EHs-c-`.
@@ -290,7 +290,7 @@ Rules:
 | Dependency | Pin | How | Needed by | Default |
 |---|---|---|---|---|
 | CPM | 0.43.2, `get_cpm.cmake` SHA256 `49a3bef9…f232aa` | committed file + a 6-line wrapper that reuses a parent's CPM (tested with 0.42.1) | build | always |
-| **FXT** | `9208e597…` → bumped to the first commit containing FXT-1; archive SHA256 | `CPMAddPackage(NAME FXT URL … URL_HASH … DOWNLOAD_ONLY YES)` + `fxt::fxt` shim if absent | `numerixx::pipes` only | `NUMERIXX_WITH_FXT=ON` |
+| **FXT** | `9570f44d…`, which adds the FXT-1 probe fix (troldal/FXT#1; moves to the merge commit on FXT's main once merged); archive SHA256 | `CPMAddPackage(NAME FXT URL … URL_HASH … DOWNLOAD_ONLY YES)` + `fxt::fxt` shim if absent | `numerixx::pipes` only | `NUMERIXX_WITH_FXT=ON` |
 | **Eigen** | 5.0.1, SHA256 `e9c326dc…3dec` (fallback `GIT_TAG 5.0.1`) | `DOWNLOAD_ONLY` + own INTERFACE target, unless a parent provides `Eigen3::Eigen` | `numerixx::linalg`, `numerixx::multiroots`; the `HybridNonLinearSolver` oracle tests | `NUMERIXX_WITH_LINALG=ON` |
 | Boost.Config + Boost.Multiprecision | boost-1.92.0 (SHA256 `b4171037…a0`, `9da99784…01d0`) | standalone boostorg repos, `BOOST_MP_STANDALONE ON`; package names `boost_config`/`boost_multiprecision`; guarded by `if(NOT TARGET Boost::multiprecision)` | `numerixx::multiprecision` adapter | OFF |
 | Boost.Math | boost-1.92.0 (SHA256 `aa84eec6…2c48`) | standalone, `BOOST_MATH_STANDALONE ON` | oracle tests only (roots, minima, quadrature; §9.1) | OFF (`NUMERIXX_TEST_ORACLES`) |
@@ -407,7 +407,7 @@ The install/export (`numerixx-config.cmake`, `SameMinorVersion`, a `find_depende
 
 ### 4.5 Presets, Emscripten and Windows
 
-- **Presets** (`CMakePresets.json` v6, verified to parse on CMake 3.29 and 4.3): `msvc`, `clang-cl`, `gcc`, `clang` (libc++), `clang-asan`, `gcc-noexcept`, `gcc-noexcept-pipes` (the FXT-1 canary: it fails until the FXT pin includes FXT-1, and CI reports that failure as a warning while any other error fails the job), `gcc-multiprecision`, `integration` (the consumer-build scenarios), `emscripten` (`-fwasm-exceptions`), `emscripten-jsexcept` (JavaScript-based `-fexceptions`), `emscripten-noexcept`, `emscripten-pthread` (`-fwasm-exceptions -pthread`), and workflow presets.
+- **Presets** (`CMakePresets.json` v6, verified to parse on CMake 3.29 and 4.3): `msvc`, `clang-cl`, `gcc`, `clang` (libc++), `clang-asan`, `gcc-noexcept` (with the FXT pipes, now that the FXT pin includes the FXT-1 probe fix), `gcc-multiprecision`, `integration` (the consumer-build scenarios), `emscripten` (`-fwasm-exceptions`), `emscripten-jsexcept` (JavaScript-based `-fexceptions`), `emscripten-noexcept`, `emscripten-pthread` (`-fwasm-exceptions -pthread`), and workflow presets.
 - **Emscripten.**
   - Test link flags: `-sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=1MB -sEXIT_RUNTIME=1 -sNODERAWFS=1`.
   - `long double` on wasm32 is software quad.
@@ -1547,7 +1547,7 @@ namespace detail {   // tridiagonal.hpp: in-house O(n) solvers; interpolate depe
 
 | Pri | ID | Change | Signature / location | When |
 |---|---|---|---|---|
-| **P0** | FXT-1 | `throw 0;` → `std::unreachable();` in the `expected_like`/`optional_like` probes; `#if __cpp_exceptions` guards for Attempt, Failure, Lazy, Format and the enums | `concepts/IsExpected.hpp:87-88`, `concepts/IsOptional.hpp:76-77` | before phase 1. P0 because it is a 2+2-line diff; it gates only the `-fno-exceptions` legs that use pipes. **Verified necessary and sufficient** for transform, and_then, value_or, match and tap under `-fno-exceptions` on GCC, Clang, em++ and clang-cl `/EHs-c-` **[prototyped]**; the patch is `docs/redesign/prototype/fxt-1.patch` |
+| **P0** | FXT-1 | `throw 0;` → `std::unreachable();` in the `expected_like`/`optional_like` probes; `#if __cpp_exceptions` guards for Attempt, Failure, Lazy, Format and the enums | `concepts/IsExpected.hpp:87-88`, `concepts/IsOptional.hpp:76-77` | before phase 1. P0 because it is a 2+2-line diff; it gates only the `-fno-exceptions` legs that use pipes. **Verified necessary and sufficient** for transform, and_then, value_or, match and tap under `-fno-exceptions` on GCC, Clang, em++ and clang-cl `/EHs-c-` **[prototyped]**; the patch is `docs/redesign/prototype/fxt-1.patch`. **Status:** the probe fix is troldal/FXT#1, pinned by Numerixx since the spike; the `__cpp_exceptions` guards are still to do (`numerixx::pipes` includes none of those headers) |
 | **P1** | FXT-2 | CMake hygiene: `if(NOT COMMAND CPMAddPackage)` or a hash-pinned CPM; TL repos only when their options are ON; `target_compile_features(fxt INTERFACE cxx_std_23)`; `install(EXPORT)` + `fxtConfig.cmake`; semver tags | `CMakeLists.txt` | phases 0–1 (not blocking) |
 | **P2** | FXT-3 | `std::expected<void, E>` in `expected_like` (or document `fxt::unit`) | `IsExpected.hpp` | phase 1 |
 | **P3** | FXT-4 | Generic lazy alternatives as **named, assignable class templates** | `template<class Policy, class... Fs> constexpr auto first_of_with(Policy p, Fs... fs); template<class... Fs> constexpr auto first_of(Fs... fs);` | after phase 3 by default; during phase 3 if you choose (open decision 12) |
@@ -1666,7 +1666,7 @@ Once FXT-4..7 exist, Numerixx's `first_of_t` can delegate to `fxt::first_of_with
 |---|---|---|
 | windows | `windows-2025-vs2026` (VS 18.9, MSVC 14.51, clang-cl) | `msvc`, `clang-cl` (`CPM_SOURCE_CACHE=C:\cpm`); `/W4 /WX` consumer TU; P2564 probe `WILL_FAIL` on `msvc` |
 | linux-clang | `ubuntu-26.04` | `clang` (libc++ 22), `clang-asan` |
-| linux-gcc | container `gcc:16` | `gcc`, `gcc-noexcept`, `gcc-noexcept-pipes` (the FXT-1 canary: the expected failure is a warning, any other error fails the job), `gcc-multiprecision` |
+| linux-gcc | container `gcc:16` | `gcc`, `gcc-noexcept` (including the FXT pipes), `gcc-multiprecision` |
 | emscripten | `ubuntu-26.04` + emsdk 6.0.10 | `emscripten` (wasm EH), `emscripten-jsexcept` (JS EH), `emscripten-noexcept`, `emscripten-pthread` (wasm EH with `-pthread`); node runs the tests |
 | consumers | `ubuntu-26.04` | a CPM parent with an older CPM and a parent `fxt::fxt`, and a FetchContent parent, each in both declaration orders (the parent declares FXT and Eigen first, or Numerixx first); a parent that declares its own `Boost` package; a scalar-only parent (`NUMERIXX_WITH_FXT=OFF`, `NUMERIXX_WITH_LINALG=OFF`, asserting that neither FXT nor Eigen is downloaded); install + `find_package` |
 | format | `ubuntu-26.04` | clang-format 22 dry run |
@@ -1705,11 +1705,11 @@ Already proven:
 
 Exit criteria:
 1. Hosted CI green on all legs with the skeleton: MSVC and clang-cl configured **through CMake**, clang-22 + libc++, `gcc:16`, emsdk 6.0.10.
-2. FXT-1 merged upstream and the pin bumped, or a patched fork commit pinned via `NUMERIXX_FXT_REF`/`CPM_FXT_SOURCE`, so `gcc-noexcept` turns green.
+2. FXT-1 merged upstream and the pin bumped, or a patched fork commit pinned via `NUMERIXX_FXT_REF`/`CPM_FXT_SOURCE`, so `gcc-noexcept` turns green. (Met by pinning the troldal/FXT#1 commit; the pin moves to FXT's main once that is merged.)
 3. `first_of`/`then` over solvers with different state types **and** fallible callbacks through `pipes.hpp` under clang-cl in CMake builds, including `.with_projection`/`.with_observer` values and the family facades.
 4. CPM deduplication with a CPM parent and a FetchContent parent, in both declaration orders (the parent declares FXT and Eigen first; Numerixx first).
 5. A compile-time measurement for the umbrella header (guard: 2 s on GCC), and one recorded for a linalg/multiroots TU.
-6. Your written decision on §12 items 1–8.
+6. Your written decision on §12 items 1–8 (done on 2026-09-28: every default accepted).
 7. **Criterion soundness:** the §9.3 property holds on every spike solver run standalone; `x_tol` on a bracketing solver does not compile, with its reason.
 8. **Canonical calls** 1, 2, 3, 9 and 10 (§6.14) compile and run on GCC, Clang + libc++, MSVC, clang-cl and em++ with **run-time** brackets, tolerances and budgets.
 9. **Diagnostics:** the compile-fail cases in §9.1 put the reason string in the first error on GCC and Clang; line counts are recorded.
@@ -1864,9 +1864,9 @@ Work also moves between phases (zero net): toms748 (1.5) and itp (1) to phase 8;
 
 ---
 
-## 12. Open decisions for the user
+## 12. Decisions
 
-Each item has a recommended default, and the plan assumes it. Items 1–8 gate the spike (§10.2, criterion 6).
+**Decided on 2026-09-28: the author accepted every default below.** Until then these were the open decisions; items 1–8 gated the spike (§10.2, criterion 6).
 
 1. **Boost.** None in the library; standalone Boost.Config + Multiprecision (+ Math) via CPM only for the optional multiprecision adapter and test oracles. **Default: accept.**
 2. **Linear algebra.** Eigen 5.0.1 as the backend behind the `nxx::linalg` facade (+2.5–6.4 s per linalg/multiroots TU in use; no `constexpr` N-D solves), or in-house kernels (constexpr and allocation-free, but more code to write and validate)? **Default: Eigen behind the facade.**
@@ -1992,7 +1992,7 @@ Derived from the author's brief (functional style, solver chaining, functions as
 
 **Prototype** (`docs/redesign/prototype/`, 2,027 lines):
 - sources: `nxx/{core,roots,deriv,linalg,linalg_eigen,multiroots,pipes,runtime}.hpp`, `test_core.cpp`, `test_nd.cpp`, `test_runtime.cpp` (the run-time chain test uses no FXT);
-- `neg/`: 16 compile-fail tests and 3 probes;
+- `neg/`: 16 compile-fail tests and 4 probes;
 - build and timing scripts for GNU-style compilers and MSVC; `fxt-1.patch`.
 
 An earlier synthesis spike (about 560 lines, not preserved) ran the same API on GCC 16.1, Clang 22 + libc++ (± `-fno-exceptions`), MSVC 19.51 `/W4`, clang-cl 22 `/W4` and em++ 6.0.8 `-fno-exceptions`; its headline chain took 59 iterations and 64 evaluations.

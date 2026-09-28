@@ -60,7 +60,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        preset: [gcc, gcc-noexcept, gcc-noexcept-pipes, gcc-multiprecision]
+        preset: [gcc, gcc-noexcept, gcc-multiprecision]
     env:
       CPM_SOURCE_CACHE: /__w/.cpm
     steps:
@@ -70,28 +70,7 @@ jobs:
         with:
           path: /__w/.cpm
           key: cpm-gcc-${{ hashFiles('cmake/NumerixxDependencies.cmake', 'tests/CMakeLists.txt', 'benchmarks/CMakeLists.txt') }}
-      - if: matrix.preset != 'gcc-noexcept-pipes'
-        run: cmake --workflow --preset ${{ matrix.preset }}
-      # The FXT-1 canary (DESIGN §8.2): GCC rejects the 'throw 0;' in FXT's concept probes under -fno-exceptions. That
-      # failure is expected and reported as a warning; any other error fails the job, and a pass says FXT-1 has landed.
-      # `ninja -k 0` compiles every translation unit, so an unrelated error cannot hide behind the expected one.
-      - if: matrix.preset == 'gcc-noexcept-pipes'
-        name: FXT-1 canary
-        shell: bash
-        run: |
-          fxt1='fxt/concepts/.*error: exception handling disabled'
-          if { cmake --preset gcc-noexcept-pipes && cmake --build --preset gcc-noexcept-pipes -- -k 0 &&
-               ctest --preset gcc-noexcept-pipes; } > canary.log 2>&1; then
-            cat canary.log
-            echo "::notice::gcc-noexcept-pipes passes: the FXT pin includes FXT-1. Drop NUMERIXX_WITH_FXT=OFF from gcc-noexcept and retire this canary."
-          elif grep -q "$fxt1" canary.log && ! grep 'error:' canary.log | grep -qv "$fxt1"; then
-            cat canary.log
-            echo "::warning::gcc-noexcept-pipes fails as expected, on FXT's 'throw 0;' only (FXT-1)."
-          else
-            cat canary.log
-            echo "::error::gcc-noexcept-pipes failed for a reason other than FXT-1."
-            exit 1
-          fi
+      - run: cmake --workflow --preset ${{ matrix.preset }}
 
   emscripten:
     runs-on: ubuntu-26.04

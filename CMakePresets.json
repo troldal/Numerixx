@@ -68,20 +68,11 @@
     {
       "name": "gcc-noexcept",
       "inherits": "gcc",
-      "displayName": "GCC, -fno-exceptions (FXT pipes off until FXT-1 is pinned)",
-      "description": "GCC rejects the 'throw 0;' in FXT's concept probes under -fno-exceptions even in system headers; FXT-1 (DESIGN §8.2) fixes it. Until the FXT pin includes FXT-1, this leg builds without numerixx::pipes.",
+      "displayName": "GCC, -fno-exceptions",
       "cacheVariables": {
         "NUMERIXX_NO_EXCEPTIONS": "ON",
-        "NUMERIXX_WITH_FXT": "OFF",
         "NUMERIXX_BUILD_BENCHMARKS": "OFF"
       }
-    },
-    {
-      "name": "gcc-noexcept-pipes",
-      "inherits": "gcc-noexcept",
-      "displayName": "GCC, -fno-exceptions, with the FXT pipes (fails until the FXT pin includes FXT-1)",
-      "description": "The canary for FXT-1: it fails until the pinned FXT commit replaces 'throw 0;' in its concept probes. CI reports that failure as a warning and fails on any other error.",
-      "cacheVariables": { "NUMERIXX_WITH_FXT": "ON" }
     },
     {
       "name": "gcc-multiprecision",
@@ -144,7 +135,6 @@
     { "name": "clang", "configurePreset": "clang" },
     { "name": "clang-asan", "configurePreset": "clang-asan" },
     { "name": "gcc-noexcept", "configurePreset": "gcc-noexcept" },
-    { "name": "gcc-noexcept-pipes", "configurePreset": "gcc-noexcept-pipes" },
     { "name": "gcc-multiprecision", "configurePreset": "gcc-multiprecision" },
     { "name": "emscripten", "configurePreset": "emscripten" },
     { "name": "emscripten-jsexcept", "configurePreset": "emscripten-jsexcept" },
@@ -165,7 +155,6 @@
     { "name": "clang", "inherits": "test-base", "configurePreset": "clang" },
     { "name": "clang-asan", "inherits": "test-base", "configurePreset": "clang-asan" },
     { "name": "gcc-noexcept", "inherits": "test-base", "configurePreset": "gcc-noexcept" },
-    { "name": "gcc-noexcept-pipes", "inherits": "test-base", "configurePreset": "gcc-noexcept-pipes" },
     { "name": "gcc-multiprecision", "inherits": "test-base", "configurePreset": "gcc-multiprecision" },
     { "name": "emscripten", "inherits": "test-base", "configurePreset": "emscripten" },
     { "name": "emscripten-jsexcept", "inherits": "test-base", "configurePreset": "emscripten-jsexcept" },
@@ -185,7 +174,6 @@
     { "name": "clang", "steps": [ { "type": "configure", "name": "clang" }, { "type": "build", "name": "clang" }, { "type": "test", "name": "clang" } ] },
     { "name": "clang-asan", "steps": [ { "type": "configure", "name": "clang-asan" }, { "type": "build", "name": "clang-asan" }, { "type": "test", "name": "clang-asan" } ] },
     { "name": "gcc-noexcept", "steps": [ { "type": "configure", "name": "gcc-noexcept" }, { "type": "build", "name": "gcc-noexcept" }, { "type": "test", "name": "gcc-noexcept" } ] },
-    { "name": "gcc-noexcept-pipes", "steps": [ { "type": "configure", "name": "gcc-noexcept-pipes" }, { "type": "build", "name": "gcc-noexcept-pipes" }, { "type": "test", "name": "gcc-noexcept-pipes" } ] },
     { "name": "gcc-multiprecision", "steps": [ { "type": "configure", "name": "gcc-multiprecision" }, { "type": "build", "name": "gcc-multiprecision" }, { "type": "test", "name": "gcc-multiprecision" } ] },
     { "name": "emscripten", "steps": [ { "type": "configure", "name": "emscripten" }, { "type": "build", "name": "emscripten" }, { "type": "test", "name": "emscripten" } ] },
     { "name": "emscripten-jsexcept", "steps": [ { "type": "configure", "name": "emscripten-jsexcept" }, { "type": "build", "name": "emscripten-jsexcept" }, { "type": "test", "name": "emscripten-jsexcept" } ] },

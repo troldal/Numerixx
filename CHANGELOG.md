@@ -20,10 +20,14 @@ one.
   Boost.MultiArray, the vendored Google Benchmark copy, and the old library, tests, demos and documentation.
 - CMake presets for GCC (with library assertions), Clang + libc++ (with sanitizers and hardening), MSVC, clang-cl,
   and Emscripten with wasm, JavaScript or no exceptions and with `-pthread`; GitHub Actions CI with every preset, the
-  consumer-build scenarios and a format check; nightly floor-compiler legs. `gcc-noexcept-pipes` is an allowed
-  failure until the FXT pin includes FXT-1.
+  consumer-build scenarios and a format check; nightly floor-compiler legs.
 - Test infrastructure: doctest 2.5.3 with test discovery (one CTest test per test case); header self-containment against each module's own target; a
   strict-warnings consumer translation unit; a layering check against the module DAG; compile-fail tests that check
   the diagnostic; and the consumer-build scenarios (CPM and FetchContent parents in both declaration orders, a
   parent with its own `Boost` package in both orders, a scalar-only parent, an installed package).
 - Deferred: the MSVC P2564 (consteval escalation) probe arrives with the refined types in phase 1.
+
+### Spike
+
+- FXT is pinned to a commit with the FXT-1 probe fix (troldal/FXT#1), so the FXT pipes build without exceptions:
+  `gcc-noexcept` now includes `numerixx::pipes`, and the `gcc-noexcept-pipes` canary is gone.

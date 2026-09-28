@@ -1,7 +1,7 @@
 # Numerixx 2: redesign plan
 
 - **Date:** 2026-09-27
-- **Status:** Draft for your review. Section 10 lists the decisions I need from you.
+- **Status:** Approved on 2026-09-28, with every default in section 10 (and DESIGN §12) accepted. Phase 0 is done; the de-risking spike is next.
 - **Companion documents:**
   - [`DESIGN.md`](DESIGN.md): the detailed design reference, covering every decision, the code sketches, per-module algorithm tables, CMake, the test strategy and the full roadmap. Section numbers there are stable; "§n" below refers to them.
   - [`prototype/`](prototype/): a throwaway feasibility prototype. It compiles and runs on nine configurations: GCC 16 and Clang 22 + libc++, each with and without `-fno-exceptions`; em++ 6.0.8 with `-fexceptions`, `-fno-exceptions` and `-fwasm-exceptions`; MSVC 19.51; and clang-cl 22.
@@ -288,7 +288,7 @@ The details are in §10. Sizes are focused developer-days for one developer.
 | # | Phase | Scope | Size |
 |---|---|---|---|
 | 0 | Skeleton | Tag `v1.0.0` (master, 5de1e07) and `v1.1.0-legacy` (dev-reorg tip, 8528e94) so that existing users can pin the old API; new CMake, presets and every CI leg (including multiprecision); delete the old tree | 2.5–3.5 |
-| S | **De-risking spike** | Hosted CI green on all legs; the FXT-1 fix pinned; chains with fallible callbacks under clang-cl in CMake builds; CPM deduplication with a parent project in both declaration orders; the umbrella-header compile-time guard and a recorded linalg TU time; your decision on §12 items 1–8; criterion soundness; the canonical calls with run-time inputs; readable compile-fail diagnostics; regularity; derivative composition (11 exit criteria in §10.2) | 3–4 |
+| S | **De-risking spike** | Hosted CI green on all legs; the FXT-1 fix pinned; chains with fallible callbacks under clang-cl in CMake builds; CPM deduplication with a parent project in both declaration orders; the umbrella-header compile-time guard and a recorded linalg TU time; your decision on §12 items 1–8; criterion soundness; the canonical calls with run-time inputs; readable compile-fail diagnostics; regularity; derivative composition (11 exit criteria in §10.2; the §12 decisions were made on 2026-09-28) | 3–4 |
 | 1 | Core vocabulary | scalar traits and maths helpers, refined types, error and result types, evaluation, `pipes` | 2.5–3.5 |
 | 2 | deriv | stencils, steps, `diff`, `diff_with_error`, `ridders`, `mixed`, `derivative_of`, the `numeric` policy | 3–5 |
 | 3 | Driver + 1-D roots | criteria, driver, combinators, `any_solver` run-time chains, `steps_view`; bisection, Brent, Illinois, Ridders, rtsafe, secant, Newton; expand/scan/subdivide; `solve`, `inverse_of`; Alefeld–Potra–Shi suite | 10–14 |
@@ -326,7 +326,7 @@ The details are in §10. Sizes are focused developer-days for one developer.
 
 The FXT items in priority order (details in §8):
 
-1. **FXT-1 (do first; it is tiny):** replace `throw 0;` with `std::unreachable();` in `concepts/IsExpected.hpp:87-88` and `concepts/IsOptional.hpp:76-77`, and guard the throwing utilities (`attempt`, `failure`, `lazy`, formatting, enums) with `#if __cpp_exceptions`. The prototype showed that this 2+2-line change is necessary and sufficient for the pipes it exercised (`transform`, `and_then`, `value_or`, `match`, `tap`) under `-fno-exceptions` on GCC, Clang, em++ and clang-cl `/EHs-c-`. It matters only for the no-exceptions build mode with pipes. The patch is in `prototype/fxt-1.patch`.
+1. **FXT-1 (do first; it is tiny):** replace `throw 0;` with `std::unreachable();` in `concepts/IsExpected.hpp:87-88` and `concepts/IsOptional.hpp:76-77`, and guard the throwing utilities (`attempt`, `failure`, `lazy`, formatting, enums) with `#if __cpp_exceptions`. The prototype showed that this 2+2-line change is necessary and sufficient for the pipes it exercised (`transform`, `and_then`, `value_or`, `match`, `tap`) under `-fno-exceptions` on GCC, Clang, em++ and clang-cl `/EHs-c-`. It matters only for the no-exceptions build mode with pipes. The patch is in `prototype/fxt-1.patch`. **Status:** the probe fix is troldal/FXT#1, which Numerixx pins; the guards are still to do.
 2. **FXT-2:** CMake hygiene:
    - reuse a parent's CPM instead of downloading an unhashed one;
    - fetch tl-expected/tl-optional only when their options are ON;
@@ -341,9 +341,9 @@ The FXT items in priority order (details in §8):
 
 ---
 
-## 10. Decisions I need from you
+## 10. Decisions
 
-Each item has my recommended default, and the plan assumes it. The full list of 19 open items is in §12, whose numbers are given in brackets; these are the ones that change the most. §12 items 1–8 must be decided in writing before the spike ends (§10.2, criterion 6).
+**Decided on 2026-09-28: every default below was accepted**, and so were the other items of §12 (19 in all, numbered in brackets here). These are the ones that change the most. The written decision on §12 items 1–8 was a spike exit criterion (§10.2, criterion 6), which this settles.
 
 0. **Starting point** (decision D1, already settled in DESIGN; listed for visibility). A fresh tree on this branch, porting from dev-reorg and tagging it as legacy, rather than merging dev-reorg. **Default: fresh tree.**
 1. **v2.0 scope** [§12.7]. The eight current modules in v2.0; `multimin` and `fit` in v2.1; `ode` in v2.2. The candidates in section 2 stay unscheduled, and the out-of-scope areas stay out. **Default: accept.**
