@@ -25,7 +25,7 @@ Everything here is header-only C++23 and uses only the standard library, except 
 | `nxx/pipes.hpp` | the only FXT include: `using fxt::operator|` for consumers |
 | `test_core.cpp` | 1-D core: refined types, headline solver chain (also inside `static_assert`), criteria, projection, warm start, fallible callbacks, FXT pipes, sizes |
 | `test_nd.cpp` | 2×2 constexpr damped Newton on in-house LU; with `-DNXX_WITH_EIGEN`, the same solver on `Eigen::Vector2d`/`VectorXd` |
-| `neg/` | 16 compile-fail tests (each must **fail** to compile, ideally with a readable reason) and 3 probes |
+| `neg/` | 16 compile-fail tests (each must **fail** to compile, ideally with a readable reason) and 4 probes |
 | `base.cpp`, `eigen_only.cpp` | compile-time baselines for `time_*.{sh,ps1}` |
 | `probe_features.cpp` | prints the C++23 feature-test macros of the current toolchain |
 | `fxt-1.patch` | the 2+2-line FXT fix (`throw 0;` → `std::unreachable();`) needed for `-fno-exceptions` builds |

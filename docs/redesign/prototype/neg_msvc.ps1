@@ -16,4 +16,4 @@ foreach ($t in $tests) {
   }
 }
 "== delete-with-reason on cl:"
-cl /nologo /std:c++latest /Zs out\del.cpp 2>&1 | Select-String "error|warning" | ForEach-Object { $_.Line -replace '^.*?(error|warning)', '$1' }
+cl /nologo /std:c++latest /Zs neg\probe_delete_reason.cpp 2>&1 | Select-String "error|warning" | ForEach-Object { $_.Line -replace '^.*?(error|warning)', '$1' }
