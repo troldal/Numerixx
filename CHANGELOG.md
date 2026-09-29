@@ -94,6 +94,8 @@ one.
   smoke test.
 - Known limits, documented in DESIGN §7.2: `expand` from a window on one side of 0 cannot cross 0 (phase 3), and a
   large but finite initial sample can hide a pole from the pole check (add `&& f_tol{…}` for a residual guarantee).
+- The spike's code is kept: phases 1-3 continue from it, with unchanged scope and acceptance criteria (DESIGN
+  §10.3 lists what the spike built and what is left).
 - Deferred to phases 1-3: the progress window and step-length cap of the open methods, the representation-space
   bisection midpoint, `illinois`, `ridders`, `rtsafe`, `scan`, `subdivide`, `inverse_of`, `.from_enclosure()`,
   `with_evaluation_budget`, `solve(f, x0)` and `solve(f, df, x0)`, noise steps, `diff_with_error`, Ridders

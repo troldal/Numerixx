@@ -1,7 +1,7 @@
 # Numerixx 2: redesign plan
 
 - **Date:** 2026-09-27
-- **Status:** Approved on 2026-09-28, with every default in section 10 (and DESIGN §12) accepted. Phase 0 is done. The de-risking spike meets its 11 exit criteria locally on all 12 presets (DESIGN §10.2 status, Appendix D), and awaits hosted CI and merge; phase 1 is next.
+- **Status:** Approved on 2026-09-28, with every default in section 10 (and DESIGN §12) accepted. Phase 0 is done. The de-risking spike meets its 11 exit criteria locally on all 12 presets (DESIGN §10.2 status, Appendix D), and awaits hosted CI and merge; phase 1 is next. The spike's code is kept, and phases 1–3 continue from it (DESIGN §10.3).
 - **Companion documents:**
   - [`DESIGN.md`](DESIGN.md): the detailed design reference, covering every decision, the code sketches, per-module algorithm tables, CMake, the test strategy and the full roadmap. Section numbers there are stable; "§n" below refers to them.
   - [`prototype/`](prototype/): a throwaway feasibility prototype. It compiles and runs on nine configurations: GCC 16 and Clang 22 + libc++, each with and without `-fno-exceptions`; em++ 6.0.8 with `-fexceptions`, `-fno-exceptions` and `-fwasm-exceptions`; MSVC 19.51; and clang-cl 22.
@@ -300,6 +300,7 @@ The details are in §10. Sizes are focused developer-days for one developer.
 | 9 | Multiprecision, docs, release | multiprecision adapter, docs, examples, benchmarks → `v2.0.0` | 5–7 |
 
 - **Total for v2.0:** 52.5–77.5 days, or 48.5–73.5 without phase 8. §10.3 shows the arithmetic.
+- **After the spike** (decided on 2026-09-29): phases 1–3 continue from the spike's code, with unchanged scope and acceptance criteria. About 0.5–1, 2–3.5 and 6–9 days of them are left, and 40–61 days in all for phases 1–9 (36–57 without phase 8). DESIGN §10.3 lists what is done and what is left.
 - **Order:** deriv comes right after the core vocabulary and before the driver, because it is small, needs only core, and is used by the numeric-derivative Newton in phase 3 and the FD Jacobians in phase 5. Phases 0 → S → 1 → 2 → 3 are sequential. After that, phases 4–7 depend only on core and the driver, so a second developer can run 6 and 7 in parallel with 4 and 5. Phase 8 may follow `v2.0.0`.
 - **Start fresh on this branch.** Port algorithm bodies mostly from dev-reorg, with provenance noted in each commit. Never merge dev-reorg: it would put 38.8 MB of Blaze into history for good. The `prototype/` headers are the starting point for the core; its in-house LU (`nxx/linalg.hpp`) and zero-heap choices are not carried over (§10.1).
 - **Migration from 1.x** (§10.4): `MIGRATION.md` maps the old API to the new one. For example:
