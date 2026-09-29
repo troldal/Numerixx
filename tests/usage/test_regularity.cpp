@@ -83,11 +83,29 @@ namespace
         });
     }
 
-    // A capture that is not nothrow-copyable: the copyable box keeps it in an optional (DESIGN §3.2).
+    // A capture whose copy may throw but whose move cannot: the copyable box copies first, then moves in place (DESIGN §3.2).
     auto make_table_projection(std::vector<double> limits)
     {
         return r::secant {}.with_projection([limits](double x) { return std::clamp(x, limits.front(), limits.back()); });
     }
+
+    // A callable whose copy throws on demand, for the copyable box's exception guarantee.
+    struct flaky_copy
+    {
+        std::vector<double> offset;
+        bool*               fail;
+
+        flaky_copy(std::vector<double> o, bool* f) : offset(std::move(o)), fail(f) {}
+        flaky_copy(const flaky_copy& other) : offset(other.offset), fail(other.fail)
+        {
+#if defined(__cpp_exceptions)
+            if (*fail) throw 1;
+#endif
+        }
+        flaky_copy(flaky_copy&&) noexcept        = default;
+        flaky_copy& operator=(const flaky_copy&) = delete;
+        double      operator()(double x) const { return x + offset.front(); }
+    };
 
     using fn_t     = std::function<double(double)>;
     using solver_t = nxx::any_solver<fn_t, r::root_estimate<double>>;
@@ -336,6 +354,36 @@ TEST_SUITE("usage")
         CHECK_FALSE(tb(f_plain, rt(0.1)).has_value());
         tb = ta;
         CHECK(same_result(tb(f_plain, rt(0.1)), ra));
+    }
+
+    TEST_CASE("copyable_box: the assignment strategy follows the capture")
+    {
+        const std::vector<double> xs { 1.0, 2.0 };
+        const auto                by_double = [k = 2.0](double x) { return k * x; };
+        const auto                by_vector = [v = xs](double x) { return x + v.front(); };    // a non-const member
+        const auto                by_const  = [xs](double x) { return x + xs.front(); };       // a const member
+        using by_double_t                   = std::remove_cvref_t<decltype(by_double)>;
+        using by_vector_t                   = std::remove_cvref_t<decltype(by_vector)>;
+        using by_const_t                    = std::remove_cvref_t<decltype(by_const)>;
+        static_assert(nxx::detail::box_kind_v<by_double_t> == 2);    // nothrow copy: in place
+        static_assert(nxx::detail::box_kind_v<by_vector_t> == 3);    // throwing copy, nothrow move: copy first
+        static_assert(nxx::detail::box_kind_v<flaky_copy> == 3);
+        // Capturing a const variable by copy makes a const member, so the closure's move copies it and may throw: the
+        // box falls back to std::optional.
+        static_assert(nxx::detail::box_kind_v<by_const_t> == 4);
+
+        bool                                  fail = false;
+        nxx::detail::copyable_box<flaky_copy> a { flaky_copy { { 1.0 }, &fail } };
+        nxx::detail::copyable_box<flaky_copy> b { flaky_copy { { 2.0 }, &fail } };
+        a = b;
+        CHECK((*a)(0.0) == 2.0);
+#if defined(__cpp_exceptions)
+        nxx::detail::copyable_box<flaky_copy> c { flaky_copy { { 3.0 }, &fail } };
+        fail = true;
+        CHECK_THROWS(a = c);
+        fail = false;
+        CHECK((*a)(0.0) == 2.0);    // a throwing copy leaves the box unchanged
+#endif
     }
 
     TEST_CASE("copy-assigning any_solver values")

@@ -208,11 +208,15 @@ namespace nxx
     {
         // copyable_box<T> (DESIGN §3.2): holds a copy-constructible T and is copy-assignable even when T is not (a
         // lambda with captures), using the std::ranges movable-box technique: assignment is destroy + construct.
+        // Kind 3 covers the common case of a capture whose copy may throw but whose move cannot (a std::vector, a
+        // std::string): it copies into a temporary first, so a throwing copy leaves the box unchanged. It also keeps
+        // std::optional out of that path: GCC 16.2 reports a false -Wmaybe-uninitialized for optional's reset + emplace.
         template<class T>
         inline constexpr int box_kind_v = std::is_copy_assignable_v<T>              ? 0     // T itself
                                           : std::is_empty_v<T>                      ? 1     // no state
                                           : std::is_nothrow_copy_constructible_v<T> ? 2     // in place
-                                                                                    : 3;    // optional
+                                          : std::is_nothrow_move_constructible_v<T> ? 3     // copy, then move in place
+                                                                                    : 4;    // optional
 
         template<class T, int Kind = box_kind_v<T>>
         class copyable_box;
@@ -276,6 +280,31 @@ namespace nxx
         template<class T>
         class copyable_box<T, 3>
         {
+            T v_;
+
+        public:
+            constexpr copyable_box()
+                requires std::default_initializable<T>
+                : v_()
+            {}
+            constexpr explicit copyable_box(T v) noexcept : v_(std::move(v)) {}
+            constexpr copyable_box(const copyable_box&) = default;
+            constexpr copyable_box& operator=(const copyable_box& other)
+            {
+                if (this != std::addressof(other)) {
+                    T copy(other.v_);    // may throw: the box is still unchanged
+                    std::destroy_at(std::addressof(v_));
+                    std::construct_at(std::addressof(v_), std::move(copy));    // cannot throw
+                }
+                return *this;
+            }
+            constexpr const T& operator*() const noexcept { return v_; }
+            constexpr const T* operator->() const noexcept { return std::addressof(v_); }
+        };
+
+        template<class T>
+        class copyable_box<T, 4>
+        {
             std::optional<T> v_;    // empty only if a copy threw during assignment, as with std::ranges' movable-box
 
         public:
@@ -288,8 +317,10 @@ namespace nxx
             constexpr copyable_box& operator=(const copyable_box& other)
             {
                 if (this != std::addressof(other)) {
-                    v_.reset();
-                    if (other.v_) v_.emplace(*other.v_);
+                    if (other.v_)
+                        v_.emplace(*other.v_);    // destroys the old value first; empty if the copy throws
+                    else
+                        v_.reset();
                 }
                 return *this;
             }
