@@ -46,7 +46,7 @@ one.
   projection (`clamp_to`); the pole check.
 - First cut of numerical differentiation (`<numerixx/deriv.hpp>`): stencils as integer data, `optimal`/`relative`/
   `absolute` steps, `diff`, `central`, `derivative_of` and the `numeric` policy.
-- Tests: 155 doctest cases (criterion soundness, determinism with a golden table of 22 solves that is bit-identical on
+- Tests: 156 doctest cases (criterion soundness, determinism with a golden table of 22 solves that is bit-identical on
   GCC, Clang, MSVC, clang-cl and em++, run-time chains equal to static chains, evaluation counts equal to instrumented
   calls, poles, extreme brackets, the canonical calls with run-time inputs, regularity, composition), 29 compile-fail
   cases, each with a control that must compile, whose reason must appear in the first error on GCC and Clang
@@ -54,7 +54,7 @@ one.
   self-tests (one of which the harness must reject), the P2564 probe (it must fail on MSVC with C7595), a
   strict-warnings consumer TU that instantiates the library with a global `f`, and compile-time measurements (the
   umbrella header is guarded at 2 s on GCC; measured 0.58 s on GCC 16, 0.46 s on Clang 22, 0.55 s on MSVC, 0.53 s on
-  clang-cl). All 12 presets pass: 224 CTest tests on most, 222 on MSVC, 233 with multiprecision, 8 on integration.
+  clang-cl). All 12 presets pass: 225 CTest tests on most, 223 on MSVC, 234 with multiprecision, 8 on integration.
 - Found and fixed by the spike (recorded in DESIGN): Clang's default floating-point contraction made solver paths
   platform-dependent, so the headers turn it off for library code; `better_than` was not transitive, so the best
   estimate of a chain depended on how it was grouped; the solver constant for the view kind is spelled `views`;
@@ -94,6 +94,10 @@ one.
   smoke test.
 - Known limits, documented in DESIGN §7.2: `expand` from a window on one side of 0 cannot cross 0 (phase 3), and a
   large but finite initial sample can hide a pole from the pole check (add `&& f_tol{…}` for a residual guarantee).
+- Found by hosted CI and fixed: GCC 16.2 (the `gcc:16` container) reported a false `-Wmaybe-uninitialized` when a
+  solver holding a lambda that captures a `std::vector` was copy-assigned, which failed every `-Werror` GCC build of
+  the spike; GCC 16.1 locally did not warn. `copyable_box` now copies such a capture into a temporary and moves it in
+  place, without `std::optional`; a throwing copy now leaves the box unchanged instead of empty.
 - The spike's code is kept: phases 1-3 continue from it, with unchanged scope and acceptance criteria (DESIGN
   §10.3 lists what the spike built and what is left).
 - Deferred to phases 1-3: the progress window and step-length cap of the open methods, the representation-space
