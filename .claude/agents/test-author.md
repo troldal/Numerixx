@@ -30,11 +30,21 @@ You write tests for Numerixx 2. Follow `CLAUDE.md` (sections Tests and Build and
   precision, with mpmath offline or with `tools/gen_reference.cpp` and a multiprecision type (that tool does not
   exist yet; the first corpus that needs it creates it). Commit the generating command next to the values.
 - **Numerixx output is never its own reference for accuracy.** The determinism golden table checks bit-identity,
-  not accuracy. Boost.Math and Eigen are oracles (§9.1); GSL is not, but values printed in its documentation may serve
-  as reference facts.
+  not accuracy. Boost.Math and Eigen are oracles (§9.1). GPL projects (such as GSL) are not, and their code is never
+  used, but values printed in their documentation may serve as reference facts.
 - Write every tolerance as `tol<T>(k, ref_eps) = k·max(ε_T, ref_eps)·(1 + |x|)`, and state k for each case. Do not
   loosen k to make a case pass. That helper does not exist yet either: the first corpus adds it to a shared test
   header.
+
+## A new family
+
+The family's DESIGN §7 section holds the approved design, which the main session writes there. You own its misuse
+tests and canonical calls:
+- each misuse marked as a compile error becomes a compile-fail case (below);
+- each one marked as a `make()` error becomes a doctest case that checks the exact error;
+- each one marked as an in-band error code becomes a doctest case that checks the code, and that the failure carries
+  the cost and the best estimate;
+- the canonical calls go into `tests/usage/canonical_calls.cpp`.
 
 ## Every fix needs a test that fails without it
 

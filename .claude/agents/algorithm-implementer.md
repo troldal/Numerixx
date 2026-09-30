@@ -26,9 +26,10 @@ You implement one algorithm in Numerixx 2. Follow `CLAUDE.md`, and work only ins
      For anything else, run `git grep -il <1.x class name> <tag> -- numerixx`, then read the file with
      `git show <tag>:<path>`.
    - **The literature.** Cite the paper or book.
-   Never port or paraphrase GSL. Do not copy GSL code found on the web; values printed in GSL's documentation may
-   serve as reference facts. Cite the source in the header comment and in the commit message you propose, and keep
-   the BSL-1.0 notice on Boost-derived code.
+   **No GPL code** (GPL, LGPL or AGPL, such as GSL or MPSolve): never port, paraphrase or copy it, including code
+   found on the web. Implement from the papers instead. Values printed in such a project's documentation may serve as
+   reference facts. Cite the source in the header comment and in the commit message you propose, and keep the BSL-1.0
+   notice on Boost-derived code.
 
 ## Shape
 
@@ -52,10 +53,13 @@ Other shapes:
 - **Stencils and step rules** follow `deriv/stencil.hpp` and `deriv/step.hpp`: constexpr data and small value types.
   There is no facade and no `algos` id.
 - **Non-iterative algorithms** (fixed quadrature rules such as `gauss_legendre`, polynomials and their closed forms,
-  interpolants) follow the API in their module's §7 section.
+  interpolants) follow the API in their module's §7 section, once the family's design is approved (see below).
 
-A family with no implemented member yet (optimize, multiroots, integrate) has no exemplar. Follow §6.6 and the
-family's §7 section, and report the facade design to the user before building on it.
+**A new family** (one with no implemented member yet: optimize, multiroots with the linalg facade, integrate,
+interpolate, poly) needs an approved design in its DESIGN §7 section. The main session writes it there after the user
+approves an `architect` note. If the section has none, stop and ask for one. Build the first member from it. Report
+any deviation to the main session instead of improvising. A deviation that touches the §6 machinery goes back to the
+architect.
 
 In every case: `NXX_BEGIN_HEADER`/`NXX_END_HEADER`, qualified internal calls, the `nxx::math` helpers, refined inputs
 through `make()`, `std::expected` results, nothing throws, constexpr where portable.
@@ -74,7 +78,9 @@ through `make()`, `std::expected` results, nothing throws, constexpr where porta
 - Add unit cases, extend the soundness properties, and check evaluation counts against `fn::counted`. Add the
   DESIGN §9.2 corpus entries this phase names.
 - Add compile-fail cases for misuse, the canonical calls the phase names, and a regression test for each "must not
-  port" bug.
+  port" bug. For a new family, leave the misuse cases and the canonical calls to `test-author`, which works from the
+  misuse catalogue in DESIGN §7. You still implement every rejection the catalogue names: constraints with reasons,
+  `make()` checks and error codes.
 - Regenerate the determinism golden table only if an intended path change requires it.
 - Update the status marks in DESIGN and add a CHANGELOG entry. Add or correct the `MIGRATION.md` row when the
   algorithm replaces a 1.x API or changes a 1.x result.

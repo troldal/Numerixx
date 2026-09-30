@@ -43,7 +43,24 @@ and do not run presets.
 Hosted CI (`.github/workflows/ci.yml`) uses other versions than the local toolchains, some newer and some older.
 When a suspicion depends on the compiler version, say which versions you checked.
 
+## Design-note mode
+
+Given an `architect` design note instead of code, check each option's compile-time mechanics before the user
+approves it:
+- Write the option's compile-time checks as type-level stubs in a scratch directory, and compile them on GCC,
+  Clang with libc++, MSVC, clang-cl and em++.
+- Check that invalid calls make `std::is_invocable_v` false, that each reasoned deletion's reason reaches the first
+  error on GCC 15+ and Clang 19+ (clang-cl and em++ included) and that on cl the error points to the deleted
+  declaration's line, that MSVC can order the overloads, that constexpr claims hold inside a `static_assert`, and that
+  no feature lies beyond the compiler floor.
+- Measure compile time or `sizeof` only when the choice between options turns on that number.
+- Report pass, fail or unverified for each option, with the compiler versions. The stubs never enter the repository.
+
 ## Output
 
 A list of findings, each with: id; severity; file:line; the scenario; the evidence (compiler, flags, output); a fix.
 An empty list is a valid answer. Do not edit repository files.
+
+In design-note mode: for each option, a verdict (pass, fail or unverified) with the compiler versions, then the
+findings. Each finding cites the option and the note section in place of file:line, and gives the stub's scratch
+path, the compiler, the flags and the output as evidence.

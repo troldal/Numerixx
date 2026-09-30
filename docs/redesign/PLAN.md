@@ -73,9 +73,9 @@ Details are in §1.1 and §10.5.
 - Each family is a new module downstream in the DAG, so no v2.0 module gains a dependency.
 
 **FLAG, licensing.**
-- GSL is GPL-3.0-or-later and Numerixx is MIT, so no GSL source may be ported or paraphrased.
+- Numerixx is MIT, so no GPL code may be ported, paraphrased or copied: nothing under the GPL, LGPL or AGPL, such as GSL or MPSolve (decided on 2026-09-30).
 - Algorithms are implemented from the literature, with references cited in each header.
-- The test oracles are Boost.Math, Eigen and high-precision reference tables. GSL is not an oracle, although values published in its documentation may serve as reference facts.
+- The test oracles are Boost.Math, Eigen and high-precision reference tables. GPL projects (such as GSL) are not oracles, although values published in their documentation may serve as reference facts.
 - Boost-derived code (Brent, TOMS748) keeps its BSL-1.0 notice.
 
 ---
@@ -368,7 +368,7 @@ The full table is in §11 of the design.
 | Risk | Mitigation |
 |---|---|
 | Scope creep towards "all of GSL" | the scope table in section 2 is the contract; each post-v2.0 family is its own module with its own corpus, and waits for `v2.0.0`; phase 8 may follow `v2.0.0`; candidates stay unscheduled; "out of scope" areas point to the standard library, Eigen or Boost.Math |
-| GPL contamination from GSL | no GSL source is ported or paraphrased; algorithms come from the literature, with references cited per header; oracles are Boost.Math, Eigen and reference tables (values published in GSL's documentation may serve as reference facts) |
+| GPL contamination (GSL, MPSolve and other GPL projects) | no GPL code is ported, paraphrased or copied; algorithms come from the literature, with references cited per header; oracles are Boost.Math, Eigen and reference tables (values published in the documentation of GPL projects may serve as reference facts) |
 | FXT-1 delayed | only `numerixx::pipes` includes FXT; pin a patched fork commit until it lands |
 | Learning curve (`.on`, `then`, criteria typed by view) | the one-call facade and the canonical calls are the front door; compile-fail tests check that diagnostics carry reasons |
 | Template-heavy code on MSVC and clang-cl (diagnostics, P2564, mangling) | no clang-cl mangling issue found with these shapes; CI legs from day one; per-compiler deletion macro; forwarding rule for refined types |

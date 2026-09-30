@@ -14,7 +14,8 @@ at the tags `v1.0.0` and `v1.1.0-legacy`).
 1. **Stay inside the current roadmap phase** (DESIGN §10.3). Build only what the phase's scope and criteria name.
    When a task seems to need a later phase's code, or the plan is unclear on scope, ask before building.
 2. **The DESIGN §2 and §12 decisions are settled.** Do not reopen them.
-3. **Never port or paraphrase GSL source** (GPL-3.0). Port from Numerixx 1.x, or implement from the literature.
+3. **No GPL code.** Never port, paraphrase or copy code under the GPL, LGPL or AGPL (GSL and MPSolve among them),
+   including code found on the web. Port from Numerixx 1.x, or implement from the papers.
    - The default 1.x source is `v1.1.0-legacy` (dev-reorg). Use `v1.0.0` (master) where DESIGN §7 or §10.1 says
      dev-reorg regressed. Read files with `git show <tag>:<path>`.
    - Cite the source in the header and in the commit message, and keep the BSL-1.0 notice on Boost-derived code.
@@ -156,7 +157,9 @@ build/gcc/tests/numerixx_test_roots -tc="solvers: brent*"   # a doctest binary d
 
 | Agent | Use it to |
 |---|---|
-| `phase-scope-checker` | check a plan or diff against the current roadmap phase before building or committing |
+| `architect` | design a new family, or answer a core question, as a note with 2-3 options for the user to approve |
+| `api-ergonomics-reviewer` | review an architect note from the caller's side: user code, cross-family consistency, misuse |
+| `phase-scope-checker` | check a plan, design note or diff against the current roadmap phase |
 | `algorithm-implementer` | implement or port one algorithm, with tests and docs |
 | `test-author` | write doctest cases, property tests, corpus cases, compile-fail cases and canonical calls |
 | `numerics-reviewer` | review numerical correctness adversarially, with probes |
@@ -165,6 +168,28 @@ build/gcc/tests/numerixx_test_roots -tc="solvers: brent*"   # a doctest binary d
 | `ci-investigator` | find out why hosted CI failed, and reproduce it |
 | `docs-auditor` | check that the docs' claims match the code and the measurements |
 
+**A new family** (optimize, multiroots with the linalg facade, integrate, interpolate, poly) is designed before it is
+built:
+1. `phase-scope-checker` settles what the phase builds and what it only accommodates.
+2. `architect` writes the note.
+3. The note is reviewed in parallel: always by `api-ergonomics-reviewer` and by `phase-scope-checker` (its
+   `build now` and `accommodate, do not build` marks), and by `cpp-reviewer` and `numerics-reviewer` in design-note
+   mode when the options differ in their area.
+4. The main session calls `architect` again with its note and every reviewer's findings, verbatim. It revises once,
+   or records each disagreement.
+5. The user approves an option and settles every `needs a decision` item. The main session writes the approved option
+   into the family's DESIGN §7 section: its types, canonical calls, misuse catalogue, and the 1.x entry points that
+   `MIGRATION.md` must map.
+6. `algorithm-implementer` builds the first member from that section, including every rejection in the misuse
+   catalogue. `test-author` then turns the catalogue into compile-fail and doctest cases and adds the canonical calls.
+7. The usual reviews, `docs-auditor` (for the `MIGRATION.md` rows), `matrix-runner` and the commit follow.
+
+A core note (a change to `core/` types, error codes or the criteria algebra) follows steps 1-5, and its result goes
+into the DESIGN §6 section it changes. In step 3, `api-ergonomics-reviewer` reviews it only when it changes a
+user-visible spelling, result field or error code.
+
 `matrix-runner`, `algorithm-implementer`, `test-author` and `ci-investigator` build in `build/<preset>`. A `--fresh`
-configure deletes the cache under any build running in the same tree, so run only one of them at a time. The
-reviewers and `docs-auditor` compile only in scratch directories and never touch `build/`.
+configure deletes the cache under any build running in the same tree, so run only one of them at a time. The other
+agents never build in or write to `build/`: the architect compiles nothing, the reviewers and `docs-auditor` compile
+probes only in scratch directories outside the repository, and `docs-auditor` may read the build reports and run
+`ctest -N`.

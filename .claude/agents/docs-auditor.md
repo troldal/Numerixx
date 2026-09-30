@@ -21,7 +21,9 @@ You check that the Numerixx docs are true. Numbers in the docs must be measured,
    - that § references point at the right section;
    - that `[sketch]`, `[prototyped]` and `[spike]` marks match reality;
    - that plans are worded as plans;
-   - that `MIGRATION.md` rows match the API as built;
+   - that `MIGRATION.md` rows match the API as built, and that they cover every 1.x entry point of a module the
+     change replaces. Use the list of 1.x entry points in the family's DESIGN §7 section first; otherwise the
+     module's 1.x demo and headers (`git show v1.1.0-legacy:<path>`);
    - that no downstream or consumer project is named;
    - that test counts match `ctest -N` (the doctest cases, compile-fail cases and controls, probes, structural tests
      and examples).

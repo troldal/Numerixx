@@ -117,7 +117,7 @@ Status legend: **v2.0** = in the first release; **planned** = scheduled in §10.
 
 **How the core extends to the planned families [sketch].** The core abstractions (§6) were chosen so that the planned families reuse them instead of adding parallel machinery. A **minimiser** over ℝⁿ is a solver whose state holds an N-D point (plus, for BFGS, an inverse-Hessian approximation) and whose estimate is extremum-like: x, f(x) and a gradient norm. **Nonlinear least squares** reuses the systems machinery of `multiroots` with a residual vector r: ℝⁿ → ℝᵐ (m ≥ n): the FD Jacobian, the `typical` and `project` hooks, and `qr_solve`. An **ODE integrator** is a solver whose step advances t with an error-controlled step size; its stop criteria include reaching t_end; `steps_view` yields the trajectory; and dense output is a function-returning API that gives the solution as a callable t → `expected<y, fault>`. The driver, the criteria algebra, the `solution`/`failure`/`fault` types, cost accounting and the combinators apply unchanged, for example `first_of(nonstiff, stiff)` for an integration, or `with_evaluation_budget` over a minimisation. Each family is a new module placed downstream in the module DAG (§5.2), so no v2.0 module gains a dependency.
 
-**FLAG, licensing.** GSL is GPL-3.0-or-later and Numerixx is MIT, so no GSL source may be ported or paraphrased. Algorithms are implemented from the literature (for example Brent 1973; Alefeld, Potra and Shi 1995; the MINPACK and QUADPACK reports; Dormand and Prince 1980; Nocedal and Wright), and each header cites its references. Values from GSL's documentation may be used as reference facts, but the test suite's oracles are Boost.Math, Eigen and high-precision reference tables (§9.2). Code derived from Boost (Brent, TOMS748) keeps its BSL-1.0 notice (§10.1).
+**FLAG, licensing.** Numerixx is MIT, so no GPL code may be ported, paraphrased or copied: nothing under the GPL, LGPL or AGPL, which covers GSL (GPL-3.0-or-later) and MPSolve (GPL) (decided on 2026-09-30; before that the rule named only GSL). Algorithms are implemented from the literature (for example Brent 1973; Alefeld, Potra and Shi 1995; the MINPACK and QUADPACK reports; Dormand and Prince 1980; Nocedal and Wright), and each header cites its references. Values from the documentation of such projects may be used as reference facts, but the test suite's oracles are Boost.Math, Eigen and high-precision reference tables (§9.2). Code derived from Boost (Brent, TOMS748) keeps its BSL-1.0 notice (§10.1).
 
 ### 1.2 Flags: where your wishes need nuance
 
@@ -1391,7 +1391,7 @@ template<class T> auto roots(const nonzero<T>&, aberth<real_t<T>> = {})
 ```
 
 - **Aberth–Ehrlich, specified:**
-  - starting points on a circle (or on Newton-polygon radii, as in MPSolve) with an angular offset;
+  - starting points on a circle, or on circles in the annuli found from the Newton polygon of the moduli of the coefficients (Bini, Numerical Algorithms 13, 1996, pp. 179–200), with an angular offset. MPSolve implements this but is GPL-licensed, so only the paper is used (§1.1);
   - per-root stop when |p(z)| ≤ γ₂ₙ·Σ|aᵢ||z|ⁱ (Horner's running error bound), freezing converged roots;
   - for real coefficients, Im z := 0 when |Im z| is within that bound; real roots are polished in real arithmetic; conjugates are paired;
   - documented accuracy ε^(1/m) for m-fold roots.
@@ -1643,7 +1643,7 @@ Once FXT-4..7 exist, Numerixx's `first_of_t` can delegate to `fxt::first_of_with
   - references carry ≥ 21 significant digits (≥ 40 for multiprecision), generated once at high precision, by `tools/gen_reference.cpp` (with a multiprecision type) or offline with mpmath, and committed together with the command that generated them;
   - tolerances go through `tol<T>(k, ref_eps) = k·max(ε_T, ref_eps)·(1 + |x|)`;
   - Numerixx output is never its own reference.
-- **Oracles** (§9.1): Boost.Math for roots, minima and quadrature; Eigen for the linalg facade and, through `HybridNonLinearSolver`, for multiroots. GSL is not an oracle and its code is not used (§1.1); values published in its documentation may serve as reference facts.
+- **Oracles** (§9.1): Boost.Math for roots, minima and quadrature; Eigen for the linalg facade and, through `HybridNonLinearSolver`, for multiroots. GPL projects (such as GSL) are not oracles and their code is not used (§1.1); values published in their documentation may serve as reference facts.
 
 ### 9.3 Properties and acceptance scenarios
 
@@ -1701,7 +1701,7 @@ Once FXT-4..7 exist, Numerixx's `first_of_t` can delegate to `fxt::first_of_with
 Use a fresh tree on this redesign branch, which descends from master. Port algorithm *bodies* by hand, mostly from dev-reorg. It contains all of master's library code plus optimize, interpolate, `mdiff`, the fixed `DerivativeFunctor`, the `1LL` shift fix and the lowercase layout. Where dev-reorg regressed, take master's version (polynomial trimming).
 - Cite provenance in each commit.
 - Keep the BSL-1.0 notice for Boost-derived Brent or TOMS748 text.
-- Never port or paraphrase GSL source (GPL-3.0-or-later, §1.1); implement new algorithms from the literature and cite it in each header.
+- Never port, paraphrase or copy GPL code (GPL, LGPL or AGPL, such as GSL or MPSolve; §1.1); implement new algorithms from the literature and cite it in each header.
 - Add each module's regression tests in the same PR as its port.
 - Start from the prototype (`docs/redesign/prototype/nxx/*.hpp`), which already implements the protocol, driver, criteria algebra, facade, bisection, Brent, secant, Newton, `expand`, `derivative_of`, `steps_view`, `any_solver` run-time chains, the Eigen `lu_solve` facade and damped N-D Newton. Its in-house LU is not carried over.
 
@@ -1905,7 +1905,7 @@ Work also moves between phases (zero net): toms748 (1.5) and itp (1) to phase 8;
 | GitLab regenerates the Eigen archive and the hash breaks | low / low | `GIT_TAG 5.0.1` fallback; `CPM_Eigen_SOURCE` override |
 | A parent's FXT is configured for `tl::expected` | low / medium | configure-time warning; public signatures use `std::expected` |
 | Scope creep (8 modules; pressure toward GSL's breadth) | medium / medium | the §1.1 scope table, with an explicit out-of-scope list and unscheduled candidates; dependency-first order; poly, integrate and interpolate may slip past `v2.0.0-beta`; phase 8 may follow `v2.0.0`; the v2.1 and v2.2 families wait for `v2.0.0` (§10.5) |
-| Provenance and licences (Brent, TOMS748 from Boost.Math; GSL is GPL-3.0-or-later) | low / high | BSL-1.0 attribution headers; no GSL source ported or paraphrased; algorithms implemented from the literature, with references in each header (§1.1, §10.1) |
+| Provenance and licences (Brent, TOMS748 from Boost.Math; GSL, MPSolve and other GPL projects) | low / high | BSL-1.0 attribution headers; no GPL code ported, paraphrased or copied; algorithms implemented from the literature, with references in each header (§1.1, §10.1) |
 | Reference-value precision makes wide-type tests flaky | medium / low | §9.2 reference rules; the generator tool |
 
 ---
@@ -1982,7 +1982,7 @@ Derived from the author's brief (functional style, solver chaining, functions as
 | R-B5 | Optional parts stay optional: FXT only for `numerixx::pipes`, Eigen only for linalg and multiroots; a scalar-only build downloads neither | D18, D22, §4.3 |
 | R-B6 | Consumers see no Numerixx warnings (SYSTEM includes) and stay clean under `/W4 /WX` and `-Wall -Wextra -Werror` | D24, §5.3, §9.1 |
 | R-B7 | Linear algebra through Eigen behind the `nxx::linalg` facade; no BLAS or LAPACK | D22, §7.5 |
-| R-B8 | MIT licence: no GPL-derived code (GSL); code derived from Boost keeps its BSL-1.0 notice | §1.1, §10.1 |
+| R-B8 | MIT licence: no GPL-derived code (GPL, LGPL or AGPL, such as GSL or MPSolve); code derived from Boost keeps its BSL-1.0 notice | §1.1, §10.1 |
 
 **Error model**
 
