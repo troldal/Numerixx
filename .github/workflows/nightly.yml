@@ -54,12 +54,35 @@ jobs:
           install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
       - run: cmake --workflow --preset gcc
 
+  # The only leg with a Clang-family front end on libstdc++. icpx uses the C++ library of the GCC it finds, and the
+  # image's default GCC is Ubuntu 24.04's 13, below the D2 floor (no std::forward_like, std::ranges::to). So the leg
+  # installs g++-14 and selects it explicitly. -fp-model=precise replaces icpx's default fast model, which Numerixx
+  # does not support (DESIGN §5.3); under fast contraction Clang would also ignore the headers' contract(off) pragma.
+  # The check step stops the leg early if either the library or the floating-point model is not what the leg tests.
   intel-icx:
     runs-on: ubuntu-latest
-    container: intel/oneapi-hpckit:latest
+    # Tag 2025.3.1-0-devel-ubuntu24.04 (icpx 2025.3.2), the image the nightly used from 2026-09-29 as :latest.
+    container: intel/oneapi-hpckit@sha256:e04b687f177216a8a92478af0735f1d69781f234bab989beb1dd64a511d1b146
+    env:
+      GCC_DIR: /usr/lib/gcc/x86_64-linux-gnu/14
     steps:
-      - run: apt-get update && apt-get install -y ninja-build
+      - run: apt-get update && apt-get install -y ninja-build g++-14
+      - name: Check the C++ library and floating-point model icpx uses (DESIGN D2, §5.3)
+        run: |
+          icpx --gcc-install-dir=$GCC_DIR -v -E -x c++ /dev/null 2>&1 | grep 'Selected GCC installation'
+          macros=$(echo '#include <version>' | icpx --gcc-install-dir=$GCC_DIR -std=c++2b -dM -E -x c++ -)
+          for m in __cpp_lib_expected __cpp_lib_forward_like __cpp_lib_ranges_to_container; do
+            echo "$macros" | grep -w "$m" || { echo "$m is missing: the C++ library is below the D2 floor"; exit 1; }
+          done
+          fp=$(icpx --gcc-install-dir=$GCC_DIR -fp-model=precise -### -c -x c++ /dev/null 2>&1)
+          echo "$fp" | grep -o -E -- '"-(ffp-contract=[a-z-]+|menable-no-[a-z]+|ffinite-math-only|ffast-math)"' || true
+          if echo "$fp" | grep -q -E -- '"-(ffp-contract=fast|menable-no-infs|menable-no-nans|ffinite-math-only)"'; then
+            echo "-fp-model=precise still allows fast contraction or finite math (DESIGN §5.3)"; exit 1
+          fi
+          echo "$fp" | grep -q -- '"-ffp-contract=' || echo "::warning::icpx -### shows no -ffp-contract flag"
       - uses: actions/checkout@v5
-      - run: cmake --preset gcc -DCMAKE_CXX_COMPILER=icpx
+      - run: >-
+          cmake --preset gcc -DCMAKE_CXX_COMPILER=icpx
+          "-DCMAKE_CXX_FLAGS=-D_GLIBCXX_ASSERTIONS --gcc-install-dir=$GCC_DIR -fp-model=precise"
       - run: cmake --build --preset gcc
       - run: ctest --preset gcc

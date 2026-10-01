@@ -98,6 +98,16 @@ one.
   solver holding a lambda that captures a `std::vector` was copy-assigned, which failed every `-Werror` GCC build of
   the spike; GCC 16.1 locally did not warn. `copyable_box` now copies such a capture into a temporary and moves it in
   place, without `std::optional`; a throwing copy now leaves the box unchanged instead of empty.
+- Found by the nightly legs, red on master since their first run on 2026-09-29. GCC 14 (the `gcc:14` container)
+  reports 8 `-Wnull-dereference` false positives inside Eigen 5.0.1's LU kernel, which `-isystem` does not hide;
+  `tests/linalg/test_linalg.cpp` now silences them with a pragma region around `<Eigen/LU>` (DESIGN §5.3; checked
+  with GCC 16.1, which reports the same 8 without `NDEBUG`). The Intel ICX leg compiled against Ubuntu 24.04's
+  default libstdc++ 13, which is below the floor and lacks `std::forward_like`; it now installs g++-14, selects it
+  with `--gcc-install-dir`, stops early if the floor's library features or the floating-point model are not met, and
+  pins its image by digest. DESIGN D2 now states what a Clang-family compiler on libstdc++ needs.
+- Documented: Numerixx does not support `-ffast-math`, `-ffinite-math-only` or icpx's default fast floating-point
+  model, because its failure checks rely on infinities and NaN (DESIGN §5.3). The ICX leg builds with
+  `-fp-model=precise`.
 - The spike's code is kept: phases 1-3 continue from it, with unchanged scope and acceptance criteria (DESIGN
   §10.3 lists what the spike built and what is left).
 - Deferred to phases 1-3: the progress window and step-length cap of the open methods, the representation-space
