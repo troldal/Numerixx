@@ -155,18 +155,21 @@ build/gcc/tests/numerixx_test_roots -tc="solvers: brent*"   # a doctest binary d
 
 ## Subagents (`.claude/agents/`)
 
-| Agent | Use it to |
-|---|---|
-| `architect` | design a new family, or answer a core question, as a note with 2-3 options for the user to approve |
-| `api-ergonomics-reviewer` | review an architect note from the caller's side: user code, cross-family consistency, misuse |
-| `phase-scope-checker` | check a plan, design note or diff against the current roadmap phase |
-| `algorithm-implementer` | implement or port one algorithm, with tests and docs |
-| `test-author` | write doctest cases, property tests, corpus cases, compile-fail cases and canonical calls |
-| `numerics-reviewer` | review numerical correctness adversarially, with probes |
-| `cpp-reviewer` | review C++ mechanics and portability across GCC, Clang, MSVC, clang-cl and em++ |
-| `matrix-runner` | build and test presets from scratch and report the results |
-| `ci-investigator` | find out why hosted CI failed, and reproduce it |
-| `docs-auditor` | check that the docs' claims match the code and the measurements |
+| Agent | Use it to | Model, effort |
+|---|---|---|
+| `architect` | design a new family, or answer a core question, as a note with 2-3 options for the user to approve | opus, xhigh |
+| `api-ergonomics-reviewer` | review an architect note from the caller's side: user code, cross-family consistency, misuse | opus, high |
+| `phase-scope-checker` | check a plan, design note or diff against the current roadmap phase | sonnet, medium |
+| `algorithm-implementer` | implement or port one algorithm, with tests and docs | opus, high |
+| `test-author` | write doctest cases, property tests, corpus cases, compile-fail cases and canonical calls | sonnet, high |
+| `numerics-reviewer` | review numerical correctness adversarially, with probes | opus, xhigh |
+| `cpp-reviewer` | review C++ mechanics and portability across GCC, Clang, MSVC, clang-cl and em++ | opus, high |
+| `matrix-runner` | build and test presets from scratch and report the results | sonnet, low |
+| `ci-investigator` | find out why hosted CI failed, and reproduce it | sonnet, medium |
+| `docs-auditor` | check that the docs' claims match the code and the measurements | sonnet, medium |
+
+The `model` and `effort` lines in each agent's frontmatter set these. A call can pass another model, which then wins
+(use it to give a hard CI failure to opus); the effort cannot be changed per call, except from a workflow step.
 
 **A new family** (optimize, multiroots with the linalg facade, integrate, interpolate, poly) is designed before it is
 built:

@@ -2,6 +2,8 @@
 name: algorithm-implementer
 description: "Implements or ports one Numerixx algorithm (a solver, searcher, minimiser, stop criterion, stencil, step rule, quadrature rule, polynomial routine or interpolant) to the design in DESIGN §6-§7, with tests and docs, within the current roadmap phase. Use for tasks like 'implement illinois', 'port ridders from 1.x' or 'add noise steps'."
 tools: Read, Grep, Glob, Edit, Write, Bash, WebSearch, WebFetch
+model: opus
+effort: high
 ---
 
 You implement one algorithm in Numerixx 2. Follow `CLAUDE.md`, and work only inside the current roadmap phase.

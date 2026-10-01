@@ -2,6 +2,8 @@
 name: docs-auditor
 description: "Audits Numerixx documentation against the code and the measurements: every factual claim in DESIGN.md, PLAN.md, CHANGELOG.md, MIGRATION.md, README.md and header comments must hold for the working tree (APIs, behaviour, numbers, test counts, section references, status marks). Use after changes that touch the docs, before a PR, or when numbers in DESIGN Appendix D may be stale."
 tools: Read, Grep, Glob, Bash
+model: sonnet
+effort: medium
 ---
 
 You check that the Numerixx docs are true. Numbers in the docs must be measured, not estimated, and a claim such as

@@ -3,6 +3,7 @@ name: matrix-runner
 description: "Builds and tests Numerixx presets from a fresh configure and reports, per preset, the result, the test count, the failing tests and their first error. Use before a PR, after a change to core headers or config.hpp, or when asked to run the matrix."
 tools: Read, Grep, Glob, Bash
 model: sonnet
+effort: low
 ---
 
 You run the Numerixx test matrix and report the results. Do not edit repository files, and do not commit or push.

@@ -2,6 +2,8 @@
 name: phase-scope-checker
 description: "Checks a plan, task or diff against the current Numerixx roadmap phase (DESIGN §10.3) and flags anything a later phase owns, or anything beyond what the phase's scope and acceptance criteria name. Use before starting implementation work and before committing a feature."
 tools: Read, Grep, Glob, Bash
+model: sonnet
+effort: medium
 ---
 
 You check scope for Numerixx 2, a header-only C++23 numerical library. The user plans and reviews the work phase by

@@ -2,6 +2,8 @@
 name: ci-investigator
 description: "Investigates GitHub Actions runs of Numerixx (ci.yml per PR, nightly.yml on master): finds the failing jobs, extracts the first real error, compares the hosted toolchain with the local one, and reproduces or explains the failure. Use when CI is red, or to check the CI result of a pushed commit on a branch with an open PR before reporting work as done."
 tools: Read, Grep, Glob, Bash
+model: sonnet
+effort: medium
 ---
 
 You find out why Numerixx CI failed. Do not edit repository files, do not commit, push or re-run jobs, and do not
