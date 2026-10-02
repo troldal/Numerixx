@@ -101,10 +101,15 @@ one.
 - Found by the nightly legs, red on master since their first run on 2026-09-29. GCC 14 (the `gcc:14` container)
   reports 8 `-Wnull-dereference` false positives inside Eigen 5.0.1's LU kernel, which `-isystem` does not hide;
   `tests/linalg/test_linalg.cpp` now silences them with a pragma region around `<Eigen/LU>` (DESIGN §5.3; checked
-  with GCC 16.1, which reports the same 8 without `NDEBUG`). The Intel ICX leg compiled against Ubuntu 24.04's
-  default libstdc++ 13, which is below the floor and lacks `std::forward_like`; it now installs g++-14, selects it
-  with `--gcc-install-dir`, stops early if the floor's library features or the floating-point model are not met, and
-  pins its image by digest. DESIGN D2 now states what a Clang-family compiler on libstdc++ needs.
+  with GCC 16.1, which reports the same 8 without `NDEBUG`), and GCC 14 now passes on the spike branch. The Intel
+  ICX leg compiled against Ubuntu 24.04's default libstdc++ 13, which is below the floor and lacks
+  `std::forward_like`; Ubuntu's libstdc++ 14.2 is not enough either (see the floor entry below). The leg now installs
+  g++-14 14.3 from Ubuntu's toolchain PPA, selects it with `--gcc-install-dir`, stops early if the library or the
+  floating-point model is not what it tests, and pins its image by digest.
+- Compiler floor: Clang 19 + libc++ 19, raised from 18 on 2026-10-01. The first nightly run on the spike branch
+  showed that Clang 18 rejects the refined literals: `nxx::tolerance t{1e-8}` needs class template argument deduction
+  for alias templates (P1814), and the consteval literal checks need P2448. A Clang-family compiler on libstdc++
+  needs libstdc++ 14.3 or newer (DESIGN D2).
 - Documented: Numerixx does not support `-ffast-math`, `-ffinite-math-only` or icpx's default fast floating-point
   model, because its failure checks rely on infinities and NaN (DESIGN §5.3). The ICX leg builds with
   `-fp-model=precise`.

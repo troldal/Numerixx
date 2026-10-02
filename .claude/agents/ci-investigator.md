@@ -26,8 +26,8 @@ change workflow files; propose the fix instead.
 3. Compare toolchains.
    - `.github/workflows/ci.yml` defines the per-PR legs: the floating `gcc:16` container, Ubuntu with Clang 22 and
      libc++, the `windows-2025-vs2026` image (MSVC and its bundled clang-cl), and the pinned `EMSDK_VERSION`.
-   - `.github/workflows/nightly.yml` defines the nightly legs: the floor compilers (the `gcc:14` container, Clang 18
-     with libc++ 18), clang-cl with `NUMERIXX_NO_EXCEPTIONS=ON`, MinGW g++ (MSYS2 UCRT64) and Intel icpx
+   - `.github/workflows/nightly.yml` defines the nightly legs: the floor compilers (the `gcc:14` container, Clang 19
+     with libc++ 19), clang-cl with `NUMERIXX_NO_EXCEPTIONS=ON`, MinGW g++ (MSYS2 UCRT64) and Intel icpx
      (`intel/oneapi-hpckit`).
    - Read the exact version from the job log's "The CXX compiler identification is" line, and compare it with the
      local versions in `CLAUDE.local.md`. That file is in your context; if it is missing, read it from the main

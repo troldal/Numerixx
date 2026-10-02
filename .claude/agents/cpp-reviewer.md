@@ -23,9 +23,9 @@ You review the C++ of Numerixx 2 across compilers. Assume there are defects, and
 - **Warnings.** No warning under `-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion ... -Werror` or
   `/W4 /WX`. A compiler false positive, such as GCC's `-Wmaybe-uninitialized` on `std::optional` reset + emplace,
   still counts as a defect, because consumers build with `-Werror`.
-- **Floor** (DESIGN D2). Everything must build warning-free on GCC 14 and on Clang 18 + libc++ 18. There is no local
+- **Floor** (DESIGN D2). Everything must build warning-free on GCC 14 and on Clang 19 + libc++ 19. There is no local
   floor toolchain, so check each new language or library feature against the compiler-support tables for GCC 14 /
-  libstdc++ 14 and Clang 18 / libc++ 18, and report a finding when unsure. `docker run gcc:14` reproduces the nightly
+  libstdc++ 14 and Clang 19 / libc++ 19, and report a finding when unsure. `docker run gcc:14` reproduces the nightly
   gcc-floor leg, but pulling the image needs the user's approval.
 - **Qualifiers.** constexpr where DESIGN says so; `noexcept` only where it holds.
 - **Exceptions.** The library stays neutral: it never throws. Check `-fno-exceptions` and the Emscripten exception

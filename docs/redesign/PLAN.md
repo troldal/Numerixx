@@ -1,7 +1,7 @@
 # Numerixx 2: redesign plan
 
 - **Date:** 2026-09-27
-- **Status:** Approved on 2026-09-28, with every default in section 10 (and DESIGN §12) accepted. Phase 0 is done. The de-risking spike meets its 11 exit criteria locally on all 12 presets (DESIGN §10.2 status, Appendix D), and awaits hosted CI and merge; phase 1 is next. The spike's code is kept, and phases 1–3 continue from it (DESIGN §10.3).
+- **Status:** Approved on 2026-09-28, with every default in section 10 (and DESIGN §12) accepted. Phase 0 is done, except that its nightly floor jobs were red on master from their first run (2026-09-29); the fixes are on the spike branch (DESIGN §12.15). The de-risking spike meets its 11 exit criteria locally on all 12 presets (DESIGN §10.2 status, Appendix D), and awaits hosted CI and merge; phase 1 is next. The spike's code is kept, and phases 1–3 continue from it (DESIGN §10.3).
 - **Companion documents:**
   - [`DESIGN.md`](DESIGN.md): the detailed design reference, covering every decision, the code sketches, per-module algorithm tables, CMake, the test strategy and the full roadmap. Section numbers there are stable; "§n" below refers to them.
   - [`prototype/`](prototype/): a throwaway feasibility prototype. It compiles and runs on nine configurations: GCC 16 and Clang 22 + libc++, each with and without `-fno-exceptions`; em++ 6.0.8 with `-fexceptions`, `-fno-exceptions` and `-fwasm-exceptions`; MSVC 19.51; and clang-cl 22.
@@ -357,7 +357,7 @@ The FXT items in priority order (details in §8):
 8. **Run-time chains** [§12.19]. Offer `any_solver` and `first_of(range)` as an opt-in header, prototyped on all nine configurations. An empty chain is accepted and fails in-band with `invalid_input` when called. **Default: yes, opt-in header.**
 9. **Multiprecision and complex** [§12.13, §12.14]. Keep multiprecision as an optional adapter and CI leg, and support complex numbers only in `poly`. **Default: keep both as described.**
 10. **Where the combinators live** [§12.12]. Keep `first_of`/`then` in Numerixx until phase 3 has proven them, then upstream the generic parts to FXT. **Default: after phase 3.**
-11. **Compiler floor** [§12.15]. GCC 14, Clang 18 + libc++, MSVC with `/std:c++latest` (19.51 tested), clang-cl, em++ ≥ 6.0.8. This is one step above FXT's stated floor (GCC 13, Clang 17), because the design uses deducing `this`; matching FXT would mean going back to CRTP. The nightly floor-compiler job confirms it. **Default: accept.**
+11. **Compiler floor** [§12.15]. GCC 14, Clang 19 + libc++, MSVC with `/std:c++latest` (19.51 tested), clang-cl, em++ ≥ 6.0.8. Deducing `this` sets GCC 14 (FXT uses it too, although its README states GCC 13 and Clang 17). Clang was raised from 18 to 19 on 2026-10-01, because Clang 18 rejects the refined literals. The nightly floor-compiler job checks the floor: GCC 14 passed on 2026-10-01; Clang 19 passes locally and is checked from the next run. **Default: accept.**
 
 ---
 

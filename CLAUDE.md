@@ -74,7 +74,7 @@ build/gcc/tests/numerixx_test_roots -tc="solvers: brent*"   # a doctest binary d
   gone: reconfigure with `cmake --preset <preset>`.
 - **Do not run em++ while an Emscripten preset is building.** A different emsdk configuration clears the shared cache
   and breaks the running build.
-- **Compiler floor** (DESIGN D2): GCC 14, and Clang 18 + libc++ 18.
+- **Compiler floor** (DESIGN D2): GCC 14, and Clang 19 + libc++ 19.
   - Neither the 12 presets nor branch CI check it; they use GCC 16 and Clang 22. Only `.github/workflows/nightly.yml`
     does, together with MinGW g++, Intel ICX and clang-cl without exceptions. It runs on a schedule, on `master`.
   - Check `gh run list --workflow nightly.yml --limit 3` when a phase starts and before opening a PR.

@@ -11,9 +11,9 @@
 #endif
 
 // NXX_DELETE(reason): a deleted overload that states why, where the compiler supports `= delete("reason")` (C++26,
-// P2573). Clang 19+ accepts it as an extension, silenced inside the macro. GCC 15+ accepts it too, but rejects
+// P2573). Clang 19+ (the floor) accepts it as an extension, silenced inside the macro. GCC 15+ accepts it too, but rejects
 // _Pragma inside a declaration, so headers that use NXX_DELETE bracket their body with NXX_BEGIN_HEADER and
-// NXX_END_HEADER. Elsewhere (MSVC, GCC 14, Clang 18) the overload is deleted without a reason; the diagnostic names
+// NXX_END_HEADER. Elsewhere (MSVC, GCC 14) the overload is deleted without a reason; the diagnostic names
 // the file and line of the deleted declaration, so NXX_DELETE always starts on the declarator's own line.
 #if defined(__clang__) && __clang_major__ >= 19
 #    define NXX_DELETE(reason)                                                                        \

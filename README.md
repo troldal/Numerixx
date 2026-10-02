@@ -22,7 +22,7 @@ interpolation, done carefully, generically and composably.
 
 ## Requirements
 
-- A C++23 compiler: GCC ≥ 14, Clang ≥ 18 with libc++, MSVC 19.51 (`/std:c++latest`), clang-cl, or Emscripten ≥ 6.0.8.
+- A C++23 compiler: GCC ≥ 14, Clang ≥ 19 with libc++ (or with libstdc++ ≥ 14.3), MSVC 19.51 (`/std:c++latest`), clang-cl, or Emscripten ≥ 6.0.8.
 - CMake ≥ 3.25 (≥ 3.30 recommended on Windows) and Ninja.
 
 Dependencies are fetched by [CPM.cmake](https://github.com/cpm-cmake/CPM.cmake), pinned by version and SHA256.

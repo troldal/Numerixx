@@ -23,8 +23,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - run: sudo apt-get update && sudo apt-get install -y ninja-build clang-18 libc++-18-dev libc++abi-18-dev
-      - run: cmake --preset clang -DCMAKE_CXX_COMPILER=clang++-18
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build clang-19 libc++-19-dev libc++abi-19-dev
+      - run: cmake --preset clang -DCMAKE_CXX_COMPILER=clang++-19
       - run: cmake --build --preset clang
       - run: ctest --preset clang
 
@@ -54,11 +54,13 @@ jobs:
           install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
       - run: cmake --workflow --preset gcc
 
-  # The only leg with a Clang-family front end on libstdc++. icpx uses the C++ library of the GCC it finds, and the
-  # image's default GCC is Ubuntu 24.04's 13, below the D2 floor (no std::forward_like, std::ranges::to). So the leg
-  # installs g++-14 and selects it explicitly. -fp-model=precise replaces icpx's default fast model, which Numerixx
-  # does not support (DESIGN §5.3); under fast contraction Clang would also ignore the headers' contract(off) pragma.
-  # The check step stops the leg early if either the library or the floating-point model is not what the leg tests.
+  # The only leg with a Clang-family front end on libstdc++. icpx uses the C++ library of the GCC it finds. The image's
+  # default GCC is Ubuntu 24.04's 13 (no std::forward_like, std::ranges::to), and Ubuntu's g++-14 is 14.2, whose
+  # forward_like has a deduced return type that Clang rejects in FXT's match and in std::bind_front. D2 therefore needs
+  # libstdc++ 14.3, which the leg takes from Ubuntu's toolchain PPA and selects explicitly. -fp-model=precise replaces
+  # icpx's default fast model, which Numerixx does not support (DESIGN §5.3); under fast contraction Clang would also
+  # ignore the headers' contract(off) pragma. The check step stops the leg early if the library or the floating-point
+  # model is not what the leg tests.
   intel-icx:
     runs-on: ubuntu-latest
     # Tag 2025.3.1-0-devel-ubuntu24.04 (icpx 2025.3.2), the image the nightly used from 2026-09-29 as :latest.
@@ -66,9 +68,14 @@ jobs:
     env:
       GCC_DIR: /usr/lib/gcc/x86_64-linux-gnu/14
     steps:
-      - run: apt-get update && apt-get install -y ninja-build g++-14
+      - run: |
+          apt-get update && apt-get install -y software-properties-common gpg-agent
+          add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          apt-get update && apt-get install -y ninja-build g++-14
       - name: Check the C++ library and floating-point model icpx uses (DESIGN D2, §5.3)
         run: |
+          v=$(g++-14 -dumpfullversion)
+          case "$v" in 14.[3-9]* | 14.[1-9][0-9]*) echo "libstdc++ $v" ;; *) echo "libstdc++ $v is below 14.3 (DESIGN D2)"; exit 1 ;; esac
           icpx --gcc-install-dir=$GCC_DIR -v -E -x c++ /dev/null 2>&1 | grep 'Selected GCC installation'
           macros=$(echo '#include <version>' | icpx --gcc-install-dir=$GCC_DIR -std=c++2b -dM -E -x c++ -)
           for m in __cpp_lib_expected __cpp_lib_forward_like __cpp_lib_ranges_to_container; do

@@ -75,7 +75,7 @@ Return the note as your answer, in these sections:
      a new concept. First check what DESIGN §6.3, `core/error.hpp` and `core/criteria.hpp` already reserve, use it,
      and flag only what is missing;
    - costs and risks: compile-time mechanics to check on MSVC, clang-cl and em++, the compiler floor (GCC 14,
-     Clang 18 with libc++ 18), and run-time cost (DESIGN §3.6).
+     Clang 19 with libc++ 19), and run-time cost (DESIGN §3.6).
 4. **Cross-family table:** input forms, call order (DESIGN D4), builder names, result fields, whether `best_x`,
    `.on`, `first_of` and `then` apply, and the error codes, compared with the families already built.
 5. **What it replaces from 1.x:** the calls in the family's demo and headers, and the `MIGRATION.md` rows that follow.
