@@ -1,12 +1,13 @@
 // Prints the Numerixx version. quick_tour.cpp shows the spike's modules; the others arrive with their phases (DESIGN §10.3).
 //
-// std::printf rather than std::println: with MinGW's libstdc++, std::print needs -lstdc++exp at link time.
+// With MinGW's libstdc++, std::print needs libstdc++exp at link time, which examples/CMakeLists.txt adds where the
+// toolchain needs it.
 #include <numerixx/numerixx.hpp>
 
-#include <cstdio>
+#include <print>
 
 int main()
 {
-    std::printf("Numerixx %d.%d.%d\n", nxx::version.major, nxx::version.minor, nxx::version.patch);
+    std::println("Numerixx {}.{}.{}", nxx::version.major, nxx::version.minor, nxx::version.patch);
     return 0;
 }
