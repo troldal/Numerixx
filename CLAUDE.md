@@ -14,8 +14,9 @@ at the tags `v1.0.0` and `v1.1.0-legacy`).
 1. **Stay inside the current roadmap phase** (DESIGN §10.3). Build only what the phase's scope and criteria name.
    When a task seems to need a later phase's code, or the plan is unclear on scope, ask before building.
 2. **The DESIGN §2 and §12 decisions are settled.** Do not reopen them.
-3. **No GPL code.** Never port, paraphrase or copy code under the GPL, LGPL or AGPL (GSL and MPSolve among them),
-   including code found on the web. Port from Numerixx 1.x, or implement from the papers.
+3. **Code comes only from Numerixx 1.x and the Boost.Math code DESIGN names** (BSL-1.0). Never port, paraphrase or
+   copy other code, including code found on the web: no GPL, LGPL or AGPL code (GSL, MPSolve), no Numerical Recipes
+   listings, no code without a licence. Implement new algorithms from the papers' text and equations.
    - The default 1.x source is `v1.1.0-legacy` (dev-reorg). Use `v1.0.0` (master) where DESIGN §7 or §10.1 says
      dev-reorg regressed. Read files with `git show <tag>:<path>`.
    - Cite the source in the header and in the commit message, and keep the BSL-1.0 notice on Boost-derived code.
@@ -74,10 +75,10 @@ build/gcc/tests/numerixx_test_roots -tc="solvers: brent*"   # a doctest binary d
   gone: reconfigure with `cmake --preset <preset>`.
 - **Do not run em++ while an Emscripten preset is building.** A different emsdk configuration clears the shared cache
   and breaks the running build.
-- **Compiler floor** (DESIGN D2): GCC 14, and Clang 19 + libc++ 19.
+- **Compiler floor** (DESIGN D2): GCC 14, Clang 19 + libc++ 19, and libstdc++ 14.3 under a Clang-family compiler.
   - Neither the 12 presets nor branch CI check it; they use GCC 16 and Clang 22. Only `.github/workflows/nightly.yml`
     does, together with MinGW g++, Intel ICX and clang-cl without exceptions. It runs on a schedule, on `master`.
-  - Check `gh run list --workflow nightly.yml --limit 3` when a phase starts and before opening a PR.
+  - Check `gh run list --workflow nightly.yml --branch master --limit 3` when a phase starts and before opening a PR.
   - When a change adds a language or library feature, say so in the PR. Ask the user before running
     `gh workflow run nightly.yml --ref <branch>`.
 - **Format** with clang-format 22 (`.clang-format`). CI runs `clang-format-22 --dry-run -Werror` over the `.hpp` and
@@ -160,7 +161,7 @@ build/gcc/tests/numerixx_test_roots -tc="solvers: brent*"   # a doctest binary d
 | `architect` | design a new family, or answer a core question, as a note with 2-3 options for the user to approve | opus, xhigh |
 | `api-ergonomics-reviewer` | review an architect note from the caller's side: user code, cross-family consistency, misuse | opus, high |
 | `phase-scope-checker` | check a plan, design note or diff against the current roadmap phase | sonnet, medium |
-| `algorithm-implementer` | implement or port one algorithm, with tests and docs | opus, high |
+| `algorithm-implementer` | implement or port one algorithm, or build one approved core change, with tests and docs | opus, high |
 | `test-author` | write doctest cases, property tests, corpus cases, compile-fail cases and canonical calls | sonnet, high |
 | `numerics-reviewer` | review numerical correctness adversarially, with probes | opus, xhigh |
 | `cpp-reviewer` | review C++ mechanics and portability across GCC, Clang, MSVC, clang-cl and em++ | opus, high |
@@ -171,8 +172,7 @@ build/gcc/tests/numerixx_test_roots -tc="solvers: brent*"   # a doctest binary d
 The `model` and `effort` lines in each agent's frontmatter set these. A call can pass another model, which then wins
 (use it to give a hard CI failure to opus); the effort cannot be changed per call, except from a workflow step.
 
-**A new family** (optimize, multiroots with the linalg facade, integrate, interpolate, poly) is designed before it is
-built:
+**A new family** (optimize, multiroots with linalg, integrate, interpolate, poly) is designed before it is built:
 1. `phase-scope-checker` settles what the phase builds and what it only accommodates.
 2. `architect` writes the note.
 3. The note is reviewed in parallel: always by `api-ergonomics-reviewer` and by `phase-scope-checker` (its
@@ -185,10 +185,11 @@ built:
    `MIGRATION.md` must map.
 6. `algorithm-implementer` builds the first member from that section, including every rejection in the misuse
    catalogue. `test-author` then turns the catalogue into compile-fail and doctest cases and adds the canonical calls.
-7. The usual reviews, `docs-auditor` (for the `MIGRATION.md` rows), `matrix-runner` and the commit follow.
+7. Reviews (`cpp-reviewer`, `numerics-reviewer`), `docs-auditor` (`MIGRATION.md` rows), `matrix-runner`, the commit.
+   Reproduce each review finding before fixing it, and give the fix back to the same reviewer: fixes repeat bug classes.
 
-A core note (a change to `core/` types, error codes or the criteria algebra) follows steps 1-5, and its result goes
-into the DESIGN §6 section it changes. In step 3, `api-ergonomics-reviewer` reviews it only when it changes a
+A core note (a change to `core/` types, error codes or the criteria algebra) follows steps 1-5, then 6-7 with the
+DESIGN §6 section it changes in place of §7. In step 3, `api-ergonomics-reviewer` reviews it only when it changes a
 user-visible spelling, result field or error code.
 
 `matrix-runner`, `algorithm-implementer`, `test-author` and `ci-investigator` build in `build/<preset>`. A `--fresh`
