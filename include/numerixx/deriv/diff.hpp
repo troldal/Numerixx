@@ -11,6 +11,7 @@
 #include <numerixx/deriv/stencil.hpp>
 #include <numerixx/deriv/step.hpp>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -28,11 +29,18 @@ namespace nxx::deriv
         using UE   = callback_error_t<F, T>;
         const T hh = detail::resolve<O, A>(h, x);
         if (!(hh > T(0)) || !math::isfinite(hh)) return std::unexpected(fault<UE> { errc::invalid_input, 0, {} });
+        // Every point must be finite too, before any evaluation: a finite h does not keep x + k h finite (x - h overflows
+        // at x = -max for central_1_2, x + 2h below +max for central_1_4), and f is never called at +-inf.
+        std::array<T, N> at {};
+        for (std::size_t i = 0; i < N; ++i) {
+            at[i] = x + T(s.offset[i]) * hh;
+            if (s.weight[i] != 0 && !math::isfinite(at[i])) return std::unexpected(fault<UE> { errc::invalid_input, 0, {} });
+        }
         T             acc(0);
         std::uint32_t evals = 0;
         for (std::size_t i = 0; i < N; ++i) {
             if (s.weight[i] == 0) continue;
-            auto y = nxx::evaluate(fn, x + T(s.offset[i]) * hh);
+            auto y = nxx::evaluate(fn, at[i]);
             if (!y) {
                 fault<UE> e = y.error();
                 e.evals += evals;

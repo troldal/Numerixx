@@ -104,9 +104,12 @@ namespace nxx
             }
         };
 
+        // range_reference_t<Rng> is formed only for an input range: a non-range Rng (a single solver passed to the
+        // one-argument first_of) must make the constraint false, not a hard error in the initializer.
         template<class Rng>
-        inline constexpr bool any_solver_range_v =
-            std::ranges::input_range<Rng> && is_any_solver_v<std::remove_cvref_t<std::ranges::range_reference_t<Rng>>>;
+        inline constexpr bool any_solver_range_v = false;
+        template<std::ranges::input_range Rng>
+        inline constexpr bool any_solver_range_v<Rng> = is_any_solver_v<std::remove_cvref_t<std::ranges::range_reference_t<Rng>>>;
 
         template<class P, class Rng>
         auto runtime_chain(P policy, Rng alts)

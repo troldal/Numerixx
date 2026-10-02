@@ -65,7 +65,8 @@ function(numerixx_add_test name)
 endfunction()
 
 # ---- Unit tests, one executable per module -----------------------------------------------------------------------
-numerixx_add_test(core SOURCES core/test_version.cpp core/test_refined.cpp core/test_criteria.cpp LINK numerixx::core)
+numerixx_add_test(core SOURCES core/test_version.cpp core/test_refined.cpp core/test_criteria.cpp core/test_scalar.cpp
+  LINK numerixx::core)
 target_compile_definitions(numerixx_test_core PRIVATE NUMERIXX_EXPECTED_VERSION="${PROJECT_VERSION}")
 
 numerixx_add_test(roots

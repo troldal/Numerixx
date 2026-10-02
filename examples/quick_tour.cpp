@@ -1,8 +1,10 @@
 // A quick tour of Numerixx 2 as it stands after the de-risking spike (DESIGN §10.2): 1-D root finding, numerical
-// derivatives, and composing solvers. Numerical failures are values, never exceptions: every result is a std::expected,
+// derivatives, and composing solvers. Numerical failures are values, not exceptions: every result is a std::expected,
 // either a solution (x, fx, how it stopped, what it cost) or a failure (an error code, what it cost, the best estimate
-// so far and, for a fallible callback, the callback's own error). Only the opt-in run-time chain of section 6 can
-// throw, and only std::bad_alloc: std::function and std::vector allocate.
+// so far and, for a fallible callback, the callback's own error). Numerixx itself does not throw, and it is
+// exception-neutral: an exception thrown by your callback propagates out of the solver (DESIGN D10). The opt-in run-time
+// chain of section 6 also allocates through std::function and std::vector, so wrapping or copying a solver there can
+// throw std::bad_alloc, or whatever the callable's copy constructor throws.
 //
 // std::printf rather than std::println: with MinGW's libstdc++, std::print needs -lstdc++exp at link time.
 #include <numerixx/core/any_solver.hpp>    // opt-in: run-time solver chains (the only header that uses std::function)

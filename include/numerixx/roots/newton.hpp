@@ -53,7 +53,7 @@ namespace nxx::roots
     struct newton_state
     {
         T             x, fx, dx;
-        T             step;    // length of the last proposed step, before projection: what the stop criteria see
+        T             step;    // the larger of the proposed and the projected step: what the stop criteria see
         std::uint32_t nfev;
     };
 
@@ -146,6 +146,8 @@ namespace nxx::roots
             using UE   = cause_t<F, T>;
             using Fail = failure<root_estimate<T>, UE>;
             const T x0 = opt_.project(p.in.x0);
+            // As in secant: a projection that leaves the reals is rejected before f is evaluated there (DESIGN §7.2).
+            if (!math::isfinite(x0)) return std::unexpected(Fail { errc::non_finite_input, id, counters {}, std::nullopt, {} });
             if (p.in.fx0 && x0 == p.in.x0)
                 return newton_state<T> { x0, *p.in.fx0, detail::unknown<T>(), detail::unknown<T>(), 0 };    // seeded
             auto y = nxx::evaluate(p.f, x0);
@@ -168,6 +170,7 @@ namespace nxx::roots
             const T proposed = s.x - s.fx / *d;
             if (!math::isfinite(proposed)) return std::unexpected(fault<UE> { errc::diverged, c, {} });
             const T x1 = opt_.project(proposed);
+            if (!math::isfinite(x1)) return std::unexpected(fault<UE> { errc::diverged, c, {} });           // projected off the reals
             if (x1 != proposed && x1 == s.x) return std::unexpected(fault<UE> { errc::stalled, c, {} });    // pinned at the edge
             auto y = nxx::evaluate(p.f, x1);
             if (!y) {
@@ -175,7 +178,10 @@ namespace nxx::roots
                 e.evals += c;
                 return std::unexpected(e);
             }
-            return newton_state<T> { x1, *y, math::abs(x1 - s.x), math::abs(proposed - s.x), s.nfev + c + cost_of(p.f) };
+            // The criteria see the larger of the proposed and the actual step: a projection that moves the point further
+            // (to a far finite value) must not look like convergence, and one that pins it must not either.
+            const T moved = math::abs(x1 - s.x);
+            return newton_state<T> { x1, *y, moved, (std::max)(math::abs(proposed - s.x), moved), s.nfev + c + cost_of(p.f) };
         }
 
         template<real T>

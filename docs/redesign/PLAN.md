@@ -163,7 +163,7 @@ later:  multimin ─► optimize, multiroots;  fit ─► multiroots (+ poly onc
 
 | Concept | Shape |
 |---|---|
-| Scalars | open, user-specialisable `nxx::scalar_traits<T>` (default: any inexact, non-integer type with `numeric_limits`); every default tolerance is an expression in `T`, so it is attainable in `float`, `long double` and multiprecision |
+| Scalars | open, user-specialisable `nxx::scalar_traits<T>` (default: any inexact, non-integer type with `numeric_limits`; a user type needs a specialised `numeric_limits` too); every default tolerance is an expression in `T`, so it is attainable in `float`, `long double` and multiprecision |
 | Refined inputs | `tolerance<T>`, `abs_tolerance<T>`, `rel_tolerance<T>`, `max_iterations`, `evaluation_budget`, `bracket<T>`, `sign_bracket<T>`, `interval<T>`; `consteval` literal constructors plus `make() → expected` |
 | Solver protocol | `prepare(f, input)`, `init(p)`, `step(p, s)` (pure), `view(s)`, `estimate(s)`, `best(s)`, `intrinsic(s)`, `finish(p, r)` |
 | Driver | `nxx::iterate(alg, problem[, observer])`: the only loop in the library |

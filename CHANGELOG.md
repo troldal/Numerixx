@@ -46,15 +46,15 @@ one.
   projection (`clamp_to`); the pole check.
 - First cut of numerical differentiation (`<numerixx/deriv.hpp>`): stencils as integer data, `optimal`/`relative`/
   `absolute` steps, `diff`, `central`, `derivative_of` and the `numeric` policy.
-- Tests: 156 doctest cases (criterion soundness, determinism with a golden table of 22 solves that is bit-identical on
+- Tests: 164 doctest cases (criterion soundness, determinism with a golden table of 22 solves that is bit-identical on
   GCC, Clang, MSVC, clang-cl and em++, run-time chains equal to static chains, evaluation counts equal to instrumented
-  calls, poles, extreme brackets, the canonical calls with run-time inputs, regularity, composition), 29 compile-fail
+  calls, poles, extreme brackets, the canonical calls with run-time inputs, regularity, composition), 31 compile-fail
   cases, each with a control that must compile, whose reason must appear in the first error on GCC and Clang
   (diagnostic line counts are written to `compile_fail_report.txt` and recorded in DESIGN Appendix D), two harness
   self-tests (one of which the harness must reject), the P2564 probe (it must fail on MSVC with C7595), a
   strict-warnings consumer TU that instantiates the library with a global `f`, and compile-time measurements (the
   umbrella header is guarded at 2 s on GCC; measured 0.58 s on GCC 16, 0.46 s on Clang 22, 0.55 s on MSVC, 0.53 s on
-  clang-cl). All 12 presets pass: 225 CTest tests on most, 223 on MSVC, 234 with multiprecision, 8 on integration.
+  clang-cl). All 12 presets pass: 237 CTest tests on most, 235 on MSVC, 246 with multiprecision, 8 on integration.
 - Found and fixed by the spike (recorded in DESIGN): Clang's default floating-point contraction made solver paths
   platform-dependent, so the headers turn it off for library code; `better_than` was not transitive, so the best
   estimate of a chain depended on how it was grouped; the solver constant for the view kind is spelled `views`;
@@ -111,6 +111,20 @@ one.
   showed that Clang 18 rejects the refined literals: `nxx::tolerance t{1e-8}` needs class template argument deduction
   for alias templates (P1814), and the consteval literal checks need P2448. A Clang-family compiler on libstdc++
   needs libstdc++ 14.3 or newer (DESIGN D2).
+- Found by the review of PR #3 and fixed (DESIGN Appendix D): secant and newton reject a projected iterate that is
+  not finite, which gave false `exact_zero` and `criterion` successes at x = ±inf or NaN; `width_tol` and `x_tol`
+  thresholds saturate at the largest finite value, so brent no longer reports `criterion` at 0 iterations when
+  abs + rel·min(|lo|, |hi|) overflows; `real` requires a specialised `std::numeric_limits`, because a type with only a
+  `scalar_traits` specialisation got collapsed defaults and false successes; `diff` returns `invalid_input` before any
+  evaluation when a stencil point is not finite; `solve(f, {1.0})` no longer solves on [0, 1]; with
+  `<numerixx/core/any_solver.hpp>` included, the one-solver `first_of` and `first_of_with` compile again;
+  `NUMERIXX_BUILD_EXAMPLES` defaults to `PROJECT_IS_TOP_LEVEL`, so projects that pull Numerixx in through CPM or
+  FetchContent no longer build its examples. A follow-up review of these fixes found more of the same: the criteria of
+  secant and newton now see the larger of the proposed and the projected step, so a projection to a far finite value
+  no longer gives a `criterion` success there; secant's second point falls back to x0 - h when x0 + h is projected off
+  the reals; `solve` is constrained on the function, so `std::is_invocable_v` is false for one that cannot take the
+  bracket's scalar type, and `solve(f, 1.0)` states that it needs a bracket; `is_real_v` of an array or function type is
+  false instead of a hard error.
 - Documented: Numerixx does not support `-ffast-math`, `-ffinite-math-only` or icpx's default fast floating-point
   model, because its failure checks rely on infinities and NaN (DESIGN §5.3). The ICX leg builds with
   `-fp-model=precise`.

@@ -313,6 +313,23 @@ TEST_SUITE("core")
         CHECK(relative(ev {}, ev { 0.0, 0.0, -1e-300, 1e-300 }, {}) == verdict::proceed);
     }
 
+    TEST_CASE("width_tol and x_tol: a threshold that overflows saturates, so an infinite width or distance never passes")
+    {
+        // abs + rel * s overflowed to inf when abs is near max, and so did the width of [-max, max]: inf <= inf said
+        // converged although 2 max > 1.5 max. Saturated at max, the threshold is still a lower bound of the exact one,
+        // and it stays a constant expression (GCC rejects an overflow there).
+        constexpr double         big = (std::numeric_limits<double>::max)();
+        constexpr nxx::width_tol wide { big, 0.5 };
+        static_assert(wide.threshold(-big, big) == big);
+        static_assert(wide.threshold(big) == big);
+        CHECK(wide(ev {}, ev { big, 0.0, -big, big }, {}) == verdict::proceed);            // 2 max > 1.5 max
+        CHECK(wide(ev {}, ev { big, 0.0, 0.25 * big, big }, {}) == verdict::converged);    // a finite width still passes
+
+        constexpr nxx::x_tol far { 1e308, 0.5 };
+        static_assert(far.threshold(big) == big);
+        CHECK(far(pv { -big, 0.0 }, pv { big, 0.0 }, {}) == verdict::proceed);    // distance 2 max > 1e308 + max / 2
+    }
+
     TEST_CASE("floored_width: w <= max(2^(1 - bits), 4 eps) max(1, min(|lo|, |hi|))")
     {
         constexpr double         eps = std::numeric_limits<double>::epsilon();

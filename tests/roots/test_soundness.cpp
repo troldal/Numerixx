@@ -736,6 +736,55 @@ TEST_SUITE("roots")
         CHECK(walked == 150);
     }
 
+    TEST_CASE("soundness: a width tolerance whose threshold overflows never accepts an infinite width")
+    {
+        // width_tol{max, 0.1} on [-max, max]: abs + rel min(|lo|, |hi|) = 1.1 max and the width 2 max were both computed
+        // as inf, so brent reported criterion before its first step (inf <= inf), at x = max, 1.9 max from the root.
+        // The checks compare halves, which cannot overflow.
+        constexpr double big  = (std::numeric_limits<double>::max)();
+        const double     root = -0.9 * big;
+        const auto       fn   = [root](double x) {    // continuous and increasing; f(-max) = -1, f(max) = 0.5
+            const double y = std::tanh(x / 1e306 - root / 1e306);
+            return y > 0.0 ? 0.5 * y : y;
+        };
+        const auto wt = nxx::width_tol<double>::make(big, 0.1);
+        if (!wt) {
+            FAIL_CHECK("width_tol::make rejected a valid tolerance");
+            return;
+        }
+        const auto check_halves = [&](const auto& res, const char* name) {
+            INFO(name);
+            if (!res || !res->enclosure) {
+                FAIL_CHECK("no success with an enclosure");
+                return;
+            }
+            const auto&  e    = *res->enclosure;
+            const double half = big / 2.0 + 0.1 * (std::min)(std::abs(e.lo()), std::abs(e.hi())) / 2.0;    // (abs + rel m) / 2
+            CHECK(res->how == stop_reason::criterion);
+            CHECK(res->used.iterations >= 1u);
+            CHECK(std::isfinite(res->uncertainty));
+            CHECK(e.hi() / 2.0 - e.lo() / 2.0 <= half);
+            CHECK(std::abs(res->x / 2.0 - root / 2.0) <= half);
+            CHECK(e.lo() <= root);
+            CHECK(root <= e.hi());
+            CHECK(res->fx == fn(res->x));
+        };
+        check_halves(r::brent { *wt }(fn, { -big, big }), "brent");
+        check_halves(r::bisection { *wt }(fn, { -big, big }), "bisection");    // tests only after a halving
+
+        // A double tolerance above FLT_MAX on a float problem: float(5e38) is inf. The bound is checked in double, exactly.
+        constexpr float fbig = (std::numeric_limits<float>::max)();
+        const auto      ffn  = [](float x) { return std::tanh(x / 1e36f + 300.0f); };    // root near -3e38; f(+-max) = +-1
+        const auto      fres = r::brent { nxx::width_tol { 5e38 } }(ffn, { -fbig, fbig });
+        if (fres && fres->enclosure) {
+            CHECK(fres->how == stop_reason::criterion);
+            CHECK(static_cast<double>(fres->enclosure->hi()) - static_cast<double>(fres->enclosure->lo()) <= 5e38);
+            CHECK(std::abs(static_cast<double>(fres->x) + 3e38) <= 5e38);
+        }
+        else
+            FAIL_CHECK("brent on a float problem with width_tol{5e38} failed or has no enclosure");
+    }
+
     TEST_CASE("soundness: x_tol on a bracketing solver does not compile")
     {
         using xt = nxx::x_tol<double>;

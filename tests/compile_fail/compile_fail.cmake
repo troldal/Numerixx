@@ -49,6 +49,12 @@ numerixx_add_compile_fail_test(${_nxx_cf}/bisection_with_stop_x_tol.cpp
 numerixx_add_compile_fail_test(${_nxx_cf}/bracket_one_end.cpp
   LINK numerixx::roots
   EXPECT "a bracket has two ends of a real type" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/solve_one_end.cpp
+  LINK numerixx::roots
+  EXPECT "a bracket has two ends of a real type" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/solve_on_scalar.cpp
+  LINK numerixx::roots
+  EXPECT "bracketing solvers need a bracket" DELETE_REASON)
 numerixx_add_compile_fail_test(${_nxx_cf}/bisection_on_pointer.cpp
   LINK numerixx::roots
   EXPECT "bracketing solvers need a bracket" DELETE_REASON)

@@ -130,9 +130,10 @@ namespace nxx::roots
 
     // What the stop criteria of open methods see.
     //
-    // distance() is the length of the step as the method PROPOSED it, before a projection shortened it: a clamped step
-    // that stops just short of the edge says nothing about convergence, so it must not satisfy x_tol or step_tol (the
-    // iterate would be reported as a root at the box edge). Without a projection it is |x_k - x_{k-1}|.
+    // distance() is the larger of the step as the method PROPOSED it and the step it actually took after a projection:
+    // a clamped step that stops just short of the edge says nothing about convergence, so it must not satisfy x_tol or
+    // step_tol (the iterate would be reported as a root at the box edge), and neither must a projection that moves the
+    // iterate further. It is never shorter than |x_k - x_{k-1}|, and without a projection it is exactly that.
     template<real T>
     class point_view
     {

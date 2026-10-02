@@ -129,6 +129,19 @@ namespace nxx
         template<class T>
         constexpr bool mixed_tolerance_ok(const T& abs, const T& rel) noexcept
         { return tag::abs_tolerance::check(abs) && tag::rel_tolerance::check(rel) && (abs > T(0) || rel > T(0)); }
+
+        // abs + rel_part (rel_part = rel * s >= 0), saturated at the largest finite value instead of overflowing to inf.
+        // An overflowing sum accepted an infinite width: width_tol{1.7e308, 0.5} on [-1.7e308, 1.7e308] computed
+        // 2.55e308 and 3.4e308 as inf, and inf <= inf (brent then stopped before its first step, since tol1 = inf / 2).
+        // The test uses halves, which cannot overflow and round like the full sum (scaling by 2 is exact), so it
+        // saturates exactly when the rounded sum would overflow, and every other sum is computed as before. An abs that
+        // is inf in U (a double tolerance above FLT_MAX on a float problem) saturates too; NaN stays NaN.
+        template<real U>
+        constexpr U saturating_sum(const U& abs, const U& rel_part) noexcept
+        {
+            const U top = (std::numeric_limits<U>::max)();
+            return abs / U(2) + rel_part / U(2) > top / U(2) ? top : abs + rel_part;
+        }
     }    // namespace detail
 
     // |x_k - x_{k-1}| <= abs + rel * |x_k|. Open methods and systems only.
@@ -169,7 +182,7 @@ namespace nxx
         // multiprecision problem).
         template<real U>
         constexpr U threshold(const U& x) const noexcept
-        { return U(abs_) + U(rel_) * math::abs(x); }
+        { return detail::saturating_sum<U>(U(abs_), U(rel_) * math::abs(x)); }
 
         template<class V>
         constexpr verdict operator()(const V& prev, const V& next, counters) const
@@ -240,10 +253,10 @@ namespace nxx
         // The threshold at a point x, and for an enclosure (min(|lo|, |hi|)), in the scalar type of the problem.
         template<real U>
         constexpr U threshold(const U& x) const noexcept
-        { return U(abs_) + U(rel_) * math::abs(x); }
+        { return detail::saturating_sum<U>(U(abs_), U(rel_) * math::abs(x)); }
         template<real U>
         constexpr U threshold(const U& lo, const U& hi) const noexcept
-        { return U(abs_) + U(rel_) * (std::min)(math::abs(lo), math::abs(hi)); }
+        { return detail::saturating_sum<U>(U(abs_), U(rel_) * (std::min)(math::abs(lo), math::abs(hi))); }
 
         template<class V>
         constexpr verdict operator()(const V&, const V& next, counters) const

@@ -97,6 +97,13 @@ namespace
         std::is_same_v<decltype(nxx::first_of_with(nxx::continue_unless_fatal {}, std::declval<std::vector<solver_t>>())), solver_t>);
     static_assert(nxx::is_any_solver_v<solver_t> && !nxx::is_any_solver_v<brent_on_t>);
 
+    // With this header included, the one-argument first_of and first_of_with still return their solver: a non-range
+    // argument makes the range overload's constraint false instead of a hard error (a single any_solver included).
+    using bisect02_t = std::remove_cvref_t<decltype(bisect02)>;
+    static_assert(std::is_same_v<decltype(nxx::first_of(bisect02)), bisect02_t>);
+    static_assert(std::is_same_v<decltype(nxx::first_of(std::declval<solver_t>())), solver_t>);
+    static_assert(std::is_same_v<decltype(nxx::first_of_with(nxx::continue_unless_fatal {}, bisect02)), bisect02_t>);
+
     // ---- Helpers ---------------------------------------------------------------------------------------------------
     bool same_bits(double a, double b) { return std::bit_cast<std::uint64_t>(a) == std::bit_cast<std::uint64_t>(b); }
 
@@ -389,6 +396,15 @@ TEST_SUITE("roots")
         // Also with a policy.
         const solver_t with_policy = nxx::first_of_with(nxx::continue_unless_fatal {}, std::span<const solver_t> { vec });
         CHECK(same_result(with_policy(f), want));
+    }
+
+    TEST_CASE("any_solver: the one-argument first_of still returns its solver with this header included")
+    {
+        const fn_t     f   = sq2;
+        const solver_t one = bisect02;
+        CHECK(same_result(nxx::first_of(bisect02)(f), bisect02(f)));
+        CHECK(same_result(nxx::first_of(one)(f), bisect02(f)));
+        CHECK(same_result(nxx::first_of_with(stop_on_any_failure {}, one)(f), bisect02(f)));
     }
 
     TEST_CASE("any_solver: copies, assignment and moves keep a working chain")

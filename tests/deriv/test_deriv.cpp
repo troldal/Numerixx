@@ -369,4 +369,44 @@ TEST_SUITE("deriv")
         CHECK(std::abs(cubel(2.0L).value_or(0.0L) - 12.0L) < 1e-9L);
         CHECK(nxx::cost_of(cubel) == 4);
     }
+
+    TEST_CASE("a stencil point that overflows is invalid_input, before any evaluation")
+    {
+        // h is finite in each call below, but a point x + k h is not. f is finite everywhere, also at +-inf (tanh(+-inf) is
+        // +-1), so only diff can notice; it used to call f at +-inf and return a value that is not the stencil's estimate.
+        constexpr double big      = (std::numeric_limits<double>::max)();
+        std::uint32_t    calls    = 0;
+        const auto       f        = nxx::fn::counted([](double x) { return std::tanh(x / (std::numeric_limits<double>::max)()); }, calls);
+        const auto       rejected = [&calls](const auto& r) {
+            const bool ok = !r.has_value() && r.error().code == nxx::errc::invalid_input && r.error().evals == 0 && calls == 0;
+            calls         = 0;
+            return ok;
+        };
+
+        CHECK(rejected(d::diff(f, rt(-big))));                                          // central_1_2: x - h = -inf
+        CHECK(rejected(d::diff(f, rt(big))));                                           // the mirror: x + h = inf, so h is inf
+        CHECK(rejected(d::diff(f, rt(big * (1 - 0x1.8p-10)), d::central_1_4)));         // x + h is finite, x + 2h = inf
+        CHECK(rejected(d::diff(f, rt(0.0), d::central_1_4, d::absolute { 1e308 })));    // 2h = inf
+        CHECK(rejected(d::diff(f, rt(1e308), d::central_1_4, d::relative { 0.5 })));    // x + 2h = 2e308
+        CHECK(rejected(d::diff(f, rt(-big), d::central_2_4)));
+        CHECK(rejected(d::diff(f, rt(-big), d::backward_1_1)));
+        CHECK(rejected(d::derivative_of(f)(rt(-big))));
+
+        // Finite points still succeed: forward_1_1 at -max samples only x and x + h.
+        CHECK(d::diff(f, rt(-big), d::forward_1_1).has_value());
+        CHECK(calls == 2);
+
+        // float: x - h overflows at -max as well.
+        std::uint32_t  fcalls = 0;
+        const auto     ff     = nxx::fn::counted([](float x) { return std::tanh(x / (std::numeric_limits<float>::max)()); }, fcalls);
+        volatile float vf     = -(std::numeric_limits<float>::max)();
+        const float    xf     = vf;
+        const auto     rf     = d::diff(ff, xf);
+        CHECK_FALSE(rf.has_value());
+        if (!rf) {
+            CHECK(rf.error().code == nxx::errc::invalid_input);
+            CHECK(rf.error().evals == 0);
+        }
+        CHECK(fcalls == 0);
+    }
 }

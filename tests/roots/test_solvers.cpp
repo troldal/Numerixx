@@ -42,6 +42,24 @@ namespace
     std::uint32_t evaluations_of(const R& res)
     { return res ? res->used.evaluations : res.error().used.evaluations; }
 
+    // solve rejects through its constraints, so std::is_invocable_v is false rather than a hard error (DESIGN §6.6): a
+    // function that cannot take the bracket's scalar type, a list or array with other than two real ends, a 2-D array.
+    // A requires-expression rather than a wrapper with a call operator nobody calls, which Clang's -Wunused-template
+    // flags; a call that resolves to a deleted overload makes it false, as it makes std::is_invocable_v false.
+    template<class... A>
+    constexpr bool solve_accepts = requires(A&&... a) { nr::solve(std::forward<A>(a)...); };
+
+    using takes_text = double (*)(const char*);
+    using sq2_t      = decltype(sq2);
+    static_assert(solve_accepts<sq2_t, const double (&)[2]>);
+    static_assert(solve_accepts<sq2_t, std::pair<double, double>>);
+    static_assert(!solve_accepts<takes_text, const double (&)[2]>);
+    static_assert(!solve_accepts<takes_text, std::pair<double, double>>);
+    static_assert(!solve_accepts<sq2_t, const double (&)[1]>);
+    static_assert(!solve_accepts<sq2_t, const double (&)[3]>);
+    static_assert(!solve_accepts<sq2_t, const int (&)[2]>);
+    static_assert(!solve_accepts<sq2_t, const double (&)[2][2]>);
+
     // The error type of a fallible callback.
     enum class table_error : std::uint8_t { negative_argument = 3, outside_table = 7 };
 
@@ -349,6 +367,137 @@ TEST_SUITE("roots")
                 FAIL_CHECK("no best estimate");
         }
         CHECK(nxx::best_x(sres).value_or(0.0) == 3.0);
+    }
+
+    TEST_CASE("solvers: an iterate projected off the reals is rejected before f is evaluated there")
+    {
+        constexpr double inf      = std::numeric_limits<double>::infinity();
+        std::uint32_t    calls    = 0;
+        std::uint32_t    df_calls = 0;
+        const auto       reset    = [&calls, &df_calls] { calls = df_calls = 0; };
+
+        // The start. clamp_to{inf, inf}, or reversed bounds with lo = inf, sends the guess to +inf, where 1/x is exactly
+        // 0; a custom projection to NaN does the same for a three-way comparison, which is 0 at NaN. Both methods
+        // reported an exact_zero success at the non-finite x after one evaluation there.
+        const auto recip          = nxx::fn::counted([](double x) { return 1.0 / x; }, calls);
+        const auto drecip         = nxx::fn::counted([](double x) { return -1.0 / (x * x); }, df_calls);
+        const auto three_way      = nxx::fn::counted([](double x) { return x < 1.0 ? -1.0 : (x > 1.0 ? 1.0 : 0.0); }, calls);
+        const auto to_nan         = [](double) { return std::numeric_limits<double>::quiet_NaN(); };
+        const auto start_rejected = [&calls, &df_calls, &reset](const auto& res, nxx::algo where) {
+            CHECK_FALSE(res.has_value());
+            if (!res) {
+                const auto& err = res.error();
+                CHECK(err.code == nxx::errc::non_finite_input);
+                CHECK(err.where == where);
+                CHECK(err.used == nxx::counters {});
+                CHECK_FALSE(err.best.has_value());
+            }
+            CHECK(calls + df_calls == 0u);    // never called at the non-finite start
+            reset();
+        };
+        start_rejected(nr::secant {}.with_projection(nr::clamp_to { inf, inf })(recip, 5.0), nr::algos::secant);
+        start_rejected(nr::secant {}.with_projection(nr::clamp_to { inf, 0.0 })(recip, 5.0), nr::algos::secant);
+        start_rejected(nr::newton {}.with_derivative(drecip).with_projection(nr::clamp_to { inf, inf })(recip, 5.0), nr::algos::newton);
+        start_rejected(nr::secant {}.with_projection(to_nan)(three_way, 3.0), nr::algos::secant);
+
+        // A later iterate. A projection that marks x <= 0 as outside the domain with +inf: the first step of either
+        // method from 10 on 1/x - 1/4 goes to about -5, projected to +inf, where f = -1/4 is finite. step_tol's threshold
+        // 2^-k max(|x|, 1) is inf there, so both methods reported a criterion success at x = inf.
+        const auto pos_or_inf    = [](double x) { return x > 0.0 ? x : std::numeric_limits<double>::infinity(); };
+        const auto quarter       = nxx::fn::counted([](double x) { return 1.0 / x - 0.25; }, calls);
+        const auto step_rejected = [&calls, &df_calls, &reset](const auto& res, nxx::algo where, nxx::counters used) {
+            CHECK_FALSE(res.has_value());
+            if (!res) {
+                const auto& err = res.error();
+                CHECK(err.code == nxx::errc::diverged);
+                CHECK(err.where == where);
+                CHECK(err.used == used);
+                CHECK(err.used.evaluations == calls + df_calls);
+                if (err.best) {
+                    CHECK(err.best->x == 10.0);    // the start: |f| grows from 10 to 10 + 2^-10 10
+                    CHECK(err.best->fx == 1.0 / 10.0 - 0.25);
+                }
+                else
+                    FAIL_CHECK("no best estimate");
+            }
+            reset();
+        };
+        step_rejected(nr::secant {}.with_projection(pos_or_inf)(quarter, 10.0),
+                      nr::algos::secant,
+                      nxx::counters { 1, 2 });    // f(x0), f(x1)
+        step_rejected(nr::newton {}.with_derivative(drecip).with_projection(pos_or_inf)(quarter, 10.0),
+                      nr::algos::newton,
+                      nxx::counters { 1, 2 });    // f(10); f'(10)
+
+        // The same domain marked with a far finite value instead: the criteria saw only the proposed step (about 15),
+        // and step_tol's threshold at x = 1e300 is huge, so both methods reported a criterion success at x = 1e300 or
+        // max with f = -1/4. The step the criteria see is now the larger of the proposed and the actual one.
+        for (const double remote : { 1e300, (std::numeric_limits<double>::max)() }) {
+            CAPTURE(remote);
+            const auto pos_or_remote = [remote](double x) { return x > 0.0 ? x : remote; };
+            const auto sec           = nr::secant {}.with_projection(pos_or_remote)(quarter, 10.0);
+            CHECK_FALSE(sec.has_value());
+            if (!sec) CHECK(sec.error().used.evaluations == calls + df_calls);
+            reset();
+            const auto nwt = nr::newton {}.with_derivative(drecip).with_projection(pos_or_remote)(quarter, 10.0);
+            CHECK_FALSE(nwt.has_value());
+            if (!nwt) CHECK(nwt.error().used.evaluations == calls + df_calls);
+            reset();
+        }
+
+        // Secant's second point: the guess 3 stays, and 3 + 2^-10 3 is projected to +inf. As where x0 + h overflows,
+        // the second point is then 3 - 2^-10 3, and x - 2 solves.
+        const auto above3   = [](double x) { return x > 3.0 ? std::numeric_limits<double>::infinity() : x; };
+        const auto line     = nxx::fn::counted([](double x) { return x - 2.0; }, calls);
+        const auto fallback = nr::secant {}.with_projection(above3)(line, 3.0);
+        CHECK(fallback.has_value());
+        if (fallback) CHECK(fallback->x == 2.0);
+        reset();
+
+        // A projection that pins one neighbour of the guess and sends the other off the reals: diverged, whichever side
+        // it pins, after f(3) alone (the rule for both: off the reals beats pinned).
+        const auto up_off   = [](double x) { return x > 3.0 ? std::numeric_limits<double>::infinity() : 3.0; };
+        const auto down_off = [](double x) { return x < 3.0 ? std::numeric_limits<double>::infinity() : 3.0; };
+        const auto r_up     = nr::secant {}.with_projection(up_off)(recip, 3.0);
+        const auto r_down   = nr::secant {}.with_projection(down_off)(recip, 3.0);
+        CHECK_FALSE(r_up.has_value());
+        CHECK_FALSE(r_down.has_value());
+        if (!r_up && !r_down) {
+            CHECK(r_up.error().code == nxx::errc::diverged);
+            CHECK(r_down.error().code == nxx::errc::diverged);
+            CHECK(r_up.error().used == nxx::counters { 0, 1 });
+            CHECK(r_down.error().used == nxx::counters { 0, 1 });
+        }
+        CHECK(calls == 2u);
+        reset();
+
+        // Reversed finite bounds send the iterate to the far bound: secant reported a criterion success at x = 1, with
+        // f = 1 - 1e-15, from 0.5, because the criteria saw only the proposed step. Now the larger step is seen.
+        const auto shifted  = nxx::fn::counted([](double x) { return x - 1e-15; }, calls);
+        const auto reversed = nr::secant {}.with_projection(nr::clamp_to { 1.0, 0.0 })(shifted, 0.5);
+        CHECK_FALSE(reversed.has_value());
+        if (!reversed) {
+            CHECK(reversed.error().code == nxx::errc::stalled);
+            CHECK(reversed.error().used.evaluations == calls);
+        }
+        reset();
+
+        // Only a projection that sends both neighbours of the guess off the reals fails: diverged, after f(3) alone.
+        const auto only3  = [](double x) { return x == 3.0 ? x : std::numeric_limits<double>::infinity(); };
+        const auto second = nr::secant {}.with_projection(only3)(recip, 3.0);
+        CHECK_FALSE(second.has_value());
+        if (!second) {
+            const auto& err = second.error();
+            CHECK(err.code == nxx::errc::diverged);
+            CHECK(err.used == nxx::counters { 0, 1 });    // f(3) only
+            if (err.best) {
+                CHECK(err.best->x == 3.0);
+                CHECK(err.best->fx == 1.0 / 3.0);
+            }
+            else
+                FAIL_CHECK("no best estimate");
+        }
+        CHECK(calls == 1u);
     }
 
     // ---- 6. Open-method failures ------------------------------------------------------------------------------------

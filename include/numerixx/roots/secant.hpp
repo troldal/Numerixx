@@ -21,7 +21,7 @@ namespace nxx::roots
     struct secant_state
     {
         T             x0, f0, x1, f1;
-        T             step;    // length of the last proposed step, before projection: what the stop criteria see
+        T             step;    // the larger of the proposed and the projected step: what the stop criteria see
         std::uint32_t nfev;
     };
 
@@ -79,8 +79,11 @@ namespace nxx::roots
         template<class F, real T>
         constexpr auto init(const problem<F, detail::open_start<T>>& p) const -> std::expected<secant_state<T>, root_failure<F, T>>
         {
-            using Fail       = root_failure<F, T>;
-            const T       x0 = opt_.project(p.in.x0);
+            using Fail = root_failure<F, T>;
+            const T x0 = opt_.project(p.in.x0);
+            // A projection can leave the reals (clamp_to{inf, inf}, or a custom one): f is never evaluated at a non-finite
+            // point, so no exact zero or criterion can be reported there (DESIGN §7.2, before each evaluation).
+            if (!math::isfinite(x0)) return std::unexpected(Fail { errc::non_finite_input, id, counters {}, std::nullopt, {} });
             T             f0 {};
             std::uint32_t used = 0;
             if (p.in.fx0 && x0 == p.in.x0)
@@ -95,14 +98,21 @@ namespace nxx::roots
             // step has a finite length unless |proposed - x1| overflows, and then inf is still an honest uncertainty.
             if (f0 == T(0)) return secant_state<T> { x0, f0, x0, f0, detail::unknown<T>(), used };
 
-            // The second point: x0 + h, or x0 - h where that overflows or the projection pins x0 + h to x0.
+            // The second point: x0 + h, or x0 - h where that overflows or the projection pins x0 + h to x0 or sends it off
+            // the reals (a domain whose outside is marked with NaN or inf).
             const T h    = math::pow2<T>(-10) * (std::max)(math::abs(x0), T(1));
             const T up   = x0 + h;
             const T down = x0 - h;
-            T       x1   = math::isfinite(up) ? opt_.project(up) : x0;
-            if (x1 == x0 && math::isfinite(down)) x1 = opt_.project(down);
+            const T a    = math::isfinite(up) ? opt_.project(up) : x0;    // x0 where x0 + h overflows
+            T       x1   = a;
+            if ((x1 == x0 || !math::isfinite(x1)) && math::isfinite(down)) x1 = opt_.project(down);
             const root_estimate<T> first { x0, f0, detail::unknown<T>(), std::nullopt };
-            if (x1 == x0) return std::unexpected(Fail { errc::stalled, id, counters { 0, used }, first, {} });
+            // Neither neighbour is usable: diverged if the projection sent one of them off the reals, stalled if it only
+            // pinned them to x0, whichever side it was (DESIGN §7.2).
+            if (x1 == x0 || !math::isfinite(x1)) {
+                const errc why = math::isfinite(a) && math::isfinite(x1) ? errc::stalled : errc::diverged;
+                return std::unexpected(Fail { why, id, counters { 0, used }, first, {} });
+            }
             auto y1 = nxx::evaluate(p.f, x1);
             if (!y1) return std::unexpected(Fail { y1.error().code, id, counters { 0, used + y1.error().evals }, first, y1.error().cause });
             return secant_state<T> { x0, f0, x1, *y1, math::abs(x1 - x0), used + cost_of(p.f) };
@@ -126,10 +136,14 @@ namespace nxx::roots
             const T proposed = s.x1 - delta;
             if (!math::isfinite(proposed)) return std::unexpected(fault<UE> { errc::diverged, 0, {} });
             const T x2 = opt_.project(proposed);
+            if (!math::isfinite(x2)) return std::unexpected(fault<UE> { errc::diverged, 0, {} });            // projected off the reals
             if (x2 != proposed && x2 == s.x1) return std::unexpected(fault<UE> { errc::stalled, 0, {} });    // pinned at the edge
             auto f2 = nxx::evaluate(p.f, x2);
             if (!f2) return std::unexpected(f2.error());
-            return secant_state<T> { s.x1, s.f1, x2, *f2, math::abs(proposed - s.x1), s.nfev + cost_of(p.f) };
+            // The criteria see the larger of the proposed and the actual step: a projection that moves the point further
+            // (to a far finite value) must not look like convergence, and one that pins it must not either.
+            const T moved = math::abs(x2 - s.x1);
+            return secant_state<T> { s.x1, s.f1, x2, *f2, (std::max)(math::abs(proposed - s.x1), moved), s.nfev + cost_of(p.f) };
         }
 
         template<real T>
