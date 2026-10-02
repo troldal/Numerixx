@@ -1,7 +1,7 @@
 # Numerixx 2: redesign plan
 
 - **Date:** 2026-09-27
-- **Status:** Draft for your review. Section 10 lists the decisions I need from you.
+- **Status:** Approved on 2026-09-28, with every default in section 10 (and DESIGN §12) accepted. Phase 0 is done, except that its nightly floor jobs were red on master from their first run (2026-09-29); the fixes are on the spike branch, where the nightly passed on 2026-10-02 (DESIGN §12.15). The de-risking spike meets its 11 exit criteria locally on all 12 presets (DESIGN §10.2 status, Appendix D), passes hosted CI on PR #3 (ci.yml and the nightly), and awaits merge; phase 1 is next. The spike's code is kept, and phases 1–3 continue from it (DESIGN §10.3).
 - **Companion documents:**
   - [`DESIGN.md`](DESIGN.md): the detailed design reference, covering every decision, the code sketches, per-module algorithm tables, CMake, the test strategy and the full roadmap. Section numbers there are stable; "§n" below refers to them.
   - [`prototype/`](prototype/): a throwaway feasibility prototype. It compiles and runs on nine configurations: GCC 16 and Clang 22 + libc++, each with and without `-fno-exceptions`; em++ 6.0.8 with `-fexceptions`, `-fno-exceptions` and `-fwasm-exceptions`; MSVC 19.51; and clang-cl 22.
@@ -73,9 +73,9 @@ Details are in §1.1 and §10.5.
 - Each family is a new module downstream in the DAG, so no v2.0 module gains a dependency.
 
 **FLAG, licensing.**
-- GSL is GPL-3.0-or-later and Numerixx is MIT, so no GSL source may be ported or paraphrased.
+- Numerixx is MIT, so no GPL code may be ported, paraphrased or copied: nothing under the GPL, LGPL or AGPL, such as GSL or MPSolve (decided on 2026-09-30).
 - Algorithms are implemented from the literature, with references cited in each header.
-- The test oracles are Boost.Math, Eigen and high-precision reference tables. GSL is not an oracle, although values published in its documentation may serve as reference facts.
+- The test oracles are Boost.Math, Eigen and high-precision reference tables. GPL projects (such as GSL) are not oracles, although values published in their documentation may serve as reference facts.
 - Boost-derived code (Brent, TOMS748) keeps its BSL-1.0 notice.
 
 ---
@@ -163,7 +163,7 @@ later:  multimin ─► optimize, multiroots;  fit ─► multiroots (+ poly onc
 
 | Concept | Shape |
 |---|---|
-| Scalars | open, user-specialisable `nxx::scalar_traits<T>` (default: any inexact, non-integer type with `numeric_limits`); every default tolerance is an expression in `T`, so it is attainable in `float`, `long double` and multiprecision |
+| Scalars | open, user-specialisable `nxx::scalar_traits<T>` (default: any inexact, non-integer type with `numeric_limits`; a user type needs a specialised `numeric_limits` too); every default tolerance is an expression in `T`, so it is attainable in `float`, `long double` and multiprecision |
 | Refined inputs | `tolerance<T>`, `abs_tolerance<T>`, `rel_tolerance<T>`, `max_iterations`, `evaluation_budget`, `bracket<T>`, `sign_bracket<T>`, `interval<T>`; `consteval` literal constructors plus `make() → expected` |
 | Solver protocol | `prepare(f, input)`, `init(p)`, `step(p, s)` (pure), `view(s)`, `estimate(s)`, `best(s)`, `intrinsic(s)`, `finish(p, r)` |
 | Driver | `nxx::iterate(alg, problem[, observer])`: the only loop in the library |
@@ -175,7 +175,7 @@ later:  multimin ─► optimize, multiroots;  fit ─► multiroots (+ poly onc
 
 ### 5.3 What it looks like
 
-The spellings below are the design's (§6.11). The prototype compiled and ran the same chain and pipeline on all nine configurations, including inside a `static_assert`. It used older spellings: `r::secant{nxx::default_step{}, 5}`, and `r::bisection{nxx::x_tol{1e-4}}`, which the design now rejects. The builder and criterion spellings shown here, and the run-time-input lines, are still sketches (spike exit criterion 8).
+The spellings below are the design's (§6.11). The prototype compiled and ran the same chain and pipeline on all nine configurations, including inside a `static_assert`. It used older spellings: `r::secant{nxx::default_step{}, 5}`, `r::expand_out` and `r::bisection{nxx::x_tol{1e-4}}`. The design rejects the first and the last, and names the searcher `r::expand`. The spike compiles and runs this snippet as written (checked with GCC 16), and its tests cover each part on every preset (spike exit criterion 8).
 
 ```cpp
 #include <numerixx/roots.hpp>
@@ -216,12 +216,12 @@ nxx::interpolate::make_cubic_spline(xs, ys);              // expected<cubic_spli
 nxx::multiroots::solve(F, std::array{1.0, 0.5});          // damped Newton with an FD Jacobian until dogleg + Broyden pass the phase-5 corpus
 ```
 
-Misuse is rejected at compile time with a reason. On GCC ≥ 15 and Clang ≥ 19 the reason is designed to appear in the first error; spike exit criterion 9 and the compile-fail tests check this. On the floor compilers and MSVC, a deleted overload shows the deleted declaration, whose source line holds the reason:
+Misuse is rejected at compile time with a reason. On GCC ≥ 15 and Clang ≥ 19 the reason is designed to appear in the first error; spike exit criterion 9 and the compile-fail tests check this. On the floor compilers and MSVC, the error names the file and line of the deleted declaration, and the reason starts on that line (`NXX_DELETE` is written on the declarator's own line; MSVC prints the location, not the source):
 
 ```cpp
 r::newton{}(f, 1.0);                  // "newton needs a derivative: .with_derivative(df), .with_derivative(deriv::numeric{}), ..."
 r::bisection{}(f, 1.0);               // "bracketing solvers need a bracket: pass {lo, hi}, nxx::bracket<T>::make(a, b), ..."
-r::bisection{nxx::x_tol{1e-9}};       // "x_tol compares successive iterates; bracketing methods converge on the enclosure: use width_tol"
+r::bisection{nxx::x_tol{1e-9}};       // "x_tol and step_tol compare successive iterates; bracketing methods converge on the enclosure: use width_tol{abs[, rel]} or floored_width{}"
 nxx::bracket{2.0, 1.0};               // invalid literal
 ```
 
@@ -288,7 +288,7 @@ The details are in §10. Sizes are focused developer-days for one developer.
 | # | Phase | Scope | Size |
 |---|---|---|---|
 | 0 | Skeleton | Tag `v1.0.0` (master, 5de1e07) and `v1.1.0-legacy` (dev-reorg tip, 8528e94) so that existing users can pin the old API; new CMake, presets and every CI leg (including multiprecision); delete the old tree | 2.5–3.5 |
-| S | **De-risking spike** | Hosted CI green on all legs; the FXT-1 fix pinned; chains with fallible callbacks under clang-cl in CMake builds; CPM deduplication with a parent project in both declaration orders; the umbrella-header compile-time guard and a recorded linalg TU time; your decision on §12 items 1–8; criterion soundness; the canonical calls with run-time inputs; readable compile-fail diagnostics; regularity; derivative composition (11 exit criteria in §10.2) | 3–4 |
+| S | **De-risking spike** | Hosted CI green on all legs; the FXT-1 fix pinned; chains with fallible callbacks under clang-cl in CMake builds; CPM deduplication with a parent project in both declaration orders; the umbrella-header compile-time guard and a recorded linalg TU time; your decision on §12 items 1–8; criterion soundness; the canonical calls with run-time inputs; readable compile-fail diagnostics; regularity; derivative composition (11 exit criteria in §10.2; the §12 decisions were made on 2026-09-28) | 3–4 |
 | 1 | Core vocabulary | scalar traits and maths helpers, refined types, error and result types, evaluation, `pipes` | 2.5–3.5 |
 | 2 | deriv | stencils, steps, `diff`, `diff_with_error`, `ridders`, `mixed`, `derivative_of`, the `numeric` policy | 3–5 |
 | 3 | Driver + 1-D roots | criteria, driver, combinators, `any_solver` run-time chains, `steps_view`; bisection, Brent, Illinois, Ridders, rtsafe, secant, Newton; expand/scan/subdivide; `solve`, `inverse_of`; Alefeld–Potra–Shi suite | 10–14 |
@@ -300,6 +300,7 @@ The details are in §10. Sizes are focused developer-days for one developer.
 | 9 | Multiprecision, docs, release | multiprecision adapter, docs, examples, benchmarks → `v2.0.0` | 5–7 |
 
 - **Total for v2.0:** 52.5–77.5 days, or 48.5–73.5 without phase 8. §10.3 shows the arithmetic.
+- **After the spike** (decided on 2026-09-29): phases 1–3 continue from the spike's code, with unchanged scope and acceptance criteria. About 0.5–1, 2–3.5 and 6–9 days of them are left, and 40–61 days in all for phases 1–9 (36–57 without phase 8). DESIGN §10.3 lists what is done and what is left.
 - **Order:** deriv comes right after the core vocabulary and before the driver, because it is small, needs only core, and is used by the numeric-derivative Newton in phase 3 and the FD Jacobians in phase 5. Phases 0 → S → 1 → 2 → 3 are sequential. After that, phases 4–7 depend only on core and the driver, so a second developer can run 6 and 7 in parallel with 4 and 5. Phase 8 may follow `v2.0.0`.
 - **Start fresh on this branch.** Port algorithm bodies mostly from dev-reorg, with provenance noted in each commit. Never merge dev-reorg: it would put 38.8 MB of Blaze into history for good. The `prototype/` headers are the starting point for the core; its in-house LU (`nxx/linalg.hpp`) and zero-heap choices are not carried over (§10.1).
 - **Migration from 1.x** (§10.4): `MIGRATION.md` maps the old API to the new one. For example:
@@ -326,7 +327,7 @@ The details are in §10. Sizes are focused developer-days for one developer.
 
 The FXT items in priority order (details in §8):
 
-1. **FXT-1 (do first; it is tiny):** replace `throw 0;` with `std::unreachable();` in `concepts/IsExpected.hpp:87-88` and `concepts/IsOptional.hpp:76-77`, and guard the throwing utilities (`attempt`, `failure`, `lazy`, formatting, enums) with `#if __cpp_exceptions`. The prototype showed that this 2+2-line change is necessary and sufficient for the pipes it exercised (`transform`, `and_then`, `value_or`, `match`, `tap`) under `-fno-exceptions` on GCC, Clang, em++ and clang-cl `/EHs-c-`. It matters only for the no-exceptions build mode with pipes. The patch is in `prototype/fxt-1.patch`.
+1. **FXT-1 (do first; it is tiny):** replace `throw 0;` with `std::unreachable();` in `concepts/IsExpected.hpp:87-88` and `concepts/IsOptional.hpp:76-77`, and guard the throwing utilities (`attempt`, `failure`, `lazy`, formatting, enums) with `#if __cpp_exceptions`. The prototype showed that this 2+2-line change is necessary and sufficient for the pipes it exercised (`transform`, `and_then`, `value_or`, `match`, `tap`) under `-fno-exceptions` on GCC, Clang, em++ and clang-cl `/EHs-c-`. It matters only for the no-exceptions build mode with pipes. The patch is in `prototype/fxt-1.patch`. **Status:** the probe fix is troldal/FXT#1, which Numerixx pins; the guards are still to do.
 2. **FXT-2:** CMake hygiene:
    - reuse a parent's CPM instead of downloading an unhashed one;
    - fetch tl-expected/tl-optional only when their options are ON;
@@ -341,9 +342,9 @@ The FXT items in priority order (details in §8):
 
 ---
 
-## 10. Decisions I need from you
+## 10. Decisions
 
-Each item has my recommended default, and the plan assumes it. The full list of 19 open items is in §12, whose numbers are given in brackets; these are the ones that change the most. §12 items 1–8 must be decided in writing before the spike ends (§10.2, criterion 6).
+**Decided on 2026-09-28: every default below was accepted**, and so were the other items of §12 (19 in all, numbered in brackets here). These are the ones that change the most. The written decision on §12 items 1–8 was a spike exit criterion (§10.2, criterion 6), which this settles.
 
 0. **Starting point** (decision D1, already settled in DESIGN; listed for visibility). A fresh tree on this branch, porting from dev-reorg and tagging it as legacy, rather than merging dev-reorg. **Default: fresh tree.**
 1. **v2.0 scope** [§12.7]. The eight current modules in v2.0; `multimin` and `fit` in v2.1; `ode` in v2.2. The candidates in section 2 stay unscheduled, and the out-of-scope areas stay out. **Default: accept.**
@@ -356,7 +357,7 @@ Each item has my recommended default, and the plan assumes it. The full list of 
 8. **Run-time chains** [§12.19]. Offer `any_solver` and `first_of(range)` as an opt-in header, prototyped on all nine configurations. An empty chain is accepted and fails in-band with `invalid_input` when called. **Default: yes, opt-in header.**
 9. **Multiprecision and complex** [§12.13, §12.14]. Keep multiprecision as an optional adapter and CI leg, and support complex numbers only in `poly`. **Default: keep both as described.**
 10. **Where the combinators live** [§12.12]. Keep `first_of`/`then` in Numerixx until phase 3 has proven them, then upstream the generic parts to FXT. **Default: after phase 3.**
-11. **Compiler floor** [§12.15]. GCC 14, Clang 18 + libc++, MSVC with `/std:c++latest` (19.51 tested), clang-cl, em++ ≥ 6.0.8. This is one step above FXT's stated floor (GCC 13, Clang 17), because the design uses deducing `this`; matching FXT would mean going back to CRTP. The nightly floor-compiler job confirms it. **Default: accept.**
+11. **Compiler floor** [§12.15]. GCC 14, Clang 19 + libc++, MSVC with `/std:c++latest` (19.51 tested), clang-cl, em++ ≥ 6.0.8. Deducing `this` sets GCC 14 (FXT uses it too, although its README states GCC 13 and Clang 17). Clang was raised from 18 to 19 on 2026-10-01, because Clang 18 rejects the refined literals. The nightly floor-compiler job checks the floor; all five of its legs passed on the spike branch on 2026-10-02. **Default: accept.**
 
 ---
 
@@ -367,7 +368,7 @@ The full table is in §11 of the design.
 | Risk | Mitigation |
 |---|---|
 | Scope creep towards "all of GSL" | the scope table in section 2 is the contract; each post-v2.0 family is its own module with its own corpus, and waits for `v2.0.0`; phase 8 may follow `v2.0.0`; candidates stay unscheduled; "out of scope" areas point to the standard library, Eigen or Boost.Math |
-| GPL contamination from GSL | no GSL source is ported or paraphrased; algorithms come from the literature, with references cited per header; oracles are Boost.Math, Eigen and reference tables (values published in GSL's documentation may serve as reference facts) |
+| GPL contamination (GSL, MPSolve and other GPL projects) | no GPL code is ported, paraphrased or copied; algorithms come from the literature, with references cited per header; oracles are Boost.Math, Eigen and reference tables (values published in the documentation of GPL projects may serve as reference facts) |
 | FXT-1 delayed | only `numerixx::pipes` includes FXT; pin a patched fork commit until it lands |
 | Learning curve (`.on`, `then`, criteria typed by view) | the one-call facade and the canonical calls are the front door; compile-fail tests check that diagnostics carry reasons |
 | Template-heavy code on MSVC and clang-cl (diagnostics, P2564, mangling) | no clang-cl mangling issue found with these shapes; CI legs from day one; per-compiler deletion macro; forwarding rule for refined types |

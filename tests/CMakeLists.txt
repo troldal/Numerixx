@@ -65,20 +65,32 @@ function(numerixx_add_test name)
 endfunction()
 
 # ---- Unit tests, one executable per module -----------------------------------------------------------------------
-numerixx_add_test(core SOURCES core/test_version.cpp LINK numerixx::core)
+numerixx_add_test(core SOURCES core/test_version.cpp core/test_refined.cpp core/test_criteria.cpp core/test_scalar.cpp
+  LINK numerixx::core)
 target_compile_definitions(numerixx_test_core PRIVATE NUMERIXX_EXPECTED_VERSION="${PROJECT_VERSION}")
+
+numerixx_add_test(roots
+  SOURCES roots/test_solvers.cpp roots/test_soundness.cpp roots/test_combinators.cpp roots/test_steps.cpp
+          roots/test_any_solver.cpp roots/test_determinism.cpp
+  LINK numerixx::roots)
+numerixx_add_test(deriv SOURCES deriv/test_deriv.cpp LINK numerixx::deriv)
+
+# ---- Usage: the canonical calls (DESIGN §6.14) and cross-module properties ---------------------------------------
+numerixx_add_test(usage
+  SOURCES usage/canonical_calls.cpp usage/test_composition.cpp usage/test_regularity.cpp
+  LINK numerixx::roots numerixx::deriv)
 
 if(TARGET numerixx::linalg)
   numerixx_add_test(linalg SOURCES linalg/test_linalg.cpp LINK numerixx::linalg)
 endif()
 if(TARGET numerixx::pipes)
-  numerixx_add_test(pipes SOURCES pipes/test_pipes.cpp LINK numerixx::pipes)
+  numerixx_add_test(pipes SOURCES pipes/test_pipes.cpp LINK numerixx::pipes numerixx::roots numerixx::deriv)
 endif()
 if(TARGET numerixx::multiprecision)
   # Scalar tests: Boost.Multiprecision without the adapter, because the scalar traits need none (DESIGN D16).
   # Phases 1-8 add their multiprecision instantiations here.
   numerixx_add_test(multiprecision SOURCES multiprecision/test_multiprecision.cpp
-                    LINK numerixx::core Boost::multiprecision Boost::config)
+                    LINK numerixx::roots numerixx::deriv Boost::multiprecision Boost::config)
   numerixx_add_test(multiprecision_adapter SOURCES multiprecision/test_adapter.cpp LINK numerixx::multiprecision)
 endif()
 if(NUMERIXX_TEST_ORACLES)
@@ -136,6 +148,7 @@ add_test(NAME structural.layering
 set_tests_properties(structural.layering PROPERTIES LABELS structural)
 
 # ---- Compile-fail tests (DESIGN §9.1) ----------------------------------------------------------------------------
-numerixx_add_compile_fail_test(${CMAKE_CURRENT_SOURCE_DIR}/compile_fail/harness_selftest.cpp
-  LINK numerixx::core
-  EXPECT "compile-fail harness self-test")
+include(compile_fail/compile_fail.cmake)
+
+# ---- Structural: compile time of the umbrella header and of a linalg TU (DESIGN §3.6) ----------------------------
+include(structural/compile_time.cmake)

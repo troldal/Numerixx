@@ -12,14 +12,17 @@ interpolation, done carefully, generically and composably.
   where it cannot.
 - **Portable.** GCC, Clang, MSVC, clang-cl and Emscripten (WebAssembly). MIT licence.
 
-> **Status: Numerixx 2 is being rebuilt.** This branch contains the new build system and an empty library skeleton
-> (roadmap phase 0). The modules are ported phase by phase; see [the plan](docs/redesign/PLAN.md) and
+> **Status: Numerixx 2 is being rebuilt.** This branch contains the new build system, a first cut of the core
+> vocabulary, 1-D root finding, numerical derivatives and the FXT pipe syntax for results (the de-risking spike,
+> roadmap phase S); the other modules (optimize, poly, integrate, interpolate, linalg, multiroots and the
+> multiprecision adapter) are still empty. [examples/quick_tour.cpp](examples/quick_tour.cpp) shows what works today. The modules are ported
+> phase by phase; see [the plan](docs/redesign/PLAN.md) and
 > [the design reference](docs/redesign/DESIGN.md). The previous API is preserved at the tags `v1.0.0` (master) and
 > `v1.1.0-legacy` (the last development branch); [MIGRATION.md](MIGRATION.md) maps it to the new one.
 
 ## Requirements
 
-- A C++23 compiler: GCC ≥ 14, Clang ≥ 18 with libc++, MSVC 19.51 (`/std:c++latest`), clang-cl, or Emscripten ≥ 6.0.8.
+- A C++23 compiler: GCC ≥ 14, Clang ≥ 19 with libc++ (or with libstdc++ ≥ 14.3), MSVC 19.51 (`/std:c++latest`), clang-cl, or Emscripten ≥ 6.0.8.
 - CMake ≥ 3.25 (≥ 3.30 recommended on Windows) and Ninja.
 
 Dependencies are fetched by [CPM.cmake](https://github.com/cpm-cmake/CPM.cmake), pinned by version and SHA256.
@@ -80,7 +83,6 @@ Every configuration is a CMake preset; `cmake --workflow --preset <name>` config
 | Preset | Toolchain |
 |---|---|
 | `gcc`, `gcc-noexcept`, `gcc-multiprecision` | GCC + libstdc++ with library assertions; without exceptions; with the multiprecision adapter and Boost.Math oracles |
-| `gcc-noexcept-pipes` | without exceptions but with the FXT pipes; fails until the FXT pin includes FXT-1 (CI reports that failure as a warning and fails on any other error) |
 | `clang`, `clang-asan` | Clang + libc++; with AddressSanitizer, UndefinedBehaviorSanitizer and libc++ debug hardening |
 | `msvc`, `clang-cl` | MSVC and clang-cl (run from a Developer PowerShell) |
 | `emscripten`, `emscripten-jsexcept`, `emscripten-noexcept`, `emscripten-pthread` | Emscripten with wasm, JavaScript or no exceptions, and with `-pthread`; tests run under node (activate emsdk first) |

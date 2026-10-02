@@ -1,4 +1,4 @@
-// Prints the Numerixx version. The module examples arrive with their phases (DESIGN §10.3).
+// Prints the Numerixx version. quick_tour.cpp shows the spike's modules; the others arrive with their phases (DESIGN §10.3).
 //
 // std::printf rather than std::println: with MinGW's libstdc++, std::print needs -lstdc++exp at link time.
 #include <numerixx/numerixx.hpp>

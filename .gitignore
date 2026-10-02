@@ -50,3 +50,8 @@ compile_commands.json
 .vs/
 .idea/
 .vscode/
+
+# Claude Code: CLAUDE.md and .claude/agents/ are shared; personal files stay local
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/worktrees/

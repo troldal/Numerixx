@@ -1,10 +1,10 @@
 # Numerixx 2 — Design Reference
 
 - **Date:** 2026-09-27
-- **Status:** Draft for review
+- **Status:** Approved on 2026-09-28, with every §12 default accepted
 - **Scope:** every module of Numerixx (core, deriv, poly, roots, optimize, linalg + multiroots, integrate, interpolate), the build system, tests and CI, upstream work in FXT, migration from Numerixx 1.x, and the families planned after v2.0 (§1.1, §10.5).
 
-**Purpose.** This is the detailed companion to [`docs/redesign/PLAN.md`](PLAN.md), the short plan. It records the library's scope and positioning, every design decision with its rationale and the alternatives considered, the principles behind them, the build and dependency design, the core abstractions with code sketches, the per-module algorithm tables (including the bugs that must not be ported), the testing and CI design, the roadmap with phase sizes and acceptance criteria, the risks, and the open decisions with their defaults. Section numbers are stable, so other documents and code comments can cite them (for example "DESIGN §6.8"). Requirement IDs (R-B1, R-E3, R-A5, …) are listed in Appendix B.
+**Purpose.** This is the detailed companion to [`docs/redesign/PLAN.md`](PLAN.md), the short plan. It records the library's scope and positioning, every design decision with its rationale and the alternatives considered, the principles behind them, the build and dependency design, the core abstractions with code sketches, the per-module algorithm tables (including the bugs that must not be ported), the testing and CI design, the roadmap with phase sizes and acceptance criteria, the risks, and the decisions that were open until 2026-09-28, with their defaults (all accepted). Section numbers are stable, so other documents and code comments can cite them (for example "DESIGN §6.8"). Requirement IDs (R-B1, R-E3, R-A5, …) are listed in Appendix B.
 
 **Evidence markers.**
 - **[prototyped]**: compiled and run in the feasibility prototype preserved at [`docs/redesign/prototype/`](prototype/), on 9 configurations with bit-identical output: GCC 16.1 and Clang 22 + libc++, each with and without `-fno-exceptions`; em++ 6.0.8 with `-fexceptions`, `-fno-exceptions` and `-fwasm-exceptions`; MSVC 19.51; clang-cl 22. MSVC and clang-cl also passed with `/EHs-c-`.
@@ -57,7 +57,7 @@ Removed: vcpkg, Boost in the library, Blaze, LAPACK, OpenMP, gcem, tl-expected, 
 2. **Solvers are values.** For example, `roots::brent{nxx::width_tol{1e-12}}.with_budget(60)`. They are called as `solver(f, input)`, curried as `solver.on(input)`, and driven by `nxx::iterate`, which returns the best iterate on every exit.
 3. **Results.** `std::expected<solution<Est>, failure<Est, UE>>`. The failure is cheap to copy and holds no heap memory of its own: cause code, algorithm id, counters, best estimate, and the user's own callback error.
 4. **Illegal states.** Invalid *literals* are compile errors (`bracket{2.0, 1.0}`, `max_iterations m = 0` or `= true`), and so are solver/input and criterion/solver mismatches. *Run-time* values are validated once, in-band (`make()` or the solver's `invalid_input`), and a validated value cannot become invalid.
-5. **Scalars are open** (`nxx::scalar_traits<T>`, user-specialisable, defaulted from `std::numeric_limits`). Every default tolerance is an expression in `T`, so `float`, `long double` and multiprecision types work; multiprecision gets an optional adapter and CI leg.
+5. **Scalars are open** (`nxx::scalar_traits<T>`, user-specialisable, defaulted from `std::numeric_limits`, which a user type must also specialise, §6.1). Every default tolerance is an expression in `T`, so `float`, `long double` and multiprecision types work; multiprecision gets an optional adapter and CI leg.
 6. **Linear algebra is Eigen 5.0.1**, as you asked: no BLAS/LAPACK, verified under Emscripten, fetched by CPM and wrapped in a thin `nxx::linalg` facade that returns `std::expected` and concrete types. Only the O(n) tridiagonal solvers for splines stay in-house.
 7. **Order: dependencies first, then by breadth of use.** Core vocabulary → deriv → driver + 1-D roots (with `steps_view` and `any_solver`) → optimize → linalg + multiroots → poly → integrate + interpolate → optional roots → multiprecision, docs and release. Multidimensional minimisation and nonlinear least squares follow in v2.1, ODE initial-value solvers in v2.2 (§10.5).
 
@@ -117,7 +117,7 @@ Status legend: **v2.0** = in the first release; **planned** = scheduled in §10.
 
 **How the core extends to the planned families [sketch].** The core abstractions (§6) were chosen so that the planned families reuse them instead of adding parallel machinery. A **minimiser** over ℝⁿ is a solver whose state holds an N-D point (plus, for BFGS, an inverse-Hessian approximation) and whose estimate is extremum-like: x, f(x) and a gradient norm. **Nonlinear least squares** reuses the systems machinery of `multiroots` with a residual vector r: ℝⁿ → ℝᵐ (m ≥ n): the FD Jacobian, the `typical` and `project` hooks, and `qr_solve`. An **ODE integrator** is a solver whose step advances t with an error-controlled step size; its stop criteria include reaching t_end; `steps_view` yields the trajectory; and dense output is a function-returning API that gives the solution as a callable t → `expected<y, fault>`. The driver, the criteria algebra, the `solution`/`failure`/`fault` types, cost accounting and the combinators apply unchanged, for example `first_of(nonstiff, stiff)` for an integration, or `with_evaluation_budget` over a minimisation. Each family is a new module placed downstream in the module DAG (§5.2), so no v2.0 module gains a dependency.
 
-**FLAG, licensing.** GSL is GPL-3.0-or-later and Numerixx is MIT, so no GSL source may be ported or paraphrased. Algorithms are implemented from the literature (for example Brent 1973; Alefeld, Potra and Shi 1995; the MINPACK and QUADPACK reports; Dormand and Prince 1980; Nocedal and Wright), and each header cites its references. Values from GSL's documentation may be used as reference facts, but the test suite's oracles are Boost.Math, Eigen and high-precision reference tables (§9.2). Code derived from Boost (Brent, TOMS748) keeps its BSL-1.0 notice (§10.1).
+**FLAG, licensing.** Numerixx is MIT, so no GPL code may be ported, paraphrased or copied: nothing under the GPL, LGPL or AGPL, which covers GSL (GPL-3.0-or-later) and MPSolve (GPL) (decided on 2026-09-30; before that the rule named only GSL). Algorithms are implemented from the literature (for example Brent 1973; Alefeld, Potra and Shi 1995; the MINPACK and QUADPACK reports; Dormand and Prince 1980; Nocedal and Wright), and each header cites its references. Values from the documentation of such projects may be used as reference facts, but the test suite's oracles are Boost.Math, Eigen and high-precision reference tables (§9.2). Code derived from Boost (Brent, TOMS748) keeps its BSL-1.0 notice (§10.1).
 
 ### 1.2 Flags: where your wishes need nuance
 
@@ -142,7 +142,7 @@ Status legend: **v2.0** = in the first release; **planned** = scheduled in §10.
 | # | Decision | Choice | Alternatives considered | Rationale |
 |---|---|---|---|---|
 | D1 | Starting point | Fresh tree on the redesign branch. Port algorithm bodies by hand, mostly from dev-reorg. Tag `v1.0.0` → 5de1e07 and `v1.1.0-legacy` → 8528e94. Never merge dev-reorg. | Merge dev-reorg; continue from master | Every file is rewritten anyway. A merge would put 38.8 MB of Blaze into history for good, and dev-reorg carries regressions (§7). |
-| D2 | Language and toolchains | C++23. Floors: GCC 14, Clang 18 + libc++, MSVC with `/std:c++latest` (a toolset with deducing `this` and `std::expected`'s monadic operations), clang-cl, em++ ≥ 6.0.8. Tested: GCC 16, Clang 22, MSVC 19.51, clang-cl 22, em++ 6.0.8. A nightly floor-compiler job confirms the floors; CI runs the newest toolchains. **MSVC lacks P2564** (`__cpp_consteval` = 201811L), so user code must forward refined types, never raw scalars, into refined constructors (§6.2). | C++20 | FXT needs C++23. The design uses `std::expected` and deducing `this`, which set the GCC 14 / Clang 18 floor (FXT's README states GCC 13, Clang 17, MSVC 19.30). |
+| D2 | Language and toolchains | C++23. Floors: GCC 14, Clang 19 + libc++ (raised from 18 on 2026-10-01), MSVC with `/std:c++latest` (a toolset with deducing `this` and `std::expected`'s monadic operations), clang-cl, em++ ≥ 6.0.8. A Clang-family compiler on libstdc++ (icpx, or clang++ without libc++) needs libstdc++ 14.3 or newer: 14.1 and 14.2 declare `std::forward_like` with a deduced return type, which Clang rejects in some uses (measured with libstdc++ 14.2: FXT's `match` fails with Clang 19 and 20, and every `std::bind_front` call with Clang 20, which turns on libstdc++'s deducing-`this` path; 14.3 compiles both). Tested: GCC 16, Clang 22, MSVC 19.51, clang-cl 22, em++ 6.0.8. A nightly floor-compiler job checks the floors (§12.15); CI runs the newest toolchains. **MSVC lacks P2564** (`__cpp_consteval` = 201811L), so user code must forward refined types, never raw scalars, into refined constructors (§6.2). | C++20 | FXT needs C++23. The design uses `std::expected` and deducing `this`, which set GCC 14. The refined literals set Clang 19: `nxx::tolerance t{1e-8}` needs class template argument deduction for alias templates (P1814), and the consteval literal checks need P2448; Clang 18 rejects both (nightly run 36925523881). FXT's README states GCC 13, Clang 17, MSVC 19.30, but FXT itself uses deducing `this` (`monads/Match.hpp`, `utils/Curry.hpp`), so it needs at least GCC 14 and Clang 18. |
 | D3 | Solver model | Immutable, configured solver **values** with `init`/`step`. `.on(input)` curries a solver into `f → result`. **[prototyped]** | Problem types that bind f; stateless function objects with per-call criteria | Only this model lets `first_of(newton…, secant…, brent…)` mix inputs without adapters. |
 | D4 | Call order | `solver(f, input)`; curried form `solver.on(input)(f)`; `std::bind_front(solver, f)` fixes f **[sketch]** | `(input, f)` | Matches the facade, the old `fsolve(f, bounds)` and every candidate API but one. |
 | D5 | Driver | One `nxx::iterate(alg, problem[, observer])`. Successes carry `estimate(s)`; failures carry the tracked `best(s)`, which may be a different type (searchers). A driver-internal `nxx::detail::advance` maps a step fault to a failure. There is an optional `finish()` post-condition. **[prototyped; `advance` and `finish` are sketch]** | Five loops (today); a `Next{state, done}` step result | Fixes the off-by-one and success-at-maxiter bugs once. The best iterate on every exit is what callers act on (R-A3). |
@@ -154,13 +154,13 @@ Status legend: **v2.0** = in the first release; **planned** = scheduled in §10.
 | D11 | Illegal states | Three tiers: compile time, construction time, run time. `consteval` literal constructors plus `make() → expected` **[prototyped]**. `detail::refined<Tag, T>` for scalar refinements; hand-written classes for multi-field invariants. | A generic `fxt::refined` now | One mechanism with readable diagnostics. Can be upstreamed later. |
 | D12 | Bracket types | `bracket<T>` (finite, lo < hi) and `sign_bracket<T>` (bracket + endpoint samples of opposite sign, or a zero; samples may be ±inf). Not bound to f's type. **[prototyped]** | `Bracketed<F,T>` bound to the closure type | Binding to the closure type breaks heterogeneous chains and wrapped functions. |
 | D13 | Capability errors | A solver/input mismatch does not compile; family facades carry a reasoned deletion. **Newton needs an explicit derivative source**, which is one of: (a) a callable `df`; (b) a **derivative policy** with `bind(f)`, e.g. `deriv::numeric{}`; (c) a structural `.derivative()` on f. **[prototyped]** | A silent finite-difference fallback | An implicit FD silently changes cost and accuracy. The policy keeps it explicit and works in curried chains without a roots→deriv edge **[prototyped]**. |
-| D14 | Scalars | Open `nxx::scalar_traits<T>` (user-specialisable; the default covers every type whose `numeric_limits` is specialised, non-integer and inexact); concept `real`; maths through the ADL idiom (`using std::abs; abs(x)`) or thin `nxx::math` helpers; no `double` round-trips; **every default tolerance is an expression in `T`** (`root_eps<T>`), with no run-time `pow` **[prototyped mechanism]** | `IsFloat` + Boost | `float`, `long double` and multiprecision work without an adapter; double-literal defaults are unattainable in `float`; power-of-two constants are exact on every platform. |
+| D14 | Scalars | Open `nxx::scalar_traits<T>` (user-specialisable; the default covers every type whose `numeric_limits` is specialised, non-integer and inexact; a user type needs a specialised `std::numeric_limits` as well, §6.1); concept `real`; maths through the ADL idiom (`using std::abs; abs(x)`) or thin `nxx::math` helpers; no `double` round-trips; **every default tolerance is an expression in `T`** (`root_eps<T>`), with no run-time `pow` **[prototyped mechanism]** | `IsFloat` + Boost | `float`, `long double` and multiprecision work without an adapter; double-literal defaults are unattainable in `float`; power-of-two constants are exact on every platform. |
 | D15 | Complex numbers | Only in `poly` | Complex open methods | Complex roots arise routinely for polynomials; complex open methods for general analytic functions are a specialised need and can be added later without changing the core. |
 | D16 | Multiprecision | Works through the open trait for expression-template-off types. Optional `numerixx::multiprecision` adapter (its linalg header includes `<boost/multiprecision/eigen.hpp>`) and CI leg. | Drop the claim | Cheap once the core is Boost-free. |
 | D17 | Composition | Named class templates `first_of_t`, `then_t`, `warm_fallback_t`, `bound`, `budgeted_t`; factories `first_of`, `first_of_with(policy, …)`, `then`, `warm_fallback`, `with_evaluation_budget`. User callables are stored in a copyable box. Written on `std::expected` members. **[prototyped mechanism; named types sketch]** | Closures (not assignable **[prototyped]**); `fxt::operator\|\|` (eager, same type); `std::function` everywhere | No allocation, constexpr, clang-cl-safe, assignable, readable symbols. |
 | D18 | Where FXT is included | Kernels and combinators include only the standard library. `<numerixx/pipes.hpp>` is the only FXT include, in its own target `numerixx::pipes`; `numerixx::core` does not link FXT. **[prototyped]** | FXT inside the facade | The core and its `-fno-exceptions` legs do not wait for FXT-1. A user who does not want the pipes need not fetch FXT (`NUMERIXX_WITH_FXT=OFF`). One include to audit. |
 | D19 | Manual stepping and tracing | **`steps_view`**, a lazy input range of `expected<state, fault>`, is *the* public manual-stepping and tracing API, delivered with the roots phase **[prototyped]**. The observer handles logging inside `iterate`. `init`/`step` remain the solver protocol; `advance` is driver-internal. | `std::generator` (missing on libc++ 22); a public `init`/`step` + `advance` loop | One public way to step; composes with `std::views`; a hand-written loop does not even type-check (`init` and `step` return different error types) **[prototyped]**. |
-| D20 | Per-iterate projection | `.with_projection(p)` on open and N-D methods, applied to the proposed iterate *before* evaluation. An iterate pinned at the edge → `stalled`. A final projection is a `transform`. **[prototyped]** | Extending the objective beyond its domain (`fn::extend_linearly`) | Box and domain constraints (bounds from the application, or a mathematical domain such as x > 0) become a library feature instead of a change to the user's function, and f is never evaluated outside its domain (R-A8). |
+| D20 | Per-iterate projection | `.with_projection(p)` on open and N-D methods, applied to the proposed iterate *before* evaluation. An iterate pinned at the edge → `stalled`. A projected iterate that is not finite → `diverged` (a projected start → `non_finite_input`), before f is evaluated there. The step the criteria see is the larger of the proposed and the actual one, so a projection that moves the iterate further cannot look like convergence either. A final projection is a `transform`. **[prototyped]** | Extending the objective beyond its domain (`fn::extend_linearly`) | Box and domain constraints (bounds from the application, or a mathematical domain such as x > 0) become a library feature instead of a change to the user's function, and f is never evaluated outside its domain (R-A8). |
 | D21 | Functions as values | `derivative_of`, `inverse_of`, `integral_of`, `antiderivative`, interpolants, `minimizer_of`, `poly::derivative`. Named `_fn` types that capture by value and are **copy-assignable whenever the captured callables are copy-constructible** (semiregular when those are also default-constructible). Two return conventions (§6.4): **scalar-valued** callables (`derivative_of`, `second_derivative_of`, `reject_outside` interpolants) **return `expected<T, fault<UE>>`**, so they plug into solvers as callbacks without nesting; **estimate-valued** callables (`integral_of`, `antiderivative`, `inverse_of`, `minimizer_of`) return `result<Est, UE>` (value, error estimate, counters) and become callbacks through `fn::value_of` **[sketch]**. | `ResultProxy` (dev-reorg); a `failure`-returning `derivative_of` | Fixes today's broken `derivativeOf`/`integralOf`; a `failure` return would nest errors inside Newton's **[prototyped]**. |
 | D22 | Linear algebra | **Eigen 5.0.1 via CPM is the backend** of `numerixx::linalg` and `numerixx::multiroots`, behind a thin `nxx::linalg` facade: `lu_solve`, `qr_solve` (`ColPivHouseholderQR`, rank-deficient and least squares) and `cholesky_solve` return `std::expected<…, errc>`; they check dimensions and `allFinite()`, `lu_solve` also checks `rcond` against n·ε (`PartialPivLU` never reports singularity itself), and all return concrete types only. Aliases `nxx::linalg::vector<T, N = Eigen::Dynamic>` and `matrix<T, R, C>`. Systems accept `std::array`, `std::vector` and Eigen vectors. In-house code is limited to the O(n) tridiagonal solvers inside `interpolate`. Option `NUMERIXX_WITH_LINALG` (default ON). | In-house LU/Cholesky/QR kernels over views (constexpr, allocation-free); keep Blaze (needs BLAS/LAPACK); Eigen only as an optional adapter | Your request: a BLAS/LAPACK-free library that compiles with Emscripten. Eigen is mature, handles fixed and dynamic sizes, and is scalar-generic (verified with `cpp_bin_float_50`). Measured cost +2.5–6.4 s per TU in use **[prototyped]**, confined to linalg/multiroots TUs. |
 | D23 | Naming | snake_case for public names. Namespace = header = CMake target per module. The integrate facade is `integrate::quad` (not `integrate::integrate`). | PascalCase; `nxx::optim` | Uniform pipelines; one name per module; no namespace/function clash. |
@@ -195,7 +195,7 @@ Status legend: **v2.0** = in the first release; **planned** = scheduled in §10.
 
 - **No `const` data members, anywhere.** They delete copy and move assignment.
 - Types with an invariant have **private members, `constexpr` getters and `with_*()` builders** that return a new value. If a change could break the invariant, `with_*` returns `expected`.
-- **Records are public aggregates**: `counters`, `root_estimate`, `solution`, `failure`, `fault`, `extremum`, `integral`, `derivative_estimate`, `system_estimate`.
+- **Records are public aggregates**: `counters`, `solution`, `failure`, `fault`, `extremum`, `integral`, `derivative_estimate`, `system_estimate`. `root_estimate` is a public struct too, but its constructor requires x and f(x) (§7.2), so it is not an aggregate **[spike]**.
 - **Combinators and function-returning APIs are named class templates**, not closures, because closure copy assignment is deleted **[prototyped: the prototype's closure-based chain, `then` and capturing `derivative_of` were not copy-assignable]**. User callables are held in `detail::copyable_box<F>`, the `std::ranges` movable-box technique: assignment is implemented as destroy + construct, and `[[no_unique_address]]` applies for empty F. A `static_assert` suite, started in phase 1 and extended by every module phase, checks `std::copyable` for every solver, chain, `any_solver` and returned function, and `std::semiregular` when the parts are default-constructible (`any_solver` is deliberately not default-constructible, §6.10).
 - **No `mutable` members, no lazy caches, no statics.** Derived data (spline coefficients, PCHIP slopes, Gauss nodes) is computed eagerly in the smart constructor. The reasons are thread safety (dev-reorg's `mutable std::optional` caches are data races) and reproducibility (bit-identical results on repeated calls).
 - **Owning values deep-copy** (`polynomial`, interpolants, Eigen dynamic vectors, `any_solver`).
@@ -232,7 +232,7 @@ Rules:
 - **Maths calls** use the ADL idiom (`using std::abs; abs(x)`) or the thin `nxx::math` helpers that wrap it, so the functions of a multiprecision type, which live in its own namespace, are found.
 - **Defaults are functions of `T`:** `rel = math::root_eps<T>(1, 2)` and similar. A `static_assert` test instantiates every module default for `float`, `double`, `long double` and `cpp_bin_float_50` and checks that it is achievable (`default_rel >= 4·eps_T`).
 - **Multiprecision:** `cpp_bin_float_50` satisfies `real` with no adapter. Only expression-template-off types are supported: algorithms write `T x = …`, never `auto x = a - b;`. The same rule protects against Eigen's expression templates (§5.3).
-- **AD scalars are not a design goal** and are not tested. A user type that satisfies `real` (with a `scalar_traits` specialisation if it has no `numeric_limits`) is accepted, but control flow compares values of `T` directly, and nothing guarantees convergence of derivative parts.
+- **AD scalars are not a design goal** and are not tested. A user type that satisfies `real` (which needs a specialised `std::numeric_limits`, §6.1) is accepted, but control flow compares values of `T` directly, and nothing guarantees convergence of derivative parts.
 - **Complex:** `poly` only.
 - **Domain versus codomain** are separate type parameters.
 - **No double literals inside algorithms**, except tabulated rule constants (Gauss–Kronrod nodes and weights, ≥ 36 significant digits; §7.6). Stencils are integer weights over a common denominator. Constants are `T(k)` or powers of two.
@@ -290,7 +290,7 @@ Rules:
 | Dependency | Pin | How | Needed by | Default |
 |---|---|---|---|---|
 | CPM | 0.43.2, `get_cpm.cmake` SHA256 `49a3bef9…f232aa` | committed file + a 6-line wrapper that reuses a parent's CPM (tested with 0.42.1) | build | always |
-| **FXT** | `9208e597…` → bumped to the first commit containing FXT-1; archive SHA256 | `CPMAddPackage(NAME FXT URL … URL_HASH … DOWNLOAD_ONLY YES)` + `fxt::fxt` shim if absent | `numerixx::pipes` only | `NUMERIXX_WITH_FXT=ON` |
+| **FXT** | `9570f44d…`, which adds the FXT-1 probe fix (troldal/FXT#1; moves to the merge commit on FXT's main once merged); archive SHA256 | `CPMAddPackage(NAME FXT URL … URL_HASH … DOWNLOAD_ONLY YES)` + `fxt::fxt` shim if absent | `numerixx::pipes` only | `NUMERIXX_WITH_FXT=ON` |
 | **Eigen** | 5.0.1, SHA256 `e9c326dc…3dec` (fallback `GIT_TAG 5.0.1`) | `DOWNLOAD_ONLY` + own INTERFACE target, unless a parent provides `Eigen3::Eigen` | `numerixx::linalg`, `numerixx::multiroots`; the `HybridNonLinearSolver` oracle tests | `NUMERIXX_WITH_LINALG=ON` |
 | Boost.Config + Boost.Multiprecision | boost-1.92.0 (SHA256 `b4171037…a0`, `9da99784…01d0`) | standalone boostorg repos, `BOOST_MP_STANDALONE ON`; package names `boost_config`/`boost_multiprecision`; guarded by `if(NOT TARGET Boost::multiprecision)` | `numerixx::multiprecision` adapter | OFF |
 | Boost.Math | boost-1.92.0 (SHA256 `aa84eec6…2c48`) | standalone, `BOOST_MATH_STANDALONE ON` | oracle tests only (roots, minima, quadrature; §9.1) | OFF (`NUMERIXX_TEST_ORACLES`) |
@@ -307,7 +307,7 @@ Rules:
 | Option | Default | Meaning |
 |---|---|---|
 | `NUMERIXX_BUILD_TESTS` | `PROJECT_IS_TOP_LEVEL` | doctest suite, header check, compile-fail, layering |
-| `NUMERIXX_BUILD_EXAMPLES` | OFF | examples, registered as smoke tests |
+| `NUMERIXX_BUILD_EXAMPLES` | `PROJECT_IS_TOP_LEVEL` | examples, registered as smoke tests |
 | `NUMERIXX_BUILD_BENCHMARKS` | OFF | ignored under Emscripten |
 | `NUMERIXX_BUILD_DOCS` | OFF | skipped with a message if the tools are missing |
 | `NUMERIXX_INSTALL` | `PROJECT_IS_TOP_LEVEL` | install/export; `find_package(numerixx 2.0 CONFIG)` |
@@ -407,7 +407,7 @@ The install/export (`numerixx-config.cmake`, `SameMinorVersion`, a `find_depende
 
 ### 4.5 Presets, Emscripten and Windows
 
-- **Presets** (`CMakePresets.json` v6, verified to parse on CMake 3.29 and 4.3): `msvc`, `clang-cl`, `gcc`, `clang` (libc++), `clang-asan`, `gcc-noexcept`, `gcc-noexcept-pipes` (the FXT-1 canary: it fails until the FXT pin includes FXT-1, and CI reports that failure as a warning while any other error fails the job), `gcc-multiprecision`, `integration` (the consumer-build scenarios), `emscripten` (`-fwasm-exceptions`), `emscripten-jsexcept` (JavaScript-based `-fexceptions`), `emscripten-noexcept`, `emscripten-pthread` (`-fwasm-exceptions -pthread`), and workflow presets.
+- **Presets** (`CMakePresets.json` v6, verified to parse on CMake 3.29 and 4.3): `msvc`, `clang-cl`, `gcc`, `clang` (libc++), `clang-asan`, `gcc-noexcept` (with the FXT pipes, now that the FXT pin includes the FXT-1 probe fix), `gcc-multiprecision`, `integration` (the consumer-build scenarios), `emscripten` (`-fwasm-exceptions`), `emscripten-jsexcept` (JavaScript-based `-fexceptions`), `emscripten-noexcept`, `emscripten-pthread` (`-fwasm-exceptions -pthread`), and workflow presets.
 - **Emscripten.**
   - Test link flags: `-sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=1MB -sEXIT_RUNTIME=1 -sNODERAWFS=1`.
   - `long double` on wasm32 is software quad.
@@ -482,10 +482,17 @@ adapter (leaf): multiprecision ─► core (+ Boost::multiprecision, Boost::conf
   - a consumer test TU compiled with `/W4 /WX` defines a global `f`.
 - `NXX_NO_UNIQUE_ADDRESS` expands to `[[msvc::no_unique_address]]` under `_MSC_VER` **[prototyped]**.
 - **`NXX_DELETE(reason)` [prototyped mechanism]:**
-  - `#if defined(__clang__) && __clang_major__ >= 19`: `= delete(reason)`, wrapped in an in-macro `_Pragma` push/ignore(`-Wc++26-extensions`)/pop (verified: 0 warnings, reason printed). Clang 18, the floor, lacks the syntax and takes the `#else` branch.
+  - `#if defined(__clang__) && __clang_major__ >= 19`: `= delete(reason)`, wrapped in an in-macro `_Pragma` push/ignore(`-Wc++26-extensions`)/pop (verified: 0 warnings, reason printed). Every Clang at or above the floor (19) takes this branch.
   - `#elif defined(__GNUC__) && __GNUC__ >= 15`: `= delete(reason)`, with each public header's body wrapped in `#pragma GCC diagnostic push` / `ignored "-Wc++26-extensions"` / `pop`. GCC rejects `_Pragma` inside a declaration, and it does not define `__cpp_deleted_function` in C++23 mode even though it prints the reason.
-  - `#else`: `= delete` (MSVC rejects the syntax; GCC 14 and Clang 18 lack it).
+  - `#else`: `= delete` (MSVC rejects the syntax; GCC 14 lacks it).
+  - The macro starts on the declarator's own line **[spike]**: cl and the floor compilers print only the file and line of the deleted declaration, so that is where the reason must begin.
   - Trade-off, recorded: a constrained overload whose body is `static_assert(false, reason)` would show the reason on every compiler, but it makes `std::is_invocable_v` true, which generic code and `first_of` rely on being false.
+- **`NXX_BEGIN_HEADER` / `NXX_END_HEADER` [verified in the spike]** bracket the body of every header with arithmetic.
+  - **Clang** (also clang-cl and em++): no floating-point contraction in the library's code. Clang contracts `a * b + c` into a fused multiply-add by default; on FMA hardware (ARM64, x86 with `-march=haswell`) and in constant folding that rounds once instead of twice, so without the pragma a solver's path would depend on the platform (§6.1). Measured on Clang 22 with `-march=haswell`: 19 contracted FMAs in the library's code before, none after. Where Clang supports `#pragma float_control` (x86, x86-64, AArch64, RISC-V, PowerPC and SystemZ, checked with Clang 22), the setting is saved and restored (`float_control(push)`, `clang fp contract(off)`, `float_control(pop)`), so a user's `x * y + z` still fuses. Elsewhere (WebAssembly, 32-bit ARM, MIPS, LoongArch, …) the pragma is ignored with a warning, so only `clang fp contract(off)` is emitted, and contraction stays off for the rest of the translation unit; WebAssembly has no scalar FMA, so there it only makes constant folding agree with run time.
+  - **GCC 15+**: they silence `-Wc++26-extensions` for `NXX_DELETE`, and do nothing about contraction. **GCC contracts by default in C++, ISO mode included** (`-ffp-contract=fast`; only ISO C defaults to off), and it has no pragma that turns contraction off for a region of code; `#pragma GCC optimize("fp-contract=off")` was not used, because GCC does not inline across differing optimisation attributes. So a GCC build for FMA hardware (AArch64; x86 with `-mfma` or `-march=haswell`) may fuse the library's arithmetic and differ from other platforms in the last ulp. Measured with GCC 16, `-std=c++23 -O2 -march=haswell`: `a * b + c` compiles to one `vfmadd`, and with `-ffp-contract=off` to a multiply and an add. The presets build baseline x86-64, which has no FMA, so the tested results are unaffected; a consumer who needs bit-identical results on an FMA target builds with `-ffp-contract=off`. **Open question for phase 1** (the `config.hpp` macros): leave this to the consumer, or add `-ffp-contract=off` to the GCC interface flags, which would change the consumer's own code as well.
+  - **MSVC**: C4459 (a declaration hides a global) is silenced in the library's templates. MSVC does not contract by default (`/fp:contract` is off); a consumer that builds with `/fp:fast` or `/fp:contract` may see last-ulp differences.
+- **No fast-math (decided on 2026-10-01).** Numerixx does not support `-ffast-math`, `-ffinite-math-only` or icpx's default `-fp-model=fast`. The library depends on IEEE infinities and NaN: refined types, intervals and derivative steps reject non-finite input with `math::isfinite`; solvers reject NaN from f, divergence, and a pole at a bracket end or an infinite jump with `math::isfinite` and `math::isnan`; and an unknown uncertainty or step is stored as infinity (`roots/bracket.hpp`). Under those flags the compiler assumes that no value is infinite or NaN: it folds those checks to constants and drops the unordered case from comparisons, which turns failures into reported successes (§9.3). Measured with GCC 16.1 and Clang 22 at `-O2`, with either flag: NaN from f is reported as `stop_reason::exact_zero` (GCC `-ffast-math` also reports f(x) = 0), a Newton step that overflows as `stop_reason::criterion` at x = ±inf, `diff` returns NaN or inf as a value, and refined types accept infinities. A pole inside the bracket (tan on [1, 2]) is still rejected, because the residual-growth test compares finite values. No diagnostic covers this: Clang's `-Wnan-infinity-disabled` reports only the `infinity()` in `roots/bracket.hpp`, and nothing when the headers come through SYSTEM includes (D24); GCC reports nothing. The nightly Intel ICX leg builds with `-fp-model=precise` (§9.4).
+- **SYSTEM includes do not stop every warning [measured 2026-10-01].** GCC can report a middle-end warning that it finds after inlining even when every frame lies in a system header, so `-isystem` (D24) does not hide it. Example: GCC 14 at `-O2`, and GCC 16.1 at `-O2` without `NDEBUG`, report 8 `-Wnull-dereference` false positives in Eigen 5.0.1's out-of-line `partial_lu_impl::unblocked_lu`, which a translation unit instantiates with `partialPivLu()`. GCC checks `#pragma GCC diagnostic` at every location in the inline stack, so a push/ignored/pop region around the first inclusion of `<Eigen/LU>` silences them; `tests/linalg/test_linalg.cpp` does this (checked with GCC 16.1 locally and GCC 14.4 in the nightly). A Numerixx header that runs LU solves (the phase-5 facade) could use the same region only as best effort: it does not help a consumer who includes `<Eigen/LU>` or `<Eigen/Dense>` first. **Needs a decision in phase 5.**
 - **clang-cl rules:** no folds over lambda-bearing concepts in variadic requires-clauses (use `bool` variable templates or unconstrained templates with `static_assert`); deduced return types on constrained factories. No clang-cl mangling problems were found with these shapes **[prototyped]**.
 
 ---
@@ -496,7 +503,7 @@ adapter (leaf): multiprecision ─► core (+ Boost::multiprecision, Boost::conf
 
 ```cpp
 namespace nxx {
-template<class T> struct scalar_traits {};                               // primary: "not a scalar"; users specialise
+template<class T> struct scalar_traits {};                               // primary: "not a scalar"; real also needs numeric_limits
 template<class T>
   requires(std::numeric_limits<T>::is_specialized && !std::numeric_limits<T>::is_integer &&
            !std::numeric_limits<T>::is_exact)                           // rejects int, bool, cpp_int, cpp_rational
@@ -505,7 +512,8 @@ struct scalar_traits<T> {
     static constexpr T epsilon() noexcept { return std::numeric_limits<T>::epsilon(); }
 };
 template<class T> inline constexpr bool is_real_v =                     // bool variable template: clang-cl safe
-    requires { requires scalar_traits<std::remove_cvref_t<T>>::is_real; };
+    requires { requires scalar_traits<std::remove_cvref_t<T>>::is_real;
+               requires std::numeric_limits<std::remove_cvref_t<T>>::is_specialized; };
 template<class T> concept real = is_real_v<T> && std::regular<T> && std::totally_ordered<T> &&
     requires(const T a, const T b) { {a+b}->std::convertible_to<T>; {a-b}->std::convertible_to<T>;
                                      {a*b}->std::convertible_to<T>; {a/b}->std::convertible_to<T>; {-a}->std::convertible_to<T>; };
@@ -527,8 +535,8 @@ template<class T> constexpr T midpoint(const T& a, const T& b) noexcept;   // st
 }
 ```
 
-- **Two groups, on purpose.** The first group is exact or correctly rounded, so its results are the same on every conforming platform. Stop tests, step-size rules, bisection midpoints and the power-of-two constants (`pow2`, `root_eps`, ITP's ⌈log₂⌉ via `frexp`) use only that group and the four basic operations, so, given the same values of f, a solver takes the same path on every platform. That extends the determinism rule (§3.2, §9.1) beyond repeated runs on one machine. The second group is not correctly rounded: where the library needs it (tanh-sinh abscissae, for example) and where a user's f calls it, results may differ in the last ulp between standard libraries.
-- `cpp_bin_float_50` and every other type with a suitable `numeric_limits` specialisation need nothing. A type without one specialises `scalar_traits` with `is_real = true` and `epsilon()`.
+- **Two groups, on purpose.** The first group is exact or correctly rounded, so its results are the same on every conforming platform. Stop tests, step-size rules, bisection midpoints and the power-of-two constants (`pow2`, `root_eps`, ITP's ⌈log₂⌉ via `frexp`) use only that group and the four basic operations, so, given the same values of f, a solver takes the same path on every platform. That extends the determinism rule (§3.2, §9.1) beyond repeated runs on one machine. It also needs the library's own arithmetic to be free of floating-point contraction. Clang and GCC both contract by default; the headers turn it off on Clang (§5.3, found and fixed in the spike), but GCC has no such pragma, so on GCC the guarantee needs a target without FMA or a build with `-ffp-contract=off` (§5.3). The second group is not correctly rounded: where the library needs it (tanh-sinh abscissae, for example) and where a user's f calls it, results may differ in the last ulp between standard libraries.
+- `cpp_bin_float_50` and every other type with a suitable `numeric_limits` specialisation need nothing. A type without one must specialise `std::numeric_limits` (which the standard permits): the library reads digits, epsilon, min, max, lowest and infinity from it, so `is_real_v` requires `numeric_limits<T>::is_specialized`. A `scalar_traits` specialisation alone made a type `real` until the review of PR #3 (2026-10-02), and the defaults then collapsed: on x² − 2 the default criteria reported `stop_reason::criterion` after at most one iteration, at errors of 0.41 to 0.59 (measured with brent, bisection, newton and secant). Whether `scalar_traits` should carry these limits instead, so that types without `numeric_limits` work, **needs a decision in phase 1**.
 - The prototype verified the trait, the constexpr-safe `abs`/`isfinite` and the power-of-two constants; there they were spelled as CPO objects and the trait also carried an AD "primal" type, which this design drops.
 
 ### 6.2 Refined types and smart or consteval constructors [prototyped]
@@ -552,7 +560,7 @@ namespace detail {
 template<real T> using tolerance     = detail::refined<tag::positive_tolerance, T>;  // finite, > 0: a criterion's only threshold
 template<real T> using abs_tolerance = detail::refined<tag::abs_tolerance, T>;       // finite, >= 0: absolute PART of a mixed test
 template<real T> using rel_tolerance = detail::refined<tag::rel_tolerance, T>;       // finite, 0 <= r < 1; roles not interchangeable
-using evaluation_budget = detail::refined<tag::evaluation_budget, std::uint32_t>;    // >= 1 (the criterion is max_evaluations)
+class evaluation_budget;   // 1 .. 2^32-1, the argument of max_evaluations; shaped like max_iterations below   [spike]
 using progress_window   = detail::refined<tag::progress_window, std::uint8_t>;       // 2..16 (open methods, §7.2)
 template<real T> using growth_factor = detail::refined<tag::growth, T>;              // > 1 (bracket expansion)
 template<class T> inline constexpr bool is_refined_v = /* refined<>, max_iterations, bracket, criteria */;
@@ -584,7 +592,7 @@ template<real T> class sign_bracket;  // §6.6
   - configuration parsed into refined types once, with the config struct holding `tolerance<double>` and `max_iterations`.
 - **Mixed criteria** take `abs_tolerance` (≥ 0) and `rel_tolerance`, with the invariant **`abs > 0 || rel > 0`** enforced in the consteval constructors and `make()`. `x_tol{0.0, 1e-8}` (purely relative, QUADPACK/GSL style) is legal; `x_tol{0.0, 0.0}` is not.
 - A chain-wide budget is `with_evaluation_budget` (§6.10); there is no per-solver "remaining budget" arithmetic.
-- **FLAG (portability).** MSVC 19.51 lacks P2564. A user template such as `template<class T> auto make_solver(T t) { return r::bisection{nxx::x_tol{t}}; }` escalates to an immediate function and compiles on GCC, Clang and clang-cl, but fails on MSVC with C7595 **[prototyped]**. Rule: *every function that forwards a tolerance or budget takes the refined type (`nxx::tolerance<T>`, `nxx::max_iterations`), never a raw scalar; wrap run-time values with `make()`*. The probe runs on the MSVC leg as a documented `WILL_FAIL`. Also, `std::is_constructible_v<tolerance<double>, double>` is **true** on all five compilers, so generic code must detect validated inputs with `nxx::is_refined_v`, not `constructible_from` or `convertible_to` **[prototyped]**.
+- **FLAG (portability).** MSVC 19.51 lacks P2564. A user template such as `template<class T> constexpr auto make_solver(T t) { return r::bisection{nxx::width_tol{t}}; }` escalates to an immediate function and compiles on GCC, Clang and clang-cl, but fails on MSVC with C7595 **[verified in the spike: tests/compile_fail/probe_p2564_escalation.cpp]**; only constexpr functions escalate (P2564), so without `constexpr` the call is an error on every compiler. Rule: *every function that forwards a tolerance or budget takes the refined type (`nxx::tolerance<T>`, `nxx::max_iterations`), never a raw scalar; wrap run-time values with `make()`*. On the MSVC leg the probe must fail with C7595 as its first error, which documents the gap. Also, `std::is_constructible_v<tolerance<double>, double>` is **true** on all five compilers, so generic code must detect validated inputs with `nxx::is_refined_v`, not `constructible_from` or `convertible_to` **[prototyped]**.
 
 ### 6.3 Error and result types [prototyped]
 
@@ -621,7 +629,8 @@ template<class Est, class UE = none> struct failure {   // trivially copyable wh
     NXX_NO_UNIQUE_ADDRESS cause_slot<UE> cause{};        // the user's callback error, unchanged
 };
 template<class Est, class UE = none> using result = std::expected<solution<Est>, failure<Est, UE>>;
-template<class R> constexpr auto best_x(const R& r);    // optional: the solution's x, or the failure's best->x   [prototyped]
+template<class R> requires requires(const R& r) { r->x; }   // not for a search result: a sign_bracket has two ends   [spike]
+constexpr auto best_x(const R& r);    // optional: the solution's x, or the failure's best->x   [prototyped]
 }
 namespace nxx::roots {
 template<real T> struct root_estimate {
@@ -674,14 +683,14 @@ template<class E> constexpr bool is_fatal(const E&) noexcept;           // CPO, 
 
 | Family | Accepted inputs (validated in `prepare()`, errors in-band) |
 |---|---|
-| bracketing roots | `bracket<T>`, `sign_bracket<T>`, `solution<sign_bracket<T>>` (search result), **braced `{lo, hi}`** (a `const T(&)[2]` overload), **`std::pair<T,T>`**, **`std::expected<bracket<T>, errc>`** (straight from `make()`); a `root_estimate` only through `.from_enclosure()` |
+| bracketing roots | `bracket<T>`, `sign_bracket<T>`, `solution<sign_bracket<T>>` (search result), **braced `{lo, hi}`** (a `const T(&)[N]` overload with N deduced; only N == 2 is accepted), **`std::pair<T,T>`**, **`std::expected<bracket<T>, errc>`** (straight from `make()`); a `root_estimate` only through `.from_enclosure()` |
 | open-method roots | a guess `T` (a real type: `1.0`, not `1`), or a `root_estimate<T>` whose `fx` seeds the first evaluation |
 | searchers | `bracket<T>`/braced/pair start window, or a guess (+ optional limits) |
 | optimisation | `bracket<T>`/braced/pair, or `min_bracket<T>` |
 | quadrature | `interval<T>` (finite, any orientation), `semi_infinite<T>`, `whole_line<T>`, or `(a, b)` |
 | systems | **`std::array<T,N>`** (fixed size: a wrong length is a compile error), `std::vector<T>`, Eigen column vectors (fixed or dynamic); internally Eigen storage via `linalg::vector_traits` (§5.2) |
 
-- `.on(input)` accepts the same forms. A braced `.on({lo, hi})` needs its own `const T(&)[2]` overload; a braced list cannot pass through a generic template parameter.
+- `.on(input)` accepts the same forms. A braced `.on({lo, hi})` needs its own `const T(&)[N]` overload; a braced list cannot pass through a generic template parameter.
 - Unvalidated forms fail as `failure{errc::invalid_input or the forwarded errc, id, {0, 0}, nullopt}`, which flows through `first_of` and `then` **[sketch]**. A naive design that rejects these forms at compile time produced 18 to 161 lines of errors with no reason (measured).
 - Internally, `solver.prepare(std::cref(f), input)` produces `problem<F, In>{f, in, nfev0}` or a failure. A domain's problem factories return that domain's failure type **[prototyped]**. Problems are exposed for manual stepping only.
 
@@ -692,7 +701,8 @@ A solver type `A` over problem `P` provides, all `const`:
 ```cpp
 static constexpr algo id;
 template<class In> static constexpr bool accepts_v;       // which inputs prepare() takes (bool variable template: clang-cl safe)
-static constexpr view_kind view;                          // point | enclosure | system: which criteria apply
+static constexpr view_kind views;                         // point | enclosure | system: which criteria apply
+                                                          //   (spelled views: view(s) below is the protocol function)
 prepare(f, input) -> std::expected<P, failure<FEst, UE>>  // validate; evaluate what must be evaluated
 init(p)           -> std::expected<S, failure<FEst, UE>>  // initial state
 step(p, s)        -> std::expected<S, fault<UE>>          // one iteration: pure except for calling p.f
@@ -700,7 +710,7 @@ view(s)           -> V                                    // what stop criteria 
 estimate(s)       -> SEst                                 // success payload
 best(s)           -> FEst                                 // failure payload candidate (default: estimate(s))   [prototyped]
 intrinsic(s)      -> std::optional<stop_reason>           // exact zero, unsplittable, Brent's tol1, ITP's bound
-finish(p, r)      -> r                                    // optional post-condition (bracketing: pole check, §7.2)   [sketch]
+finish(p, sol)    -> std::optional<failure<FEst, UE>>     // optional post-condition (bracketing: pole check, §7.2): a failure if it does not hold
 options()                                                 // stop, budget, derivative source, projection, observer
 s.nfev                                                    // evaluations so far (in cost_of units)
 ```
@@ -708,11 +718,14 @@ s.nfev                                                    // evaluations so far 
 - **Configuration is one aggregate, builders are generic.** Each solver holds `options<Stop, Deriv, Proj, Obs>` plus algorithm-specific parameters, and declares `template<class O2> using rebind = …`. The facade provides `with_stop(c)`, `with_budget(max_iterations)`, `with_derivative(d)`, `with_projection(p)` and `with_observer(o)` by rebinding that aggregate with deducing `this`. The alternative, hand-written builders per solver with a private all-members constructor and a friend declaration, was prototyped and is boilerplate **[prototyped]**.
   - Constructors take nothing, a criterion (`bisection{nxx::width_tol{1e-4}}`), or algorithm-specific parameters (`itp{itp_params{…}}`), with CTAD guides.
   - There are no positional budgets, which is what makes configuration order-independent.
-  - `with_stop` is constrained on `criterion_for<C, Self::view>` and has a reasoned deleted sibling. A Tier-A test checks `S{}` and `S{criterion}` for every solver **[sketch]**.
-- **Family facades carry the reasons.** Solvers derive from `bracketing_facade`, `open_facade`, `search_facade` or `system_facade`, all deducing-`this` bases with no CRTP **[prototyped]**. Each facade constrains `operator()` and `.on()` on `accepts_v<In>` and "F invocable on the scalar", and provides a reasoned deletion for everything else. `std::is_invocable_v<bisection<>, F, double>` is then `false`, not a hard error (as it is when the check sits inside the body). The reasons:
+  - `with_stop` is constrained on `criterion_for<C, Self::views>` and has a reasoned deleted sibling. A Tier-A test checks `S{}` and `S{criterion}` for every solver **[sketch]**.
+  - `with_derivative` and `with_projection` exist only where they mean something (`uses_derivative`, `projects`), and are deleted with a reason elsewhere: "this solver does not use a derivative (newton does)"; "projection applies to open methods (secant, newton): a bracketing method keeps every iterate inside its bracket" **[spike]**.
+- **Family facades carry the reasons.** Solvers derive from `bracketing_facade`, `open_facade`, `search_facade` or `system_facade`, all deducing-`this` bases with no CRTP **[prototyped]**. Each facade constrains `operator()` on `accepts_v<In>` and "F invocable on the scalar", and `.on()` on `accepts_v<In>` alone (F is not known yet), with a reasoned deletion for every rejected input and for a function that cannot take the input's scalar type. The curried solver (`bound`) is constrained on the solver being invocable with F and its input, without a reasoned deletion, so a wrong function there gets the compiler's generic error. `std::is_invocable_v<bisection<>, F, double>` is then `false`, not a hard error (as it is when the check sits inside the body). The reasons:
   - "bracketing solvers need a bracket: pass {lo, hi}, nxx::bracket<T>::make(a, b), or a search result";
   - "open methods take a guess of a real type: write 1.0, not 1";
-  - "searchers take a start window or a guess".
+  - "searchers take a start window or a guess";
+  - "the function cannot be called with the scalar type of the bracket" (and of the guess, or of the window; for a braced `{lo, hi}` too) **[spike]**. The spike review found that the facades did not check "F invocable on the scalar", so `std::is_invocable_v` with a function of the wrong signature was a hard error inside the solver, not `false`. Each solver now declares `callable_v<F, In>`, and the facade asks it only once `accepts_v` holds (`detail::input_callable_v`, with F decayed so that a plain function does not form a `const` function type, which MSVC warns about).
+  - **[spike]** A braced list or a C array binds to `const T (&)[N]` overloads with N deduced: N == 2 with a real T is a bracket (or a window), and any other length or element type is deleted with "a bracket has two ends of a real type: write {lo, hi}, for example {1.0, 2.0}". `nxx::roots::solve` (§6.13) deduces N the same way; it kept a fixed `[2]` until the review of PR #3. With a fixed `[2]`, a one-element `{x}` bound as `{x, 0}` and was solved on [0, x]. Arrays are left out of the call operators' catch-alls, and the `.on` catch-alls take a forwarding reference, so an array never decays to a pointer, which cl cannot order against the array overloads; a pointer keeps its reason.
 
   Solver-specific deletions (Newton's) stay in the solver, which must then repeat `using facade::operator();`. A test catches it if that line is forgotten.
 - **Derivative sources (D13) [prototyped]:**
@@ -725,7 +738,7 @@ s.nfev                                                    // evaluations so far 
   > `newton needs a derivative: .with_derivative(df), .with_derivative(deriv::numeric{}), a callable with .derivative(), or use secant`
 - The only transition of `sign_bracket` is `narrowed(m, fm)`. Sign tests use comparisons, not products, and accept an exact zero at an endpoint **[prototyped]**.
 
-### 6.7 The single bounded-iteration driver [prototyped; `detail::advance`, `finish` and the enclosure-aware `better` are sketch]
+### 6.7 The single bounded-iteration driver [prototyped; `detail::advance`, `finish` and the enclosure-aware `better` are implemented in the spike; the listing below is the pre-spike sketch]
 
 ```cpp
 template<class A, class P, class Obs = no_observer>
@@ -739,7 +752,7 @@ constexpr auto iterate(const A& alg, const P& p, const Obs& observe = {}) {
     if (!first) return R{std::unexpect, std::move(first).error()};
     auto s = *std::move(first);
     FEst best = alg.best(s);
-    if (auto how = alg.intrinsic(s)) return alg.finish(p, R{solution<SEst>{alg.estimate(s), {0, s.nfev}, A::id, *how}});
+    if (auto how = alg.intrinsic(s)) return detail::succeed<R>(alg, p, solution<SEst>{alg.estimate(s), {0, s.nfev}, A::id, *how});
     const auto& stop = alg.options().stop;
     const std::uint32_t n = alg.options().budget.value();
     for (std::uint32_t k = 1; k <= n; ++k) {
@@ -748,10 +761,10 @@ constexpr auto iterate(const A& alg, const P& p, const Obs& observe = {}) {
         if (const FEst e = alg.best(*next); detail::better(e, best)) best = e;   // best iterate on EVERY exit
         std::invoke(observe, alg.view(*next));                                     // logging lives here
         if (auto how = alg.intrinsic(*next))
-            return alg.finish(p, R{solution<SEst>{alg.estimate(*next), {k, next->nfev}, A::id, *how}});
+            return detail::succeed<R>(alg, p, solution<SEst>{alg.estimate(*next), {k, next->nfev}, A::id, *how});
         switch (stop(alg.view(s), alg.view(*next), counters{k, next->nfev})) {
             case verdict::converged:
-                return alg.finish(p, R{solution<SEst>{alg.estimate(*next), {k, next->nfev}, A::id, stop_reason::criterion}});
+                return detail::succeed<R>(alg, p, solution<SEst>{alg.estimate(*next), {k, next->nfev}, A::id, stop_reason::criterion});
             case verdict::stalled:   return R{std::unexpect, Fail{errc::stalled, A::id, {k, next->nfev}, best, {}}};
             case verdict::exhausted: return R{std::unexpect, Fail{errc::evaluations_exhausted, A::id, {k, next->nfev}, best, {}}};
             case verdict::proceed:   break;
@@ -767,6 +780,8 @@ constexpr auto advance(const A& alg, const P& p, const S& s, counters so_far, co
 }
 ```
 
+**Implemented in the spike** (`core/iterate.hpp`), with one change of shape: a success goes through `detail::succeed<R>(alg, p, solution)`, which runs the solver's `finish(p, solution) -> std::optional<failure>` and builds the result once, in place. The sketched `finish(p, r) -> r`, which passes the `std::expected` through a by-value hook, made GCC 16 report a false `-Wmaybe-uninitialized` in every `-Werror` build of a chain.
+
 This one loop replaces `fsolve_impl`, `fdfsolve_impl`, `search_impl`, `integrate` and `multisolve_impl`. The prototype runs `expand` through it **[prototyped]**. It removes, in one place:
 - the off-by-one `maxiter`;
 - max-iterations reported as success;
@@ -774,7 +789,7 @@ This one loop replaces `fsolve_impl`, `fdfsolve_impl`, `search_impl`, `integrate
 - printing to `std::cout`.
 
 `detail::better` is per family:
-- roots: **if both estimates carry enclosures, the narrower (nested, hence newer) wins; otherwise the smaller |fx| wins**. Without that rule, a bisection failure could carry an older, wider enclosure;
+- roots: **an estimate with a sign-changing enclosure beats one without; between two enclosures the narrower (nested, hence newer) wins; ties, and two estimates without enclosures, go by the smaller |fx|** — a strict weak order. Without the enclosure rule, a bisection failure could carry an older, wider enclosure. The earlier wording ("if both carry enclosures, the narrower wins; otherwise the smaller |fx|") is not transitive: the spike found three failures where each beat the next, so a static `first_of` (which merges right to left) and the run-time chain (left to right) returned different best estimates, and regrouping a static chain changed its answer. With a strict weak order, every fold order selects the same estimate;
 - optimisation: fx under the optimisation sense;
 - systems: the weighted merit.
 
@@ -796,27 +811,28 @@ struct criterion_base {   // hidden friends, bool-variable-template constraints 
 
 | Criterion | Applies to | Test | Notes |
 |---|---|---|---|
-| `x_tol{abs[, rel]}` | point, system | \|x_k − x_{k−1}\| ≤ abs + rel·\|x_k\|. For systems it is componentwise: max_i \|dx_i\| / (abs_i + rel·\|x_i\|) ≤ 1, measured on the **full** Newton step | **Ill-formed on enclosure views**: "x_tol compares successive iterates; bracketing methods converge on the enclosure: use width_tol{abs[, rel]} or floored_width{}" |
-| `step_tol<Num, Den>{}` | point, system | \|dx\| ≤ 2^(−⌈p·Num/Den⌉)·max(\|x\|, typical), p = digits of `T`; returns the post-step iterate | Open-method default: Newton/Halley `step_tol<3,5>` (quadratic convergence puts the post-step error at O(ε)), secant `step_tol<7,10>` |
-| `width_tol{abs[, rel]}` | enclosure | hi − lo ≤ abs + rel·min(\|lo\|, \|hi\|): every point of the enclosure, including the returned x, is within tolerance | abs may be 0 when rel > 0 |
-| `floored_width{bits = digits, scale = 1}` | enclosure | w ≤ max(2^(1−bits), 4ε)·max(scale, min(\|a\|, \|b\|)) | The default tolerance of bracketing methods. The absolute floor at `scale = 1` makes roots at 0 terminate; set `scale` for small-magnitude roots |
+| `x_tol{abs[, rel]}` | point, system | \|x_k − x_{k−1}\| ≤ abs + rel·\|x_k\|, with the threshold saturated at the largest finite value as for `width_tol`. For systems it is componentwise: max_i \|dx_i\| / (abs_i + rel·\|x_i\|) ≤ 1, measured on the **full** Newton step | **Ill-formed on enclosure views**: "x_tol and step_tol compare successive iterates; bracketing methods converge on the enclosure: use width_tol{abs[, rel]} or floored_width{}" |
+| `step_tol<Num, Den>{}` | point, system | \|dx\| ≤ 2^(−⌈p·Num/Den⌉)·max(\|x\|, typical), p = digits of `T`; returns the post-step iterate | Open-method default: Newton/Halley `step_tol<3,5>` (quadratic convergence puts the post-step error at O(ε)), secant `step_tol<7,10>`. The spike uses typical = 1; the `typical` hook arrives with the options in phase 3 |
+| `width_tol{abs[, rel]}` | enclosure | hi − lo ≤ abs + rel·min(\|lo\|, \|hi\|): every point of the enclosure, including the returned x, is within tolerance. The threshold saturates at the largest finite value of the problem's type, so an overflowing sum never accepts an infinite width | abs may be 0 when rel > 0 |
+| `floored_width{bits = digits, scale = 1}` | enclosure | w ≤ max(2^(1−bits), 4ε)·max(scale, min(\|a\|, \|b\|)) | The default tolerance of bracketing methods. The absolute floor at `scale = 1` makes roots at 0 terminate; set `scale` for small-magnitude roots. The spike implements `bits` with scale = 1; `scale` is phase 3 |
 | `f_tol{abs}` | all | \|f(best)\| ≤ abs; systems: the weighted norm with `hooks.weights` | opt-in; **ill-formed on minimisers** (an f test is meaningless for a minimum) |
 | `max_evaluations{evaluation_budget}` | all | counter-aware → `exhausted` | budgets for expensive f (simulations, inner iterative solvers) |
-| `min_iterations{n}` | all | counter-aware | ships with integrate (phase 7): false convergence on sin²(8πx) |
+| `min_iterations{n}` | all | counter-aware | ships with integrate (phase 7): false convergence on sin²(8πx). **A guard** **[spike]**: it delays convergence but never establishes it, so a solver accepts it only under `&&` with a convergence test (`stop_criterion_for_v`). Alone, or under `\|\|`, it would report success after n iterations without testing accuracy; the constructors and `with_stop` delete that with a reason |
 | `never{}` | all | never stops | leaves the decision to `intrinsic` and the budget |
 | `custom{λ}` | declared | `(prev, next[, counters]) → verdict` | user-defined tests, e.g. per-component tests on a system |
 
-- **Implementation.** Views expose `x()`, `fx()`, `residual()` and `scale()`. Point and system views add `distance(prev)`; enclosure views add `enclosure()` but **not** `distance()`. The prototype put a `static_assert` inside the criterion (`width_tol` on an open method fails with its reason on all compilers **[prototyped]**). The design adds the solver-level check at construction (`criterion_for<C, S::view>`) so the error points at the user's line **[sketch]**.
+- **Implementation.** Views expose `x()`, `fx()`, `residual()` and `scale()`. Point and system views add `distance(prev)`; enclosure views add `enclosure()` but **not** `distance()`. The prototype put a `static_assert` inside the criterion (`width_tol` on an open method fails with its reason on all compilers **[prototyped]**). The design adds the solver-level check at construction (`criterion_for_v<C, S::views>`) so the error points at the user's line **[implemented in the spike: a constrained constructor and `with_stop`, each with a reasoned deleted sibling]**.
 - **Windowed tests are not criteria.** A criterion is a pure function of (previous view, next view, counters), so it cannot see a window; a windowed `no_progress{factor}` criterion is unimplementable. Cycle and divergence detection live in open-method states (§7.2).
 - **Internal-test solvers.** Brent, golden and Brent-min (and TOMS748 and ITP, phase 8) take a width criterion *as their tolerance*: `brent{nxx::width_tol{abs, rel}}`, default `floored_width{}`.
-  - Brent's `tol1 = 2ε|b| + threshold/2`, where `threshold = abs + rel·|b|`. The intrinsic test then guarantees width ≤ threshold + 4ε|x|.
-  - The result reports `stop_reason::criterion`.
+  - Brent's `tol1 = max(threshold/2, 2ε|b|)`, where `threshold` is the tolerance's enclosure form on the current enclosure [min(b, c), max(b, c)] (`width_tol`: abs + rel·min(|b|, |c|)). The intrinsic test stops when |c − b|/2 ≤ tol1 **[implemented in the spike]**.
+  - It reports `stop_reason::criterion` only when |c − b| ≤ threshold. That is the width criterion's own guarantee (§9.3), so Brent is sound without a weaker Brent-specific bound. When the tolerance is below Brent's floor (threshold < 4ε|b|), Brent stops at the floor, with width ≤ 4ε|b|: it reports `stop_reason::criterion` if that width still meets the threshold, and `stop_reason::resolution_limit` otherwise.
+  - The earlier form had two defects, and the spike's soundness test caught both. The form was `tol1 = 2ε|b| + threshold/2` with `threshold = abs + rel·|b|`. It reported `criterion` for widths up to threshold + 4ε|b|, and it measured the relative part at b instead of at the enclosure's smaller end.
   - Their external `Stop` defaults to `never{}`, so there are not two sources of truth. Extra external criteria are allowed only when combined explicitly.
 - **Per-module defaults (all expressions in `T`):**
 
   | Module | Default criterion | Budget |
   |---|---|---|
-  | roots, bracketing | `floored_width{}`, as internal tolerance or external stop | 100 |
+  | roots, bracketing | `floored_width{}`, as internal tolerance or external stop | bisection 200 (enough for `cpp_bin_float_50`: 168 bits need about 165 halvings from a unit bracket), brent 100 |
   | roots, open | `step_tol` + progress window (§7.2) | Newton/Halley 30, secant 50 |
   | optimize | Brent's intrinsic test, `tol1 = rel·\|x\| + abs/3`, `rel = root_eps<T>(1, 2)`, `abs = rel·typical` | 200 |
   | integrate | QUADPACK acceptance with `rel = root_eps<T>(1, 2)` and a roundoff floor (§7.6) | per rule |
@@ -954,10 +970,11 @@ public:
 
 namespace nxx {
 
-// A curried solver for callables of type F: a copyable value s with s(f) -> R for const F& f.
+// A curried solver for callables of type F: a copyable value s with s(f) -> R for const F& f. The call is checked
+// before copyability [spike; see Exact types below].
 template<class S, class F, class R>
-concept curried_solver_for = std::copy_constructible<S> && std::invocable<const S&, const F&> &&
-                             std::same_as<std::invoke_result_t<const S&, const F&>, R>;
+concept curried_solver_for = std::invocable<const S&, const F&> &&
+                             std::same_as<std::invoke_result_t<const S&, const F&>, R> && std::copy_constructible<S>;
 
 // any_solver<F, Est, UE>: "const F& -> result<Est, UE>" for ONE fixed callable type F
 // (e.g. std::function<double(double)>). Built on std::function (std::move_only_function is missing on
@@ -1078,7 +1095,7 @@ auto mixed  = nxx::first_of(r::newton{}.with_derivative(df).on(0.0), *chain);   
   - *Copyable solvers only.* A solver with a move-only capture cannot be wrapped; `std::move_only_function` and `std::copyable_function` are missing on libc++ 22 / Emscripten.
   - *Small buffers differ*: 16 B and trivially copyable targets only (libstdc++), three pointers (libc++), 56 B (MSVC). Convert f to `F` once, outside the call.
   - *Indirection.* Each evaluation of f goes through the caller's `std::function`, and each alternative adds one indirect call; nothing inlines across the boundary. `operator()` cannot be `noexcept`, because f may throw. All three standard libraries compile `std::function` under `-fno-exceptions`.
-  - *Exact types.* `F`, `Est` and `UE` must match exactly; a mismatch hits the reasoned deleted constructor (Clang prints the reason; GCC shows the deleted function and the source line holding the reason). A `static_assert` in the constructor body would instead make `std::is_constructible_v` true (§5.3).
+  - *Exact types.* `F`, `Est` and `UE` must match exactly. A solver that is callable with F but returns another result type hits the reasoned deleted constructor (Clang prints the reason; GCC shows the deleted function and the source line holding the reason); anything else is simply not convertible, so `any_solver` is not a viable conversion target for every type, and overload sets that mention it stay unambiguous **[spike]**. The concept checks the call before copyability: copying a chain that holds an `any_solver` asks whether its copyable box converts to an `any_solver`, and checking copyability first makes that question depend on itself, which Clang rejects **[spike]**. A `static_assert` in the constructor body would instead make `std::is_constructible_v` true (§5.3).
   - *Overload shape.* To beat the one-argument `first_of(S)`, the range overload takes one by-value parameter with a plain `class` template head and a requires-clause; `template<std::ranges::input_range R>` or `R&&` made calls ambiguous. All 5 compilers resolve the compiled form.
   - *Ownership.* `first_of` copies the range into a vector (a curried chain must not borrow a `span`); an rvalue vector is moved in.
   - **FLAG (illegal states).** An empty run-time chain is representable and fails in-band with `invalid_input` when called, because run-time configuration can be empty. The alternatives, `first_of` returning `expected<any_solver, errc>` or taking a non-empty range type, were not chosen; `make_chain` above already rejects bad configuration before a chain exists.
@@ -1094,7 +1111,7 @@ auto mixed  = nxx::first_of(r::newton{}.with_derivative(df).on(0.0), *chain);   
 
 ### 6.11 The headline example, end to end
 
-The spellings below are the design's. The prototype compiled and ran the same example with older spellings on all 9 configurations **[prototyped]**: `r::secant{nxx::default_step{}, 5}` and `r::bisection{nxx::x_tol{1e-4}}`. The builder and criterion spellings are **[sketch]**.
+The spellings below are the design's. The prototype compiled and ran the same example with older spellings on all 9 configurations **[prototyped]**: `r::secant{nxx::default_step{}, 5}` and `r::bisection{nxx::x_tol{1e-4}}`. The spike compiles and runs this block as written (checked with GCC 16), and its tests cover each part on all 12 presets **[spike]**.
 
 ```cpp
 #include <numerixx/roots.hpp>
@@ -1110,18 +1127,18 @@ constexpr auto chain = nxx::first_of(
     r::secant{}.with_budget(5).on(0.0),              // fails within its 5-iteration budget
     r::bisection{}.on(nxx::bracket{0.0, 2.0}));      // succeeds (literal bracket, validated at compile time)
 static_assert(chain(f).has_value() && chain(f)->by == r::algos::bisection);   // the whole chain runs at compile time
-auto res = chain(f);   // x = 1.4142135623730949; used = {57 iterations, 61 evaluations} incl. failed attempts [prototyped, older defaults]
+auto res = chain(f);   // x = 1.4142135623730949; used = {57 iterations, 62 evaluations} incl. failed attempts [spike; the prototype counted 61: the derivative call in Newton's failing step is now counted]
 
 // Numeric-derivative Newton inside a curried chain (f unknown when the chain is built).
 constexpr auto chain_fd = nxx::first_of(r::newton{}.with_derivative(nxx::deriv::numeric{}).on(1.0),
-                                        r::brent{}.on(nxx::bracket{0.0, 2.0}));   // [prototyped: newton wins, 6 it, 13 evals]
+                                        r::brent{}.on(nxx::bracket{0.0, 2.0}));   // [spike: newton wins, 5 it, 16 evals incl. the stencil's 2 per derivative; the prototype reported 6 it, 13 evals]
 
 // Sequential refinement: grow a window until f changes sign, coarse enclosure, Newton polish.
 constexpr auto pipeline = nxx::then(r::expand{}.on(nxx::bracket{2.0, 2.5}),
                                     r::bisection{nxx::width_tol{1e-4}},        // width, NOT x_tol (x_tol would falsely converge)
                                     r::newton{}.with_derivative(df));          // rtsafe{}.from_enclosure() stays inside it
 
-// Run-time inputs are first-class.                                                                   [sketch]
+// Run-time inputs are first-class.                                                                   [spike]
 auto r1 = r::brent{}(f, {lo, hi});                                         // braced, validated in-band
 auto r2 = r::brent{nxx::width_tol{1e-12}}.with_budget(60).on(nxx::bracket<double>::make(lo, hi))(f);
 
@@ -1228,6 +1245,8 @@ template<class P> struct relative { tolerance<P> factor; std::optional<tolerance
 template<class P> struct noise    { rel_tolerance<P> eps_f; std::optional<tolerance<P>> typical; }; // factor = eps_f^(1/(O+A)) via frexp/ldexp
 template<class P> struct absolute { tolerance<P> h; };
 // (CTAD guides: relative{1e-5, 1.0} -> relative<double>, noise{1e-10} -> noise<double>)
+// [spike] relative stores the typical value and a flag, and typical() returns the std::optional: MSVC 19.51 rejects a
+// consteval constructor that initialises a std::optional member. noise follows the same shape when it lands.
 
 template<class F, real T, int O = 1, int A = 2, std::size_t N = 2, class H = optimal>
 constexpr auto diff(const F& fn, T x, const stencil<O, A, N>& s = central_1_2, H h = {})
@@ -1262,13 +1281,17 @@ template<class S = decltype(central_1_2), class H = optimal> struct numeric {   
 | Drop | Template-template `diff<ALGO>`; `IsDiffSolver`; the `requires(!poly::IsPolynomial)` back-edge; gcem. |
 | Must not port | the discarded argument in `derivativeOf`; non-const `operator()`; the sign-blind step; dev-reorg's √ε step for every order (the sin′(1) error rises from 2e-12 to 1.2e-9); absolute √ε in `mdiff` (errors of 0.57); examples that dereference a result without checking it. |
 | Genericity | real T (`float`, `double`, `long double`, multiprecision); steps in `T`; no `pow` at run time (factors are exact powers of two). Measured: sin′(1) error −1.86e-13 with `central_1_2`, −5.34e-14 with `central_1_4` **[prototyped]**. |
+**Sample points.** `diff` computes every point x + k·h that carries a non-zero weight before it calls f, and returns `invalid_input` with 0 evaluations if one is not finite: a finite h does not keep x + 2h finite near the largest value, nor x − h at −max (found in the review of PR #3; until then f was called at ±inf and the result returned as a success).
 
 ### 7.2 roots (1-D)
 
 **Common rules for bracketing solvers:**
 - The midpoint is overflow-safe (`math::midpoint`). The naive `lo + (hi−lo)/2` reported a false `resolution_limit` success at x = −1.7e308 on [−1.7e308, 1.7e308] (measured).
 - Endpoint samples may be ±inf (`evaluate_sample`), and the solver bisects while an endpoint value is infinite, so log(x) on [0, 2] works; a design that rejects infinite samples fails there with `non_finite_value`.
-- **Pole check in `finish()`.** After a criterion or `resolution_limit` stop, if min(|f(a)|, |f(b)|) > max(|f(lo₀)|, |f(hi₀)|) (the residual grew while the bracket shrank), the solve fails with `errc::sign_change_not_root`, carrying the final enclosure as best. Without it, tan on [1, 2] is reported as a root with |f| = 6e15 (measured).
+- **Pole check in `finish()`.** After a criterion or `resolution_limit` stop, if min(|f(a)|, |f(b)|) > max(|f(lo₀)|, |f(hi₀)|) (the residual grew while the bracket shrank), the solve fails with `errc::sign_change_not_root`, carrying the final enclosure as best. Without it, tan on [1, 2] is reported as a root with |f| = 1.2e15 (measured on the spike's bisection and brent, which both stop at x = 1.5707963267948974; the prototype measured 6e15).
+  - **Implemented in the spike** (`detail::pole_check`, shared by bisection and brent), with two refinements found by the review. First, a non-finite fx at the returned point is always a pole. Second, the reference max(|f(lo₀)|, |f(hi₀)|) is taken over the *finite* initial samples. An infinite end sample (1/x on [−1, 0]) would otherwise make the reference infinite and switch the check off, and 1/x on [−1, 0] was reported as a root with |f| = 1.1e15.
+  - When both initial samples are infinite, only the finiteness test applies (1/x³ on [−1e-200, 1e-200] is caught by it; tested).
+  - **Known limit:** the reference is the *larger* initial sample, so a large but finite one hides a pole near the other end. bisection on 1/x over [−1e-20, 1] (reference 1e20) returns a success at |f| = 1.1e15 (measured). Comparing with the smaller sample, or side by side, would reject legitimate roots when the bracket starts next to a near-root and the tolerance is loose. It is a heuristic by design (§11); callers who need a residual guarantee add `&& f_tol{…}`, as for jump discontinuities.
 - Jump discontinuities (for example a step from −1 to +1) still return the sign-change location with its fx. Callers who need a residual guarantee add `&& f_tol{…}`.
 
 | Solver | Input | Phase | Status | Notes |
@@ -1278,9 +1301,9 @@ template<class S = decltype(central_1_2), class H = optimal> struct numeric {   
 | `ridders` | bracket-like | 3 | Keep/Fix | guard the `sqrt`, falling back to bisection; 2 evaluations per step |
 | `brent` | bracket-like | 3 | Add, provisional **default** | zeroin; tolerance = a width criterion (default `floored_width{}`); 7 iterations and 9 evaluations on x²−2 over [1, 2]; constexpr **[prototyped]** |
 | `rtsafe` | sign_bracket + derivative | 3 | Add | a Newton step is accepted only if it stays inside the enclosure and makes progress; otherwise bisect. Used by `solve(f, df, x0)` |
-| `secant` | guess | 3 | **Fix: derivative-free** | second point x0 + 2⁻¹⁰·max(\|x0\|, typical), or a caller-supplied `x1`; a flat secant → `stalled` **[prototyped]**; `step_tol<7,10>`; budget 50 |
+| `secant` | guess | 3 | **Fix: derivative-free** | second point x0 + 2⁻¹⁰·max(\|x0\|, typical), or x0 − h where x0 + h overflows or a projection pins it to x0 or sends it off the reals **[spike]**; a caller-supplied `x1` is phase 3; a flat secant → `stalled` **[prototyped]**; `step_tol<7,10>`; budget 50 |
 | `newton` | guess + derivative source | 3 | Keep/Fix | zero or non-finite derivative → error; `step_tol<3,5>`; budget 30; optional projection **[prototyped]** |
-| `expand` / `scan` / `subdivide` | window or guess (+ limits) | 3 | Merge the six searchers | success `solution<sign_bracket<T>>` **is** the input of every bracketing solver (R-A6) **[prototyped: `expand` through the driver]**. **No configurable stop criterion** (intrinsic stop + budget only), because `estimate()` on a non-bracketing state would build an invalid `sign_bracket`. Rules for `expand`: **geometric growth** (lo/g, hi·g, g = 1.6) when lo > 0, mirrored when hi < 0, additive otherwise; **expand only the end with smaller \|f\|** (1 evaluation per step); a NaN at a trial point marks a domain limit on that side, so it backtracks halfway to the last finite point and stops expanding that side (a symmetric additive search walked sqrt(x)−10 into x < 0, measured); it returns the **tightest** sign-changing pair among cached samples. |
+| `expand` / `scan` / `subdivide` | window or guess (+ limits) | 3 | Merge the six searchers | success `solution<sign_bracket<T>>` **is** the input of every bracketing solver (R-A6) **[prototyped: `expand` through the driver]**. **No configurable stop criterion** (intrinsic stop + budget only), because `estimate()` on a non-bracketing state would build an invalid `sign_bracket`: `with_stop` is deleted, and the public `rebuild(options)` accepts only `never{}` **[spike]**. Rules for `expand`: **geometric growth** (lo/g, hi·g, g = 1.6) when lo > 0, mirrored when hi < 0, additive otherwise; **expand only the end with smaller \|f\|** (1 evaluation per step); a NaN at a trial point marks a domain limit on that side, so it backtracks halfway to the last finite point and stops expanding that side (a symmetric additive search walked sqrt(x)−10 into x < 0, measured); it returns the **tightest** sign-changing pair among cached samples. **Spike:** endpoints saturate at ±max (the width is computed as 2·(hi/2 − lo/2)), because an infinite endpoint gave a `sign_bracket` that bisection called unsplittable, a false `resolution_limit` success at \|f\| = 4.5e307. When both ends are at ±max, `expand` fails with `stalled`. **Known limit, for phase 3:** geometric growth moves the end nearer 0 toward 0 without ever crossing it, so x + 1 from [1, 2] exhausts its budget. Phase 3 switches that end to additive growth once it is within one window width of 0, together with the NaN backtrack, which is needed exactly where crossing 0 leaves a domain (log, sqrt). The NaN backtrack, a guess as start, `scan` and `subdivide` are phase 3. |
 | `toms748` | bracket-like | 8 (optional) | Add | attributed port of Boost.Math `toms748_solve` (BSL-1.0 notice kept); tolerance `floored_width`. A strong general method, usually fewer evaluations than Brent on smooth f; checked against Boost.Math as an oracle |
 | `itp` | bracket-like | 8 (optional) | Add | `itp_params{kappa1 = relative{0.2} /* kappa1 = 0.2/(b0-a0) at init */ or absolute{k}, kappa2 = 2 /* 1 <= kappa2 < 1+phi */, n0 = 1}`. ε_ITP = half the tolerance's threshold at (a₀, b₀), frozen at init; the ⌈log₂(w₀/2ε)⌉ + n₀ worst-case bound is relative to it; ⌈log₂⌉ via `frexp` (exact). Best worst-case bound among the bracketing methods |
 | `halley` | guess + f′, f″ (+ optional sign_bracket) | 8 (optional) | Add | accepts one callable returning `{f, f′, f″}`; with a bracket it falls back to bisection when a step leaves it (as rtsafe does) |
@@ -1291,8 +1314,9 @@ template<class S = decltype(central_1_2), class H = optimal> struct numeric {   
   - `stalled` when the best |f| has not improved for `window` steps **and** the step length has not shrunk. This catches cycling, such as Newton on x³−2x+2 from 0, which alternates 0 ↔ 1.
   - `diverged` when |x| and |dx| have both grown monotonically over the window.
   - The step-shrink guard prevents false stalls on Newton's long approach from a poor start: x²−2 from 1e-3 overshoots to about 1000, then needs about 10 steps of halving.
-- **Before each evaluation**: a non-finite proposed x → `diverged`; |dx| is **capped** at `max_step` (default 2^10·max(|x|, typical)). A binding cap feeds the window's divergence rule; it is not an immediate failure.
-- `root_estimate::uncertainty` = |x_k − x_{k−1}|. `exact_zero` means "f evaluated to 0", not "full accuracy". Newton on the expanded (x−1)³ stops `exact_zero` at an error of 4.7e-6, the ε^(1/3) conditioning limit (measured).
+- **Before each evaluation**: a non-finite proposed or projected x → `diverged` (a projected start that is not finite → `non_finite_input`), and f is never evaluated there; the step the criteria see is max(\|proposed − x\|, \|projected − x\|), so neither a pinned nor a far-projected iterate looks converged; secant's second point falls back to x₀ − h when x₀ + h overflows or is projected onto x₀ or off the reals, and if neither neighbour is usable it fails with `diverged` when the projection sent one off the reals and `stalled` when it only pinned them; |dx| is **capped** at `max_step` (default 2^10·max(|x|, typical)). A binding cap feeds the window's divergence rule; it is not an immediate failure.
+- A `root_estimate` is built from x and f(x) at least **[spike]**. Its constructor has no default for fx, because an open method starts from an estimate's fx without evaluating f again. Before the spike's review, `root_estimate<double>{1.0}` gave an `exact_zero` success at x = 1 without a single evaluation.
+- `root_estimate::uncertainty` = |x_k − x_{k−1}|, or inf for an estimate with neither an enclosure nor a step: the best endpoint of a no-sign-change or search failure, or an open method that stops at its start on an exact zero (secant and Newton agree) **[spike]**. `exact_zero` means "f evaluated to 0", not "full accuracy". Newton on the expanded (x−1)³ stops `exact_zero` at an error of 4.7e-6, the ε^(1/3) conditioning limit (measured).
 
 Other roots items:
 - **Default choice (D29):** the phase-3 corpus records mean and worst-case evaluation counts for bisection, illinois, ridders and brent, and fixes the bracketing default. Phase 8 re-runs it with toms748 and itp; the default changes only with a documented behaviour note. TOMS748 usually needs fewer evaluations on smooth f; ITP has the best worst-case bound.
@@ -1371,7 +1395,7 @@ template<class T> auto roots(const nonzero<T>&, aberth<real_t<T>> = {})
 ```
 
 - **Aberth–Ehrlich, specified:**
-  - starting points on a circle (or on Newton-polygon radii, as in MPSolve) with an angular offset;
+  - starting points on a circle, or on circles in the annuli found from the Newton polygon of the moduli of the coefficients (Bini, Numerical Algorithms 13, 1996, pp. 179–200), with an angular offset. MPSolve implements this but is GPL-licensed, so only the paper is used (§1.1);
   - per-root stop when |p(z)| ≤ γ₂ₙ·Σ|aᵢ||z|ⁱ (Horner's running error bound), freezing converged roots;
   - for real coefficients, Im z := 0 when |Im z| is within that bound; real roots are polished in real arithmetic; conjugates are paired;
   - documented accuracy ε^(1/m) for m-fold roots.
@@ -1547,7 +1571,7 @@ namespace detail {   // tridiagonal.hpp: in-house O(n) solvers; interpolate depe
 
 | Pri | ID | Change | Signature / location | When |
 |---|---|---|---|---|
-| **P0** | FXT-1 | `throw 0;` → `std::unreachable();` in the `expected_like`/`optional_like` probes; `#if __cpp_exceptions` guards for Attempt, Failure, Lazy, Format and the enums | `concepts/IsExpected.hpp:87-88`, `concepts/IsOptional.hpp:76-77` | before phase 1. P0 because it is a 2+2-line diff; it gates only the `-fno-exceptions` legs that use pipes. **Verified necessary and sufficient** for transform, and_then, value_or, match and tap under `-fno-exceptions` on GCC, Clang, em++ and clang-cl `/EHs-c-` **[prototyped]**; the patch is `docs/redesign/prototype/fxt-1.patch` |
+| **P0** | FXT-1 | `throw 0;` → `std::unreachable();` in the `expected_like`/`optional_like` probes; `#if __cpp_exceptions` guards for Attempt, Failure, Lazy, Format and the enums | `concepts/IsExpected.hpp:87-88`, `concepts/IsOptional.hpp:76-77` | before phase 1. P0 because it is a 2+2-line diff; it gates only the `-fno-exceptions` legs that use pipes. **Verified necessary and sufficient** for transform, and_then, value_or, match and tap under `-fno-exceptions` on GCC, Clang, em++ and clang-cl `/EHs-c-` **[prototyped]**; the patch is `docs/redesign/prototype/fxt-1.patch`. **Status:** the probe fix is troldal/FXT#1, pinned by Numerixx since the spike; the `__cpp_exceptions` guards are still to do (`numerixx::pipes` includes none of those headers) |
 | **P1** | FXT-2 | CMake hygiene: `if(NOT COMMAND CPMAddPackage)` or a hash-pinned CPM; TL repos only when their options are ON; `target_compile_features(fxt INTERFACE cxx_std_23)`; `install(EXPORT)` + `fxtConfig.cmake`; semver tags | `CMakeLists.txt` | phases 0–1 (not blocking) |
 | **P2** | FXT-3 | `std::expected<void, E>` in `expected_like` (or document `fxt::unit`) | `IsExpected.hpp` | phase 1 |
 | **P3** | FXT-4 | Generic lazy alternatives as **named, assignable class templates** | `template<class Policy, class... Fs> constexpr auto first_of_with(Policy p, Fs... fs); template<class... Fs> constexpr auto first_of(Fs... fs);` | after phase 3 by default; during phase 3 if you choose (open decision 12) |
@@ -1580,7 +1604,7 @@ Once FXT-4..7 exist, Numerixx's `first_of_t` can delegate to `fxt::first_of_with
 |---|---|
 | Unit and property | doctest `TEST_CASE`/`TEST_CASE_TEMPLATE`/`SUBCASE` inside `TEST_SUITE`s; one executable per module, linking only that module; `doctest_discover_tests`, one CTest test per test case, labelled with its module. Without exceptions a failed `REQUIRE` reports but does not end the test case, so no test relies on `REQUIRE` to guard a dereference: results are compared whole (`CHECK(r == 3)` on an `expected`). doctest has no generators, so property tests loop over samples drawn from a `std::mt19937` with a fixed seed |
 | Compile-time contracts | `static_assert` on concepts and traits; constexpr solves where portable (1-D); **regularity** (`std::copyable` for every solver, chain, `_fn` and `any_solver`; `semiregular` when parts are default-constructible); **defaults achievable for every T** (§3.5). Result sizes are printed, not asserted |
-| Compile-fail | `WILL_FAIL` builds, each with a `NUMERIXX_CF_CONTROL` twin that must compile; `RESOURCE_LOCK`. **On GCC and Clang, `PASS_REGULAR_EXPRESSION` checks that the reason string appears in the first error**; MSVC checks only that the build fails. Line counts are recorded, not gated: GCC 16's nested explanations alone make 77 lines for the `then` contract **[prototyped]**. Cases: bisection given a guess; int guess; `first_of` without `.on`; open method → bracket solver in `then`; run-time `bracket{}` literal; wrong-length fixed-size guess; `x_tol` on a bracketing solver; `f_tol` on a minimiser; Newton without a derivative; mixed callback error types; an `any_solver` from a solver with a different result type. Plus the documented MSVC-only `WILL_FAIL` for the P2564 escalation probe. |
+| Compile-fail | Each case is a CTest test that runs `cmake/RunCompileFail.cmake`, with a `NUMERIXX_CF_CONTROL` twin that must compile; `RESOURCE_LOCK`. The build must fail with a compiler error (a build that succeeds, or fails without one, fails the test). **On GCC and Clang (clang-cl too) the script extracts the first error (the error line and its notes, including GCC's nested error after "in 'constexpr' expansion of") and checks that the reason matches it**; for deletion reasons only on GCC 15+ and Clang 19+. On cl the case only has to fail with a compiler error. Line counts are recorded, not gated: GCC 16's nested explanations alone made 77 lines for the prototype's `then` contract **[prototyped]**. Cases: bisection given a guess; int guess; `first_of` without `.on`; open method → bracket solver in `then`; run-time `bracket{}` literal; wrong-length fixed-size guess; `x_tol` on a bracketing solver; `f_tol` on a minimiser; Newton without a derivative; mixed callback error types; an `any_solver` from a solver with a different result type. Plus the documented MSVC-only failure of the P2564 escalation probe. **[spike]** A deletion reason (`NXX_DELETE`) must appear in the compiler's own message: quoted source lines ("  123 \| code" and caret lines) are left out of the match, because a "declared here" note echoes the `NXX_DELETE("…")` line and would match even if the compiler printed no reason. The self-test `harness_quoted_reason`, which the harness must reject (`PASS_REGULAR_EXPRESSION` on its rejection), guards that rule. A rejected consteval literal is different: GCC reports the call to the non-constexpr `literal_violates_invariant("…")` and quotes the source line that makes it, which holds the reason, so there the quote counts. The P2564 probe must fail on cl with C7595 as its first error, so an unrelated build failure cannot pass for the documented gap. |
 | Structural | header self-containment (every header compiled twice); layering against the DAG allow-list (Eigen only under linalg/multiroots); **consumer TU with `/W4 /WX` (MSVC) and `-Wall -Wextra -Werror` defining a global `f`** |
 | Usage | `tests/usage/canonical_calls.cpp` (§6.14) on every toolchain |
 | Determinism | bit-identical results on repeated runs and repeated calls; no statics or `mutable` members (review and clang-tidy) |
@@ -1623,14 +1647,14 @@ Once FXT-4..7 exist, Numerixx's `first_of_t` can delegate to `fxt::first_of_with
   - references carry ≥ 21 significant digits (≥ 40 for multiprecision), generated once at high precision, by `tools/gen_reference.cpp` (with a multiprecision type) or offline with mpmath, and committed together with the command that generated them;
   - tolerances go through `tol<T>(k, ref_eps) = k·max(ε_T, ref_eps)·(1 + |x|)`;
   - Numerixx output is never its own reference.
-- **Oracles** (§9.1): Boost.Math for roots, minima and quadrature; Eigen for the linalg facade and, through `HybridNonLinearSolver`, for multiroots. GSL is not an oracle and its code is not used (§1.1); values published in its documentation may serve as reference facts.
+- **Oracles** (§9.1): Boost.Math for roots, minima and quadrature; Eigen for the linalg facade and, through `HybridNonLinearSolver`, for multiroots. GPL projects (such as GSL) are not oracles and their code is not used (§1.1); values published in their documentation may serve as reference facts.
 
 ### 9.3 Properties and acceptance scenarios
 
 - **Properties:**
   - **Criterion soundness**, run on every solver *standalone* (never behind a polishing stage): success with `stop_reason::criterion` implies the guarantee holds for the returned estimate. For width criteria, width ≤ abs + rel·min(|lo|, |hi|); for `f_tol`, |fx| ≤ tol; for `x_tol`, |x_k − x_{k−1}| ≤ tol. Regression: exp(x)−1.0001 on [0, 10] with a 1e-3 width tolerance.
   - A bracketing solver never reports convergence while its width exceeds the requested tolerance.
-  - `resolution_limit` implies `hi == nextafter(lo, +inf)` (for built-in floats).
+  - `resolution_limit` implies `hi == nextafter(lo, +inf)` (for built-in floats) for bisection. For Brent it means that the tolerance was below Brent's floor, and it implies width ≤ 4ε|x| (§6.8) **[both tested in the spike]**.
   - `first_of(s1, s2)(a) == s1(a)` when s1 succeeds, **and s2 is never invoked**; the same for `first_of` over an `any_solver` range.
   - A run-time `any_solver` chain returns exactly what the equivalent static chain returns, bit for bit, on success and on total failure **[prototyped]**.
   - `steps_view` yields the same iterates as the driver, up to the driver's stopping point.
@@ -1664,13 +1688,13 @@ Once FXT-4..7 exist, Numerixx's `first_of_t` can delegate to `fxt::first_of_with
 
 | Job | Runner | Legs |
 |---|---|---|
-| windows | `windows-2025-vs2026` (VS 18.9, MSVC 14.51, clang-cl) | `msvc`, `clang-cl` (`CPM_SOURCE_CACHE=C:\cpm`); `/W4 /WX` consumer TU; P2564 probe `WILL_FAIL` on `msvc` |
+| windows | `windows-2025-vs2026` (VS 18.9, MSVC 14.51, clang-cl) | `msvc`, `clang-cl` (`CPM_SOURCE_CACHE=C:\cpm`); `/W4 /WX` consumer TU; P2564 probe must fail on `msvc` with C7595 as its first error |
 | linux-clang | `ubuntu-26.04` | `clang` (libc++ 22), `clang-asan` |
-| linux-gcc | container `gcc:16` | `gcc`, `gcc-noexcept`, `gcc-noexcept-pipes` (the FXT-1 canary: the expected failure is a warning, any other error fails the job), `gcc-multiprecision` |
+| linux-gcc | container `gcc:16` | `gcc`, `gcc-noexcept` (including the FXT pipes), `gcc-multiprecision` |
 | emscripten | `ubuntu-26.04` + emsdk 6.0.10 | `emscripten` (wasm EH), `emscripten-jsexcept` (JS EH), `emscripten-noexcept`, `emscripten-pthread` (wasm EH with `-pthread`); node runs the tests |
 | consumers | `ubuntu-26.04` | a CPM parent with an older CPM and a parent `fxt::fxt`, and a FetchContent parent, each in both declaration orders (the parent declares FXT and Eigen first, or Numerixx first); a parent that declares its own `Boost` package; a scalar-only parent (`NUMERIXX_WITH_FXT=OFF`, `NUMERIXX_WITH_LINALG=OFF`, asserting that neither FXT nor Eigen is downloaded); install + `find_package` |
 | format | `ubuntu-26.04` | clang-format 22 dry run |
-| nightly | — | floor compilers (GCC 14, Clang 18 + libc++ 18), MinGW g++ (a common GCC distribution on Windows), Intel ICX (common in HPC), clang-cl `/EHs-c-` |
+| nightly | — | floor compilers (GCC 14, Clang 19 + libc++ 19), MinGW g++ (a common GCC distribution on Windows), Intel ICX (common in HPC; the only leg with a Clang-family front end on libstdc++: libstdc++ 14.3 from Ubuntu's toolchain PPA, selected with `--gcc-install-dir`, built with `-fp-model=precise`), clang-cl `/EHs-c-` |
 
 ---
 
@@ -1681,7 +1705,7 @@ Once FXT-4..7 exist, Numerixx's `first_of_t` can delegate to `fxt::first_of_with
 Use a fresh tree on this redesign branch, which descends from master. Port algorithm *bodies* by hand, mostly from dev-reorg. It contains all of master's library code plus optimize, interpolate, `mdiff`, the fixed `DerivativeFunctor`, the `1LL` shift fix and the lowercase layout. Where dev-reorg regressed, take master's version (polynomial trimming).
 - Cite provenance in each commit.
 - Keep the BSL-1.0 notice for Boost-derived Brent or TOMS748 text.
-- Never port or paraphrase GSL source (GPL-3.0-or-later, §1.1); implement new algorithms from the literature and cite it in each header.
+- Never port, paraphrase or copy GPL code (GPL, LGPL or AGPL, such as GSL or MPSolve; §1.1); implement new algorithms from the literature and cite it in each header.
 - Add each module's regression tests in the same PR as its port.
 - Start from the prototype (`docs/redesign/prototype/nxx/*.hpp`), which already implements the protocol, driver, criteria algebra, facade, bisection, Brent, secant, Newton, `expand`, `derivative_of`, `steps_view`, `any_solver` run-time chains, the Eigen `lu_solve` facade and damped N-D Newton. Its in-house LU is not carried over.
 
@@ -1705,16 +1729,32 @@ Already proven:
 
 Exit criteria:
 1. Hosted CI green on all legs with the skeleton: MSVC and clang-cl configured **through CMake**, clang-22 + libc++, `gcc:16`, emsdk 6.0.10.
-2. FXT-1 merged upstream and the pin bumped, or a patched fork commit pinned via `NUMERIXX_FXT_REF`/`CPM_FXT_SOURCE`, so `gcc-noexcept` turns green.
+2. FXT-1 merged upstream and the pin bumped, or a patched fork commit pinned via `NUMERIXX_FXT_REF`/`CPM_FXT_SOURCE`, so `gcc-noexcept` turns green. (Met by pinning the troldal/FXT#1 commit; the pin moves to FXT's main once that is merged.)
 3. `first_of`/`then` over solvers with different state types **and** fallible callbacks through `pipes.hpp` under clang-cl in CMake builds, including `.with_projection`/`.with_observer` values and the family facades.
 4. CPM deduplication with a CPM parent and a FetchContent parent, in both declaration orders (the parent declares FXT and Eigen first; Numerixx first).
 5. A compile-time measurement for the umbrella header (guard: 2 s on GCC), and one recorded for a linalg/multiroots TU.
-6. Your written decision on §12 items 1–8.
+6. Your written decision on §12 items 1–8 (done on 2026-09-28: every default accepted).
 7. **Criterion soundness:** the §9.3 property holds on every spike solver run standalone; `x_tol` on a bracketing solver does not compile, with its reason.
 8. **Canonical calls** 1, 2, 3, 9 and 10 (§6.14) compile and run on GCC, Clang + libc++, MSVC, clang-cl and em++ with **run-time** brackets, tolerances and budgets.
 9. **Diagnostics:** the compile-fail cases in §9.1 put the reason string in the first error on GCC and Clang; line counts are recorded.
 10. **Regularity:** combinator and function-returning results are copy-assignable (`static_assert`).
 11. **Composition:** `newton.with_derivative(derivative_of(g))` with a fallible g preserves `UE` and the derivative's cause; the numeric policy works in a curried chain.
+
+**Status (2026-09-28, branch `claude/numerixx-spike`).** Every criterion is met locally: the test-based criteria on the 11 presets that build the tests, and criterion 4 (the consumer-build scenarios) on `integration`, which builds only those. Hosted CI runs on the spike's pull request. The evidence is in Appendix D.
+
+| # | Status | Where |
+|---|---|---|
+| 1 | met in phase 0 (hosted CI green on every leg) | `.github/workflows/ci.yml` |
+| 2 | met: the troldal/FXT#1 commit is pinned; the pin moves to FXT's main once that PR is merged | `cmake/NumerixxDependencies.cmake` |
+| 3 | met: combinators over bisection, brent, secant and newton with fallible callbacks, `.with_projection`, `.with_observer` and every facade, through `pipes.hpp`, on the `clang-cl` CMake preset (and on every other preset that builds the tests, including `-fno-exceptions`) | `tests/pipes/test_pipes.cpp` |
+| 4 | met in phase 0 | `tests/integration/` |
+| 5 | met: umbrella header 0.58 s on GCC (guard 2 s); a linalg TU 4.6 s on GCC (Eigen LU solves called directly: `<numerixx/linalg.hpp>` is still the phase-0 skeleton), both recorded on all four desktop compilers (Appendix D) | `tests/structural/compile_time.cmake` |
+| 6 | met on 2026-09-28 | §12 |
+| 7 | met: the property holds for bisection and brent (width criteria, `f_tol`, near the resolution limit, the exp(x)−1.0001 regression) and for secant and newton (`x_tol`, `step_tol`, `f_tol`), each run standalone; `x_tol` on bisection and brent (in the constructor and in `with_stop`) and `step_tol` on bisection do not compile, with the reason | `tests/roots/test_soundness.cpp`; `tests/compile_fail/{bisection_x_tol,brent_x_tol,bisection_with_stop_x_tol,bisection_step_tol}.cpp` |
+| 8 | met: calls 1, 2, 3, 9 and 10 with run-time brackets, tolerances (`make()`) and budgets, on GCC, Clang + libc++, MSVC, clang-cl and em++ (4 EH/thread modes) | `tests/usage/canonical_calls.cpp` |
+| 9 | met for the spike's modules: 31 cases, the reason in the first error on GCC and Clang (for deletion reasons, in the compiler's own message, not in a quoted source line), plus two harness self-tests; line counts recorded (Appendix D). §9.1's wrong-length fixed-size guess (multiroots, phase 5) and `f_tol` on a minimiser (optimize, phase 4) arrive with their modules | `tests/compile_fail/` |
+| 10 | met: `static_assert` copy-assignability for solvers, criteria, refined types and results, and for solvers, curried solvers, `first_of`/`first_of_with`/`then`/`warm_fallback` chains, `derivative_of` and `fn::counted` holding capturing (hence non-assignable) lambdas, and `any_solver` | `tests/usage/test_regularity.cpp` |
+| 11 | met: `UE` and the derivative's cause are preserved; the numeric policy works in a curried chain, including at compile time | `tests/usage/test_composition.cpp` |
 
 ### 10.3 Phases
 
@@ -1739,6 +1779,16 @@ Sizes are focused developer-days for one developer (rough). Every phase also has
 | 7 | integrate + interpolate | G7K15 (QUADPACK rules, tabulated nodes), tanh-sinh (complement) + exp-sinh/sinh-sinh, Romberg (max_level 12, `min_iterations`), `gauss_legendre` (plain function), `quad`, `integral_of`, `antiderivative`; linear, splines with the in-house tridiagonal solvers (Thomas, pivoted tridiagonal, Sherman–Morrison), pchip, steffen, Floater–Hormann | `numerixx::integrate`, `numerixx::interpolate` (both core only) | corpora and properties; the QUADPACK/Piessens and Bailey–Borwein-style test integrals; sin²(8πx); zero-valued integral; last-knot regression; canonical calls 5–7 | 8–11 |
 | 8 | Optional roots | toms748 (attributed Boost.Math port), itp (`itp_params`, frozen ε_ITP), halley (combined callable, bracket fallback), steffensen (deleted if the corpus shows no benefit); re-run the default-choice corpus | roots additions | agreement with the Boost.Math TOMS748 oracle; ITP within its worst-case bound on the corpus; criterion soundness for each; default-solver decision recorded | 4 |
 | 9 | Multiprecision, docs, release | multiprecision adapter (`numerixx::multiprecision`: `adapters/multiprecision.hpp`, `adapters/multiprecision_linalg.hpp`) and the MP linalg tests on the existing `gcc-multiprecision` leg; docs rewritten (dev-reorg `docRoots.rst` structure, "no error handling" policy inverted); examples; benchmarks | `v2.0.0` | docs build; examples are smoke tests; MIGRATION.md complete; MP leg green including linalg | 5–7 |
+
+**Phases 1–3 start from the spike's code** (decided on 2026-09-29). The spike built first cuts of phase 1–3 code in the library tree, more than its exit criteria needed (§10.2, Appendix D). That code is kept, and phases 1–3 continue from it. Their scope and acceptance criteria are unchanged, and a phase is done only when all of them are met. What the spike built, and what is left:
+
+| Phase | In the spike (a first cut, tested on every preset) | Still to do | Size: planned → left |
+|---|---|---|---|
+| 1 Core vocabulary | the whole scope: `config.hpp` macros, scalar traits, `nxx::math`, refined types, errors and results, `evaluate`/`evaluate_sample`, `cost_of`, unwrapping and common cause, `copyable_box`, `numerixx::pipes` | the acceptance work: defaults-achievable `static_assert`s for `float`…`cpp_bin_float_50`, recorded result sizes; one error code for every non-finite input; the role types in the literal forms of `x_tol` and `width_tol`; the GCC `-ffp-contract` decision (§5.3) | 2.5–3.5 → 0.5–1 |
+| 2 deriv | the stencils `central_1_2`, `central_1_4`, `central_2_2`, `central_2_4`, `forward_1_1` and `backward_1_1`; the steps `optimal`, `relative` and `absolute`; `diff`, `central`, `derivative_of`, `numeric` | `noise` steps, `diff_with_error`, `ridders`, mixed partials, `second_derivative_of`, the remaining stencils; the deriv corpus (x ∈ {1e-3, 1e-8}, mixed scales), the stencil-order property, error-estimate reliability and the §9.3 derivative scenarios. The default step needs that corpus: relative steps are scale-invariant for power laws (the derivative of 1/x has a relative error of about 6e-11 from x = 1e-8 to 1e8), but not for exp at large x (8.7e-7 at x = 300 with `central_1_2`, 2.5e-4 with `central_1_4`; measured) | 3–5 → 2–3.5 |
+| 3 Driver + 1-D roots | criteria with view kinds; the driver; facades, options, builders and input overloads; `first_of`, `then`, `warm_fallback`; `any_solver` and `first_of` over a range; `steps_view`; bisection, brent, secant, newton, expand; `solve(f, bracket)`. Tested: criterion soundness, poles, extreme brackets, a root at 0, counts equal to instrumented calls, `steps_view` equal to the driver, run-time chains equal to static chains, canonical calls 1–3, 9 and 10 | `with_evaluation_budget`; illinois, ridders, rtsafe; scan, subdivide; `expand` from a guess, its NaN backtrack and crossing 0; `solve(f, x0)`, `solve(f, df, x0)`; `inverse_of`; the open-method safeguards (without the progress window, Newton on x³ − 2x + 2 from 0 runs its whole budget, 30 iterations and 61 evaluations, before failing); the representation-space bisection midpoint (without it, a root at 1e-200 with a relative tolerance exhausts bisection's 200-step budget); `floored_width`'s `scale`, `step_tol`'s `typical`, secant's `x1`; `custom` criteria and `fdf`; the roots corpus with the Alefeld–Potra–Shi problems, and the default-solver choice; canonical calls 11 and 12 | 10–14 → 6–9 |
+
+This moves work into the spike rather than saving it: the spike did much more than its 3–4 days. Left for phases 1–9: 40–61 developer-days, or 36–57 without phase 8 (planned: 47–70, or 43–66).
 
 **Totals, and how they follow from the baseline.** The baseline is 57.5–82.5 developer-days: the estimate for an earlier scope that also required zero heap allocation and AD scalars, both now out of scope (§3.5, §3.6), taken without its project-specific migration work. Each change below is a single number applied to both ends of the range.
 
@@ -1840,7 +1890,7 @@ Work also moves between phases (zero net): toms748 (1.5) and itp (1) to phase 8;
 | clang-cl mangling on variadic constrained combinators | low / medium | none found with these shapes **[prototyped]**; unconstrained variadics with `static_assert`s; bool variable templates; clang-cl leg from day one |
 | MSVC lacks P2564 (consteval escalation) | certain / low | rule: forward refined types, never raw scalars; P2564 probe on the MSVC leg; `is_refined_v` for generic detection |
 | MSVC shows no deletion reasons | certain / low | deleted declarations sit on a line that holds the reason; `static_assert`-based contracts in combinators give messages everywhere |
-| The floor compilers (GCC 14, Clang 18) miss something the design uses | medium / low | nightly floor job; `NXX_DELETE` falls back to plain `= delete` below GCC 15 and Clang 19; raise the floor if a needed feature is missing |
+| The floor compilers (GCC 14, Clang 19) miss something the design uses | medium / low | nightly floor job; `NXX_DELETE` falls back to plain `= delete` on GCC 14; raise the floor if a needed feature is missing (done once: Clang 18 to 19 on 2026-10-01, for the refined literals) |
 | Numerical defaults unsuitable at small scales | medium / medium | D32 `typical`; relative derivative steps; `floored_width{scale}`; small-scale corpus entries; scale-invariance property |
 | False stall or divergence from the progress window | medium / medium | step-shrink guard; corpus property "never fires on a run that converges"; configurable window and an off switch |
 | Pole check rejects a legitimate root | low / medium | applies only to criterion or `resolution_limit` stops and compares with the initial samples; corpus covers steep simple roots; documented |
@@ -1859,14 +1909,14 @@ Work also moves between phases (zero net): toms748 (1.5) and itp (1) to phase 8;
 | GitLab regenerates the Eigen archive and the hash breaks | low / low | `GIT_TAG 5.0.1` fallback; `CPM_Eigen_SOURCE` override |
 | A parent's FXT is configured for `tl::expected` | low / medium | configure-time warning; public signatures use `std::expected` |
 | Scope creep (8 modules; pressure toward GSL's breadth) | medium / medium | the §1.1 scope table, with an explicit out-of-scope list and unscheduled candidates; dependency-first order; poly, integrate and interpolate may slip past `v2.0.0-beta`; phase 8 may follow `v2.0.0`; the v2.1 and v2.2 families wait for `v2.0.0` (§10.5) |
-| Provenance and licences (Brent, TOMS748 from Boost.Math; GSL is GPL-3.0-or-later) | low / high | BSL-1.0 attribution headers; no GSL source ported or paraphrased; algorithms implemented from the literature, with references in each header (§1.1, §10.1) |
+| Provenance and licences (Brent, TOMS748 from Boost.Math; GSL, MPSolve and other GPL projects) | low / high | BSL-1.0 attribution headers; no GPL code ported, paraphrased or copied; algorithms implemented from the literature, with references in each header (§1.1, §10.1) |
 | Reference-value precision makes wide-type tests flaky | medium / low | §9.2 reference rules; the generator tool |
 
 ---
 
-## 12. Open decisions for the user
+## 12. Decisions
 
-Each item has a recommended default, and the plan assumes it. Items 1–8 gate the spike (§10.2, criterion 6).
+**Decided on 2026-09-28: the author accepted every default below.** Until then these were the open decisions; items 1–8 gated the spike (§10.2, criterion 6).
 
 1. **Boost.** None in the library; standalone Boost.Config + Multiprecision (+ Math) via CPM only for the optional multiprecision adapter and test oracles. **Default: accept.**
 2. **Linear algebra.** Eigen 5.0.1 as the backend behind the `nxx::linalg` facade (+2.5–6.4 s per linalg/multiroots TU in use; no `constexpr` N-D solves), or in-house kernels (constexpr and allocation-free, but more code to write and validate)? **Default: Eigen behind the facade.**
@@ -1882,7 +1932,7 @@ Each item has a recommended default, and the plan assumes it. Items 1–8 gate t
 12. **When combinators move to FXT.** Keep `first_of_t`/`then_t` in Numerixx until phase 3 has settled their semantics, then upstream the generic parts (FXT-4..7), or land FXT-4 during phase 3 so `nxx::first_of` is FXT code from day one? **Default: after phase 3.**
 13. **Multiprecision.** Keep an optional adapter and CI leg, or drop the claim? **Default: keep.**
 14. **Complex scope.** Poly only, or also complex open methods? **Default: poly only.**
-15. **Compiler floor.** GCC 14, Clang 18 + libc++, MSVC with `/std:c++latest` (19.51 tested), clang-cl (22 tested), em++ ≥ 6.0.8; confirmed by the nightly floor job; MinGW g++ and Intel ICX nightly only. Note that this is one step above FXT's own stated floor (its README says GCC 13+, Clang 17+, MSVC 19.30+): Numerixx's use of deducing `this` sets GCC 14 and Clang 18 (D2). Lowering the floor to FXT's would mean replacing deducing `this` in the facades with CRTP. **Default: accept.**
+15. **Compiler floor.** GCC 14, Clang 19 + libc++, MSVC with `/std:c++latest` (19.51 tested), clang-cl (22 tested), em++ ≥ 6.0.8; MinGW g++ and Intel ICX nightly only. The nightly floor job was red on master from its first run (2026-09-29). On the spike branch, the first run (36925523881, 2026-10-01) passed GCC 14 and failed Clang 18 on the refined literals (D2), so the user raised the Clang floor to 19 that day. The next run (36973025194, 2026-10-02) passed all five legs: GCC 14.4.0 (223 tests), Clang 19.1.1 + libc++ (225), MinGW GCC 16.2.0 (225), clang-cl 20.1.8 without exceptions (225), and Intel ICX 2025.3.2 on libstdc++ 14.3.0 (223). GCC 14 and ICX skip the harness self-test, which needs a compiler that prints deletion reasons. Master's nightly stays red until the spike merges. FXT's README states a lower floor (GCC 13+, Clang 17+, MSVC 19.30+), but deducing `this`, which both Numerixx's facades and FXT itself use, needs GCC 14 and Clang 18. **Default: accept.**
 16. **Low-value algorithms.** Keep Ridders and Illinois (Anderson–Björck by default); plain regula falsi only as an Illinois variant; Steffensen at low priority in phase 8, deleted if the corpus shows no benefit; Gauss–Legendre only as a plain function. **Default: accept.**
 17. **`NUMERIXX_WITH_LINALG` default.** ON, so the target `numerixx::numerixx` is complete (the umbrella header still leaves linalg and multiroots out, §5.2); users who need only the scalar modules set it OFF and never download Eigen. **Default: accept.**
 18. **Branch hygiene.** After tagging `v1.0.0` and `v1.1.0-legacy` (and any other branch tip worth keeping), delete `dev`, `dev-terminator` and `dev-reorg`. **Default: keep the tags, delete the branches.**
@@ -1936,7 +1986,7 @@ Derived from the author's brief (functional style, solver chaining, functions as
 | R-B5 | Optional parts stay optional: FXT only for `numerixx::pipes`, Eigen only for linalg and multiroots; a scalar-only build downloads neither | D18, D22, §4.3 |
 | R-B6 | Consumers see no Numerixx warnings (SYSTEM includes) and stay clean under `/W4 /WX` and `-Wall -Wextra -Werror` | D24, §5.3, §9.1 |
 | R-B7 | Linear algebra through Eigen behind the `nxx::linalg` facade; no BLAS or LAPACK | D22, §7.5 |
-| R-B8 | MIT licence: no GPL-derived code (GSL); code derived from Boost keeps its BSL-1.0 notice | §1.1, §10.1 |
+| R-B8 | MIT licence: no GPL-derived code (GPL, LGPL or AGPL, such as GSL or MPSolve); code derived from Boost keeps its BSL-1.0 notice | §1.1, §10.1 |
 
 **Error model**
 
@@ -1970,7 +2020,7 @@ Derived from the author's brief (functional style, solver chaining, functions as
 
 | ID | Requirement | Where met |
 |---|---|---|
-| R-S1 | Generic real scalars (`float`, `double`, `long double`, multiprecision) through an open `scalar_traits` | D14, §3.5, §6.1 |
+| R-S1 | Generic real scalars (`float`, `double`, `long double`, multiprecision) through an open `scalar_traits` and a specialised `std::numeric_limits` | D14, §3.5, §6.1 |
 | R-S2 | Every default tolerance is an expression in `T` and achievable for every supported `T` | D14, §3.5 |
 | R-S3 | Scale awareness: relative steps and tolerances with an explicit absolute floor; mixed scales (1e-8 to 1e8) and badly scaled systems work | D32, §9.2 |
 | R-S4 | N-D systems of fixed and dynamic size (`std::array`, `std::vector`, Eigen vectors) | §6.5, §7.5 |
@@ -1980,7 +2030,7 @@ Derived from the author's brief (functional style, solver chaining, functions as
 
 | ID | Requirement | Where met |
 |---|---|---|
-| R-P1 | GCC ≥ 14, Clang ≥ 18 with libc++, MSVC (`/std:c++latest`), clang-cl, em++ ≥ 6.0.8; MinGW g++ and Intel ICX nightly | D2, §9.4 |
+| R-P1 | GCC ≥ 14, Clang ≥ 19 with libc++ (or with libstdc++ ≥ 14.3), MSVC (`/std:c++latest`), clang-cl, em++ ≥ 6.0.8; MinGW g++ and Intel ICX nightly | D2, §9.4 |
 | R-P2 | Emscripten in every exception mode (`-fexceptions`, `-fwasm-exceptions`, `-fno-exceptions`) and with `-pthread`, also under a consumer's global flags | §4.5, §9.4 |
 | R-P3 | The exception model belongs to the consumer: no EH flags in the usage requirements | §4.1 |
 | R-P4 | Public signatures use `std::expected`, never a configuration-dependent alias | §8.1 |
@@ -1992,7 +2042,7 @@ Derived from the author's brief (functional style, solver chaining, functions as
 
 **Prototype** (`docs/redesign/prototype/`, 2,027 lines):
 - sources: `nxx/{core,roots,deriv,linalg,linalg_eigen,multiroots,pipes,runtime}.hpp`, `test_core.cpp`, `test_nd.cpp`, `test_runtime.cpp` (the run-time chain test uses no FXT);
-- `neg/`: 16 compile-fail tests and 3 probes;
+- `neg/`: 16 compile-fail tests and 4 probes;
 - build and timing scripts for GNU-style compilers and MSVC; `fxt-1.patch`.
 
 An earlier synthesis spike (about 560 lines, not preserved) ran the same API on GCC 16.1, Clang 22 + libc++ (± `-fno-exceptions`), MSVC 19.51 `/W4`, clang-cl 22 `/W4` and em++ 6.0.8 `-fno-exceptions`; its headline chain took 59 iterations and 64 evaluations.
@@ -2037,3 +2087,113 @@ An earlier synthesis spike (about 560 lines, not preserved) ran the same API on 
 - misuse diagnostics of 18–161 lines;
 - closures not assignable;
 - `failure`-returning callbacks nesting.
+
+## Appendix D: Spike evidence
+
+**Code** (`include/numerixx/`, branch `claude/numerixx-spike`): `core/` 2,167 lines, `roots/` 1,341, `deriv/` 293, and `config.hpp` plus the umbrella headers 121. The spike's tests (the `.cpp` files in `tests/{core,roots,deriv,usage,pipes,compile_fail}/`) are 6,920 lines. Every header with arithmetic in `core/`, `roots/` and `deriv/` is bracketed by `NXX_BEGIN_HEADER`/`NXX_END_HEADER` (§5.3).
+
+**Test matrix** (2026-10-02, each preset configured `--fresh`): 237 CTest tests on `gcc`, `gcc-noexcept`, `clang` (libc++), `clang-asan`, `clang-cl`, `emscripten`, `emscripten-jsexcept`, `emscripten-noexcept` and `emscripten-pthread`; 235 on `msvc`, where the harness self-test `harness_quoted_reason` is not added because cl prints no deletion reasons; 246 on `gcc-multiprecision`; 8 on `integration`. All pass. The 237 are 164 doctest cases, 33 compile-fail cases with their controls (31 illegal states and 2 harness self-tests), the P2564 probe, 3 structural tests, 2 examples and 1 linalg smoke test from phase 0.
+
+**Determinism.** `tests/roots/test_determinism.cpp` holds a golden table of 22 solves. Each row records success or error code, stop reason, iterations, evaluations, x, fx, uncertainty and enclosure, in hexadecimal floating point. The table covers bisection, brent, secant, newton, expand, chains and failures. It is bit-identical on GCC 16.1, Clang 22.1.8 + libc++, MSVC 19.51, clang-cl 22.1.3 and em++ 6.0.8 (CI: 6.0.10) in all four modes. It was bit-identical only after Clang's floating-point contraction was switched off inside the headers (§5.3).
+
+| Result (measured on GCC 16.1; the headline chain and brent counts are asserted on every preset that builds the tests, all but `integration`) | Value |
+|---|---|
+| Headline chain (§6.11: Newton → secant(5) → bisection), constexpr | x = 1.4142135623730949, 57 iterations, 62 evaluations |
+| Newton with the `deriv::numeric{}` policy, then brent, in a curried chain | Newton wins: 5 iterations, 16 evaluations |
+| expand from [2, 2.5] → `bisection{width_tol{1e-4}}` → Newton | x = 1.4142135623730949, 17 iterations, 22 evaluations |
+| brent on x² − 2 over [1, 2] | 7 iterations, 9 evaluations |
+
+**Compile times** (best of 3, RelWithDebInfo, one TU, measured serially on an idle machine):
+
+| Compiler | Umbrella header (`<numerixx/numerixx.hpp>`, nothing instantiated) | linalg TU (Eigen `partialPivLu` solves, fixed-size and dynamic, called directly; `<numerixx/linalg.hpp>` is still the phase-0 skeleton, so there is no facade cost yet) |
+|---|---|---|
+| GCC 16.1 | 0.58 s (guard 2 s) | 4.58 s |
+| Clang 22.1.8 + libc++ | 0.46 s | 2.55 s |
+| MSVC 19.51 | 0.55 s | 3.98 s |
+| clang-cl 22.1.3 | 0.53 s | 2.55 s |
+
+**Diagnostics.** On GCC and Clang, each compile-fail case checks that the reason is in the first error. Line counts, as total diagnostic lines / lines of the first error (the harness self-tests: `harness_selftest` 5 / 4 on GCC and 8 / 7 on Clang; `harness_quoted_reason`, which the harness must reject, 8 / 6 and 8 / 7):
+
+| Case | GCC 16.1 | Clang 22.1.8 |
+|---|---|---|
+| `bisection_given_guess` | 14 / 12 | 35 / 27 |
+| `open_int_guess` | 14 / 12 | 32 / 24 |
+| `newton_no_derivative` | 13 / 11 | 38 / 30 |
+| `newton_mixed_errors` | 27 / 4 | 62 / 24 |
+| `bisection_x_tol` | 13 / 11 | 8 / 7 |
+| `brent_x_tol` | 13 / 11 | 8 / 7 |
+| `bisection_step_tol` | 13 / 11 | 8 / 7 |
+| `bisection_with_stop_x_tol` (`with_stop`) | 14 / 12 | 20 / 19 |
+| `newton_width_tol` | 13 / 11 | 8 / 7 |
+| `secant_width_tol` | 13 / 11 | 8 / 7 |
+| `bisection_with_projection` | 14 / 12 | 14 / 13 |
+| `secant_with_derivative` | 14 / 12 | 14 / 13 |
+| `secant_min_iterations_alone` (`with_stop`) | 14 / 12 | 20 / 19 |
+| `bisection_min_iterations_or` (constructor) | 13 / 11 | 8 / 7 |
+| `brent_braced_wrong_function` | 14 / 12 | 38 / 30 |
+| `bracket_one_end` | 14 / 12 | 35 / 27 |
+| `solve_one_end` | 13 / 11 | 17 / 16 |
+| `solve_on_scalar` | 13 / 11 | 29 / 28 |
+| `bisection_on_pointer` (`.on`) | 14 / 12 | 20 / 19 |
+| `expand_with_stop` | 11 / 9 | 8 / 7 |
+| `first_of_without_on` | 12 / 4 | 11 / 7 |
+| `first_of_mismatch` | 12 / 4 | 11 / 7 |
+| `then_open_to_bracket` | 12 / 4 | 11 / 7 |
+| `any_solver_wrong_result` | 12 / 10 | 8 / 7 |
+| `bracket_runtime_literal` | 11 / 3 | 11 / 10 |
+| `bracket_reversed_literal` | 16 / 10 | 26 / 12 |
+| `tolerance_negative_literal` | 21 / 6 | 32 / 15 |
+| `max_iterations_zero` | 17 / 15 | 14 / 13 |
+| `max_iterations_bool` | 16 / 14 | 8 / 7 |
+| `x_tol_zero_zero` | 15 / 7 | 26 / 12 |
+| `rel_tolerance_as_tolerance` | 35 / 33 | 20 / 19 |
+
+The prototype's worst case was the `then` contract at 77 lines on GCC; the spike's worst is 62 lines on Clang (mixed callback error types), with the reason in the first of them. The totals include the compile command that the build tool echoes (one line) and any context lines before the first error ("In function …", "In file included from …"). The first-error counts do not include the command, but on Clang they include the trailing "1 error generated." when the first error is the only one. So the counts compare within one compiler's column; they are not absolute. Two harness rules decide what "in the first error" means (§9.1):
+- On GCC a failed consteval call can explain itself in a nested error after "in 'constexpr' expansion of" lines, which the harness counts as part of the first error. For a rejected literal, GCC reports the call to the non-constexpr `literal_violates_invariant("…")` and quotes the source line that makes it: in `Tag::reject()` for the refined tolerances (which GCC also names), in the consteval constructor itself for `bracket`, `x_tol`, `width_tol`, `floored_width`, `max_iterations` and `evaluation_budget`. Either way the quoted line holds the reason as a string literal, and that quote counts.
+- A deletion reason must be in the compiler's own message. Quoted source lines are left out of the match, so a reason cannot pass merely because a "declared here" note echoes the `NXX_DELETE("…")` line.
+
+**What the spike changed in the design** (each item is in the section cited):
+- Floating-point contraction is off inside the headers on Clang, clang-cl and em++ (§5.3, §6.1).
+- `better` is a strict weak order, so the static and run-time chains merge to the same best estimate in any fold order (§6.7).
+- The driver's success path is `detail::succeed` with `finish(p, sol) -> optional<failure>`, which avoids a GCC 16 false `-Wmaybe-uninitialized` (§6.7).
+- Brent's `tol1` and stop reasons, so that `criterion` means the width criterion holds (§6.8, §9.3).
+- The pole check takes its reference from the finite initial samples and rejects a non-finite fx, and its known limit is documented (§7.2).
+- `expand` saturates at ±max and stalls when both ends are there; its crossing of 0 is a known limit for phase 3 (§7.2).
+- secant falls back to x0 − h when x0 + h overflows (§7.2).
+- The facades check "F invocable on the scalar" (`callable_v`) and delete the rest with a reason; `with_derivative` and `with_projection` exist only where they apply (§6.6).
+- `any_solver`'s reasoned deleted constructor applies only to a solver that is callable with F but returns the wrong result type, so `any_solver` is not a conversion target for every type. Its concept checks invocability before copyability, which avoids a recursive constraint on Clang (§6.10).
+- `evaluation_budget` is a class, checked in the source type like `max_iterations` (§6.2).
+- A braced list or C array is a bracket only with two ends of a real type; `{x}` had been taken as `{x, 0}` (§6.6).
+- MSVC: arrays are left out of the call operators' catch-alls and the `.on` catch-alls take a forwarding reference, so `f, {lo, hi}`, `f, arr` and `.on(arr)` all work on cl and a pointer still gets its reason (§6.6); `deriv::relative` has no `std::optional` member in its consteval constructor (§7.1); F is decayed before `const F&` is formed (§6.6).
+- A braced `{lo, hi}` with a function of the wrong signature gets the facade's reason, as a `bracket<T>` or a pair does (§6.6).
+- `NXX_DELETE` starts on the declarator's own line, where cl and the floor compilers point; the Clang header brackets save and restore the floating-point setting on every target that supports it (§5.3).
+- `expand`'s public `rebuild(options)` accepts only `never{}`, so a searcher's stop criterion cannot be configured through it either (§7.2).
+- `copyable_box` (§6.10) copies first and then moves in place when a capture's copy may throw but its move cannot (a `std::vector`, a `std::string`), so a throwing copy leaves it unchanged. That path avoids `std::optional`, whose reset + emplace made GCC 16.2 report a false `-Wmaybe-uninitialized`; hosted CI's three GCC legs failed on it. `std::optional` remains for types whose move can throw, such as a lambda that captures a const vector by copy.
+- `min_iterations` is a guard, accepted by a solver only under `&&` with a convergence test, on every path that sets a stop criterion: the constructors, `with_stop` and the public `rebuild(options)` (§6.8).
+- `root_estimate` has a constructor that requires x and f(x); the uncertainty of an estimate with neither an enclosure nor a step is inf (§7.2).
+- `best_x` is constrained to results whose solution has an x (§6.3).
+- The compile-fail harness matches deletion reasons only in the compiler's own message, and a self-test case (`harness_quoted_reason`, which the harness must reject) checks that. The MSVC P2564 probe must fail with C7595 (§9.1).
+
+**Open question found by the spike's audit:** GCC contracts `a * b + c` by default in C++ (ISO mode included) and has no pragma to stop it for a region, so on FMA targets a GCC build may differ from other platforms in the last ulp (§5.3). The presets are unaffected (baseline x86-64 has no FMA). Phase 1 decides between documenting `-ffp-contract=off` for consumers who need bit-identical results and adding it to the GCC interface flags.
+
+**Found by the review of PR #3 and fixed** (2026-10-02; each was reproduced with a probe and has a regression test):
+- A projected iterate that is not finite gave false successes: `clamp_to{inf, inf}`, `clamp_to{inf, 0.0}` or a projection to NaN gave `exact_zero` at a non-finite x, and a projection that sends a later iterate to +inf gave `criterion` at x = inf. secant and newton now reject it (§7.2).
+- `width_tol` and `x_tol` thresholds that overflow to inf accepted an infinite width: brent reported `criterion` at 0 iterations for `width_tol{1.7e308, 0.5}` on [−1.7e308, 1.7e308]. They now saturate (§6.8).
+- A type with only a `scalar_traits` specialisation was `real`, and its defaults collapsed into false successes. `real` now needs a specialised `std::numeric_limits` (§6.1).
+- `diff` called f at ±inf when a stencil point overflowed (§7.1).
+- `solve(f, {1.0})` solved on [0, 1] (§6.6).
+- With `<numerixx/core/any_solver.hpp>` included, `first_of` and `first_of_with` with one solver did not compile.
+- A projection to a far finite value (1e300, or max) still gave `criterion` successes there, because the criteria saw only the proposed step. They now see the larger of the proposed and the actual step (§7.2). `clamp_to` results with lo ≤ hi are unchanged; reversed finite bounds (`clamp_to{1.0, 0.0}`) gave a `criterion` success at the far bound (x = 1 on x − 1e-15 from 0.5) and now give `stalled`.
+- secant failed with `diverged` when the projection sent x₀ + h off the reals, although x₀ − h was valid; it now falls back to x₀ − h (§7.2).
+- `solve` was not constrained on the function, so `std::is_invocable_v` with a function that cannot take the bracket's scalar type was a hard error; it is now false, and a direct call gets the facades' reason; `solve(f, 1.0)` now says that it needs a bracket instead of failing with no reason. `is_real_v` of an array or function type was a hard error inside `<limits>`; it is now false.
+- The `NUMERIXX_BUILD_EXAMPLES` default is now `PROJECT_IS_TOP_LEVEL` (§4.3; it was ON in the code and OFF in this table), and the quick tour no longer claims that only the run-time chain can throw (D10).
+
+**Minor review findings left open** (none reports a false success; each is for the phase that owns the code):
+- `clamp_to` is a public aggregate, so reversed or NaN bounds are accepted. Bounds that send iterates off the reals gave false `exact_zero` successes, and reversed finite bounds false `criterion` successes, until the review of PR #3; secant and newton now reject a non-finite projected iterate (§7.2). A validated constructor belongs with the options in phase 3.
+- A constexpr `diff` whose stencil point overflows (for example `diff(f, -max)`) is not a constant expression on GCC and MSVC, because the overflowing addition is not; Clang returns `invalid_input`. It is a compile error, not a wrong result, and at run time every compiler returns `invalid_input`. An overflow-free placement test belongs with deriv in phase 2.
+- Newton with a numeric derivative reports `invalid_input`, an input-error code, when a later iterate lies where a stencil point overflows; the input was valid. The evaluation count and the best estimate are correct. Phase 1's decision on the codes for non-finite values covers it ("Non-finite inputs get different codes" above).
+- Non-finite inputs get different codes: a NaN bracket end is `invalid_input`, a NaN guess `non_finite_input`, a non-finite x in `deriv::diff` `invalid_input`. Phase 1 settles the codes.
+- The consteval literal forms `x_tol{abs, rel}` and `width_tol{abs, rel}` take plain `T`, so swapped arguments compile; `make(abs_tolerance, rel_tolerance)` has the role types (§6.2).
+- Hosted CI does not upload `compile_time_report.txt` or `compile_fail_report.txt`; the numbers above were measured locally.
+
+**Example.** `examples/quick_tour.cpp` shows the library as it is now: the one-call `solve`, choosing solvers and criteria, run-time configuration through `make()`, open methods with analytic and numeric derivatives, failures as values (no sign change, a pole, an exhausted budget, a fallible callback's own error), `first_of`, `then` and a run-time `any_solver` chain, derivatives, `steps_view` and an observer. It is built with the strict warning flags and runs as a smoke test on every preset except `integration`, which builds the consumer scenarios instead of the examples.

@@ -1,7 +1,19 @@
 // Phase 0: numerixx::linalg carries Eigen 5.0.1. The facade itself arrives in phase 5.
 #include <numerixx/linalg.hpp>
 
+// GCC 14 at -O2, and GCC 16 at -O2 without NDEBUG, report -Wnull-dereference inside Eigen 5.0.1's out-of-line
+// partial_lu_impl::unblocked_lu: Block's add_to_nullable_pointer creates null branches that cannot run, because the LU
+// storage is never null. -isystem does not hide middle-end warnings reported through an inline stack, but GCC checks
+// the pragma state at every location in that stack, so the region must contain the first inclusion of
+// PartialPivLU.h (DESIGN §5.3).
+#if defined(__GNUC__) && !defined(__clang__)
+#    pragma GCC diagnostic push
+#    pragma GCC diagnostic ignored "-Wnull-dereference"
+#endif
 #include <Eigen/LU>
+#if defined(__GNUC__) && !defined(__clang__)
+#    pragma GCC diagnostic pop
+#endif
 #include <doctest/doctest.h>
 
 #include <cmath>
