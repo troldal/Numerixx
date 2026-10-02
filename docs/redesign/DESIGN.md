@@ -727,7 +727,9 @@ s.nfev                                                    // evaluations so far 
   - "the function cannot be called with the scalar type of the bracket" (and of the guess, or of the window; for a braced `{lo, hi}` too) **[spike]**. The spike review found that the facades did not check "F invocable on the scalar", so `std::is_invocable_v` with a function of the wrong signature was a hard error inside the solver, not `false`. Each solver now declares `callable_v<F, In>`, and the facade asks it only once `accepts_v` holds (`detail::input_callable_v`, with F decayed so that a plain function does not form a `const` function type, which MSVC warns about).
   - **[spike]** A braced list or a C array binds to `const T (&)[N]` overloads with N deduced: N == 2 with a real T is a bracket (or a window), and any other length or element type is deleted with "a bracket has two ends of a real type: write {lo, hi}, for example {1.0, 2.0}". `nxx::roots::solve` (§6.13) deduces N the same way; it kept a fixed `[2]` until the review of PR #3. With a fixed `[2]`, a one-element `{x}` bound as `{x, 0}` and was solved on [0, x]. Arrays are left out of the call operators' catch-alls, and the `.on` catch-alls take a forwarding reference, so an array never decays to a pointer, which cl cannot order against the array overloads; a pointer keeps its reason.
 
-  Solver-specific deletions (Newton's) stay in the solver, which must then repeat `using facade::operator();`. A test catches it if that line is forgotten.
+  Newton's deletion lives in `open_facade` too, keyed on the solver trait `ready_v<F>`, which is false without a derivative source. So no solver declares an `operator()` of its own. Until 2026-10-02 the deletion was in Newton, which had to repeat `using open_facade::operator();`. That was valid C++, and every compiler accepted it: the template-heads differ in their requires-clauses, so the declarations do not correspond ([basic.scope.scope]/4, [temp.over.link]/6), and the using-declaration hides nothing ([namespace.udecl]/11). CLion's ReSharper C++ engine (2026.2), however, treated Newton's deleted overload as hiding the facade's, and marked every valid Newton call as an error.
+  - The cost: the reason is a string literal, so it cannot depend on the solver. On Clang and clang-cl, a misuse of secant now lists this candidate in its notes and quotes "newton needs a derivative" (`open_int_guess` on Clang 22.1.8: 32 / 24 to 38 / 30 lines, Appendix D; the error line and its reason are unchanged).
+  - Only `open_facade` has a `!ready_v` deletion. A bracketing solver that takes a derivative (rtsafe, phase 3) adds one to `bracketing_facade` in two forms, `accepts_v<Self, In> && !ready_v<Self, F>` and `N == 2 && real<T> && !ready_v<Self, F>` for `const T (&)[N]`, with a reason that names no solver. Until then such a solver gets "no match for call" without a reason (`std::is_invocable_v` is still false).
 - **Derivative sources (D13) [prototyped]:**
   - (a) A callable `df`, stored in a copyable box.
   - (b) **A derivative policy**: any `P` with `P::bind(f) -> df`, e.g. `with_derivative(deriv::numeric{deriv::central_1_2, deriv::noise{1e-10}})`. Recognised structurally, so roots does not include deriv. Each bound `df` call costs its stencil's points, which are counted.
@@ -2117,8 +2119,8 @@ An earlier synthesis spike (about 560 lines, not preserved) ran the same API on 
 | Case | GCC 16.1 | Clang 22.1.8 |
 |---|---|---|
 | `bisection_given_guess` | 14 / 12 | 35 / 27 |
-| `open_int_guess` | 14 / 12 | 32 / 24 |
-| `newton_no_derivative` | 13 / 11 | 38 / 30 |
+| `open_int_guess` | 14 / 12 | 38 / 30 |
+| `newton_no_derivative` | 14 / 12 | 38 / 30 |
 | `newton_mixed_errors` | 27 / 4 | 62 / 24 |
 | `bisection_x_tol` | 13 / 11 | 8 / 7 |
 | `brent_x_tol` | 13 / 11 | 8 / 7 |
@@ -2132,7 +2134,7 @@ An earlier synthesis spike (about 560 lines, not preserved) ran the same API on 
 | `bisection_min_iterations_or` (constructor) | 13 / 11 | 8 / 7 |
 | `brent_braced_wrong_function` | 14 / 12 | 38 / 30 |
 | `bracket_one_end` | 14 / 12 | 35 / 27 |
-| `solve_one_end` | 13 / 11 | 17 / 16 |
+| `solve_one_end` | 13 / 11 | 29 / 28 |
 | `solve_on_scalar` | 13 / 11 | 29 / 28 |
 | `bisection_on_pointer` (`.on`) | 14 / 12 | 20 / 19 |
 | `expand_with_stop` | 11 / 9 | 8 / 7 |

@@ -300,6 +300,18 @@ namespace nxx
             requires(detail::accepts_v<Self, In> && detail::ready_v<Self, F> && !detail::input_callable_v<Self, F, In>)
         void operator()(this const Self&, const F&, const In&) NXX_DELETE("the function cannot be called with the type of the guess");
 
+        // Newton's reason, kept here so that no solver declares an operator() of its own. A solver that did would have
+        // to repeat `using open_facade::operator();`. Its operator()'s template-head would differ from each facade
+        // overload's in the requires-clause, so the two would not correspond ([basic.scope.scope]/4, [temp.over.link]/6)
+        // and the using-declaration would hide nothing ([namespace.udecl]/11). CLion's ReSharper C++ engine (2026.2)
+        // treats the solver's overload as hiding the facade's, however, and marks every valid call as an error.
+        template<class Self, class F, class In>
+            requires(detail::accepts_v<Self, In> && !detail::ready_v<Self, F>)
+        void operator()(this const Self&, const F&, const In&) NXX_DELETE("newton needs a derivative: "
+                                                                          ".with_derivative(df), "
+                                                                          ".with_derivative(deriv::numeric{}), a "
+                                                                          "callable with .derivative(), or use secant");
+
         template<class Self, class In>
             requires detail::accepts_v<Self, In>
         constexpr auto on(this const Self& self, In in)

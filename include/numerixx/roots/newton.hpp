@@ -2,10 +2,10 @@
 //   (a) a callable df:                          newton{}.with_derivative(df)
 //   (b) a derivative policy with bind(f):       newton{}.with_derivative(deriv::numeric{}) (works in curried chains)
 //   (c) a structural .derivative() on f itself: a polynomial or a spline
-// Recognised structurally, so roots does not include deriv. Without a source, calling it does not compile, with a
-// reason. A zero derivative is errc::zero_derivative; a non-finite step is errc::diverged; the projection works as for
-// secant. The error type of the solve is the common cause of f and f' (DESIGN §6.4). Default criterion
-// step_tol<3, 5>, budget 30.
+// Recognised structurally, so roots does not include deriv. Without a source (ready_v false), calling it does not
+// compile, with the reason in open_facade. A zero derivative is errc::zero_derivative; a non-finite step is
+// errc::diverged; the projection works as for secant. The error type of the solve is the common cause of f and f'
+// (DESIGN §6.4). Default criterion step_tol<3, 5>, budget 30.
 //
 // Deferred to phase 3: the progress window and the step-length cap.
 #pragma once
@@ -111,14 +111,6 @@ namespace nxx::roots
             requires stop_criterion_for_v<typename O2::stop_type, views>
         constexpr auto rebuild(O2 o) const
         { return newton<O2> { nxx::detail::from_options, std::move(o) }; }
-
-        template<class Self, class F, class In>
-            requires(nxx::detail::accepts_v<Self, In> && !nxx::detail::ready_v<Self, F>)
-        void operator()(this const Self&, const F&, const In&) NXX_DELETE("newton needs a derivative: "
-                                                                          ".with_derivative(df), "
-                                                                          ".with_derivative(deriv::numeric{}), a "
-                                                                          "callable with .derivative(), or use secant");
-        using open_facade::operator();
 
         template<class F, class In>
             requires(detail::open_input_v<In> && detail::derivative_available_v<D, F>)
