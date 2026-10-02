@@ -20,9 +20,16 @@ group's `PATH`), over the `.hpp` and `.cpp` files in `include/`, `tests/`, `exam
 `/fake_boost/`. Strip the CRs first: `.clang-format` sets `DeriveLineEnding: false`, so on a CRLF checkout (Git for
 Windows' `core.autocrlf`) a plain dry run flags every line of an unchanged file.
 
+The loop runs in the current shell, so it can count the failures and the check exits nonzero if any file is
+unformatted (rerun clang-format on a listed file to see why):
+
 ```bash
-find include tests examples benchmarks -name '*.[hc]pp' | grep -v /fake_boost/ | while read -r f; do
-  tr -d '\r' < "$f" | clang-format --dry-run -Werror --assume-filename="$f" || echo "unformatted: $f"; done
+bad=0
+while read -r f; do
+  tr -d '\r' < "$f" | clang-format --dry-run -Werror --assume-filename="$f" > /dev/null 2>&1 \
+    || { echo "unformatted: $f"; bad=$((bad + 1)); }
+done < <(find include tests examples benchmarks -name '*.[hc]pp' | grep -v /fake_boost/)
+echo "unformatted files: $bad"; [ "$bad" -eq 0 ]
 ```
 
 ## Method
@@ -34,7 +41,8 @@ find include tests examples benchmarks -name '*.[hc]pp' | grep -v /fake_boost/ |
   with a quoted heredoc (`<<'EOF'` keeps single backslashes; the Bash tool still turns `\\` into `\`, so avoid `\\`)
   and run it with `cmd //c` the same way. Do not use `run_in_background`: you have no tool to wait for it.
 - The toolchain groups (GCC plus `integration`, Clang, Emscripten, MSVC plus clang-cl) build in separate
-  directories: you may send one call per group in the same message, and run the presets of a group one after another.
+  directories, so they can run in parallel: send up to four calls in one message, each running one preset from a
+  different group. Within a group, run the presets one after another, each still in its own call.
   While the Emscripten presets build, do not run em++ anywhere else: a different emsdk configuration clears the shared
   cache.
 - A call that hit the timeout leaves a log without ctest's summary, and may leave ninja or ctest running in
