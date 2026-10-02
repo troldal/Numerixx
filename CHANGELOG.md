@@ -134,3 +134,11 @@ one.
   bisection midpoint, `illinois`, `ridders`, `rtsafe`, `scan`, `subdivide`, `inverse_of`, `.from_enclosure()`,
   `with_evaluation_budget`, `solve(f, x0)` and `solve(f, df, x0)`, noise steps, `diff_with_error`, Ridders
   differentiation and the mixed partials.
+
+### Phase 1: core vocabulary (DESIGN §10.3)
+
+- "newton needs a derivative" is now deleted in `open_facade`, keyed on the solver's `ready_v`, so `newton` declares no
+  call operator and no `using open_facade::operator();`. Calls, `std::is_invocable_v` and the reason text are
+  unchanged. GCC and cl now name `nxx::open_facade::operator()` in the error, and Clang lists the candidate in the
+  notes of secant's misuses. CLion's ReSharper C++ engine (2026.2) took Newton's deleted overload to hide the facade's,
+  and marked every valid Newton call as an error (DESIGN §6.6).
