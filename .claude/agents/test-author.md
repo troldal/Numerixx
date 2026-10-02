@@ -19,9 +19,17 @@ You write tests for Numerixx 2. Follow `CLAUDE.md` (sections Tests and Build and
   `if (res) { ... } else FAIL_CHECK("...");`, or compare whole results.
 - Put anything that throws or catches under `#if defined(__cpp_exceptions)`.
 - Property tests draw from a `std::mt19937` with a fixed seed, and record the inputs with `CAPTURE`.
-- Check compile-time facts with `static_assert`. An invalid call must make `std::is_invocable_v` false, not a hard
-  error. Results must be copy-assignable.
+- Check compile-time facts with `static_assert`. Results must be copy-assignable. An invalid call must make
+  `std::is_invocable_v` false, not a hard error. Test whether a call is accepted with a `bool` variable template over
+  a requires-expression, like `solve_accepts` in `tests/roots/test_solvers.cpp`. Do not write a wrapper whose call
+  operator nobody calls, or any other never-called function template in an anonymous namespace: em++'s newer Clang
+  reports it with `-Wunused-template`, `-Werror` makes that fatal, and the `gcc` and `clang` presets do not report it.
 - Keep tests fast and deterministic: the Emscripten presets run them under node.
+- Build and run what you touched on the `gcc` preset, in the environment `CLAUDE.local.md` gives for the toolchain:
+  `cmake --build --preset gcc`, then `ctest --preset gcc -L <name>`, where `<name>` is the first argument of
+  `numerixx_add_test`. Read the build output before trusting ctest. Also run `gcc-multiprecision` for
+  `tests/multiprecision/` and `tests/oracles/` (no other preset builds them), and `gcc-noexcept` for a test with an
+  `#if defined(__cpp_exceptions)` branch. Name the presets you did not run.
 
 ## Corpus and reference values (DESIGN §9.2)
 
@@ -38,10 +46,10 @@ You write tests for Numerixx 2. Follow `CLAUDE.md` (sections Tests and Build and
   loosen k to make a case pass. That helper does not exist yet either: the first corpus adds it to a shared test
   header.
 
-## A new family
+## A new family or core change
 
-The family's DESIGN §7 section holds the approved design, which the main session writes there. You own its misuse
-tests and canonical calls:
+The family's DESIGN §7 section (for an approved core change, the DESIGN §6 section it changes) holds the approved
+design, which the main session writes there. You own its misuse tests and canonical calls:
 - each misuse marked as a compile error becomes a compile-fail case (below);
 - each one marked as a `make()` error becomes a doctest case that checks the exact error;
 - each one marked as an in-band error code becomes a doctest case that checks the code, and that the failure carries
@@ -50,8 +58,17 @@ tests and canonical calls:
 
 ## Every fix needs a test that fails without it
 
-Prove it. Copy the fixed header into a scratch directory outside the repository, revert the fix in the copy,
-compile the test against the copy (`-I<scratch>` before `-Iinclude`), and check that the test fails.
+Prove it. Copy each fixed header to the same relative path under a scratch directory outside the repository
+(`<scratch>/numerixx/<module>/<file>.hpp`; the headers include each other as `<numerixx/...>`, so a copy at
+`<scratch>/<file>.hpp` shadows nothing), and revert the fix in the copy. Compile the test file and
+`tests/doctest_main.cpp` with the flags of the test file's entry in `build/gcc/compile_commands.json`, adding
+`-I<scratch>` before the first `-I`, and write the outputs to the scratch directory. Run the case and check that it
+fails, then check that it passes against the unmodified headers.
+
+When the fixed mechanism is shared (the projection of every open method, the width threshold of every bracketing
+solver or criterion), write the regression test over every member that shares it, for example with
+`TEST_CASE_TEMPLATE`, and report each member it fails on instead of weakening the test. Reviews of earlier fixes kept
+finding the same bug in the siblings.
 
 ## Compile-fail cases
 

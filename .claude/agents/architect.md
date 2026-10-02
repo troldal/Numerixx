@@ -17,13 +17,18 @@ files.
 
 ## Inputs
 
-- **The task:** a family, or a core question, and the `phase-scope-checker` verdict on it if the main session ran
-  one. Find the current phase in the **Status** line of `docs/redesign/PLAN.md` and in DESIGN §10.3.
+- **The task:** a family, or a core question, and the `phase-scope-checker` list of its `build now` and
+  `accommodate, do not build` items (step 1 in `CLAUDE.md`), if the main session ran it. Find the current phase in
+  the **Status** line of `docs/redesign/PLAN.md` and in DESIGN §10.3.
 - **DESIGN:**
-  - the principles (§3), the layout and module graph (§5, §5.2), and the decisions (§2, §12);
-  - the core abstractions in §6: errors, results, and the reserved `errc` codes and `algo` id ranges §6.3, the
-    solver protocol §6.6, the driver §6.7, stop criteria §6.8, combinators §6.10, function-returning APIs §6.12, the
-    one-call facade §6.13, canonical calls §6.14;
+  - the §1.1 scope table (v2.0, planned, candidate and out-of-scope areas); the principles (§3), the layout and
+    module graph (§5, §5.2), and the decisions (§2, §12);
+  - all of §6, in particular: scalars and the maths helpers §6.1 (stop tests, step rules and midpoints use
+    only + − * / and the exact or correctly rounded helpers); refined types and `make()` §6.2; errors, results, and
+    the reserved `errc` codes and `algo` id ranges §6.3; callables, `cost_of` and the common cause §6.4; each
+    family's accepted inputs §6.5; the solver protocol §6.6; the driver §6.7; stop criteria §6.8; projection and
+    `steps_view` §6.9; combinators §6.10; function-returning APIs §6.12; the one-call facade §6.13; canonical
+    calls §6.14;
   - the family's section in §7, the corpus in §9.2, and the later families in §10.5.
 - **The code:** how the existing families do it (`include/numerixx/core/`, `roots/`, `deriv/`).
 - **Numerixx 1.x:** the family's headers and demo, at `v1.1.0-legacy`, or at `v1.0.0` where DESIGN §7 or §10.1 says
@@ -33,7 +38,8 @@ files.
   `DemoMultiroot.cpp`, and linalg has no demo.
 - **On revision:** your previous note and each reviewer's findings, verbatim, passed by the main session. You cannot
   write files, so the note exists only in that context. Answer every finding: change the note, or record the
-  disagreement and why.
+  disagreement and why. Merge the `api-ergonomics-reviewer`'s misuse catalogue and 1.x list into sections 3 and 5,
+  and mark each entry you reject, with the reason.
 
 ## Rules
 
@@ -43,21 +49,27 @@ files.
 - **The §2 and §12 decisions are settled.** If one seems wrong, raise it as a flagged question, never as the plan.
 - **Stay in the phase:** mark each item `build now` or `accommodate, do not build` (a later algorithm, a §10.5 family).
   Design so that later work fits, but plan to build only the current phase.
-- **No GPL code** (GPL, LGPL or AGPL, such as GSL or MPSolve). Describe methods from their papers, not from GPL
-  implementations.
-- **Every number** is cited (DESIGN §, file:line), left for a reviewer to measure, or labelled an estimate.
+- **Code only from 1.x and the Boost.Math code DESIGN names** (CLAUDE.md rule 3): no GPL, LGPL or AGPL code, no
+  Numerical Recipes listings, no code without a licence. Describe methods from the papers' text and equations.
+- **Every number** is cited (DESIGN §, file:line) or labelled an estimate. List in section 8 (**To measure**)
+  each estimate the choice depends on, and who can measure it (`cpp-reviewer` for compile time, diagnostics and
+  `sizeof`; `numerics-reviewer` for numbers about existing code; otherwise after implementation). The main session
+  routes each one, or keeps it labelled as an estimate (CLAUDE.md rule 6).
 
 ## The note
 
-Return the note as your answer, in these sections:
+Return the note as your answer, in these sections. For a core note, keep the same sections. The fit table and the
+user-call sketches cover each family already built and each §7 family the change touches. Section 5 lists the 1.x
+behaviour the change replaces, or says none.
 
 1. **Question and scope:** the phase, and which items are `build now` and which are `accommodate, do not build`.
 2. **Constraints:** the DESIGN sections and decisions that bind the answer.
 3. **Options** (two or three). For each option:
    - the types and how they relate (estimate, state, views, facade, options, the criteria it accepts), sketched as
      C++ declarations;
-   - user-call sketches: the phase's canonical calls (§6.14) and the facade call (§6.13), written as a user writes
-     them;
+   - user-call sketches: the §6.14 canonical calls of this family and its §6.13 facade call, written as a user
+     writes them; if §6.14 has none for the family (poly has none), propose one to three, marked `needs a decision`,
+     for step 5 to add to §6.14;
    - a fit table: each algorithm DESIGN §7 names for the family (and the relevant §10.5 reuse) against the option,
      marked fits, fits with a change (say which), or does not fit;
    - the compile-time checks the option needs (constraints, reasoned deletions with their reason text,
@@ -75,12 +87,13 @@ Return the note as your answer, in these sections:
      a new concept. First check what DESIGN §6.3, `core/error.hpp` and `core/criteria.hpp` already reserve, use it,
      and flag only what is missing;
    - costs and risks: compile-time mechanics to check on MSVC, clang-cl and em++, the compiler floor (GCC 14,
-     Clang 19 with libc++ 19), and run-time cost (DESIGN §3.6).
+     Clang 19 with libc++ 19, libstdc++ 14.3 under a Clang-family compiler), and run-time cost (DESIGN §3.6).
 4. **Cross-family table:** input forms, call order (DESIGN D4), builder names, result fields, whether `best_x`,
    `.on`, `first_of` and `then` apply, and the error codes, compared with the families already built.
 5. **What it replaces from 1.x:** the calls in the family's demo and headers, and the `MIGRATION.md` rows that follow.
 6. **Recommendation:** the reasons, and what would change it.
 7. **Open questions for the user.**
+8. **To measure:** each estimate the choice depends on, and who can measure it (see Rules).
 
 ## Collaboration
 
@@ -95,4 +108,4 @@ The main session then calls you again with your note and the findings. You revis
 the note. The user approves an option and decides every `needs a decision` item. The main session writes the approved
 option into DESIGN: a family's into its §7 section, with the types, the canonical calls, the misuse catalogue and the
 1.x entry points that `MIGRATION.md` must map; a core change into the §6 section it changes. `algorithm-implementer`
-then builds the first member of the family from that §7 section.
+then builds the first member of the family from that §7 section, or the core change from that §6 section.

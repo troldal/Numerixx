@@ -1,7 +1,7 @@
 # Numerixx 2: redesign plan
 
 - **Date:** 2026-09-27
-- **Status:** Approved on 2026-09-28, with every default in section 10 (and DESIGN §12) accepted. Phase 0 is done, except that its nightly floor jobs were red on master from their first run (2026-09-29); the fixes are on the spike branch, where the nightly passed on 2026-10-02 (DESIGN §12.15). The de-risking spike meets its 11 exit criteria locally on all 12 presets (DESIGN §10.2 status, Appendix D), passes hosted CI on PR #3 (ci.yml and the nightly), and awaits merge; phase 1 is next. The spike's code is kept, and phases 1–3 continue from it (DESIGN §10.3).
+- **Status:** Approved on 2026-09-28, with every default in section 10 (and DESIGN §12) accepted. Phase 0 and the de-risking spike are done. The spike met its 11 exit criteria locally on all 12 presets (DESIGN §10.2 status, Appendix D), passed hosted CI on PR #3 (ci.yml, and the nightly dispatched on the spike branch on 2026-10-02, DESIGN §12.15), and was merged into master on 2026-10-02 (PR #3, 53d3384) with the nightly floor fixes. Phase 1 is the current phase. The spike's code is kept, and phases 1–3 continue from it (DESIGN §10.3).
 - **Companion documents:**
   - [`DESIGN.md`](DESIGN.md): the detailed design reference, covering every decision, the code sketches, per-module algorithm tables, CMake, the test strategy and the full roadmap. Section numbers there are stable; "§n" below refers to them.
   - [`prototype/`](prototype/): a throwaway feasibility prototype. It compiles and runs on nine configurations: GCC 16 and Clang 22 + libc++, each with and without `-fno-exceptions`; em++ 6.0.8 with `-fexceptions`, `-fno-exceptions` and `-fwasm-exceptions`; MSVC 19.51; and clang-cl 22.
@@ -73,7 +73,7 @@ Details are in §1.1 and §10.5.
 - Each family is a new module downstream in the DAG, so no v2.0 module gains a dependency.
 
 **FLAG, licensing.**
-- Numerixx is MIT, so no GPL code may be ported, paraphrased or copied: nothing under the GPL, LGPL or AGPL, such as GSL or MPSolve (decided on 2026-09-30).
+- Numerixx is MIT, so no GPL code may be ported, paraphrased or copied: nothing under the GPL, LGPL or AGPL, such as GSL or MPSolve (decided on 2026-09-30). Code may come only from Numerixx 1.x and the Boost.Math code DESIGN names; Numerical Recipes listings and code without a licence are excluded too (decided on 2026-10-02).
 - Algorithms are implemented from the literature, with references cited in each header.
 - The test oracles are Boost.Math, Eigen and high-precision reference tables. GPL projects (such as GSL) are not oracles, although values published in their documentation may serve as reference facts.
 - Boost-derived code (Brent, TOMS748) keeps its BSL-1.0 notice.
