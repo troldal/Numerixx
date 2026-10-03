@@ -547,10 +547,13 @@ template<class T> constexpr T midpoint(const T& a, const T& b) noexcept;   // st
   - **In v2.0: adapt at the call site.** Strip the inputs to raw values in one coherent unit, solve on the raw type, and rewrap the result, as call 3 of §6.14 does with `transform`:
 
     ```cpp
-    auto g = [&](double p) { return residual(Pressure{p}).value(); };       // p is in the unit that Pressure{double} assumes
-    auto r = nxx::roots::solve(g, {lo.value(), hi.value()})
-                 .transform([](const auto& s) { return Pressure{s.x}; });
+    auto g  = [&](double p) { return residual(Pressure{p}).value(); };         // p is in the unit that Pressure{double} assumes
+    auto r0 = nxx::roots::solve(g, {lo.value(), hi.value()});                  // the raw result
+    auto p  = r0.transform([](const auto& s) { return Pressure{s.x}; });       // a success, rewrapped
+    auto pb = nxx::best_x(r0).transform([](double v) { return Pressure{v}; });  // the solution's or the failure's best x
     ```
+
+    - `transform` maps only a success. A failure's `best` estimate and its f(x) stay in raw units, so read them through the same rewrap; `best_x` gives the solution's x or the failure's best x in one place.
 
     - The raw unit sets the scale of every absolute tolerance (`width_tol{1e-3}` is 1e-3 of that unit). It also sets the scale of the D32 floors and the relative steps, which are measured from the unit's zero. Strip into absolute units whose typical magnitudes are near 1 or above (K, not °C).
     - A derivative's raw value is in units of y per unit of x, in the units that were stripped in, so it must be rewrapped with that quotient type. An analytic `df` must use the same raw units; nothing checks this.
@@ -560,7 +563,7 @@ template<class T> constexpr T midpoint(const T& a, const T& b) noexcept;   // st
     - An opt-in trait maps a quantity to its raw value and back. It requires an exact round trip and a linear scale.
     - The code that uses both libraries specialises the trait; Numerixx names no units library.
     - A `dimensioned(solver)` wrapper maps the input, f and the result, so the algorithms keep running on the raw type and no algorithm changes.
-    - The wrapper returns its own result type, which holds the rewrapped x and f(x) and the unchanged cost, stop reason and failure. The core's `solution`, `failure` and estimate types do not change. If a later design wants the estimate types themselves to carry f's codomain, that is a core change and needs a decision, and the item then stops being a candidate under §1.1.
+    - The wrapper returns its own result type, which holds the rewrapped x and f(x) of a success and of a failure's best estimate, with the cost, stop reason, error code and callback cause unchanged. The core's `solution`, `failure` and estimate types do not change. If a later design wants the estimate types themselves to carry f's codomain, that is a core change and needs a decision, and the item then stops being a candidate under §1.1.
     - A derivative's result type Y/X is built from the traits of X and Y, so no trait is needed for the quotient type.
 
     Generic support for separate domain and codomain types in every algorithm is not planned: it would touch every algorithm, and it has not been designed for N-D states.
