@@ -115,6 +115,8 @@ Removed: vcpkg, Boost in the library, Blaze, LAPACK, OpenMP, gcem, tl-expected, 
 
 Status legend: **v2.0** = in the first release; **planned** = scheduled in §10.5; **candidate** = not scheduled, and can be added after v2.0 without changing the core; **out of scope** = use another library; **not needed** = the standard library or Eigen already covers it.
 
+**Dimensioned quantities** (strongly typed values from a units library) in callbacks and results are a **candidate**: not scheduled, and addable after v2.0 only if the boundary adapter returns its own result type (§6.1). In v2.0, the caller adapts at the call site (decided 2026-10-03).
+
 **How the core extends to the planned families [sketch].** The core abstractions (§6) were chosen so that the planned families reuse them instead of adding parallel machinery. A **minimiser** over ℝⁿ is a solver whose state holds an N-D point (plus, for BFGS, an inverse-Hessian approximation) and whose estimate is extremum-like: x, f(x) and a gradient norm. **Nonlinear least squares** reuses the systems machinery of `multiroots` with a residual vector r: ℝⁿ → ℝᵐ (m ≥ n): the FD Jacobian, the `typical` and `project` hooks, and `qr_solve`. An **ODE integrator** is a solver whose step advances t with an error-controlled step size; its stop criteria include reaching t_end; `steps_view` yields the trajectory; and dense output is a function-returning API that gives the solution as a callable t → `expected<y, fault>`. The driver, the criteria algebra, the `solution`/`failure`/`fault` types, cost accounting and the combinators apply unchanged, for example `first_of(nonstiff, stiff)` for an integration, or `with_evaluation_budget` over a minimisation. Each family is a new module placed downstream in the module DAG (§5.2), so no v2.0 module gains a dependency.
 
 **FLAG, licensing.** Numerixx is MIT, so no GPL code may be ported, paraphrased or copied: nothing under the GPL, LGPL or AGPL, which covers GSL (GPL-3.0-or-later) and MPSolve (GPL) (decided on 2026-09-30; before that the rule named only GSL). Code may come only from Numerixx 1.x and from the Boost.Math code named below; Numerical Recipes listings (their licence forbids redistribution) and code without a licence are excluded too, and a 1.x passage that names Numerical Recipes as its source counts as such a listing (decided on 2026-10-02). Algorithms are implemented from the text and equations of the literature, not from code printed in it (for example Brent 1973; Alefeld, Potra and Shi 1995; the MINPACK and QUADPACK reports; Dormand and Prince 1980; Nocedal and Wright), and each header cites its references. Values from the documentation of such projects may be used as reference facts, but the test suite's oracles are Boost.Math, Eigen and high-precision reference tables (§9.2). Code derived from Boost (Brent, TOMS748) keeps its BSL-1.0 notice (§10.1).
@@ -536,7 +538,35 @@ template<class T> constexpr T midpoint(const T& a, const T& b) noexcept;   // st
 ```
 
 - **Two groups, on purpose.** The first group is exact or correctly rounded, so its results are the same on every conforming platform. Stop tests, step-size rules, bisection midpoints and the power-of-two constants (`pow2`, `root_eps`, ITP's ⌈log₂⌉ via `frexp`) use only that group and the four basic operations, so, given the same values of f, a solver takes the same path on every platform. That extends the determinism rule (§3.2, §9.1) beyond repeated runs on one machine. It also needs the library's own arithmetic to be free of floating-point contraction. Clang and GCC both contract by default; the headers turn it off on Clang (§5.3, found and fixed in the spike), but GCC has no such pragma, so on GCC the guarantee needs a target without FMA or a build with `-ffp-contract=off` (§5.3). The second group is not correctly rounded: where the library needs it (tanh-sinh abscissae, for example) and where a user's f calls it, results may differ in the last ulp between standard libraries.
-- `cpp_bin_float_50` and every other type with a suitable `numeric_limits` specialisation need nothing. A type without one must specialise `std::numeric_limits` (which the standard permits): the library reads digits, epsilon, min, max, lowest and infinity from it, so `is_real_v` requires `numeric_limits<T>::is_specialized`. A `scalar_traits` specialisation alone made a type `real` until the review of PR #3 (2026-10-02), and the defaults then collapsed: on x² − 2 the default criteria reported `stop_reason::criterion` after at most one iteration, at errors of 0.41 to 0.59 (measured with brent, bisection, newton and secant). Whether `scalar_traits` should carry these limits instead, so that types without `numeric_limits` work, **needs a decision in phase 1**.
+- `cpp_bin_float_50` and every other type with a suitable `numeric_limits` specialisation need nothing. A type without one must specialise `std::numeric_limits` (which the standard permits): the library reads digits, epsilon, min, max, lowest and infinity from it, so `is_real_v` requires `numeric_limits<T>::is_specialized`. A `scalar_traits` specialisation alone made a type `real` until the review of PR #3 (2026-10-02), and the defaults then collapsed: on x² − 2 the default criteria reported `stop_reason::criterion` after at most one iteration, at errors of 0.41 to 0.59 (measured with brent, bisection, newton and secant). Whether `scalar_traits` should carry these limits instead, so that types without `numeric_limits` work, **needs a decision in phase 1**. That decision places no requirement on dimensioned quantities, which v2.0 callers adapt at the call site (next item). An opt-in raw-value trait is a post-v2.0 candidate, and the decision need only not rule it out.
+- **Dimensioned quantities [sketch; decided 2026-10-03].** A quantity type from a units library is not `real`.
+  - A length times a length is an area, so `a*b` does not convert back to T.
+  - A quantity type derived from the library's unit type does not inherit that type's `numeric_limits` specialisation.
+
+  Both were measured on GCC 16.1 and Clang 22.1.8. The only quantity-like type probed that is `real` is a dimensionless unit; even that one lacked `numeric_limits<T>::digits`, so the default criteria (`floored_width`, `step_tol`) and `root_eps` did not compile with it.
+  - **In v2.0: adapt at the call site.** Strip the inputs to raw values in one coherent unit, solve on the raw type, and rewrap the result, as call 3 of §6.14 does with `transform`:
+
+    ```cpp
+    auto g  = [&](double p) { return residual(Pressure{p}).value(); };         // p is in the unit that Pressure{double} assumes
+    auto r0 = nxx::roots::solve(g, {lo.value(), hi.value()});                  // the raw result
+    auto p  = r0.transform([](const auto& s) { return Pressure{s.x}; });       // a success, rewrapped
+    auto pb = nxx::best_x(r0).transform([](double v) { return Pressure{v}; });  // the solution's or the failure's best x
+    ```
+
+    - `transform` maps only a success. A failure's `best` estimate and its f(x) stay in raw units, so read them through the same rewrap; `best_x` gives the solution's x or the failure's best x in one place.
+
+    - The raw unit sets the scale of every absolute tolerance (`width_tol{1e-3}` is 1e-3 of that unit). It also sets the scale of the D32 floors and the relative steps, which are measured from the unit's zero. Strip into absolute units whose typical magnitudes are near 1 or above (K, not °C).
+    - A derivative's raw value is in units of y per unit of x, in the units that were stripped in, so it must be rewrapped with that quotient type. An analytic `df` must use the same raw units; nothing checks this.
+    - Wrapping a structured callable in a lambda hides `evaluation_cost()` and `.derivative()` (§6.4, D33), so a wrapper must forward them.
+    - Cost, measured on one model (a single `solve` on one residual function) with coherent SI units: the `-O2` code of the solve through such an adapter was identical to that of a solve on a plain `double` function (GCC 16.1 and Clang 22.1.8, x86-64 without FMA). With `-mfma`, Clang's code differed. No other function, flag or compiler was measured.
+  - **After v2.0 (candidate, §1.1): a boundary adapter.**
+    - An opt-in trait maps a quantity to its raw value and back. It requires an exact round trip and a linear scale.
+    - The code that uses both libraries specialises the trait; Numerixx names no units library.
+    - A `dimensioned(solver)` wrapper maps the input, f and the result, so the algorithms keep running on the raw type and no algorithm changes.
+    - The wrapper returns its own result type, which holds the rewrapped x and f(x) of a success and of a failure's best estimate, with the cost, stop reason, error code and callback cause unchanged. The core's `solution`, `failure` and estimate types do not change. If a later design wants the estimate types themselves to carry f's codomain, that is a core change and needs a decision, and the item then stops being a candidate under §1.1.
+    - A derivative's result type Y/X is built from the traits of X and Y, so no trait is needed for the quotient type.
+
+    Generic support for separate domain and codomain types in every algorithm is not planned: it would touch every algorithm, and it has not been designed for N-D states.
 - The prototype verified the trait, the constexpr-safe `abs`/`isfinite` and the power-of-two constants; there they were spelled as CPO objects and the trait also carried an AD "primal" type, which this design drops.
 
 ### 6.2 Refined types and smart or consteval constructors [prototyped]
@@ -2197,5 +2227,16 @@ The prototype's worst case was the `then` contract at 77 lines on GCC; the spike
 - Non-finite inputs get different codes: a NaN bracket end is `invalid_input`, a NaN guess `non_finite_input`, a non-finite x in `deriv::diff` `invalid_input`. Phase 1 settles the codes.
 - The consteval literal forms `x_tol{abs, rel}` and `width_tol{abs, rel}` take plain `T`, so swapped arguments compile; `make(abs_tolerance, rel_tolerance)` has the role types (§6.2).
 - Hosted CI does not upload `compile_time_report.txt` or `compile_fail_report.txt`; the numbers above were measured locally.
+- Three gaps in the reasons for misuse, found with dimensioned-quantity probes on GCC 16.1 and Clang 22.1.8 on 2026-10-03:
+  - A function whose result converts to the scalar only explicitly (a dimensioned quantity, for example) passes `callable_v`, which checks only the argument. It then fails as a hard error at `const X y = std::invoke(fn, x)` in `core/callable.hpp`. So even a check with `std::is_invocable_v` (brent, bisection, secant, the function that `derivative_of` returns) or with a requires-expression (`solve`, `central`) fails to compile instead of returning false. `deriv::diff`'s requires-check reports such a call as valid.
+  - A bracket of a non-real type gets "a bracket has two ends of a real type: write {lo, hi}" as a braced list. As a `std::pair`, it gets "bracketing solvers need a bracket". Neither says that the type is the problem.
+  - `deriv` called at a non-real x gets no reason.
+
+  They are left open for the owning phases, and none is decided here:
+  - the first gap for phase 1, which owns `callable.hpp`. It is more than a missing reason: it is a hard error where `std::is_invocable_v` should be false, against the convention in CLAUDE.md;
+  - the third gap for phase 2 (`deriv`);
+  - the second gap for phase 3 (the facades).
+
+  None of them reports a false success.
 
 **Example.** `examples/quick_tour.cpp` shows the library as it is now: the one-call `solve`, choosing solvers and criteria, run-time configuration through `make()`, open methods with analytic and numeric derivatives, failures as values (no sign change, a pole, an exhausted budget, a fallible callback's own error), `first_of`, `then` and a run-time `any_solver` chain, derivatives, `steps_view` and an observer. It is built with the strict warning flags and runs as a smoke test on every preset except `integration`, which builds the consumer scenarios instead of the examples.
