@@ -142,3 +142,9 @@ one.
   unchanged. GCC and cl now name `nxx::open_facade::operator()` in the error, and Clang lists the candidate in the
   notes of secant's misuses. CLion's ReSharper C++ engine (2026.2) took Newton's deleted overload to hide the facade's,
   and marked every valid Newton call as an error (DESIGN §6.6).
+- The examples print with `std::println`, not `std::printf`. Their format strings are checked at compile time, and
+  doubles print in the shortest form that reads back to the same value, not with 17 significant digits. The
+  quick tour's error and stop-reason names are `constexpr std::string_view` functions with `using enum`, and its
+  stepping loop counts with a range-for initializer. With MinGW's libstdc++ (GCC 16.1 still), `std::print` needs
+  libstdc++exp. `examples/CMakeLists.txt` probes for it and links it to the examples only where the toolchain needs it.
+  The library headers do not use `<print>`, so consumers link nothing extra.
