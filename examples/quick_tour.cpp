@@ -13,7 +13,6 @@
 #include <numerixx/deriv.hpp>
 #include <numerixx/roots.hpp>
 
-#include <cmath>
 #include <expected>
 #include <functional>
 #include <limits>
