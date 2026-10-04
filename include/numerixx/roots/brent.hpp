@@ -20,6 +20,7 @@
 #include <expected>
 #include <limits>
 #include <optional>
+#include <type_traits>
 
 NXX_BEGIN_HEADER
 
@@ -27,11 +28,16 @@ namespace nxx::roots
 {
     namespace detail
     {
-        // A tolerance for Brent: a width criterion with a threshold for an enclosure.
+        // A tolerance for Brent: a width criterion with a threshold for an enclosure. False, not a hard error, for any
+        // other W: each test is asked only once the one before it holds, because an && in a variable template's
+        // initializer does not stop the instantiation of its later operands (W::applies_to was formed for a double).
         template<class W>
-        inline constexpr bool width_tolerance_v = criterion_for_v<W, view_kind::enclosure> && requires(const W& w) {
-            w.threshold(1.0, 2.0);
-        } && (std::remove_cvref_t<W>::applies_to == view_kind::enclosure);
+        inline constexpr bool width_tolerance_v = [] {
+            if constexpr (criterion_for_v<W, view_kind::enclosure>)
+                return requires(const W& w) { w.threshold(1.0, 2.0); } && std::remove_cvref_t<W>::applies_to == view_kind::enclosure;
+            else
+                return false;
+        }();
     }    // namespace detail
 
     template<real T>
@@ -109,6 +115,10 @@ namespace nxx::roots
             requires(is_criterion_v<C> && !detail::width_tolerance_v<C>)
         explicit brent(C) NXX_DELETE("brent's tolerance is a width criterion: width_tol{abs[, rel]} or floored_width{} "
                                      "(x_tol and step_tol compare successive iterates; bracketing methods converge on the enclosure)");
+
+        template<class R>
+            requires((std::is_arithmetic_v<R> || real<R>) && !std::is_convertible_v<R, Tol>)
+        explicit brent(R) NXX_DELETE("a tolerance is a criterion, not a number: write brent{nxx::width_tol{1e-10}}");
 
         // Constrained as rebuild is, so no options that carry a width criterion build a brent, not even through the
         // detail key (DESIGN §6.8). The constraint spells brent<Tol, Opt>, not the injected-class-name: in the deduction
@@ -227,6 +237,13 @@ namespace nxx::roots
     template<class C>
         requires is_criterion_v<C>
     brent(C) -> brent<C>;
+
+    // A bare number deduces brent<>, whose deleted constructor gives the reason. Without this guide, Clang 19.1 deduced
+    // brent<double> from the implicit guide of brent(Tol) despite its constraint, and brent<double> has no constructor
+    // left for a double (the deletion skips numbers its own Tol accepts): a bare "no matching constructor".
+    template<class R>
+        requires(std::is_arithmetic_v<R> || real<R>)
+    brent(R) -> brent<>;
 }    // namespace nxx::roots
 
 NXX_END_HEADER

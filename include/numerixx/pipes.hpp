@@ -20,6 +20,8 @@
 
 namespace nxx
 {
-    // No other operator| is declared in namespace nxx, so this is the one found there (DESIGN §8.1).
+    // The pipe found through `using nxx::operator|;` (DESIGN §8.1). The only other operator| in namespace nxx combines
+    // two view_kind flags (core/criteria.hpp). Both its parameters are that scoped enum: no arithmetic or enum type
+    // converts to it, and no FXT result or adaptor has a conversion function to it, so it is never viable for a pipe.
     using fxt::operator|;
 }    // namespace nxx

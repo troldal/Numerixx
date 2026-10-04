@@ -162,3 +162,35 @@ one.
   stepping loop counts with a range-for initializer. With MinGW's libstdc++ (GCC 16.1 still), `std::print` needs
   libstdc++exp. `examples/CMakeLists.txt` probes for it and links it to the examples only where the toolchain needs it.
   The library headers do not use `<print>`, so consumers link nothing extra.
+- A bare number as a solver's tolerance gets a reason. `brent{1e-10}` was a hard error inside `brent.hpp` ("'applies_to'
+  is not a member of double"), and so were `std::is_constructible_v<brent<double>, double>` and CTAD probes: its
+  `width_tolerance_v` used `&&` in a variable template's initializer, which formed `W::applies_to` for every `W`. The
+  trait is now false for a non-criterion, and `brent`, `bisection`, `secant` and `newton` delete a number with "a
+  tolerance is a criterion, not a number: write brent{nxx::width_tol{1e-10}}" (each solver names its own criterion).
+  `bisection{1e-10}`, `secant{1e-10}` and `newton{1e-10}` failed class template argument deduction without a reason.
+  A number that the solver's own criterion type converts from is still accepted, so a user criterion with a
+  converting constructor keeps `brent<my_width>{tol}`. A deduction guide sends a bare number to `brent<>`: Clang 19.1
+  deduced `brent<double>` from the implicit guide of `brent(Tol)` despite its constraint, and gave a bare "no matching
+  constructor" (found by the nightly clang-floor leg). Each solver has a compile-fail case for the reason.
+- An open method given a braced list or a C array (`secant{}(f, {1.0, 2.0})`, `newton{}.with_derivative(df).on({1.0,
+  2.0})`) is deleted with "open methods take one guess of a real type or a root estimate, not a braced list: write 1.0,
+  or pass {lo, hi} to a bracketing solver", not a bare "no matching function". `open_facade`'s `.on` catch-all takes a
+  forwarding reference, as the other facades' do, so a named array reaches the array overload on cl.
+- The facades check the solver protocol (DESIGN §6.6). `std::is_invocable_v` is now `false` for a solver without
+  `accepts_v`, or without a member that `prepare(f, in)` or `nxx::iterate` needs (`id`, `options`, `init`, `step`,
+  `view`, `estimate`, `best`, `intrinsic`), or whose `prepare` does not return a `std::expected`, where it was a hard
+  error inside `detail::run`; a call names the protocol in a deleted overload. A member of the wrong type (a `prepare`
+  error that `init`'s failure type cannot hold, an `options()` that is not an options aggregate, an `init` error that is
+  not a `nxx::failure`) is still a hard error inside `detail::run` or `nxx::iterate`. `with_stop` on a facade-derived
+  type without `views` is `false` too, where `detail::stop_allowed_v` made it a hard error, and so is one whose
+  `views` is not a `view_kind` constant, on GCC, Clang and clang-cl (cl 19.51 still rejects that case with a hard
+  error, as before). On Clang 22.1.8, misuses of
+  the call operators list the new candidates in their notes (`bisection_given_guess` 35 / 27 to 44 / 36 lines,
+  `open_int_guess` 38 / 30 to 47 / 39 with the braced-list deletion, `newton_mixed_errors` 62 / 24 to 84 / 34); the
+  error line and its reason are unchanged. On GCC 16.1 only `newton_mixed_errors` changed (27 / 4 to 33 / 4).
+- DESIGN §8.1 and `pipes.hpp` no longer say that no other `operator|` is declared in `nxx`: `operator|(view_kind,
+  view_kind)` is, and it never competes with the pipe.
+- Tests for these fixes: 6 compile-fail cases (`brent_number_tolerance`, `bisection_number_tolerance`,
+  `secant_number_tolerance`, `open_braced_bracket`, `newton_on_braced_bracket`, `solver_incomplete`), static asserts in
+  `tests/roots/test_solvers.cpp` and one doctest case, a client solver run under its own id. `gcc`, `gcc-noexcept`
+  and `clang` run 255 CTest tests (242 before), `gcc-multiprecision` 264 (251 before).

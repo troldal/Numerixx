@@ -35,6 +35,15 @@ numerixx_add_compile_fail_test(${_nxx_cf}/newton_no_derivative.cpp
 numerixx_add_compile_fail_test(${_nxx_cf}/newton_mixed_errors.cpp
   LINK numerixx::roots
   EXPECT "transform_error")
+numerixx_add_compile_fail_test(${_nxx_cf}/open_braced_bracket.cpp
+  LINK numerixx::roots
+  EXPECT "open methods take one guess of a real type or a root estimate, not a braced list" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/newton_on_braced_bracket.cpp
+  LINK numerixx::roots
+  EXPECT "open methods take one guess of a real type or a root estimate, not a braced list" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/solver_incomplete.cpp
+  LINK numerixx::roots
+  EXPECT "this solver does not implement the solver protocol" DELETE_REASON)
 
 # ---- Criterion/solver mismatches (exit criterion 7: x_tol on a bracketing solver) --------------------------------
 numerixx_add_compile_fail_test(${_nxx_cf}/bisection_x_tol.cpp
@@ -70,6 +79,18 @@ numerixx_add_compile_fail_test(${_nxx_cf}/bisection_min_iterations_or.cpp
 numerixx_add_compile_fail_test(${_nxx_cf}/brent_x_tol.cpp
   LINK numerixx::roots
   EXPECT "brent's tolerance is a width criterion" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/brent_number_tolerance.cpp
+  LINK numerixx::roots
+  EXPECT "a tolerance is a criterion, not a number: write brent" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/bisection_number_tolerance.cpp
+  LINK numerixx::roots
+  EXPECT "a tolerance is a criterion, not a number: write bisection" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/secant_number_tolerance.cpp
+  LINK numerixx::roots
+  EXPECT "a tolerance is a criterion, not a number: write secant" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/newton_number_tolerance.cpp
+  LINK numerixx::roots
+  EXPECT "a tolerance is a criterion, not a number: write newton" DELETE_REASON)
 numerixx_add_compile_fail_test(${_nxx_cf}/newton_width_tol.cpp
   LINK numerixx::roots
   EXPECT "width_tol needs a bracketing method" DELETE_REASON)
