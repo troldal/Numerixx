@@ -169,7 +169,9 @@ one.
   tolerance is a criterion, not a number: write brent{nxx::width_tol{1e-10}}" (each solver names its own criterion).
   `bisection{1e-10}`, `secant{1e-10}` and `newton{1e-10}` failed class template argument deduction without a reason.
   A number that the solver's own criterion type converts from is still accepted, so a user criterion with a
-  converting constructor keeps `brent<my_width>{tol}`.
+  converting constructor keeps `brent<my_width>{tol}`. A deduction guide sends a bare number to `brent<>`: Clang 19.1
+  deduced `brent<double>` from the implicit guide of `brent(Tol)` despite its constraint, and gave a bare "no matching
+  constructor" (found by the nightly clang-floor leg). Each solver has a compile-fail case for the reason.
 - An open method given a braced list or a C array (`secant{}(f, {1.0, 2.0})`, `newton{}.with_derivative(df).on({1.0,
   2.0})`) is deleted with "open methods take one guess of a real type or a root estimate, not a braced list: write 1.0,
   or pass {lo, hi} to a bracketing solver", not a bare "no matching function". `open_facade`'s `.on` catch-all takes a

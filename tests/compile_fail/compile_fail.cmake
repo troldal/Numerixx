@@ -88,6 +88,9 @@ numerixx_add_compile_fail_test(${_nxx_cf}/bisection_number_tolerance.cpp
 numerixx_add_compile_fail_test(${_nxx_cf}/secant_number_tolerance.cpp
   LINK numerixx::roots
   EXPECT "a tolerance is a criterion, not a number: write secant" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/newton_number_tolerance.cpp
+  LINK numerixx::roots
+  EXPECT "a tolerance is a criterion, not a number: write newton" DELETE_REASON)
 numerixx_add_compile_fail_test(${_nxx_cf}/newton_width_tol.cpp
   LINK numerixx::roots
   EXPECT "width_tol needs a bracketing method" DELETE_REASON)

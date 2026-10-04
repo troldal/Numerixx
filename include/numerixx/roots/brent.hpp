@@ -237,6 +237,13 @@ namespace nxx::roots
     template<class C>
         requires is_criterion_v<C>
     brent(C) -> brent<C>;
+
+    // A bare number deduces brent<>, whose deleted constructor gives the reason. Without this guide, Clang 19.1 deduced
+    // brent<double> from the implicit guide of brent(Tol) despite its constraint, and brent<double> has no constructor
+    // left for a double (the deletion skips numbers its own Tol accepts): a bare "no matching constructor".
+    template<class R>
+        requires(std::is_arithmetic_v<R> || real<R>)
+    brent(R) -> brent<>;
 }    // namespace nxx::roots
 
 NXX_END_HEADER
