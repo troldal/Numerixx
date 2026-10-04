@@ -89,7 +89,8 @@ one.
   line, where cl's note points; the Clang header brackets now save and restore the floating-point setting on RISC-V,
   PowerPC and SystemZ too. The audit also found that GCC contracts `a * b + c` by default in C++, ISO mode included,
   and that the headers cannot stop it; DESIGN §5.3 documents this (build with `-ffp-contract=off` for bit-identical
-  results on FMA targets), and phase 1 decides whether the GCC interface flags should add it.
+  results on FMA targets); the phase-1 design (DESIGN §12.20) leaves the flag to the consumer and does not add it to
+  the GCC interface flags.
 - `examples/quick_tour.cpp`: a tour of the library as it is now, built with the strict warning flags and run as a
   smoke test.
 - Known limits, documented in DESIGN §7.2: `expand` from a window on one side of 0 cannot cross 0 (phase 3), and a
