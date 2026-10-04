@@ -1154,6 +1154,169 @@ TEST_SUITE("roots")
     static_assert(!binds_one_end<nr::bisection<>> && !binds_one_end<nr::expand<>>);
     static_assert(!binds_pointer<nr::brent<>> && !binds_pointer<nr::expand<>>);
 
+    // Open methods take one guess, not a braced list: a deleted overload gives the reason (compile-fail cases
+    // open_braced_bracket and newton_on_braced_bracket), for a named array too, and a pointer keeps "open methods take a
+    // guess" (the .on catch-all takes a forwarding reference, so an array never decays to a pointer).
+    template<class S>
+    concept binds_two_ends = requires(const S& s) { s.on({ 1.0, 2.0 }); };
+    template<class S>
+    concept binds_array = requires(const S& s, const double (&a)[2]) { s.on(a); };
+    template<class S, class F>
+    concept takes_array = requires(const S& s, const F& fn, const double (&a)[2]) { s(fn, a); };
+    using newton_line_t = decltype(nr::newton {}.with_derivative(line_t {}));
+    static_assert(!takes_two_ends<nr::secant<>, line_t> && !takes_one_end<nr::secant<>, line_t> && !takes_array<nr::secant<>, line_t>);
+    static_assert(!takes_two_ends<newton_line_t, line_t> && !takes_array<newton_line_t, line_t>);
+    static_assert(!binds_two_ends<nr::secant<>> && !binds_array<nr::secant<>> && !binds_pointer<nr::secant<>>);
+    static_assert(!binds_two_ends<newton_line_t> && !binds_array<newton_line_t>);
+    static_assert(binds_two_ends<nr::brent<>> && binds_array<nr::brent<>>);
+
+    // A bare number is not a tolerance (DESIGN §6.8): each solver deletes it with a reason (compile-fail cases
+    // brent_number_tolerance, bisection_number_tolerance and secant_number_tolerance). brent's width_tolerance_v asked
+    // W::applies_to of every W, so the brent probes were hard errors inside brent.hpp rather than false.
+    template<class T>
+    concept brent_from = requires(T t) { nr::brent { t }; };
+    template<class T>
+    concept bisection_from = requires(T t) { nr::bisection { t }; };
+    template<class T>
+    concept newton_from = requires(T t) { nr::newton { t }; };
+    static_assert(!std::is_constructible_v<nr::brent<double>, double>);
+    static_assert(!std::is_constructible_v<nr::brent<>, double> && !std::is_constructible_v<nr::brent<wt_t>, double>);
+    static_assert(!brent_from<double> && !brent_from<float> && !brent_from<int>);
+    static_assert(brent_from<wt_t> && brent_from<fw_t>);
+    static_assert(!bisection_from<double> && !newton_from<double>);
+    static_assert(bisection_from<wt_t> && newton_from<nxx::x_tol<double>>);
+    // A number that the solver's own criterion type takes implicitly is still accepted: the deletion excludes it, so a
+    // user-defined criterion with a converting constructor keeps its run-time spelling, brent<user_width>{tol}.
+    struct user_width : nxx::criterion_base
+    {
+        static constexpr nxx::view_kind applies_to = nxx::view_kind::enclosure;
+        double                          w;
+        constexpr user_width(double a) noexcept : w(a) {}
+        template<class U>
+        constexpr U threshold(const U&, const U&) const noexcept
+        { return U(w); }
+        template<class V>
+        constexpr nxx::verdict operator()(const V&, const V& next, nxx::counters) const
+        {
+            const auto e = next.enclosure();
+            return e.hi() - e.lo() <= w ? nxx::verdict::converged : nxx::verdict::proceed;
+        }
+    };
+    static_assert(std::is_constructible_v<nr::brent<user_width>, double>);
+    static_assert(std::is_constructible_v<nr::bisection<nxx::options<user_width>>, double>);
+    static_assert(brent_from<user_width>);
+
+    // The facades check the solver protocol (DESIGN §6.6), so a solver that lacks part of it makes std::is_invocable_v
+    // false, with a reasoned deletion (compile-fail case solver_incomplete), rather than a hard error inside
+    // detail::run. Each type below hides one protocol member of bisection<>, which is what a solver without that
+    // member looks like to the facade.
+    struct hides_accepts : nr::bisection<>
+    {
+        static constexpr int accepts_v = 0;
+    };
+    struct hides_prepare : nr::bisection<>
+    {
+        void prepare() const = delete;
+    };
+    struct hides_id : nr::bisection<>
+    {
+        static constexpr int id = 0;
+    };
+    struct hides_options : nr::bisection<>
+    {
+        void options() const = delete;
+    };
+    struct hides_init : nr::bisection<>
+    {
+        void init() const = delete;
+    };
+    struct hides_step : nr::bisection<>
+    {
+        void step() const = delete;
+    };
+    struct hides_view : nr::bisection<>
+    {
+        void view() const = delete;
+    };
+    struct hides_estimate : nr::bisection<>
+    {
+        void estimate() const = delete;
+    };
+    struct hides_best : nr::bisection<>
+    {
+        void best() const = delete;
+    };
+    struct hides_intrinsic : nr::bisection<>
+    {
+        void intrinsic() const = delete;
+    };
+    // A complete solver: bisection's protocol under an id of its own.
+    struct own_bisection : nr::bisection<>
+    {
+        static constexpr nxx::algo id = nxx::algo::user_first;
+    };
+    template<class S>
+    constexpr bool runs_on_pair = std::is_invocable_v<const S&, const line_t&, const std::pair<double, double>&>;
+    template<class S>
+    constexpr bool runs_on_braced = std::is_invocable_v<const S&, const line_t&, const double (&)[2]>;
+    static_assert(runs_on_pair<own_bisection> && runs_on_braced<own_bisection>);
+    static_assert(!runs_on_pair<hides_accepts> && !runs_on_pair<hides_prepare> && !runs_on_pair<hides_id> && !runs_on_pair<hides_options>);
+    static_assert(!runs_on_pair<hides_init> && !runs_on_pair<hides_step> && !runs_on_pair<hides_view>);
+    static_assert(!runs_on_pair<hides_estimate> && !runs_on_pair<hides_best> && !runs_on_pair<hides_intrinsic>);
+    // A braced {lo, hi} is converted to a pair and never asks accepts_v, as before; the rest of the protocol is checked.
+    static_assert(!runs_on_braced<hides_prepare> && !runs_on_braced<hides_id> && !runs_on_braced<hides_options>);
+    static_assert(!runs_on_braced<hides_init> && !runs_on_braced<hides_step> && !runs_on_braced<hides_view>);
+    static_assert(!runs_on_braced<hides_estimate> && !runs_on_braced<hides_best> && !runs_on_braced<hides_intrinsic>);
+    // prepare must return a std::expected: one that returns a std::optional problem has a value_type but no error, which
+    // run needs on its failure path, so the call was a hard error there.
+    struct optional_prepare : nr::bisection<>
+    {
+        template<class F, class In>
+        constexpr auto prepare(const F& fn, const In& in) const
+        {
+            auto p  = nr::bisection<>::prepare(fn, in);
+            using P = std::remove_cvref_t<decltype(*p)>;
+            return p ? std::optional<P> { *p } : std::optional<P> {};
+        }
+    };
+    static_assert(!runs_on_pair<optional_prepare> && !runs_on_braced<optional_prepare>);
+    // The builders read views through detail::stop_allowed_v: a facade-derived type without it makes with_stop false
+    // too, not a hard error inside that variable template.
+    struct no_views : nxx::bracketing_facade
+    {
+    };
+    template<class S, class C>
+    constexpr bool takes_stop = requires(const S& s, C c) { s.with_stop(c); };
+    static_assert(!takes_stop<no_views, nxx::width_tol<double>> && !takes_stop<no_views, nxx::f_tol<double>>);
+    static_assert(takes_stop<nr::bisection<>, nxx::width_tol<double>> && takes_stop<nr::brent<>, nxx::f_tol<double>>);
+#if !defined(_MSC_VER) || defined(__clang__)
+    // A views of the wrong kind is false too. cl rejects these types at with_stop's constraint, with or without the
+    // check, so they are left out there.
+    struct int_views : nxx::bracketing_facade
+    {
+        static constexpr int views = 0;
+    };
+    struct member_views : nxx::bracketing_facade
+    {
+        nxx::view_kind views = nxx::view_kind::enclosure;
+    };
+    static_assert(!takes_stop<int_views, nxx::f_tol<double>> && !takes_stop<member_views, nxx::f_tol<double>>);
+#endif
+
+    TEST_CASE("solvers: a solver that implements the protocol runs through the facade under its own id")
+    {
+        const auto res = own_bisection {}(sq2, { 1.0, 2.0 });
+        const auto ref = nr::bisection {}(sq2, { 1.0, 2.0 });
+        if (res && ref) {
+            CHECK(res->by == nxx::algo::user_first);
+            CHECK(res->x == ref->x);
+            CHECK(res->used.iterations == ref->used.iterations);
+            CHECK(res->used.evaluations == ref->used.evaluations);
+        }
+        else
+            FAIL_CHECK("bisection's protocol under its own id failed on x^2 - 2");
+    }
+
     // best_x needs a solution with an x; a search result is a sign_bracket, with two ends.
     template<class R>
     concept has_best_x = requires(const R& r) { nxx::best_x(r); };

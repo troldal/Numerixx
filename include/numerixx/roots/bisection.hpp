@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <expected>
 #include <optional>
+#include <type_traits>
 
 NXX_BEGIN_HEADER
 
@@ -58,6 +59,10 @@ namespace nxx::roots
             requires(is_criterion_v<C> && !criterion_for_v<C, view_kind::enclosure>)
         explicit bisection(C) NXX_DELETE("x_tol and step_tol compare successive iterates; bracketing methods converge on the "
                                          "enclosure: use width_tol{abs[, rel]} or floored_width{}");
+
+        template<class R>
+            requires((std::is_arithmetic_v<R> || real<R>) && !std::is_convertible_v<R, stop_type>)
+        explicit bisection(R) NXX_DELETE("a tolerance is a criterion, not a number: write bisection{nxx::width_tol{1e-10}}");
 
         constexpr bisection(nxx::detail::from_options_t, Opt o) : opt_(std::move(o)) {}
 

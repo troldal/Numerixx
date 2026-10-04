@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <expected>
 #include <optional>
+#include <type_traits>
 
 NXX_BEGIN_HEADER
 
@@ -59,6 +60,10 @@ namespace nxx::roots
         template<class C>
             requires(is_criterion_v<C> && !criterion_for_v<C, view_kind::point>)
         explicit secant(C) NXX_DELETE("width_tol needs a bracketing method (the view has no enclosure()); use x_tol or step_tol");
+
+        template<class R>
+            requires((std::is_arithmetic_v<R> || real<R>) && !std::is_convertible_v<R, stop_type>)
+        explicit secant(R) NXX_DELETE("a tolerance is a criterion, not a number: write secant{nxx::x_tol{1e-10}}");
 
         constexpr secant(nxx::detail::from_options_t, Opt o) : opt_(std::move(o)) {}
 

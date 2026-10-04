@@ -101,6 +101,10 @@ namespace nxx::roots
             requires(is_criterion_v<C> && !criterion_for_v<C, view_kind::point>)
         explicit newton(C) NXX_DELETE("width_tol needs a bracketing method (the view has no enclosure()); use x_tol or step_tol");
 
+        template<class R>
+            requires((std::is_arithmetic_v<R> || real<R>) && !std::is_convertible_v<R, stop_type>)
+        explicit newton(R) NXX_DELETE("a tolerance is a criterion, not a number: write newton{nxx::x_tol{1e-10}}");
+
         constexpr newton(nxx::detail::from_options_t, Opt o) : opt_(std::move(o)) {}
 
         constexpr const Opt& options() const noexcept { return opt_; }

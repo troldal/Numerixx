@@ -7,7 +7,9 @@
 //
 // The family facades (bracketing, open, search) are deducing-this bases, no CRTP. Each constrains operator() and .on()
 // on the inputs its solvers accept and deletes everything else with a reason, so std::is_invocable_v is false (not a
-// hard error) for a solver given the wrong kind of input.
+// hard error) for a solver given the wrong kind of input. operator() is also constrained on the solver protocol
+// (detail::runnable_v), so a solver that lacks a protocol member gives false too, and a reason. A member of the wrong
+// type is still a hard error inside detail::run or nxx::iterate (DESIGN §6.6).
 #pragma once
 
 #include <numerixx/config.hpp>
@@ -72,9 +74,19 @@ namespace nxx
         // Whether solver S's with_stop and public rebuild accept stop criterion C: C can stop S alone (a bare
         // min_iterations guard cannot) and does not try to tighten S's own tolerance. with_stop and every solver's
         // rebuild use this one predicate, so a solver that sets internal_tolerance gets both halves of the rule; such a
-        // solver also constrains its from_options constructor with it (DESIGN §6.8).
+        // solver also constrains its from_options constructor with it (DESIGN §6.8). False, not a hard error, for a type
+        // without views, and on GCC, Clang and clang-cl also for a views that is not a view_kind constant (an int, a data
+        // member, a function): forming S::views as the template argument is part of the nested requirement's
+        // substitution. cl 19.51 treats that invalid argument as a hard error; it rejects such a malformed solver at
+        // with_stop's constraint anyway. tightens_tolerance_v is asked only after it, because an && in a variable
+        // template's initializer does not stop the instantiation of its later operands.
         template<class S, class C>
-        inline constexpr bool stop_allowed_v = stop_criterion_for_v<C, S::views> && !tightens_tolerance_v<S, C>;
+        inline constexpr bool stop_allowed_v = [] {
+            if constexpr (!requires { requires stop_criterion_for_v<C, S::views>; })
+                return false;
+            else
+                return !tightens_tolerance_v<S, C>;
+        }();
     }    // namespace detail
 
     template<class Stop, class Deriv = no_derivative, class Proj = no_projection, class Obs = no_observer>
@@ -235,8 +247,25 @@ namespace nxx
             return nxx::iterate(solver, *p);
         }
 
+        // Whether S states the inputs it takes: a static bool variable template accepts_v<In> (DESIGN §6.6). An accepts_v
+        // that is not a template is ruled out first, because GCC 16 makes `S::template accepts_v<In>` a hard error for
+        // it, even inside a requires-expression.
         template<class S, class In>
-        inline constexpr bool accepts_v = S::template accepts_v<std::remove_cvref_t<In>>;
+        inline constexpr bool states_inputs_v = [] {
+            if constexpr (requires { S::accepts_v; })
+                return false;
+            else
+                return requires { std::bool_constant<S::template accepts_v<std::remove_cvref_t<In>>> {}; };
+        }();
+        // False, not a hard error, for a solver without accepts_v. Each test is asked only once the one before it holds:
+        // an && in a variable template's initializer does not stop the instantiation of its later operands.
+        template<class S, class In>
+        inline constexpr bool accepts_v = [] {
+            if constexpr (states_inputs_v<S, In>)
+                return bool(S::template accepts_v<std::remove_cvref_t<In>>);
+            else
+                return false;
+        }();
         template<class S, class F>
         inline constexpr bool ready_v = S::template ready_v<F>;
         // Whether F can be called with the scalar type of the input (only asked once accepts_v holds). F decays: for a
@@ -244,9 +273,50 @@ namespace nxx
         // warns about (C4180); a function and a pointer to it are invocable alike.
         template<class S, class F, class In>
         inline constexpr bool input_callable_v = S::template callable_v<std::decay_t<F>, std::remove_cvref_t<In>>;
-        // An input that is not accepted, and not a C array (MSVC cannot order the array overload against this one).
+        // An input that is not accepted, and not a C array (MSVC cannot order the array overload against this one). A
+        // solver that does not state its inputs at all is incomplete instead.
         template<class S, class In>
-        inline constexpr bool rejected_v = !accepts_v<S, In> && !std::is_array_v<std::remove_cvref_t<In>>;
+        inline constexpr bool rejected_v = states_inputs_v<S, In> && !accepts_v<S, In> && !std::is_array_v<std::remove_cvref_t<In>>;
+
+        // What prepare returns on run's path: the function by std::cref (F& rather than const F&, which would qualify a
+        // function type), then the input.
+        template<class S, class F, class In>
+        using prepared_t = decltype(std::declval<const S&>().prepare(std::cref(std::declval<F&>()), std::declval<const In&>()));
+
+        // Whether run can call S (DESIGN §6.6): prepare(std::cref(f), in) returns a std::expected problem, and S is an
+        // iterative_solver_for that problem (id, options, init, step, view, estimate, best, intrinsic, nfev). Without
+        // it, a solver that lacks a member made std::is_invocable_v a hard error inside run. Members are checked for
+        // presence, not for every type the driver needs: a prepare error that init's failure cannot hold, an options()
+        // that is not an options aggregate or an init error that is not a failure is still a hard error in run or
+        // iterate (DESIGN §6.6). Asked only once accepts_v, ready_v and input_callable_v hold.
+        template<class S, class F, class In>
+        inline constexpr bool runnable_v = [] {
+            if constexpr (requires {
+                              typename prepared_t<S, F, In>::value_type;
+                              typename prepared_t<S, F, In>::error_type;
+                          })
+                return iterative_solver_for<S, typename prepared_t<S, F, In>::value_type>;
+            else
+                return false;
+        }();
+
+        // A solver that cannot take part in the call: it does not state its inputs, or it accepts this one and cannot
+        // run it. Arrays are left to the array overloads, which ask runnable_v themselves.
+        template<class S, class F, class In>
+        inline constexpr bool incomplete_v = [] {
+            if constexpr (std::is_array_v<std::remove_cvref_t<In>>)
+                return false;
+            else if constexpr (!states_inputs_v<S, In>)
+                return true;
+            else if constexpr (!accepts_v<S, In>)
+                return false;
+            else if constexpr (!ready_v<S, F>)
+                return false;
+            else if constexpr (!input_callable_v<S, F, In>)
+                return false;
+            else
+                return !runnable_v<S, F, In>;
+        }();
     }    // namespace detail
 
     // Bracketing methods: a bracket<T>, a braced {lo, hi}, a std::pair, the result of bracket<T>::make, a sign_bracket
@@ -254,15 +324,26 @@ namespace nxx
     struct bracketing_facade : solver_facade
     {
         template<class Self, class F, class In>
-            requires(detail::accepts_v<Self, In> && detail::ready_v<Self, F> && detail::input_callable_v<Self, F, In>)
+            requires(detail::accepts_v<Self, In> && detail::ready_v<Self, F> && detail::input_callable_v<Self, F, In> &&
+                     detail::runnable_v<Self, F, In>)
         constexpr auto operator()(this const Self& self, const F& fn, const In& in)
         { return detail::run(self, fn, in); }
 
         // A braced list or a C array: N is deduced, so {x} is not taken as {x, 0} and {a, b, c} is not cut short.
         template<class Self, class F, real T, std::size_t N>
-            requires(N == 2 && detail::ready_v<Self, F> && detail::input_callable_v<Self, F, std::pair<T, T>>)
+            requires(N == 2 && detail::ready_v<Self, F> && detail::input_callable_v<Self, F, std::pair<T, T>> &&
+                     detail::runnable_v<Self, F, std::pair<T, T>>)
         constexpr auto operator()(this const Self& self, const F& fn, const T (&lo_hi)[N])
         { return detail::run(self, fn, std::pair<T, T> { lo_hi[0], lo_hi[1] }); }
+
+        // A solver that does not implement the protocol (DESIGN §6.6) for {lo, hi}, and below for any other input.
+        template<class Self, class F, real T, std::size_t N>
+            requires(N == 2 && detail::ready_v<Self, F> && detail::input_callable_v<Self, F, std::pair<T, T>> &&
+                     !detail::runnable_v<Self, F, std::pair<T, T>>)
+        void operator()(this const Self&, const F&, const T (&)[N]) NXX_DELETE("this solver does not implement the solver protocol "
+                                                                               "(DESIGN 6.6): it needs accepts_v, prepare(f, in), "
+                                                                               "and id, options(), init, step, view, estimate, best "
+                                                                               "and intrinsic for the problem prepare returns");
 
         template<class Self, class F, real T, std::size_t N>
             requires(N == 2 && detail::ready_v<Self, F> && !detail::input_callable_v<Self, F, std::pair<T, T>>)
@@ -284,6 +365,13 @@ namespace nxx
             requires(detail::accepts_v<Self, In> && detail::ready_v<Self, F> && !detail::input_callable_v<Self, F, In>)
         void operator()(this const Self&, const F&, const In&) NXX_DELETE("the function cannot be called with the "
                                                                           "scalar type of the bracket");
+
+        template<class Self, class F, class In>
+            requires detail::incomplete_v<Self, F, In>
+        void operator()(this const Self&, const F&, const In&) NXX_DELETE("this solver does not implement the solver protocol "
+                                                                          "(DESIGN 6.6): it needs accepts_v, prepare(f, in), "
+                                                                          "and id, options(), init, step, view, estimate, best "
+                                                                          "and intrinsic for the problem prepare returns");
 
         template<class Self, class In>
             requires detail::accepts_v<Self, In>
@@ -312,7 +400,8 @@ namespace nxx
     struct open_facade : solver_facade
     {
         template<class Self, class F, class In>
-            requires(detail::accepts_v<Self, In> && detail::ready_v<Self, F> && detail::input_callable_v<Self, F, In>)
+            requires(detail::accepts_v<Self, In> && detail::ready_v<Self, F> && detail::input_callable_v<Self, F, In> &&
+                     detail::runnable_v<Self, F, In>)
         constexpr auto operator()(this const Self& self, const F& fn, const In& in)
         { return detail::run(self, fn, in); }
 
@@ -322,8 +411,9 @@ namespace nxx
                                                                           "a root estimate; bracketing solvers take "
                                                                           "{lo, hi}");
 
+        // A solver that does not state its inputs gets the protocol's reason below instead (not an ambiguous call).
         template<class Self, class F, class I>
-            requires std::is_integral_v<std::remove_cvref_t<I>>
+            requires(std::is_integral_v<std::remove_cvref_t<I>> && detail::states_inputs_v<Self, I>)
         void operator()(this const Self&, const F&, const I&) NXX_DELETE("open methods take a guess of a real type: write 1.0, not 1");
 
         template<class Self, class F, class In>
@@ -342,15 +432,36 @@ namespace nxx
                                                                           ".with_derivative(deriv::numeric{}), a "
                                                                           "callable with .derivative(), or use secant");
 
+        template<class Self, class F, class In>
+            requires detail::incomplete_v<Self, F, In>
+        void operator()(this const Self&, const F&, const In&) NXX_DELETE("this solver does not implement the solver protocol "
+                                                                          "(DESIGN 6.6): it needs accepts_v, prepare(f, in), "
+                                                                          "and id, options(), init, step, view, estimate, best "
+                                                                          "and intrinsic for the problem prepare returns");
+
+        // A braced list or a C array: open methods start from one point, so {lo, hi} (or {x}) gets a reason rather than a
+        // bare "no matching function". Arrays are left out of the catch-alls above, so only this overload takes them.
+        template<class Self, class F, class T, std::size_t N>
+        void operator()(this const Self&, const F&, const T (&)[N]) NXX_DELETE("open methods take one guess of a real type "
+                                                                               "or a root estimate, not a braced list: write "
+                                                                               "1.0, or pass {lo, hi} to a bracketing solver");
+
         template<class Self, class In>
             requires detail::accepts_v<Self, In>
         constexpr auto on(this const Self& self, In in)
         { return bound<Self, In> { self, std::move(in) }; }
 
+        template<class Self, class T, std::size_t N>
+        void on(this const Self&, const T (&)[N]) NXX_DELETE("open methods take one guess of a real type or a root "
+                                                             "estimate, not a braced list: write 1.0, or pass {lo, hi} to a "
+                                                             "bracketing solver");
+
+        // A forwarding reference, for the reason given in bracketing_facade: by value, a C array would decay to a
+        // pointer, which cl cannot order against the array overload above (C2668).
         template<class Self, class In>
-            requires(detail::rejected_v<Self, In> && !std::is_integral_v<std::remove_cvref_t<In>>)
-        void on(this const Self&, In) NXX_DELETE("open methods take a guess of a real type or a root estimate; "
-                                                 "bracketing solvers take {lo, hi}");
+            requires(detail::rejected_v<Self, std::remove_cvref_t<In>> && !std::is_integral_v<std::remove_cvref_t<In>>)
+        void on(this const Self&, In&&) NXX_DELETE("open methods take a guess of a real type or a root estimate; "
+                                                   "bracketing solvers take {lo, hi}");
 
         template<class Self, class I>
             requires std::is_integral_v<std::remove_cvref_t<I>>
@@ -366,15 +477,26 @@ namespace nxx
                                                        "the first sign change or when the budget runs out");
 
         template<class Self, class F, class In>
-            requires(detail::accepts_v<Self, In> && detail::ready_v<Self, F> && detail::input_callable_v<Self, F, In>)
+            requires(detail::accepts_v<Self, In> && detail::ready_v<Self, F> && detail::input_callable_v<Self, F, In> &&
+                     detail::runnable_v<Self, F, In>)
         constexpr auto operator()(this const Self& self, const F& fn, const In& in)
         { return detail::run(self, fn, in); }
 
         // A braced list or a C array: N is deduced, so {x} is not taken as {x, 0} and {a, b, c} is not cut short.
         template<class Self, class F, real T, std::size_t N>
-            requires(N == 2 && detail::ready_v<Self, F> && detail::input_callable_v<Self, F, std::pair<T, T>>)
+            requires(N == 2 && detail::ready_v<Self, F> && detail::input_callable_v<Self, F, std::pair<T, T>> &&
+                     detail::runnable_v<Self, F, std::pair<T, T>>)
         constexpr auto operator()(this const Self& self, const F& fn, const T (&lo_hi)[N])
         { return detail::run(self, fn, std::pair<T, T> { lo_hi[0], lo_hi[1] }); }
+
+        // A solver that does not implement the protocol (DESIGN §6.6) for {lo, hi}, and below for any other input.
+        template<class Self, class F, real T, std::size_t N>
+            requires(N == 2 && detail::ready_v<Self, F> && detail::input_callable_v<Self, F, std::pair<T, T>> &&
+                     !detail::runnable_v<Self, F, std::pair<T, T>>)
+        void operator()(this const Self&, const F&, const T (&)[N]) NXX_DELETE("this solver does not implement the solver protocol "
+                                                                               "(DESIGN 6.6): it needs accepts_v, prepare(f, in), "
+                                                                               "and id, options(), init, step, view, estimate, best "
+                                                                               "and intrinsic for the problem prepare returns");
 
         template<class Self, class F, real T, std::size_t N>
             requires(N == 2 && detail::ready_v<Self, F> && !detail::input_callable_v<Self, F, std::pair<T, T>>)
@@ -394,6 +516,13 @@ namespace nxx
             requires(detail::accepts_v<Self, In> && detail::ready_v<Self, F> && !detail::input_callable_v<Self, F, In>)
         void operator()(this const Self&, const F&, const In&) NXX_DELETE("the function cannot be called with the "
                                                                           "scalar type of the window");
+
+        template<class Self, class F, class In>
+            requires detail::incomplete_v<Self, F, In>
+        void operator()(this const Self&, const F&, const In&) NXX_DELETE("this solver does not implement the solver protocol "
+                                                                          "(DESIGN 6.6): it needs accepts_v, prepare(f, in), "
+                                                                          "and id, options(), init, step, view, estimate, best "
+                                                                          "and intrinsic for the problem prepare returns");
 
         template<class Self, class In>
             requires detail::accepts_v<Self, In>
