@@ -94,8 +94,8 @@ build/gcc/tests/numerixx_test_roots -tc="solvers: brent*"   # a doctest binary d
 - **Every header with arithmetic** wraps its body in `NXX_BEGIN_HEADER` … `NXX_END_HEADER` (`config.hpp`).
   - On Clang, clang-cl and em++ that turns floating-point contraction off, so that, given the same values of f, a
     solver takes the same path on every preset. The golden table in `tests/roots/test_determinism.cpp` checks this.
-  - GCC still contracts on FMA targets. Whether to add `-ffp-contract=off` is an open phase-1 question (DESIGN
-    §5.3); do not decide it without the user.
+  - GCC still contracts on FMA targets. Decided on 2026-10-04 (DESIGN §12.20): `-ffp-contract=off` is documented
+    for consumers (DESIGN §5.3) and not added to the GCC interface flags; do not add it without the user.
 - **Maths:**
   - Call the `nxx::math` helpers (`abs`, `isfinite`, `isnan`, `sqrt`, `midpoint`, `pow2`, `root_eps`), not `<cmath>`,
     on constexpr and multiprecision paths.
