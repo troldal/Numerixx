@@ -108,7 +108,7 @@ namespace nxx::roots
         // Only options whose stop criterion can stop this solver: rebuild is public, so it must not be a way around the
         // constructors and with_stop (a bare min_iterations guard would report success without testing accuracy).
         template<class O2>
-            requires stop_criterion_for_v<typename O2::stop_type, views>
+            requires nxx::detail::stop_allowed_v<newton, typename O2::stop_type>
         constexpr auto rebuild(O2 o) const
         { return newton<O2> { nxx::detail::from_options, std::move(o) }; }
 

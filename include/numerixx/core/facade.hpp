@@ -57,6 +57,24 @@ namespace nxx
             explicit constexpr from_options_t() = default;
         };
         inline constexpr from_options_t from_options {};
+
+        // Whether stop criterion C would try to tighten solver S's own tolerance: S has one (internal_tolerance) and C
+        // contains a width criterion. Such a solver's intrinsic test runs before the stop criterion and reports success
+        // once its own tolerance holds, so with_stop can only add an early exit or a failure (DESIGN §6.8).
+        template<class S, class C>
+        inline constexpr bool tightens_tolerance_v = [] {
+            if constexpr (S::internal_tolerance)
+                return contains_width_v<C>;
+            else
+                return false;
+        }();
+
+        // Whether solver S's with_stop and public rebuild accept stop criterion C: C can stop S alone (a bare
+        // min_iterations guard cannot) and does not try to tighten S's own tolerance. with_stop and every solver's
+        // rebuild use this one predicate, so a solver that sets internal_tolerance gets both halves of the rule; such a
+        // solver also constrains its from_options constructor with it (DESIGN §6.8).
+        template<class S, class C>
+        inline constexpr bool stop_allowed_v = stop_criterion_for_v<C, S::views> && !tightens_tolerance_v<S, C>;
     }    // namespace detail
 
     template<class Stop, class Deriv = no_derivative, class Proj = no_projection, class Obs = no_observer>
@@ -83,7 +101,7 @@ namespace nxx
     };
 
     // The builders shared by every solver. A solver provides options(), rebuild(options) (constrained on
-    // stop_criterion_for_v, like its constructors) and the kind of its views,
+    // detail::stop_allowed_v<Self, typename O2::stop_type>, as with_stop is) and the kind of its views,
     // static constexpr view_kind views (named so because view(s) is the protocol function).
     struct solver_facade
     {
@@ -101,6 +119,11 @@ namespace nxx
         static constexpr bool uses_derivative = false;
         static constexpr bool projects        = false;
 
+        // Whether the solver has its own tolerance, which its intrinsic test applies (brent; later golden, brent_min,
+        // toms748, itp). Its constructor takes the width criterion; with_stop rejects one, at any depth of || and &&,
+        // because the intrinsic test reports success before the stop criterion is asked (DESIGN §6.8).
+        static constexpr bool internal_tolerance = false;
+
         template<class Self>
         constexpr auto with_budget(this const Self& self, max_iterations budget)
         {
@@ -110,7 +133,7 @@ namespace nxx
         }
 
         template<class Self, class C>
-            requires stop_criterion_for_v<C, Self::views>
+            requires detail::stop_allowed_v<Self, C>
         constexpr auto with_stop(this const Self& self, C stop)
         {
             const auto& o = self.options();
@@ -129,6 +152,13 @@ namespace nxx
             requires(criterion_for_v<C, Self::views> && detail::guard_only_v<C>)
         void with_stop(this const Self&, C) NXX_DELETE("min_iterations only guards another criterion: combine it with a "
                                                        "convergence test using && (your_test && min_iterations{n})");
+
+        template<class Self, class C>
+            requires(stop_criterion_for_v<C, Self::views> && detail::tightens_tolerance_v<Self, C>)
+        void with_stop(this const Self&, C) NXX_DELETE("this solver has its own tolerance: pass the width criterion to its "
+                                                       "constructor (brent{nxx::width_tol{1e-10}}); with_stop adds an early "
+                                                       "exit or a failure (f_tol, max_evaluations) and cannot tighten that "
+                                                       "tolerance");
 
         template<class Self, class D>
             requires Self::uses_derivative
