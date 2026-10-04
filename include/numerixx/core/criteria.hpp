@@ -126,6 +126,52 @@ namespace nxx
 
     namespace detail
     {
+        // Whether C is a width criterion (one that applies to enclosures only: width_tol, floored_width) or contains one
+        // under || or &&, at any depth. A solver with its own tolerance (brent) rejects such a stop criterion: its
+        // intrinsic test runs first and reports success once its own tolerance holds, so an external width criterion
+        // could not tighten it (DESIGN §6.8). Each step is an if constexpr, so no operand is instantiated that the
+        // answer does not need.
+        template<class C>
+        struct contains_width
+        {
+            static constexpr bool value = [] {
+                if constexpr (!is_criterion_v<C>)
+                    return false;
+                else if constexpr (requires { C::applies_to; })
+                    return C::applies_to == view_kind::enclosure;
+                else
+                    return false;
+            }();
+        };
+
+        template<class A, class B>
+        struct contains_width<any_of_t<A, B>>
+        {
+            static constexpr bool value = [] {
+                if constexpr (contains_width<std::remove_cvref_t<A>>::value)
+                    return true;
+                else
+                    return contains_width<std::remove_cvref_t<B>>::value;
+            }();
+        };
+
+        template<class A, class B>
+        struct contains_width<all_of_t<A, B>>
+        {
+            static constexpr bool value = [] {
+                if constexpr (contains_width<std::remove_cvref_t<A>>::value)
+                    return true;
+                else
+                    return contains_width<std::remove_cvref_t<B>>::value;
+            }();
+        };
+
+        template<class C>
+        inline constexpr bool contains_width_v = contains_width<std::remove_cvref_t<C>>::value;
+    }    // namespace detail
+
+    namespace detail
+    {
         template<class T>
         constexpr bool mixed_tolerance_ok(const T& abs, const T& rel) noexcept
         { return tag::abs_tolerance::check(abs) && tag::rel_tolerance::check(rel) && (abs > T(0) || rel > T(0)); }

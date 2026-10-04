@@ -85,6 +85,9 @@ numerixx_add_compile_fail_test(${_nxx_cf}/secant_with_derivative.cpp
 numerixx_add_compile_fail_test(${_nxx_cf}/expand_with_stop.cpp
   LINK numerixx::roots
   EXPECT "no configurable stop criterion" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/brent_with_stop_width.cpp
+  LINK numerixx::roots
+  EXPECT "this solver has its own tolerance: pass the width criterion to its constructor" DELETE_REASON)
 
 # ---- Composition errors ------------------------------------------------------------------------------------------
 numerixx_add_compile_fail_test(${_nxx_cf}/first_of_without_on.cpp

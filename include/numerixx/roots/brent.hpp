@@ -6,7 +6,10 @@
 // stop_reason::criterion exactly then, as every width criterion guarantees (DESIGN §9.3). With a tolerance below the
 // floor it stops at the floor, with width <= 4 eps |b|: stop_reason::criterion if that width still meets the threshold,
 // stop_reason::resolution_limit otherwise. The external stop defaults to never{}, so there are not two sources of
-// truth. It bisects while a sample is infinite (log(x) on [0, 2]) and runs the pole check. Budget 100.
+// truth. The intrinsic test runs before the external stop, so with_stop adds an early exit (f_tol) or a failure
+// (max_evaluations) and cannot tighten the tolerance: with_stop and rebuild reject a stop criterion that contains a
+// width criterion, which goes to the constructor instead (brent{width_tol{1e-12}}). It bisects while a sample is
+// infinite (log(x) on [0, 2]) and runs the pole check. Budget 100.
 #pragma once
 
 #include <numerixx/roots/bracket.hpp>
@@ -83,6 +86,8 @@ namespace nxx::roots
     public:
         static constexpr algo      id    = algos::brent;
         static constexpr view_kind views = view_kind::enclosure;
+        // The tolerance decides convergence, so with_stop and rebuild reject a width criterion (solver_facade).
+        static constexpr bool internal_tolerance = true;
         template<class In>
         static constexpr bool accepts_v = detail::bracket_input_v<In>;
         template<class F, class In>
@@ -105,15 +110,23 @@ namespace nxx::roots
         explicit brent(C) NXX_DELETE("brent's tolerance is a width criterion: width_tol{abs[, rel]} or floored_width{} "
                                      "(x_tol and step_tol compare successive iterates; bracketing methods converge on the enclosure)");
 
-        constexpr brent(nxx::detail::from_options_t, Opt o, Tol tol) : tol_(tol), opt_(std::move(o)) {}
+        // Constrained as rebuild is, so no options that carry a width criterion build a brent, not even through the
+        // detail key (DESIGN §6.8). The constraint spells brent<Tol, Opt>, not the injected-class-name: in the deduction
+        // guide that cl builds from this constructor, a constraint on the injected name is never satisfied.
+        constexpr brent(nxx::detail::from_options_t, Opt o, Tol tol)
+            requires nxx::detail::stop_allowed_v<brent<Tol, Opt>, typename Opt::stop_type>
+            : tol_(tol),
+              opt_(std::move(o))
+        {}
 
         constexpr const Opt& options() const noexcept { return opt_; }
         constexpr const Tol& tolerance() const noexcept { return tol_; }
 
         // Only options whose stop criterion can stop this solver: rebuild is public, so it must not be a way around the
-        // constructors and with_stop (a bare min_iterations guard would report success without testing accuracy).
+        // constructors and with_stop (a bare min_iterations guard would report success without testing accuracy), nor
+        // take a width criterion, which the tolerance's intrinsic test would preempt (with_stop's rule, DESIGN §6.8).
         template<class O2>
-            requires stop_criterion_for_v<typename O2::stop_type, views>
+            requires nxx::detail::stop_allowed_v<brent, typename O2::stop_type>
         constexpr auto rebuild(O2 o) const
         { return brent<Tol, O2> { nxx::detail::from_options, std::move(o), tol_ }; }
 

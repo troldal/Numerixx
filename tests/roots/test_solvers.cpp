@@ -1049,6 +1049,88 @@ TEST_SUITE("roots")
     static_assert(!rebuilds_with<nr::expand<>, nxx::options<guarded_t>>);
     static_assert(rebuilds_with<nr::expand<>, nxx::options<nxx::never>>);
 
+    // A solver with its own tolerance (brent) takes a width criterion only in its constructor. Its intrinsic test runs
+    // before the stop criterion, so a width criterion given to with_stop or rebuild, alone or at any depth of || and
+    // &&, reported stop_reason::criterion once brent's own tolerance held: width 6.66e-16 for width_tol{1e-20, 0} on
+    // x^2 - 2 over [1, 2] (DESIGN §6.8). with_stop deletes it with a reason and rebuild is constrained, so both are
+    // false here rather than hard errors. Solvers without their own tolerance (bisection) keep taking it.
+    template<class S, class C>
+    constexpr bool with_stop_accepts = requires(const S& s, const C& c) { s.with_stop(c); };
+
+    using wt_t           = nxx::width_tol<double>;
+    using fw_t           = nxx::floored_width;
+    using ft_t           = nxx::f_tol<double>;
+    using me_t           = nxx::max_evaluations;
+    using width_or_f_t   = decltype(std::declval<wt_t>() || std::declval<ft_t>());
+    using width_and_f_t  = decltype(std::declval<wt_t>() && std::declval<ft_t>());
+    using f_and_width_t  = decltype(std::declval<ft_t>() && std::declval<wt_t>());
+    using fw_or_f_t      = decltype(std::declval<fw_t>() || std::declval<ft_t>());
+    using nested_width_t = decltype((std::declval<ft_t>() || std::declval<me_t>()) &&
+                                    (std::declval<me_t>() || (std::declval<ft_t>() && std::declval<fw_t>())));
+    using f_or_budget_t  = decltype(std::declval<ft_t>() || std::declval<me_t>());
+    using f_guarded_t    = decltype(std::declval<ft_t>() && std::declval<guard_t>());
+    static_assert(nxx::detail::contains_width_v<wt_t> && nxx::detail::contains_width_v<fw_t>);
+    static_assert(nxx::detail::contains_width_v<width_or_f_t> && nxx::detail::contains_width_v<f_and_width_t>);
+    static_assert(nxx::detail::contains_width_v<nested_width_t> && nxx::detail::contains_width_v<const wt_t&>);
+    static_assert(!nxx::detail::contains_width_v<ft_t> && !nxx::detail::contains_width_v<f_or_budget_t>);
+    static_assert(!nxx::detail::contains_width_v<nxx::never> && !nxx::detail::contains_width_v<nxx::x_tol<double>>);
+    static_assert(!nxx::detail::contains_width_v<f_guarded_t> && !nxx::detail::contains_width_v<double>);
+    // Rejected on brent, through with_stop and through rebuild, whatever its tolerance.
+    static_assert(!with_stop_accepts<nr::brent<>, wt_t>);
+    static_assert(!with_stop_accepts<nr::brent<>, fw_t>);
+    static_assert(!with_stop_accepts<nr::brent<>, width_or_f_t>);
+    static_assert(!with_stop_accepts<nr::brent<>, width_and_f_t>);
+    static_assert(!with_stop_accepts<nr::brent<>, f_and_width_t>);
+    static_assert(!with_stop_accepts<nr::brent<>, nested_width_t>);
+    static_assert(!with_stop_accepts<nr::brent<wt_t>, fw_t>);
+    static_assert(!rebuilds_with<nr::brent<>, nxx::options<wt_t>>);
+    static_assert(!rebuilds_with<nr::brent<>, nxx::options<width_or_f_t>>);
+    static_assert(!rebuilds_with<nr::brent<>, nxx::options<nested_width_t>>);
+    static_assert(!rebuilds_with<nr::brent<wt_t>, nxx::options<fw_t>>);
+    // The detail key is closed too, and with_stop and every rebuild share one predicate (stop_allowed_v).
+    static_assert(!std::is_constructible_v<nr::brent<fw_t, nxx::options<wt_t>>, nxx::detail::from_options_t, nxx::options<wt_t>, fw_t>);
+    static_assert(std::is_constructible_v<nr::brent<fw_t, nxx::options<ft_t>>, nxx::detail::from_options_t, nxx::options<ft_t>, fw_t>);
+    static_assert(!nxx::detail::stop_allowed_v<nr::brent<>, width_or_f_t> && nxx::detail::stop_allowed_v<nr::brent<>, ft_t>);
+    static_assert(!nxx::detail::stop_allowed_v<nr::brent<>, guard_t> && !nxx::detail::stop_allowed_v<nr::bisection<>, guard_t>);
+    static_assert(nxx::detail::stop_allowed_v<nr::bisection<>, width_and_f_t>);
+    // Kept: brent's early exits and failures, its constructor, and every width criterion on bisection.
+    static_assert(with_stop_accepts<nr::brent<>, ft_t>);
+    static_assert(with_stop_accepts<nr::brent<>, me_t>);
+    static_assert(with_stop_accepts<nr::brent<>, f_or_budget_t>);
+    static_assert(with_stop_accepts<nr::brent<>, f_guarded_t>);
+    static_assert(with_stop_accepts<nr::brent<wt_t>, ft_t>);
+    static_assert(rebuilds_with<nr::brent<>, nxx::options<ft_t>>);
+    static_assert(std::is_constructible_v<nr::brent<wt_t>, wt_t>);
+    static_assert(std::is_constructible_v<nr::brent<>, fw_t>);
+    static_assert(with_stop_accepts<nr::bisection<>, wt_t>);
+    static_assert(with_stop_accepts<nr::bisection<>, fw_or_f_t>);
+    static_assert(with_stop_accepts<nr::bisection<>, width_and_f_t>);
+    static_assert(with_stop_accepts<nr::bisection<>, nested_width_t>);
+    static_assert(rebuilds_with<nr::bisection<>, nxx::options<wt_t>>);
+
+    // The route that works: the width criterion as brent's tolerance. Below brent's resolution floor (4 eps |b|) it
+    // stops at the floor and reports resolution_limit, because the width does not meet the tolerance; with_stop gave
+    // stop_reason::criterion at that same width. The tolerance is the smallest normal T, below the floor for every T: a
+    // fixed 1e-20 is above it where long double is binary128 (wasm32, ε = 1.9e-34), and brent then meets it.
+    TEST_CASE_TEMPLATE("solvers: brent with a width tolerance below its floor reports resolution_limit", T, float, double, long double)
+    {
+        constexpr T tiny = (std::numeric_limits<T>::min)();
+        const auto  quad = [](T x) { return x * x - T(2); };
+        const auto  res  = nr::brent { nxx::width_tol { tiny, T(0) } }(quad, { T(1), T(2) });
+        if (res) {
+            CHECK(res->how == nxx::stop_reason::resolution_limit);
+            if (res->enclosure) {
+                const T width = res->enclosure->hi() - res->enclosure->lo();
+                CHECK(width > tiny);
+                CHECK(width <= T(4) * std::numeric_limits<T>::epsilon() * T(2));
+            }
+            else
+                FAIL_CHECK("brent returned no enclosure");
+        }
+        else
+            FAIL_CHECK("brent failed on x^2 - 2 with a tolerance below its floor");
+    }
+
     // A braced list is a bracket only with two ends of a real type: {x} was once taken as {x, 0} and solved on [0, x].
     template<class S, class F>
     concept takes_one_end = requires(const S& s, const F& fn) { s(fn, { 1.0 }); };

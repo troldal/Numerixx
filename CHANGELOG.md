@@ -93,7 +93,9 @@ one.
 - `examples/quick_tour.cpp`: a tour of the library as it is now, built with the strict warning flags and run as a
   smoke test.
 - Known limits, documented in DESIGN §7.2: `expand` from a window on one side of 0 cannot cross 0 (phase 3), and a
-  large but finite initial sample can hide a pole from the pole check (add `&& f_tol{…}` for a residual guarantee).
+  large but finite initial sample can hide a pole from the pole check (for a residual guarantee, check |fx| of the
+  result, or use bisection with `&& f_tol{…}` and accept only `stop_reason::criterion` or `exact_zero`; brent's
+  `with_stop(f_tol{…})` is only an early exit).
 - Found by hosted CI and fixed: GCC 16.2 (the `gcc:16` container) reported a false `-Wmaybe-uninitialized` when a
   solver holding a lambda that captures a `std::vector` was copy-assigned, which failed every `-Werror` GCC build of
   the spike; GCC 16.1 locally did not warn. `copyable_box` now copies such a capture into a temporary and moves it in
@@ -137,6 +139,18 @@ one.
 
 ### Phase 1: core vocabulary (DESIGN §10.3)
 
+- Fixed: `brent` took a width criterion through `with_stop` and through its public `rebuild(options)`, and reported
+  `stop_reason::criterion` where its own tolerance held instead of the given one.
+  `brent{}.with_stop(width_tol{1e-20, 0})`, alone or with `|| f_tol{…}` or `&& f_tol{…}`, stopped at width 6.66e-16
+  on x² − 2 over [1, 2]. Its intrinsic test runs before the stop criterion, so `with_stop` can only add an early exit
+  (`f_tol`) or a failure (`max_evaluations`). `with_stop` and `rebuild` now reject any stop criterion that contains a
+  width criterion (`width_tol`, `floored_width`, at any depth of `||` and `&&`), with a reason that points to the
+  constructor: `brent{nxx::width_tol{1e-20, 0}}` reports `resolution_limit` at that width. The rule is keyed on a
+  facade trait, `internal_tolerance`, for the later solvers with their own tolerance, and `with_stop` and every
+  solver's `rebuild` share one predicate, `detail::stop_allowed_v` (DESIGN §6.8). brent has no spelling that
+  guarantees a residual, and never had one: `with_stop(floored_width{} && f_tol{1e-12})` reported `criterion` at
+  |fx| = 1 on a jump from −1 to +1, and `with_stop(f_tol{…})` is OR-ed with its tolerance. The docs that advised
+  `&& f_tol{…}` for a residual guarantee now restrict it to bisection (DESIGN §7.2, §9.3).
 - "newton needs a derivative" is now deleted in `open_facade`, keyed on the solver's `ready_v`, so `newton` declares no
   call operator and no `using open_facade::operator();`. Calls, `std::is_invocable_v` and the reason text are
   unchanged. GCC and cl now name `nxx::open_facade::operator()` in the error, and Clang lists the candidate in the
