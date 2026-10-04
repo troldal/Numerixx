@@ -165,6 +165,7 @@ build/gcc/tests/numerixx_test_roots -tc="solvers: brent*"   # a doctest binary d
 | `test-author` | write doctest cases, property tests, corpus cases, compile-fail cases and canonical calls | sonnet, high |
 | `numerics-reviewer` | review numerical correctness adversarially, with probes | opus, xhigh |
 | `cpp-reviewer` | review C++ mechanics and portability across GCC, Clang, MSVC, clang-cl and em++ | opus, high |
+| `simplicity-reviewer` | pull design notes, approved DESIGN sections and large diffs toward the smallest design that meets the requirement: keep, simplify, cut or defer | opus, high |
 | `matrix-runner` | build and test presets from scratch and report the results | sonnet, low |
 | `ci-investigator` | find out why hosted CI failed, and reproduce it | sonnet, medium |
 | `docs-auditor` | check that the docs' claims match the code and the measurements | sonnet, medium |
@@ -175,9 +176,10 @@ The `model` and `effort` lines in each agent's frontmatter set these. A call can
 **A new family** (optimize, multiroots with linalg, integrate, interpolate, poly) is designed before it is built:
 1. `phase-scope-checker` settles what the phase builds and what it only accommodates.
 2. `architect` writes the note.
-3. The note is reviewed in parallel: always by `api-ergonomics-reviewer` and by `phase-scope-checker` (its
-   `build now` and `accommodate, do not build` marks), and by `cpp-reviewer` and `numerics-reviewer` in design-note
-   mode when the options differ in their area.
+3. The note is reviewed in parallel: always by `api-ergonomics-reviewer`, `phase-scope-checker` (its
+   `build now` and `accommodate, do not build` marks) and `simplicity-reviewer` (the counterweight to the
+   others: what can be merged, cut, documented instead or deferred); and by `cpp-reviewer` and
+   `numerics-reviewer` in design-note mode when the options differ in their area.
 4. The main session calls `architect` again with its note and every reviewer's findings, verbatim. It revises once,
    or records each disagreement.
 5. The user approves an option and settles every `needs a decision` item. The main session writes the approved option
@@ -185,12 +187,14 @@ The `model` and `effort` lines in each agent's frontmatter set these. A call can
    `MIGRATION.md` must map.
 6. `algorithm-implementer` builds the first member from that section, including every rejection in the misuse
    catalogue. `test-author` then turns the catalogue into compile-fail and doctest cases and adds the canonical calls.
-7. Reviews (`cpp-reviewer`, `numerics-reviewer`), `docs-auditor` (`MIGRATION.md` rows), `matrix-runner`, the commit.
+7. Reviews (`cpp-reviewer`, `numerics-reviewer`, and `simplicity-reviewer` on a diff that adds public names,
+   overloads, traits or reason texts to the library, or more than about 300 lines under `include/`), `docs-auditor`
+   (`MIGRATION.md` rows), `matrix-runner`, the commit.
    Reproduce each review finding before fixing it, and give the fix back to the same reviewer: fixes repeat bug classes.
 
 A core note (a change to `core/` types, error codes or the criteria algebra) follows steps 1-5, then 6-7 with the
 DESIGN §6 section it changes in place of §7. In step 3, `api-ergonomics-reviewer` reviews it only when it changes a
-user-visible spelling, result field or error code.
+user-visible spelling, result field or error code; `simplicity-reviewer` always reviews it.
 
 `matrix-runner`, `algorithm-implementer`, `test-author` and `ci-investigator` build in `build/<preset>`. A `--fresh`
 configure deletes the cache under any build running in the same tree, so run only one of them at a time. The other
