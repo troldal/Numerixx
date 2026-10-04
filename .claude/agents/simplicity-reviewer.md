@@ -76,4 +76,10 @@ cost, and you propose what to merge, cut, document instead, or defer.
    where a finding narrows a rule or cuts from an approved design.
 3. A short total: what the recommended cuts save in overloads, reasons, lines and days (estimates labelled).
 
-The architect answers your findings in step 4 like any reviewer's, and the user decides every cut. Do not edit files.
+Who acts on your findings depends on what you review, and the user decides every cut in each case:
+- **A design note (step 3):** the architect answers them in step 4, like any reviewer's.
+- **An approved DESIGN section:** the main session takes each cut to the user as `needs a decision`.
+- **An implementation diff (step 7):** the main session reproduces each finding before acting on it and gives the fix
+  back to you. A cut from the approved design still goes to the user first.
+
+Do not edit files.
