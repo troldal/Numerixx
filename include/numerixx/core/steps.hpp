@@ -6,9 +6,11 @@
 //         for (const auto& st : nxx::steps_view{solver, *p} | std::views::take(8))
 //             if (st) trace(solver.estimate(*st).x);
 //
-// Element 0 is init(p), its failure mapped to a fault. The range ends after the first error or the first intrinsic
-// stop, and is otherwise infinite: bound it with std::views::take. It applies neither the stop criterion nor the
-// budget; those belong to nxx::iterate. fn must outlive the view, because the problem holds std::cref(fn).
+// Element 0 is init(p), its failure mapped to a fault. Each later element is a step through detail::checked_step, as in
+// the driver. A nested input code is already non_finite_value from nxx::evaluate in every element (DESIGN §6.4);
+// checked_step is the backstop for a step that returns one directly (§6.7). The range ends after the first
+// error or the first intrinsic stop, and is otherwise infinite: bound it with std::views::take. It applies neither the
+// stop criterion nor the budget; those belong to nxx::iterate. fn must outlive the view, because the problem holds std::cref(fn).
 #pragma once
 
 #include <numerixx/core/error.hpp>
@@ -57,7 +59,7 @@ namespace nxx
                 if (!*cur_ || parent_->alg_.intrinsic(**cur_))
                     done_ = true;
                 else
-                    cur_ = parent_->alg_.step(parent_->p_, **cur_);
+                    cur_ = nxx::detail::checked_step(parent_->alg_, parent_->p_, **cur_);    // as the driver steps (DESIGN §6.7)
                 return *this;
             }
 

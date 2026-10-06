@@ -43,8 +43,9 @@ namespace nxx::roots
     template<real T>
     struct root_estimate;
 
-    // A bracket with endpoint samples of opposite sign (or an exact zero). Samples may be +-inf. The only transition is
-    // narrowed(m, fm), which keeps the half that still changes sign.
+    // A bracket with endpoint samples of opposite sign (or an exact zero). Samples may be +-inf; the ends are finite, so
+    // width() is never NaN (DESIGN §6.7). The only transition is narrowed(m, fm), which keeps the half that still changes
+    // sign.
     template<real T>
     class sign_bracket
     {
@@ -56,7 +57,9 @@ namespace nxx::roots
     public:
         using value_type = T;
 
-        constexpr sign_bracket(nxx::detail::trust_me, T lo, T flo, T hi, T fhi) noexcept : lo_(lo), flo_(flo), hi_(hi), fhi_(fhi) {}
+        // Every construction site keeps lo < hi with finite ends: bracket<T>, narrowed(), brent's and expand's estimates.
+        constexpr sign_bracket(nxx::detail::trust_me, T lo, T flo, T hi, T fhi) noexcept : lo_(lo), flo_(flo), hi_(hi), fhi_(fhi)
+        { NXX_EXPECTS(math::isfinite(lo) && math::isfinite(hi)); }
 
         constexpr T    lo() const noexcept { return lo_; }
         constexpr T    hi() const noexcept { return hi_; }
@@ -102,6 +105,36 @@ namespace nxx::roots
         {}
 
         friend constexpr bool operator==(const root_estimate&, const root_estimate&) = default;
+
+        // The better of two failure payloads (DESIGN §6.6, §6.7, §7.2), found by ADL through nxx::better_than: a hidden
+        // friend, so that no namespace-scope better_than competes with the object nxx::better_than under using-directives.
+        // A strict weak order, so the best estimate of a chain does not depend on how its alternatives are grouped or
+        // folded. It compares the key (e, o, k, n, a) lexicographically:
+        //   e: an estimate with a sign-changing enclosure first (the enclosure is a guarantee, a small |f(x)| is not);
+        //   o, k: between two enclosures the narrower (nested, hence newer) by width(); a width that overflows to inf
+        //         ranks after every finite one, and when both overflow the halves hi/2 - lo/2 decide (exact at those
+        //         magnitudes). Rounded subtraction is monotone, so a strictly narrower enclosure never ranks after a
+        //         strictly wider one; half-widths alone would invert [d, 3d] and [2d, 5d] near the subnormal range;
+        //   n, a: then the smaller |f(x)|, with a NaN |f(x)| last.
+        // The ends of a sign_bracket are finite and lo < hi, so the width lies in (0, +inf] and is never NaN.
+        friend constexpr bool better_than(const root_estimate& a, const root_estimate& b) noexcept
+        {
+            if (a.enclosure.has_value() != b.enclosure.has_value()) return a.enclosure.has_value();
+            if (a.enclosure) {
+                T wa = a.enclosure->width();
+                T wb = b.enclosure->width();
+                if (!math::isfinite(wa) && !math::isfinite(wb)) {    // both overflow: the halves are exact at these magnitudes
+                    wa = a.enclosure->hi() / T(2) - a.enclosure->lo() / T(2);
+                    wb = b.enclosure->hi() / T(2) - b.enclosure->lo() / T(2);
+                }
+                if (wa < wb) return true;
+                if (wb < wa) return false;
+            }
+            const T fa = math::abs(a.fx);
+            const T fb = math::abs(b.fx);
+            if (math::isnan(fa)) return false;    // NaN last
+            return math::isnan(fb) || fa < fb;
+        }
     };
 
     template<real T>
@@ -109,23 +142,6 @@ namespace nxx::roots
     {
         return math::abs(flo_) <= math::abs(fhi_) ? root_estimate<T> { lo_, flo_, width(), *this }
                                                   : root_estimate<T> { hi_, fhi_, width(), *this };
-    }
-
-    // The better of two failure payloads (DESIGN §6.7), a strict weak order, so the best estimate of a chain does not
-    // depend on how its alternatives are grouped or folded: an estimate with a sign-changing enclosure beats one without
-    // (the enclosure is a guarantee, a small |f(x)| is not); between two enclosures the narrower one (nested, hence newer)
-    // wins; ties, and two estimates without enclosures, go by the smaller |f(x)|.
-    template<real T>
-    constexpr bool better_than(const root_estimate<T>& a, const root_estimate<T>& b) noexcept
-    {
-        if (a.enclosure.has_value() != b.enclosure.has_value()) return a.enclosure.has_value();
-        if (a.enclosure) {
-            const T wa = a.enclosure->width();
-            const T wb = b.enclosure->width();
-            if (wa < wb) return true;
-            if (wb < wa) return false;
-        }
-        return math::abs(a.fx) < math::abs(b.fx);
     }
 
     // What the stop criteria of open methods see.
@@ -283,7 +299,8 @@ namespace nxx::roots
         template<class In>
         using open_scalar_t = typename open_input<std::remove_cvref_t<In>>::scalar;
 
-        // Validates a window: invalid endpoints fail in-band with invalid_input (or the errc make() reported), at zero cost.
+        // Validates a window through bracket<T>::make (DESIGN §6.3, §6.5): a NaN or infinite end fails in-band with
+        // non_finite_input, equal ends with invalid_input, and a make() result with its own errc, at zero cost.
         template<class F, class In>
         constexpr auto to_window(algo id, const In& in)
             -> std::expected<bracket<bracket_scalar_t<In>>, root_failure<F, bracket_scalar_t<In>>>
@@ -312,13 +329,14 @@ namespace nxx::roots
             using Fail = root_failure<F, T>;
             auto flo   = nxx::evaluate_sample(fn, b.lo());
             if (!flo)
-                return std::unexpected(Fail { flo.error().code, id, counters { 0, flo.error().evals }, std::nullopt, flo.error().cause });
+                return std::unexpected(
+                    Fail { flo.error().code, id, counters { 0, flo.error().evaluations }, std::nullopt, flo.error().cause });
             const std::uint32_t one = cost_of(fn);
             auto                fhi = nxx::evaluate_sample(fn, b.hi());
             if (!fhi)
                 return std::unexpected(Fail { fhi.error().code,
                                               id,
-                                              counters { 0, one + fhi.error().evals },
+                                              counters { 0, one + fhi.error().evaluations },
                                               root_estimate<T> { b.lo(), *flo, unknown<T>(), std::nullopt },
                                               fhi.error().cause });
             const std::uint32_t used = one + cost_of(fn);
@@ -378,7 +396,7 @@ namespace nxx::roots
             if constexpr (std::is_same_v<UE, UE2>)
                 return f;
             else
-                return fault<UE> { f.code, f.evals, {} };
+                return fault<UE> { f.code, f.evaluations, {} };
         }
 
         template<class UE, class Est, class UE2>
@@ -387,7 +405,7 @@ namespace nxx::roots
             if constexpr (std::is_same_v<UE, UE2>)
                 return f;
             else
-                return failure<Est, UE> { f.code, f.where, f.used, f.best, {} };
+                return failure<Est, UE> { f.code, f.by, f.used, f.best, {} };
         }
 
         // The pole check of the bracketing methods (DESIGN §7.2): after a criterion or resolution-limit stop, a residual
@@ -398,12 +416,20 @@ namespace nxx::roots
         // [0, 2]), and an infinite level would switch the check off exactly where a pole sits at an end (1/x on
         // [-1, 0]). A success whose f(x) is not finite is never accepted (a pole reached exactly). Known limit: a large
         // finite endpoint sample (1/x on [-1e-20, 1]) still raises the level and hides the pole.
+        //
+        // The failure carries the estimate without its enclosure (x, f(x) and uncertainty unchanged; DESIGN §6.7, §7.2):
+        // the enclosure has been shown to hold a pole, not a root, and better_than ranks every enclosure above every
+        // estimate without one, so first_of and warm_fallback would otherwise report the pole as their best estimate.
+        // The pole's location is best->x, which lies inside the old enclosure.
         template<class Fail, real T>
         constexpr auto pole_check(const sign_bracket<T>& initial, const solution<root_estimate<T>>& sol) -> std::optional<Fail>
         {
             const auto pole = [&] {
-                return std::optional<Fail>(
-                    Fail { errc::sign_change_not_root, sol.by, sol.used, static_cast<const root_estimate<T>&>(sol), {} });
+                return std::optional<Fail>(Fail { errc::sign_change_not_root,
+                                                  sol.by,
+                                                  sol.used,
+                                                  root_estimate<T> { sol.x, sol.fx, sol.uncertainty, std::nullopt },
+                                                  {} });
             };
             if (!math::isfinite(sol.fx)) return pole();
             if (sol.how == stop_reason::exact_zero || !sol.enclosure) return std::nullopt;

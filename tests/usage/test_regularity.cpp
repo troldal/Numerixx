@@ -45,7 +45,7 @@ namespace
                    a->used == b->used && a->by == b->by && a->how == b->how;
         const auto& ea = a.error();
         const auto& eb = b.error();
-        return ea.code == eb.code && ea.where == eb.where && ea.used == eb.used && ea.best.has_value() == eb.best.has_value() &&
+        return ea.code == eb.code && ea.by == eb.by && ea.used == eb.used && ea.best.has_value() == eb.best.has_value() &&
                (!ea.best || ea.best->x == eb.best->x);
     }
 

@@ -57,7 +57,7 @@ namespace consumer
         const auto facade       = nxx::roots::solve(f, { 1.0, 2.0 });
         const auto curried      = r::bisection {}.on({ 1.0, 2.0 })(f);
         return nxx::best_x(by_reference).value_or(0.0) + nxx::best_x(by_pointer).value_or(0.0) + nxx::best_x(facade).value_or(0.0) +
-               nxx::best_x(curried).value_or(0.0);
+               nxx::best_x(curried).value_or(0.0) + (nxx::best(curried).has_value() ? 0.0 : 1.0);
     }
 
     // Canonical call 9: newton, secant and brent (three state types) with run-time inputs.

@@ -95,7 +95,9 @@ namespace nxx::roots
                 f0 = *p.in.fx0;    // seeded by a previous stage: no re-evaluation
             else {
                 auto y = nxx::evaluate(p.f, x0);
-                if (!y) return std::unexpected(Fail { y.error().code, id, counters { 0, y.error().evals }, std::nullopt, y.error().cause });
+                if (!y)
+                    return std::unexpected(
+                        Fail { y.error().code, id, counters { 0, y.error().evaluations }, std::nullopt, y.error().cause });
                 f0   = *y;
                 used = cost_of(p.f);
             }
@@ -119,7 +121,9 @@ namespace nxx::roots
                 return std::unexpected(Fail { why, id, counters { 0, used }, first, {} });
             }
             auto y1 = nxx::evaluate(p.f, x1);
-            if (!y1) return std::unexpected(Fail { y1.error().code, id, counters { 0, used + y1.error().evals }, first, y1.error().cause });
+            if (!y1)
+                return std::unexpected(
+                    Fail { y1.error().code, id, counters { 0, used + y1.error().evaluations }, first, y1.error().cause });
             return secant_state<T> { x0, f0, x1, *y1, math::abs(x1 - x0), used + cost_of(p.f) };
         }
 

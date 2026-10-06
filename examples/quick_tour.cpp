@@ -100,7 +100,8 @@ int main()
 
     std::println("1. One call");
     // The bracketing default (Brent, provisionally). {lo, hi} is validated in-band: the ends may come in either order,
-    // and equal or non-finite ends give an errc::invalid_input failure, not an exception.
+    // equal ends give an errc::invalid_input failure and a NaN or infinite end an errc::non_finite_input one, not an
+    // exception.
     report("solve(f, {lo, hi})", r::solve(f, { lo, hi }));
     report("solve(f, {hi, lo})", r::solve(f, { hi, lo }));
     report("solve(f, {hi, hi})", r::solve(f, { hi, hi }));

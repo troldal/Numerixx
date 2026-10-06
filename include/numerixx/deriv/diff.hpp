@@ -26,7 +26,11 @@ namespace nxx::deriv
     constexpr auto diff(const F& fn, T x, const stencil<O, A, N>& s = central_1_2, H h = {})
         -> std::expected<T, fault<callback_error_t<F, T>>>
     {
-        using UE   = callback_error_t<F, T>;
+        using UE = callback_error_t<F, T>;
+        // A NaN or infinite x is an input error of its own (DESIGN §6.3, §7.1); an overflow at a finite x is invalid_input.
+        // Called directly, diff keeps both codes; where it runs as a callback (derivative_of(f) as a solver's f, or the
+        // f of another diff), nxx::evaluate turns both into non_finite_value (§6.4, §12 item 22).
+        if (!math::isfinite(x)) return std::unexpected(fault<UE> { errc::non_finite_input, 0, {} });
         const T hh = detail::resolve<O, A>(h, x);
         if (!(hh > T(0)) || !math::isfinite(hh)) return std::unexpected(fault<UE> { errc::invalid_input, 0, {} });
         // Every point must be finite too, before any evaluation: a finite h does not keep x + k h finite (x - h overflows
@@ -37,16 +41,16 @@ namespace nxx::deriv
             if (s.weight[i] != 0 && !math::isfinite(at[i])) return std::unexpected(fault<UE> { errc::invalid_input, 0, {} });
         }
         T             acc(0);
-        std::uint32_t evals = 0;
+        std::uint32_t evaluations = 0;
         for (std::size_t i = 0; i < N; ++i) {
             if (s.weight[i] == 0) continue;
             auto y = nxx::evaluate(fn, at[i]);
             if (!y) {
                 fault<UE> e = y.error();
-                e.evals += evals;
+                e.evaluations += evaluations;
                 return std::unexpected(e);
             }
-            evals += cost_of(fn);
+            evaluations += cost_of(fn);
             acc += T(s.weight[i]) * *y;
         }
         // acc / (denominator h^O) in one division where h^O is representable; otherwise one division per power, which
@@ -61,7 +65,7 @@ namespace nxx::deriv
             d = acc / T(s.denominator);
             for (int k = 0; k < O; ++k) d /= hh;
         }
-        if (!math::isfinite(d)) return std::unexpected(fault<UE> { errc::non_finite_value, evals, {} });
+        if (!math::isfinite(d)) return std::unexpected(fault<UE> { errc::non_finite_value, evaluations, {} });
         return d;
     }
 

@@ -33,10 +33,11 @@ namespace nxx
                 detail::literal_violates_invariant("a bracket needs finite lo < hi");
         }
 
-        // Re-orders the endpoints; equal or non-finite endpoints are an error.
+        // Re-orders the endpoints. A NaN or infinite end is non_finite_input, equal ends are invalid_input (DESIGN §6.3).
         static constexpr auto make(T a, T b) noexcept -> std::expected<bracket, errc>
         {
-            if (!math::isfinite(a) || !math::isfinite(b) || a == b) return std::unexpected(errc::invalid_input);
+            if (!math::isfinite(a) || !math::isfinite(b)) return std::unexpected(errc::non_finite_input);
+            if (a == b) return std::unexpected(errc::invalid_input);
             return a < b ? bracket { detail::trust_me {}, a, b } : bracket { detail::trust_me {}, b, a };
         }
 

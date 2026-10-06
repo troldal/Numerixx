@@ -5,8 +5,14 @@
 //                                all attempts and the total cost. Falls through unless the user's error is_fatal.
 //   first_of_with(policy, s...)  the same, with policy(const failure&) -> bool deciding whether to continue.
 //   then(s1, s2, ...)            staging: stage 2 gets the function and stage 1's value (search -> bracketing solver,
-//                                bracketing solver -> open method).
-//   warm_fallback(s1, s2)        restart s2 from s1's best estimate when s1 fails.
+//                                bracketing solver -> open method). Stage 1's failure passes unchanged; stage 2's
+//                                failure carries the better of its best and stage 1's estimate, except a pole failure
+//                                (sign_change_not_root), which keeps stage 2's pole estimate.
+//   warm_fallback(s1, s2)        restart s2 from s1's best estimate when s1 fails, except after a pole failure, which is
+//                                returned as is.
+//
+// Stage 2 of then and warm_fallback starts from stage 1's output, not the caller's input, so its invalid_input or
+// non_finite_input becomes non_finite_value, with its cost and cause (DESIGN §6.10, §12 item 23).
 #pragma once
 
 #include <numerixx/config.hpp>
@@ -14,8 +20,10 @@
 #include <numerixx/core/error.hpp>
 #include <numerixx/core/iterate.hpp>
 
+#include <concepts>
 #include <expected>
 #include <functional>
+#include <optional>
 #include <type_traits>
 #include <utility>
 
@@ -69,8 +77,23 @@ namespace nxx
                 static_assert(std::is_same_v<typename From::estimate_type, typename To::estimate_type> &&
                                   std::is_same_v<typename From::cause_type, none>,
                               "nxx::then: the stages report different callback error types; map one with .transform_error so they agree");
-                return To { f.code, f.where, f.used, f.best, {} };
+                return To { f.code, f.by, f.used, f.best, {} };
             }
+        }
+
+        // Stage 1's success estimate as stage 2's failure estimate Est: the estimate itself (a solution<Est> is an Est),
+        // or what its best() gives (a search's sign_bracket gives a root_estimate); nullopt if neither applies.
+        template<class Est, class V>
+        constexpr std::optional<Est> stage_estimate(const V& v)
+        {
+            if constexpr (std::is_convertible_v<const V&, Est>)
+                return Est(v);
+            else if constexpr (requires {
+                                   { v.best() } -> std::convertible_to<Est>;
+                               })
+                return Est(v.best());
+            else
+                return std::nullopt;
         }
 
         template<class S, class... A>
@@ -84,9 +107,13 @@ namespace nxx
     template<class Policy, class S1, class S2>
     class first_of_t
     {
-        NXX_NO_UNIQUE_ADDRESS detail::copyable_box<Policy> policy_;
-        detail::copyable_box<S1>                           s1_;
-        detail::copyable_box<S2>                           s2_;
+        // No [[no_unique_address]] on policy_ (DESIGN §5.3): on cl, [[msvc::no_unique_address]] on this leading empty
+        // member overlaps a first_of_t nested as S1 of another first_of_t with that one's s2_, and the results come out
+        // wrong. Dropped on every compiler, so that the type is correct on cl; costs one byte (plus padding) per chain
+        // link. cl and clang-cl still lay out nxx::options, and so every solver and chain, differently (§5.3).
+        detail::copyable_box<Policy> policy_;
+        detail::copyable_box<S1>     s1_;
+        detail::copyable_box<S2>     s2_;
 
     public:
         constexpr first_of_t(Policy policy, S1 s1, S2 s2) : policy_(std::move(policy)), s1_(std::move(s1)), s2_(std::move(s2)) {}
@@ -168,9 +195,21 @@ namespace nxx
                 return r1;
             }
             else {
-                using R2 = std::invoke_result_t<const S2&, const F&, const V1&>;
-                if (!r1) return R2 { std::unexpect, detail::rebind_failure<typename R2::error_type>(std::move(r1).error()) };
-                return detail::add_cost(std::invoke(*s2_, fn, *r1), r1->used);
+                using R2   = std::invoke_result_t<const S2&, const F&, const V1&>;
+                using Fail = typename R2::error_type;
+                if (!r1) return R2 { std::unexpect, detail::rebind_failure<Fail>(std::move(r1).error()) };
+                auto r2 = detail::add_cost(std::invoke(*s2_, fn, *r1), r1->used);
+                if (r2) return r2;
+                // Stage 2 started from stage 1's value, not the caller's input: an input code is non_finite_value. The
+                // failure carries the better of stage 2's best and stage 1's estimate (DESIGN §3.4, §6.10), unless stage 2
+                // found a pole in stage 1's bracket: then stage 1's estimate, whose enclosure holds that pole, is refuted,
+                // and stage 2's pole estimate (no enclosure) stays (DESIGN §6.7, §12 item 23).
+                Fail e = nxx::detail::step_fault(std::move(r2).error());
+                if (e.code != errc::sign_change_not_root) {
+                    auto s1 = detail::stage_estimate<typename Fail::estimate_type>(*r1);
+                    if (s1 && (!e.best || nxx::detail::better(*s1, *e.best))) e.best = std::move(s1);
+                }
+                return R2 { std::unexpect, std::move(e) };
             }
         }
     };
@@ -196,14 +235,17 @@ namespace nxx
         constexpr auto operator()(const F& fn) const
         {
             auto r1 = std::invoke(*s1_, fn);
-            if (r1 || !r1.error().best) return r1;
+            // A pole (sign_change_not_root) is no start for an open method: its step criterion would accept the pole as
+            // a root (DESIGN §3.4, §6.10). The pole failure is returned with its estimate and cost.
+            if (r1 || !r1.error().best || r1.error().code == errc::sign_change_not_root) return r1;
             auto r2 = std::invoke(*s2_, fn, *r1.error().best);
             static_assert(std::is_same_v<decltype(r1), decltype(r2)>, "nxx::warm_fallback: both stages must return the same result type");
             if (r2) {
                 r2->used = r2->used + r1.error().used;
                 return r2;
             }
-            return decltype(r1) { std::unexpect, detail::merge(r1.error(), std::move(r2).error()) };
+            // Stage 2 started from stage 1's best estimate, not the caller's input: an input code is non_finite_value.
+            return decltype(r1) { std::unexpect, detail::merge(r1.error(), nxx::detail::step_fault(std::move(r2).error())) };
         }
     };
 

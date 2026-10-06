@@ -68,10 +68,9 @@ namespace
     bool close_to(double a, double b, double tol) { return std::abs(a - b) <= tol; }
 
     constexpr auto x_of     = [](const auto& sol) { return sol.x; };
-    constexpr auto by_of    = [](const auto& sol) { return sol.by; };
+    constexpr auto by_of    = [](const auto& res) { return res.by; };    // a solution's or a failure's algorithm
     constexpr auto used_of  = [](const auto& sol) { return sol.used; };
     constexpr auto code_of  = [](const auto& err) { return err.code; };
-    constexpr auto where_of = [](const auto& err) { return err.where; };
     constexpr auto cause_of = [](const auto& err) { return err.cause; };
     constexpr auto spent_of = [](const auto& err) { return err.used; };
 
@@ -117,7 +116,7 @@ namespace
     {
         if (a.has_value() != b.has_value()) return false;
         if (a) return a->x == b->x && a->fx == b->fx && a->used == b->used && a->by == b->by && a->how == b->how;
-        return a.error().code == b.error().code && a.error().where == b.error().where && a.error().used == b.error().used &&
+        return a.error().code == b.error().code && a.error().by == b.error().by && a.error().used == b.error().used &&
                nxx::best_x(a) == nxx::best_x(b);
     }
 }    // namespace
@@ -201,7 +200,7 @@ TEST_SUITE("pipes")
         // A failing first stage passes through then unchanged: the user's cause, and where it failed.
         const auto blocked = nxx::then(r::expand {}.on(nxx::bracket { -3.0, -2.0 }), r::brent {})(parabola);
         CHECK((blocked | fxt::transform_error(code_of)) == std::unexpected(nxx::errc::callback_failed));
-        CHECK((blocked | fxt::transform_error(where_of)) == std::unexpected(r::algos::expand));
+        CHECK((blocked | fxt::transform_error(by_of)) == std::unexpected(r::algos::expand));
         CHECK((blocked | fxt::transform_error(cause_of)) == std::unexpected(std::optional { eval_error::domain }));
         CHECK((blocked | fxt::transform_error(spent_of)) == std::unexpected(nxx::counters { 0, 1 }));
     }
@@ -226,7 +225,7 @@ TEST_SUITE("pipes")
         const auto all_fail = nxx::first_of(r::bisection {}.on({ -2.0, -1.0 }), r::newton {}.with_derivative(parabola_slope).on(-1.0));
         const auto failed   = all_fail(parabola);
         CHECK((failed | fxt::transform_error(code_of)) == std::unexpected(nxx::errc::callback_failed));
-        CHECK((failed | fxt::transform_error(where_of)) == std::unexpected(r::algos::newton));
+        CHECK((failed | fxt::transform_error(by_of)) == std::unexpected(r::algos::newton));
         CHECK((failed | fxt::transform_error(cause_of)) == std::unexpected(std::optional { eval_error::domain }));
         CHECK((failed | fxt::transform_error(spent_of)) == std::unexpected(nxx::counters { 0, 2 }));
         CHECK_FALSE(nxx::best_x(failed).has_value());
@@ -247,7 +246,7 @@ TEST_SUITE("pipes")
         const auto    stopped = guarded(nxx::fn::counted(parabola_fatal, calls));
         CHECK(later == 0);
         CHECK(calls == 1);
-        CHECK((stopped | fxt::transform_error(where_of)) == std::unexpected(r::algos::bisection));
+        CHECK((stopped | fxt::transform_error(by_of)) == std::unexpected(r::algos::bisection));
         CHECK((stopped | fxt::transform_error(cause_of)) == std::unexpected(std::optional { eval_error::fatal }));
 
         // The same chain with a non-fatal cause falls through to brent.
@@ -299,7 +298,7 @@ TEST_SUITE("pipes")
         // or_else accepts the best estimate of a stalled solve as a value.
         const auto accepted = pinned | fxt::or_else([](const auto& err) -> fallible {
                                   if (err.code == nxx::errc::stalled && err.best)
-                                      return nxx::solution<estimate> { *err.best, err.used, err.where, nxx::stop_reason::algorithm };
+                                      return nxx::solution<estimate> { *err.best, err.used, err.by, nxx::stop_reason::algorithm };
                                   return std::unexpected(err);
                               });
         CHECK((accepted | fxt::transform(x_of) | fxt::value_or(not_a_number)) == 2.0);
@@ -432,7 +431,7 @@ TEST_SUITE("pipes")
         // No real root: every alternative fails; the chain reports the last code and keeps a best estimate.
         const auto none_found = headline(no_real_root);
         CHECK((none_found | fxt::transform_error(code_of)) == std::unexpected(nxx::errc::no_sign_change));
-        CHECK((none_found | fxt::transform_error(where_of)) == std::unexpected(r::algos::bisection));
+        CHECK((none_found | fxt::transform_error(by_of)) == std::unexpected(r::algos::bisection));
         CHECK(nxx::best_x(none_found).has_value());
         CHECK((none_found | fxt::match([](const auto&) { return 0; },
                                        [](const auto& err) { return err.code == nxx::errc::no_sign_change ? 1 : 2; })) == 1);

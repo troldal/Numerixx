@@ -44,6 +44,9 @@ numerixx_add_compile_fail_test(${_nxx_cf}/newton_on_braced_bracket.cpp
 numerixx_add_compile_fail_test(${_nxx_cf}/solver_incomplete.cpp
   LINK numerixx::roots
   EXPECT "this solver does not implement the solver protocol" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/solver_without_better_than.cpp
+  LINK numerixx::roots
+  EXPECT "better_than\\(const Est&, const Est&\\) for its estimate type" DELETE_REASON)
 
 # ---- Criterion/solver mismatches (exit criterion 7: x_tol on a bracketing solver) --------------------------------
 numerixx_add_compile_fail_test(${_nxx_cf}/bisection_x_tol.cpp
@@ -123,6 +126,11 @@ numerixx_add_compile_fail_test(${_nxx_cf}/then_open_to_bracket.cpp
 numerixx_add_compile_fail_test(${_nxx_cf}/any_solver_wrong_result.cpp
   LINK numerixx::roots
   EXPECT "needs a copyable curried solver" DELETE_REASON)
+
+# ---- Results -----------------------------------------------------------------------------------------------------
+numerixx_add_compile_fail_test(${_nxx_cf}/best_search_result.cpp
+  LINK numerixx::roots
+  EXPECT "succeeds and fails with different estimates" DELETE_REASON)
 
 # ---- Invalid literals and roles (tier A) -------------------------------------------------------------------------
 numerixx_add_compile_fail_test(${_nxx_cf}/bracket_runtime_literal.cpp

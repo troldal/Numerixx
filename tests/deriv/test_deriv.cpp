@@ -242,8 +242,8 @@ TEST_SUITE("deriv")
             if (!r) {
                 CHECK(r.error().code == nxx::errc::callback_failed);
                 CHECK(r.error().cause == eval_error::domain);
-                CHECK(r.error().evals == 1);
-                CHECK(r.error().evals == calls);
+                CHECK(r.error().evaluations == 1);
+                CHECK(r.error().evaluations == calls);
             }
         }
         SUBCASE("the third of four points fails")
@@ -254,8 +254,8 @@ TEST_SUITE("deriv")
             if (!r) {
                 CHECK(r.error().code == nxx::errc::callback_failed);
                 CHECK(r.error().cause == eval_error::too_big);
-                CHECK(r.error().evals == 3);
-                CHECK(r.error().evals == calls);
+                CHECK(r.error().evaluations == 3);
+                CHECK(r.error().evaluations == calls);
             }
         }
         SUBCASE("success counts nothing as a fault")
@@ -274,7 +274,7 @@ TEST_SUITE("deriv")
             if (!r) {
                 CHECK(r.error().code == nxx::errc::callback_failed);
                 CHECK(r.error().cause == eval_error::too_big);
-                CHECK(r.error().evals == 2);
+                CHECK(r.error().evaluations == 2);
                 CHECK(calls == 2);
             }
         }
@@ -288,7 +288,7 @@ TEST_SUITE("deriv")
         CHECK_FALSE(r.has_value());
         if (!r) {
             CHECK(r.error().code == nxx::errc::non_finite_value);
-            CHECK(r.error().evals == 2);
+            CHECK(r.error().evaluations == 2);
             CHECK(calls == 2);
         }
     }
@@ -302,17 +302,54 @@ TEST_SUITE("deriv")
         CHECK_FALSE(zero.has_value());
         if (!zero) {
             CHECK(zero.error().code == nxx::errc::invalid_input);
-            CHECK(zero.error().evals == 0);
+            CHECK(zero.error().evaluations == 0);
         }
         CHECK(calls == 0);
+    }
 
-        const auto at_inf = d::diff(f, rt(std::numeric_limits<double>::infinity()));
-        CHECK_FALSE(at_inf.has_value());
-        if (!at_inf) { CHECK(at_inf.error().code == nxx::errc::invalid_input); }
-        const auto at_nan = d::diff(f, rt(std::numeric_limits<double>::quiet_NaN()));
-        CHECK_FALSE(at_nan.has_value());
-        if (!at_nan) { CHECK(at_nan.error().code == nxx::errc::invalid_input); }
-        CHECK(calls == 0);
+    TEST_CASE("a non-finite x is non_finite_input, before any evaluation")
+    {
+        // DESIGN §6.3, §7.1: a NaN or infinite x is an input value of its own, checked first; an overflow at a finite x
+        // stays invalid_input (the cases above and below).
+        constexpr double inf      = std::numeric_limits<double>::infinity();
+        constexpr double nan      = std::numeric_limits<double>::quiet_NaN();
+        std::uint32_t    calls    = 0;
+        const auto       f        = nxx::fn::counted([](double x) { return x * x; }, calls);
+        const auto       rejected = [&calls](const auto& r) {
+            const bool ok = !r.has_value() && r.error().code == nxx::errc::non_finite_input && r.error().evaluations == 0 && calls == 0;
+            calls         = 0;
+            return ok;
+        };
+
+        CHECK(rejected(d::diff(f, rt(inf))));
+        CHECK(rejected(d::diff(f, rt(-inf))));
+        CHECK(rejected(d::diff(f, rt(nan))));
+        CHECK(rejected(d::central(f, rt(nan))));
+        CHECK(rejected(d::diff(f, rt(inf), d::forward_1_1)));                          // only x and x + h
+        CHECK(rejected(d::diff(f, rt(nan), d::central_1_2, d::absolute { 1e-3 })));    // h itself would be finite
+        CHECK(rejected(d::derivative_of(f)(rt(nan))));
+        CHECK(rejected(d::derivative_of(f, d::central_2_4)(rt(-inf))));
+        CHECK(rejected(d::numeric {}.bind(f)(rt(inf))));
+
+        // In a constant expression, and for float and long double.
+        constexpr auto sq = [](double x) { return x * x; };
+        static_assert(d::diff(sq, nan).error().code == nxx::errc::non_finite_input);
+        static_assert(d::diff(sq, -inf).error().code == nxx::errc::non_finite_input);
+        const auto rf = d::central([](float x) { return x; }, std::numeric_limits<float>::infinity());
+        CHECK_FALSE(rf.has_value());
+        if (!rf) { CHECK(rf.error().code == nxx::errc::non_finite_input); }
+        const auto rl = d::central([](long double x) { return x; }, std::numeric_limits<long double>::quiet_NaN());
+        CHECK_FALSE(rl.has_value());
+        if (!rl) { CHECK(rl.error().code == nxx::errc::non_finite_input); }
+
+        // A fallible callback's fault type is unchanged: no cause, because f was never called.
+        const auto fallible = [](double x) -> std::expected<double, int> { return x; };
+        const auto rx       = d::diff(fallible, rt(nan));
+        CHECK_FALSE(rx.has_value());
+        if (!rx) {
+            CHECK(rx.error().code == nxx::errc::non_finite_input);
+            CHECK_FALSE(rx.error().cause.has_value());
+        }
     }
 
     TEST_CASE("cost_of: the stencil's non-zero points times the cost of f")
@@ -378,7 +415,7 @@ TEST_SUITE("deriv")
         std::uint32_t    calls    = 0;
         const auto       f        = nxx::fn::counted([](double x) { return std::tanh(x / (std::numeric_limits<double>::max)()); }, calls);
         const auto       rejected = [&calls](const auto& r) {
-            const bool ok = !r.has_value() && r.error().code == nxx::errc::invalid_input && r.error().evals == 0 && calls == 0;
+            const bool ok = !r.has_value() && r.error().code == nxx::errc::invalid_input && r.error().evaluations == 0 && calls == 0;
             calls         = 0;
             return ok;
         };
@@ -405,7 +442,7 @@ TEST_SUITE("deriv")
         CHECK_FALSE(rf.has_value());
         if (!rf) {
             CHECK(rf.error().code == nxx::errc::invalid_input);
-            CHECK(rf.error().evals == 0);
+            CHECK(rf.error().evaluations == 0);
         }
         CHECK(fcalls == 0);
     }

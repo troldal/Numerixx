@@ -78,13 +78,14 @@ namespace nxx::roots
             using Fail = root_failure<F, T>;
             auto flo   = nxx::evaluate_sample(p.f, p.in.lo());
             if (!flo)
-                return std::unexpected(Fail { flo.error().code, id, counters { 0, flo.error().evals }, std::nullopt, flo.error().cause });
+                return std::unexpected(
+                    Fail { flo.error().code, id, counters { 0, flo.error().evaluations }, std::nullopt, flo.error().cause });
             const std::uint32_t one = cost_of(p.f);
             auto                fhi = nxx::evaluate_sample(p.f, p.in.hi());
             if (!fhi)
                 return std::unexpected(Fail { fhi.error().code,
                                               id,
-                                              counters { 0, one + fhi.error().evals },
+                                              counters { 0, one + fhi.error().evaluations },
                                               root_estimate<T> { p.in.lo(), *flo, detail::unknown<T>(), std::nullopt },
                                               fhi.error().cause });
             return expand_state<T> { p.in.lo(), *flo, p.in.hi(), *fhi, p.in.lo(), *flo, 0, one + cost_of(p.f) };

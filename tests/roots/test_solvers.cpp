@@ -219,7 +219,7 @@ TEST_SUITE("roots")
             if (!res) {
                 const auto& err = res.error();
                 CHECK(err.code == nxx::errc::no_sign_change);
-                CHECK(err.where == id);
+                CHECK(err.by == id);
                 CHECK(err.used == nxx::counters { 0, 2 });
                 if (err.best) {
                     CHECK(err.best->x == 3.0);    // the end with the smaller |f|
@@ -249,7 +249,7 @@ TEST_SUITE("roots")
             if (!res) {
                 const auto& err = res.error();
                 CHECK(err.code == nxx::errc::callback_failed);
-                CHECK(err.where == id);
+                CHECK(err.by == id);
                 CHECK(err.used == nxx::counters { 0, 1 });    // the failing call counts
                 CHECK_FALSE(err.best.has_value());            // nothing was evaluated successfully
                 if (err.cause)
@@ -271,7 +271,7 @@ TEST_SUITE("roots")
         if (!res) {
             const auto& err = res.error();
             CHECK(err.code == nxx::errc::callback_failed);
-            CHECK(err.where == nr::algos::bisection);
+            CHECK(err.by == nr::algos::bisection);
             CHECK(err.used == nxx::counters { 2, 4 });
             if (err.cause)
                 CHECK(*err.cause == table_error::outside_table);
@@ -297,7 +297,7 @@ TEST_SUITE("roots")
         if (!res) {
             const auto& err = res.error();
             CHECK(err.code == nxx::errc::budget_exhausted);
-            CHECK(err.where == nr::algos::newton);
+            CHECK(err.by == nr::algos::newton);
             CHECK(err.used.iterations == 30u);
             CHECK(err.used.evaluations == 61u);
             if (err.best) {
@@ -340,7 +340,7 @@ TEST_SUITE("roots")
         if (!nres) {
             const auto& err = nres.error();
             CHECK(err.code == nxx::errc::stalled);
-            CHECK(err.where == nr::algos::newton);
+            CHECK(err.by == nr::algos::newton);
             CHECK(err.used == nxx::counters { 2, 4 });    // f(1); f'(1), f(3); f'(3)
             if (err.best) {
                 CHECK(err.best->x == 3.0);
@@ -357,7 +357,7 @@ TEST_SUITE("roots")
         if (!sres) {
             const auto& err = sres.error();
             CHECK(err.code == nxx::errc::stalled);
-            CHECK(err.where == nr::algos::secant);
+            CHECK(err.by == nr::algos::secant);
             CHECK(err.used == nxx::counters { 2, 3 });    // f(x0), f(x1); f(3); pinned before evaluating
             if (err.best) {
                 CHECK(err.best->x == 3.0);
@@ -383,12 +383,12 @@ TEST_SUITE("roots")
         const auto drecip         = nxx::fn::counted([](double x) { return -1.0 / (x * x); }, df_calls);
         const auto three_way      = nxx::fn::counted([](double x) { return x < 1.0 ? -1.0 : (x > 1.0 ? 1.0 : 0.0); }, calls);
         const auto to_nan         = [](double) { return std::numeric_limits<double>::quiet_NaN(); };
-        const auto start_rejected = [&calls, &df_calls, &reset](const auto& res, nxx::algo where) {
+        const auto start_rejected = [&calls, &df_calls, &reset](const auto& res, nxx::algo by) {
             CHECK_FALSE(res.has_value());
             if (!res) {
                 const auto& err = res.error();
                 CHECK(err.code == nxx::errc::non_finite_input);
-                CHECK(err.where == where);
+                CHECK(err.by == by);
                 CHECK(err.used == nxx::counters {});
                 CHECK_FALSE(err.best.has_value());
             }
@@ -405,12 +405,12 @@ TEST_SUITE("roots")
         // 2^-k max(|x|, 1) is inf there, so both methods reported a criterion success at x = inf.
         const auto pos_or_inf    = [](double x) { return x > 0.0 ? x : std::numeric_limits<double>::infinity(); };
         const auto quarter       = nxx::fn::counted([](double x) { return 1.0 / x - 0.25; }, calls);
-        const auto step_rejected = [&calls, &df_calls, &reset](const auto& res, nxx::algo where, nxx::counters used) {
+        const auto step_rejected = [&calls, &df_calls, &reset](const auto& res, nxx::algo by, nxx::counters used) {
             CHECK_FALSE(res.has_value());
             if (!res) {
                 const auto& err = res.error();
                 CHECK(err.code == nxx::errc::diverged);
-                CHECK(err.where == where);
+                CHECK(err.by == by);
                 CHECK(err.used == used);
                 CHECK(err.used.evaluations == calls + df_calls);
                 if (err.best) {
@@ -510,7 +510,7 @@ TEST_SUITE("roots")
         if (!res) {
             const auto& err = res.error();
             CHECK(err.code == nxx::errc::stalled);
-            CHECK(err.where == nr::algos::secant);
+            CHECK(err.by == nr::algos::secant);
             CHECK(err.used == nxx::counters { 1, 2 });
             if (err.best)
                 CHECK(err.best->fx == 1.0);
@@ -526,7 +526,7 @@ TEST_SUITE("roots")
         if (!res) {
             const auto& err = res.error();
             CHECK(err.code == nxx::errc::zero_derivative);
-            CHECK(err.where == nr::algos::newton);
+            CHECK(err.by == nr::algos::newton);
             CHECK(err.used == nxx::counters { 1, 2 });    // f(0), f'(0)
             if (err.best) {
                 CHECK(err.best->x == 0.0);
@@ -547,7 +547,7 @@ TEST_SUITE("roots")
         if (!nres) {
             const auto& err = nres.error();
             CHECK(err.code == nxx::errc::diverged);
-            CHECK(err.where == nr::algos::newton);
+            CHECK(err.by == nr::algos::newton);
             CHECK(err.used == nxx::counters { 1, 2 });    // f(1), f'(1); the proposed iterate is never evaluated
             if (err.best)
                 CHECK(err.best->x == 1.0);
@@ -563,7 +563,7 @@ TEST_SUITE("roots")
         if (!sres) {
             const auto& err = sres.error();
             CHECK(err.code == nxx::errc::diverged);
-            CHECK(err.where == nr::algos::secant);
+            CHECK(err.by == nr::algos::secant);
             CHECK(err.used == nxx::counters { 1, 2 });
             if (err.best)
                 CHECK(err.best->x == 1e300);
@@ -583,16 +583,19 @@ TEST_SUITE("roots")
             if (!res) {
                 const auto& err = res.error();
                 CHECK(err.code == nxx::errc::sign_change_not_root);
-                CHECK(err.where == id);
+                CHECK(err.by == id);
                 CHECK(err.used.iterations > 0u);
                 CHECK(err.used.evaluations == err.used.iterations + 2u);
-                if (err.best && err.best->enclosure) {    // the final enclosure, around the pole
-                    CHECK(err.best->enclosure->lo() <= pole);
-                    CHECK(pole <= err.best->enclosure->hi());
+                // The estimate without its enclosure (DESIGN §6.7, §7.2): x, f(x) and the uncertainty (the final
+                // enclosure's width) are kept, and x lies within that width of the pole.
+                if (err.best) {
+                    CHECK_FALSE(err.best->enclosure.has_value());
+                    CHECK(std::abs(err.best->x - pole) <= err.best->uncertainty);
+                    CHECK(err.best->uncertainty < 1e-6);
                     CHECK(std::abs(err.best->fx) > 1e10);
                 }
                 else
-                    FAIL_CHECK("no best estimate with an enclosure");
+                    FAIL_CHECK("no best estimate");
             }
         };
         check_pole(nr::bisection {}(tangent, { 1.0, 2.0 }), nr::algos::bisection, std::numbers::pi / 2.0);
@@ -611,7 +614,10 @@ TEST_SUITE("roots")
             CHECK_FALSE(res.has_value());
             if (!res) {
                 CHECK(res.error().code == nxx::errc::sign_change_not_root);
-                CHECK(res.error().where == id);
+                CHECK(res.error().by == id);
+                if (res.error().best) { CHECK_FALSE(res.error().best->enclosure.has_value()); }
+                else
+                    FAIL_CHECK("no best estimate");
             }
         };
         check_pole(nr::bisection {}(reciprocal, { -1.0, 0.0 }), nr::algos::bisection);
@@ -809,7 +815,7 @@ TEST_SUITE("roots")
             if (!res) {
                 const auto& err = res.error();
                 CHECK(err.code == code);
-                CHECK(err.where == id);
+                CHECK(err.by == id);
                 CHECK(err.used == nxx::counters {});
                 CHECK_FALSE(err.best.has_value());
             }
@@ -821,9 +827,17 @@ TEST_SUITE("roots")
         check_input(nr::brent {}(counted, { one, one }), nxx::errc::invalid_input, nr::algos::brent);
         check_input(nr::expand {}(counted, { one, one }), nxx::errc::invalid_input, nr::algos::expand);
         check_input(nr::bisection {}(counted, std::pair { one, one }), nxx::errc::invalid_input, nr::algos::bisection);
-        // Non-finite endpoints.
-        check_input(nr::bisection {}(counted, std::pair { not_a_number, one }), nxx::errc::invalid_input, nr::algos::bisection);
-        check_input(nr::brent {}(counted, { one, infinite }), nxx::errc::invalid_input, nr::algos::brent);
+        // Non-finite endpoints: non_finite_input, in every input form (DESIGN §6.3, §6.5).
+        check_input(nr::bisection {}(counted, std::pair { not_a_number, one }), nxx::errc::non_finite_input, nr::algos::bisection);
+        check_input(nr::bisection {}(counted, std::pair { infinite, one }), nxx::errc::non_finite_input, nr::algos::bisection);
+        check_input(nr::brent {}(counted, { one, infinite }), nxx::errc::non_finite_input, nr::algos::brent);
+        check_input(nr::brent {}(counted, { infinite, infinite }), nxx::errc::non_finite_input, nr::algos::brent);
+        check_input(nr::expand {}(counted, { not_a_number, one }), nxx::errc::non_finite_input, nr::algos::expand);
+        check_input(nr::bisection {}.on({ one, not_a_number })(counted), nxx::errc::non_finite_input, nr::algos::bisection);
+        check_input(nr::solve(counted, { not_a_number, one }), nxx::errc::non_finite_input, nr::algos::brent);
+        check_input(nr::bisection {}(counted, nxx::bracket<double>::make(one, infinite)),
+                    nxx::errc::non_finite_input,
+                    nr::algos::bisection);
         // make()'s error, forwarded unchanged.
         check_input(nr::bisection {}(counted, nxx::bracket<double>::make(one, one)), nxx::errc::invalid_input, nr::algos::bisection);
         const std::expected<nxx::bracket<double>, nxx::errc> refused { std::unexpect, nxx::errc::out_of_domain };
@@ -835,6 +849,17 @@ TEST_SUITE("roots")
         check_input(nr::secant {}(counted, not_a_number), nxx::errc::non_finite_input, nr::algos::secant);
         check_input(nr::newton {}.with_derivative(dsq2)(counted, infinite), nxx::errc::non_finite_input, nr::algos::newton);
         check_input(nr::newton {}.with_derivative(dsq2)(counted, not_a_number), nxx::errc::non_finite_input, nr::algos::newton);
+        // A root estimate's x is an input value as well (DESIGN §6.3).
+        check_input(nr::secant {}(counted, nr::root_estimate<double> { not_a_number, 1.0 }),
+                    nxx::errc::non_finite_input,
+                    nr::algos::secant);
+        check_input(nr::secant {}(counted, nr::root_estimate<double> { infinite, 1.0 }), nxx::errc::non_finite_input, nr::algos::secant);
+        check_input(nr::newton {}.with_derivative(dsq2)(counted, nr::root_estimate<double> { not_a_number, 1.0 }),
+                    nxx::errc::non_finite_input,
+                    nr::algos::newton);
+        check_input(nr::newton {}.with_derivative(dsq2)(counted, nr::root_estimate<double> { infinite, 1.0 }),
+                    nxx::errc::non_finite_input,
+                    nr::algos::newton);
     }
 
     // ---- 12. Evaluation counts --------------------------------------------------------------------------------------
@@ -949,7 +974,7 @@ TEST_SUITE("roots")
         if (!res) {
             const auto& err = res.error();
             CHECK(err.code == nxx::errc::budget_exhausted);
-            CHECK(err.where == nr::algos::expand);
+            CHECK(err.by == nr::algos::expand);
             CHECK(err.used == nxx::counters { 60, 62 });
             if (err.best) {
                 CHECK(err.best->fx == positive(err.best->x));
@@ -1317,11 +1342,7 @@ TEST_SUITE("roots")
             FAIL_CHECK("bisection's protocol under its own id failed on x^2 - 2");
     }
 
-    // best_x needs a solution with an x; a search result is a sign_bracket, with two ends.
-    template<class R>
-    concept has_best_x = requires(const R& r) { nxx::best_x(r); };
-    static_assert(has_best_x<nxx::result<nr::root_estimate<double>>>);
-    static_assert(!has_best_x<std::expected<nxx::solution<nr::sign_bracket<double>>, nxx::failure<nr::root_estimate<double>>>>);
+    // best_x and best on each kind of result: tests/roots/test_results.cpp.
 
     TEST_CASE("solvers: the facades accept exactly their inputs")
     {

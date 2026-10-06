@@ -75,7 +75,7 @@ namespace
     {
         const char*     name = "";
         bool            ok   = false;
-        nxx::algo       by {};      // solution::by, or failure::where
+        nxx::algo       by {};      // solution::by, or failure::by
         stop_reason     how {};     // success only
         errc            code {};    // failure only
         std::uint32_t   iterations   = 0;
@@ -113,7 +113,7 @@ namespace
         }
         else {
             const auto& e   = res.error();
-            out.by          = e.where;
+            out.by          = e.by;
             out.code        = e.code;
             out.iterations  = e.used.iterations;
             out.evaluations = e.used.evaluations;
@@ -378,7 +378,7 @@ TEST_SUITE("roots")
         CHECK(!got.empty());
 #else
         // clang-format off
-        // { name, ok, by/where, how, code, iterations, evaluations, has_estimate,
+        // { name, ok, by, how, code, iterations, evaluations, has_estimate,
         //   { x, fx, uncertainty, enclosed, lo, flo, hi, fhi } }
         const record golden[] = {
             { "bisection sqrt2 [1, 2]", true, algos::bisection, stop_reason::criterion, errc{}, 50, 52, true,
