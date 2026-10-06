@@ -209,7 +209,8 @@ TEST_SUITE("core")
 
     TEST_CASE("bracket::make re-orders, and rejects equal and non-finite endpoints")
     {
-        // In constant expressions: math::isfinite takes its comparison-only path there.
+        // In constant expressions: math::isfinite takes its comparison-only path there. A NaN or infinite end is
+        // non_finite_input, equal ends are invalid_input (DESIGN §6.3).
         static_assert(nxx::bracket<double>::make(2.0, 1.0) == nxx::bracket { 1.0, 2.0 });
         static_assert(nxx::bracket<double>::make(1.0, 2.0) == nxx::bracket { 1.0, 2.0 });
         static_assert(nxx::bracket<double>::make(-3.0, -4.0)->lo() == -4.0);
@@ -219,6 +220,10 @@ TEST_SUITE("core")
         static_assert(!nxx::bracket<double>::make(-k_inf, 0.0).has_value());
         static_assert(!nxx::bracket<double>::make(k_nan, 1.0).has_value());
         static_assert(!nxx::bracket<double>::make(1.0, k_nan).has_value());
+        static_assert(nxx::bracket<double>::make(k_nan, 0.0).error() == nxx::errc::non_finite_input);
+        static_assert(nxx::bracket<double>::make(k_inf, k_inf).error() == nxx::errc::non_finite_input);    // equal, but not finite
+        static_assert(nxx::bracket<double>::make(0.0, -k_inf).error() == nxx::errc::non_finite_input);
+        static_assert(nxx::bracket<double>::make(0.0, -0.0).error() == nxx::errc::invalid_input);
         static_assert(nxx::bracket<float>::make(2.0f, 1.0f) == nxx::bracket { 1.0f, 2.0f });
         static_assert(!nxx::bracket<float>::make(1.0f, std::numeric_limits<float>::quiet_NaN()).has_value());
         static_assert(nxx::bracket<long double>::make(2.0L, 1.0L) == nxx::bracket { 1.0L, 2.0L });
@@ -234,8 +239,14 @@ TEST_SUITE("core")
             FAIL_CHECK("bracket<double>::make(5, -5) failed");
         }
         CHECK(nxx::bracket<double>::make(rt(1.0), rt(1.0)) == std::unexpected(nxx::errc::invalid_input));
-        CHECK(nxx::bracket<double>::make(rt(0.0), rt(k_inf)) == std::unexpected(nxx::errc::invalid_input));
-        CHECK(nxx::bracket<double>::make(rt(k_nan), rt(0.0)) == std::unexpected(nxx::errc::invalid_input));
+        CHECK(nxx::bracket<double>::make(rt(0.0), rt(k_inf)) == std::unexpected(nxx::errc::non_finite_input));
+        CHECK(nxx::bracket<double>::make(rt(k_nan), rt(0.0)) == std::unexpected(nxx::errc::non_finite_input));
+        CHECK(nxx::bracket<double>::make(rt(k_inf), rt(k_inf)) == std::unexpected(nxx::errc::non_finite_input));
+        CHECK(nxx::bracket<double>::make(rt(k_nan), rt(k_nan)) == std::unexpected(nxx::errc::non_finite_input));
+        CHECK(nxx::bracket<float>::make(1.0f, std::numeric_limits<float>::infinity()) == std::unexpected(nxx::errc::non_finite_input));
+        CHECK(nxx::bracket<long double>::make(std::numeric_limits<long double>::quiet_NaN(), 1.0L) ==
+              std::unexpected(nxx::errc::non_finite_input));
+        CHECK(nxx::bracket<long double>::make(2.0L, 2.0L) == std::unexpected(nxx::errc::invalid_input));
 
         // Extreme endpoints: the midpoint and half-width stay finite.
         const auto big = nxx::bracket<double>::make(rt(-1.7e308), rt(1.7e308));

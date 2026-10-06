@@ -3,12 +3,15 @@
 // an adapter. This test therefore uses Boost.Multiprecision directly, not <numerixx/adapters/multiprecision.hpp>.
 // Phases 1-8 add their multiprecision instantiations here; the spike adds the root solvers (DESIGN §3.5, §7.2).
 #include <numerixx/core.hpp>
+#include <numerixx/deriv.hpp>
 #include <numerixx/roots.hpp>
 
 #include <boost/multiprecision/cpp_bin_float.hpp>
 #include <doctest/doctest.h>
 
+#include <expected>
 #include <limits>
+#include <optional>
 #include <type_traits>
 
 using mp50 = boost::multiprecision::cpp_bin_float_50;
@@ -110,5 +113,70 @@ TEST_SUITE("multiprecision")
         }
         else
             FAIL_CHECK("secant failed on x^2 - 2 in cpp_bin_float_50");
+    }
+
+    TEST_CASE("cpp_bin_float_50 non-finite inputs are non_finite_input, equal ends invalid_input")
+    {
+        // DESIGN §6.3: the input codes do not depend on the scalar type.
+        const mp50 nan = std::numeric_limits<mp50>::quiet_NaN();
+        const mp50 inf = std::numeric_limits<mp50>::infinity();
+        CHECK(nxx::bracket<mp50>::make(nan, mp50 { 1 }) == std::unexpected(nxx::errc::non_finite_input));
+        CHECK(nxx::bracket<mp50>::make(mp50 { 1 }, -inf) == std::unexpected(nxx::errc::non_finite_input));
+        CHECK(nxx::bracket<mp50>::make(mp50 { 1 }, mp50 { 1 }) == std::unexpected(nxx::errc::invalid_input));
+
+        const auto res = nr::bisection {}(mp_quad, { nan, mp50 { 2 } });
+        CHECK_FALSE(res.has_value());
+        if (!res) {
+            CHECK(res.error().code == nxx::errc::non_finite_input);
+            CHECK(res.error().used == nxx::counters {});
+            CHECK_FALSE(res.error().best.has_value());
+        }
+
+        const auto dx = nxx::deriv::diff(mp_quad, inf);
+        CHECK_FALSE(dx.has_value());
+        if (!dx) {
+            CHECK(dx.error().code == nxx::errc::non_finite_input);
+            CHECK(dx.error().evaluations == 0u);
+        }
+    }
+
+    TEST_CASE("cpp_bin_float_50 failure estimates: the R3 order, and a pole failure carries no enclosure")
+    {
+        // DESIGN §6.7, §7.2: an enclosure first; the smaller width, the smaller hi/2 - lo/2 when both widths overflow;
+        // then the smaller |f(x)|, with a NaN |f(x)| last.
+        using est      = nr::root_estimate<mp50>;
+        const mp50 nan = std::numeric_limits<mp50>::quiet_NaN();
+        const mp50 inf = std::numeric_limits<mp50>::infinity();
+        const mp50 m   = (std::numeric_limits<mp50>::max)();
+        const auto enc = [](const mp50& lo, const mp50& hi, const mp50& fx) {
+            return est { lo, fx, mp50 { hi - lo }, nr::sign_bracket<mp50> { nxx::detail::trust_me {}, lo, mp50 { -1 }, hi, mp50 { 1 } } };
+        };
+        const est open_one { mp50 { 0 }, mp50 { 1 } };
+        const est open_nan { mp50 { 0 }, nan };
+        CHECK(nxx::better_than(open_one, open_nan));
+        CHECK_FALSE(nxx::better_than(open_nan, open_one));
+        CHECK_FALSE(nxx::better_than(open_nan, open_nan));
+
+        const est whole = enc(-m, m, mp50 { 0 });
+        const est most  = enc(mp50 { -m / 2 }, m, mp50 { 1 });
+        const est half  = enc(mp50 { 0 }, m, mp50 { 1 });
+        CHECK(whole.enclosure->width() == inf);
+        CHECK(most.enclosure->width() == inf);
+        CHECK(nxx::better_than(most, whole));
+        CHECK_FALSE(nxx::better_than(whole, most));
+        CHECK(nxx::better_than(half, most));
+        CHECK_FALSE(nxx::better_than(most, half));
+        CHECK(nxx::better_than(enc(mp50 { 1 }, mp50 { 2 }, nan), open_one));
+
+        const auto hyperbola = [](const mp50& x) -> mp50 { return 1 / (x - mp50 { 1 } / 3); };
+        const auto res       = nr::bisection {}(hyperbola, { mp50 { 0 }, mp50 { 1 } });
+        CHECK_FALSE(res.has_value());
+        if (!res && res.error().best) {
+            CHECK(res.error().code == nxx::errc::sign_change_not_root);
+            CHECK_FALSE(res.error().best->enclosure.has_value());
+            CHECK(abs(res.error().best->x - mp50 { 1 } / 3) <= res.error().best->uncertainty);
+        }
+        else
+            FAIL_CHECK("bisection on a pole in cpp_bin_float_50 fails with a best estimate");
     }
 }

@@ -109,7 +109,39 @@ namespace
     {
     };
 
-    template<class Stop>
+    // The failure estimate's order is a customisation point (DESIGN §6.6): mock_estimate has one (above); these have
+    // none that nxx::better_than finds. A member function, or a function in a namespace that is not the type's, does
+    // not count.
+    struct unordered_estimate
+    {
+        double x;
+        double fx;
+    };
+
+    struct member_ordered_estimate
+    {
+        double         x;
+        double         fx;
+        constexpr bool better_than(const member_ordered_estimate& b) const noexcept { return fx < b.fx; }
+    };
+
+    namespace estimate_home
+    {
+        struct foreign_estimate
+        {
+            double x;
+            double fx;
+        };
+    }    // namespace estimate_home
+
+    namespace elsewhere
+    {
+        [[maybe_unused]] constexpr bool better_than(const estimate_home::foreign_estimate& a,
+                                                    const estimate_home::foreign_estimate& b) noexcept
+        { return a.fx < b.fx; }
+    }    // namespace elsewhere
+
+    template<class Stop, class Est = mock_estimate>
     struct mock_solver
     {
         static constexpr nxx::algo id { nxx::algo::user_first };
@@ -120,7 +152,7 @@ namespace
 
         constexpr const nxx::options<Stop>& options() const noexcept { return opt; }
 
-        constexpr auto init(const mock_problem&) const -> std::expected<mock_state, nxx::failure<mock_estimate>>
+        constexpr auto init(const mock_problem&) const -> std::expected<mock_state, nxx::failure<Est>>
         { return mock_state { 10.0, init_cost }; }
 
         constexpr auto step(const mock_problem&, const mock_state& s) const -> std::expected<mock_state, nxx::fault<>>
@@ -129,10 +161,44 @@ namespace
         }
 
         constexpr pv                              view(const mock_state& s) const noexcept { return { s.x, s.x }; }
-        constexpr mock_estimate                   estimate(const mock_state& s) const noexcept { return { s.x, s.x }; }
-        constexpr mock_estimate                   best(const mock_state& s) const noexcept { return { s.x, s.x }; }
+        constexpr Est                             estimate(const mock_state& s) const noexcept { return { s.x, s.x }; }
+        constexpr Est                             best(const mock_state& s) const noexcept { return { s.x, s.x }; }
         constexpr std::optional<nxx::stop_reason> intrinsic(const mock_state&) const noexcept { return std::nullopt; }
     };
+
+    // nxx::better_than is invocable only on an estimate type with an ADL better_than, and iterative_solver_for requires
+    // one for the failure estimate type, so a solver whose estimate has no order is not a solver (DESIGN §6.6).
+    template<class Est>
+    constexpr bool ordered_v = std::is_invocable_v<decltype(nxx::better_than), const Est&, const Est&>;
+    static_assert(ordered_v<mock_estimate> && nxx::detail::has_better_than_v<mock_estimate>);
+    static_assert(!ordered_v<unordered_estimate> && !nxx::detail::has_better_than_v<unordered_estimate>);
+    static_assert(!ordered_v<member_ordered_estimate> && !nxx::detail::has_better_than_v<member_ordered_estimate>);
+    static_assert(!ordered_v<estimate_home::foreign_estimate> && !nxx::detail::has_better_than_v<estimate_home::foreign_estimate>);
+    static_assert(!ordered_v<double> && !ordered_v<int>);
+    static_assert(nxx::iterative_solver_for<mock_solver<nxx::never>, mock_problem>);
+    static_assert(!nxx::iterative_solver_for<mock_solver<nxx::never, unordered_estimate>, mock_problem>);
+    static_assert(!nxx::iterative_solver_for<mock_solver<nxx::never, member_ordered_estimate>, mock_problem>);
+    static_assert(!nxx::iterative_solver_for<mock_solver<nxx::never, estimate_home::foreign_estimate>, mock_problem>);
+    // The CPO is noexcept exactly when the order and its conversion to bool are: an order whose result converts to bool
+    // through a conversion that may throw gives a CPO that is not noexcept.
+    struct boolish
+    {
+        bool      value;
+        constexpr operator bool() const { return value; }    // NOLINT(google-explicit-constructor): not noexcept
+    };
+    struct boolish_estimate
+    {
+        double x;
+        double fx;
+    };
+    [[maybe_unused]] constexpr boolish better_than(const boolish_estimate& a, const boolish_estimate& b) noexcept
+    { return { a.fx < b.fx }; }
+    static_assert(ordered_v<boolish_estimate>);
+    static_assert(noexcept(nxx::better_than(std::declval<const mock_estimate&>(), std::declval<const mock_estimate&>())));
+    static_assert(!noexcept(nxx::better_than(std::declval<const boolish_estimate&>(), std::declval<const boolish_estimate&>())));
+    // The order is used through the CPO, in constant expressions too.
+    static_assert(nxx::better_than(mock_estimate { 0.0, 1.0 }, mock_estimate { 0.0, -2.0 }));
+    static_assert(!nxx::better_than(mock_estimate { 0.0, 1.0 }, mock_estimate { 0.0, 1.0 }));
 
     template<class Stop>
     constexpr mock_solver<Stop> make_mock(Stop stop, nxx::max_iterations budget, std::uint32_t init_cost, std::uint32_t cost)
@@ -426,7 +492,7 @@ TEST_SUITE("core")
         if (!spent) {
             CHECK(spent.error().code == nxx::errc::evaluations_exhausted);
             CHECK(spent.error().used == nxx::counters { 9, 10 });
-            CHECK(spent.error().where == nxx::algo::user_first);
+            CHECK(spent.error().by == nxx::algo::user_first);
             CHECK(spent.error().best.has_value());
         }
 

@@ -284,11 +284,12 @@ namespace nxx
         using prepared_t = decltype(std::declval<const S&>().prepare(std::cref(std::declval<F&>()), std::declval<const In&>()));
 
         // Whether run can call S (DESIGN §6.6): prepare(std::cref(f), in) returns a std::expected problem, and S is an
-        // iterative_solver_for that problem (id, options, init, step, view, estimate, best, intrinsic, nfev). Without
-        // it, a solver that lacks a member made std::is_invocable_v a hard error inside run. Members are checked for
-        // presence, not for every type the driver needs: a prepare error that init's failure cannot hold, an options()
-        // that is not an options aggregate or an init error that is not a failure is still a hard error in run or
-        // iterate (DESIGN §6.6). Asked only once accepts_v, ready_v and input_callable_v hold.
+        // iterative_solver_for that problem (id, options, init, step, view, estimate, best, intrinsic, nfev, and
+        // better_than for the estimate_type of init's failure). Without it, a solver that lacks a member made
+        // std::is_invocable_v a hard error inside run. Members are checked for presence, not for every type the driver
+        // needs: a prepare error that init's failure cannot hold, an options() that is not an options aggregate or an
+        // init error that has an estimate_type but is not a failure is still a hard error in run or iterate (DESIGN
+        // §6.6). Asked only once accepts_v, ready_v and input_callable_v hold.
         template<class S, class F, class In>
         inline constexpr bool runnable_v = [] {
             if constexpr (requires {
@@ -343,7 +344,8 @@ namespace nxx
         void operator()(this const Self&, const F&, const T (&)[N]) NXX_DELETE("this solver does not implement the solver protocol "
                                                                                "(DESIGN 6.6): it needs accepts_v, prepare(f, in), "
                                                                                "and id, options(), init, step, view, estimate, best "
-                                                                               "and intrinsic for the problem prepare returns");
+                                                                               "and intrinsic for the problem prepare returns, and "
+                                                                               "better_than(const Est&, const Est&) for its estimate type");
 
         template<class Self, class F, real T, std::size_t N>
             requires(N == 2 && detail::ready_v<Self, F> && !detail::input_callable_v<Self, F, std::pair<T, T>>)
@@ -371,7 +373,8 @@ namespace nxx
         void operator()(this const Self&, const F&, const In&) NXX_DELETE("this solver does not implement the solver protocol "
                                                                           "(DESIGN 6.6): it needs accepts_v, prepare(f, in), "
                                                                           "and id, options(), init, step, view, estimate, best "
-                                                                          "and intrinsic for the problem prepare returns");
+                                                                          "and intrinsic for the problem prepare returns, and "
+                                                                          "better_than(const Est&, const Est&) for its estimate type");
 
         template<class Self, class In>
             requires detail::accepts_v<Self, In>
@@ -437,7 +440,8 @@ namespace nxx
         void operator()(this const Self&, const F&, const In&) NXX_DELETE("this solver does not implement the solver protocol "
                                                                           "(DESIGN 6.6): it needs accepts_v, prepare(f, in), "
                                                                           "and id, options(), init, step, view, estimate, best "
-                                                                          "and intrinsic for the problem prepare returns");
+                                                                          "and intrinsic for the problem prepare returns, and "
+                                                                          "better_than(const Est&, const Est&) for its estimate type");
 
         // A braced list or a C array: open methods start from one point, so {lo, hi} (or {x}) gets a reason rather than a
         // bare "no matching function". Arrays are left out of the catch-alls above, so only this overload takes them.
@@ -496,7 +500,8 @@ namespace nxx
         void operator()(this const Self&, const F&, const T (&)[N]) NXX_DELETE("this solver does not implement the solver protocol "
                                                                                "(DESIGN 6.6): it needs accepts_v, prepare(f, in), "
                                                                                "and id, options(), init, step, view, estimate, best "
-                                                                               "and intrinsic for the problem prepare returns");
+                                                                               "and intrinsic for the problem prepare returns, and "
+                                                                               "better_than(const Est&, const Est&) for its estimate type");
 
         template<class Self, class F, real T, std::size_t N>
             requires(N == 2 && detail::ready_v<Self, F> && !detail::input_callable_v<Self, F, std::pair<T, T>>)
@@ -522,7 +527,8 @@ namespace nxx
         void operator()(this const Self&, const F&, const In&) NXX_DELETE("this solver does not implement the solver protocol "
                                                                           "(DESIGN 6.6): it needs accepts_v, prepare(f, in), "
                                                                           "and id, options(), init, step, view, estimate, best "
-                                                                          "and intrinsic for the problem prepare returns");
+                                                                          "and intrinsic for the problem prepare returns, and "
+                                                                          "better_than(const Est&, const Est&) for its estimate type");
 
         template<class Self, class In>
             requires detail::accepts_v<Self, In>

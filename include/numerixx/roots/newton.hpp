@@ -149,7 +149,7 @@ namespace nxx::roots
             auto y = nxx::evaluate(p.f, x0);
             if (!y) {
                 const fault<UE> e = detail::widen<UE>(y.error());
-                return std::unexpected(Fail { e.code, id, counters { 0, e.evals }, std::nullopt, e.cause });
+                return std::unexpected(Fail { e.code, id, counters { 0, e.evaluations }, std::nullopt, e.cause });
             }
             return newton_state<T> { x0, *y, detail::unknown<T>(), detail::unknown<T>(), cost_of(p.f) };
         }
@@ -171,7 +171,7 @@ namespace nxx::roots
             auto y = nxx::evaluate(p.f, x1);
             if (!y) {
                 fault<UE> e = detail::widen<UE>(y.error());
-                e.evals += c;
+                e.evaluations += c;
                 return std::unexpected(e);
             }
             // The criteria see the larger of the proposed and the actual step: a projection that moves the point further

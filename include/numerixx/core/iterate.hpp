@@ -37,23 +37,54 @@ namespace nxx
         using init_failure_t = typename init_result_t<A, P>::error_type;
         template<class A, class P>
         using estimate_t = std::remove_cvref_t<decltype(std::declval<const A&>().estimate(std::declval<const state_t<A, P>&>()))>;
+    }    // namespace detail
 
-        // Whether e is a better failure payload than best: the family's better_than (found by ADL), else merit_of.
+    // nxx::better_than(a, b): whether failure estimate a is a better best estimate than b (DESIGN §6.6). It calls the
+    // better_than(const Est&, const Est&) that ADL finds next to the estimate type: a hidden friend or a function in the
+    // estimate type's namespace. It must be a strict weak order, so the best estimate of a chain does not depend on how
+    // its alternatives are grouped or folded (§6.7). Without one it is not invocable (std::is_invocable_v is false); a
+    // better_than in another namespace, or a member function, counts as missing. There is no fallback.
+    namespace detail::better_cpo
+    {
+        void better_than() = delete;    // poison pill: unqualified calls below find only ADL candidates
+
+        template<class E>
+        inline constexpr bool found_v = requires(const E& a, const E& b) {
+            { better_than(a, b) } -> std::convertible_to<bool>;
+        };
+
+        struct better_than_fn
+        {
+            // No deleted sibling: without found_v<E> the call is simply not invocable, and the compiler names found_v.
+            template<class E>
+                requires found_v<E>
+            constexpr bool operator()(const E& a, const E& b) const noexcept(noexcept(static_cast<bool>(better_than(a, b))))
+            { return static_cast<bool>(better_than(a, b)); }
+        };
+    }    // namespace detail::better_cpo
+
+    inline constexpr detail::better_cpo::better_than_fn better_than {};
+
+    namespace detail
+    {
+        // Whether the failure estimate type Est has an order that nxx::better_than can call.
+        template<class Est>
+        inline constexpr bool has_better_than_v = better_cpo::found_v<std::remove_cvref_t<Est>>;
+
+        // Whether e is a better failure payload than best (DESIGN §6.6): the family's better_than. A <= order instead
+        // of a < order trips the precondition in assert builds.
         template<class Est>
         constexpr bool better(const Est& e, const Est& best)
         {
-            if constexpr (requires {
-                              { better_than(e, best) } -> std::convertible_to<bool>;
-                          })
-                return better_than(e, best);
-            else
-                return merit_of(e) < merit_of(best);
+            NXX_EXPECTS(!nxx::better_than(e, e));
+            return nxx::better_than(e, best);
         }
     }    // namespace detail
 
     // The protocol, all const: init(p) -> expected<S, failure>, step(p, s) -> expected<S, fault>, view(s) for the stop
     // criteria, estimate(s) on success, best(s) on failure, intrinsic(s) for the algorithm's own stops, options() for
-    // the stop criterion, budget and observer, and s.nfev, the evaluations so far.
+    // the stop criterion, budget and observer, and s.nfev, the evaluations so far. The failure estimate type (the
+    // estimate_type of init's failure) must have an order, found by ADL through nxx::better_than (DESIGN §6.6).
     template<class A, class P>
     concept iterative_solver_for = requires(const A& a, const P& p, const detail::state_t<A, P>& s) {
         { A::id } -> std::convertible_to<algo>;
@@ -65,20 +96,44 @@ namespace nxx
         a.best(s);
         { a.intrinsic(s) } -> std::same_as<std::optional<stop_reason>>;
         { s.nfev } -> std::convertible_to<std::uint32_t>;
+        requires detail::has_better_than_v<typename detail::init_failure_t<A, P>::estimate_type>;
     };
 
     namespace detail
     {
+        // A step never reports invalid_input or non_finite_input (DESIGN §6.3, §6.7): input codes mean "rejected before
+        // iterating". nxx::evaluate already maps them when a callback returns a Numerixx fault (§6.4), and the
+        // library's steps produce neither code; this is the backstop for a user-written step that returns one
+        // directly. It becomes non_finite_value with the fault's evaluations and cause. Stage 2 of then and
+        // warm_fallback maps its failure the same way, with its cost and cause: its input is stage 1's output, not the
+        // caller's (§6.10). Not noexcept: moving a user cause may throw, and the library is exception-neutral (D10).
+        template<class E>    // a fault<UE>, or a failure<Est, UE> of a stage 2
+        constexpr E step_fault(E e)
+        {
+            if (e.code == errc::invalid_input || e.code == errc::non_finite_input) e.code = errc::non_finite_value;
+            return e;
+        }
+
+        // alg.step(p, s) with step_fault applied: the driver (advance) and steps_view both step through it, so
+        // steps_view yields what the driver sees.
+        template<class A, class P, class S>
+        constexpr auto checked_step(const A& alg, const P& p, const S& s)
+        {
+            auto next = alg.step(p, s);
+            if (!next) return decltype(next) { std::unexpect, nxx::detail::step_fault(std::move(next).error()) };
+            return next;
+        }
+
         // One step; a fault becomes a failure that carries the best estimate and the failing step's evaluations.
         template<class A, class P, class S, class FEst>
         constexpr auto advance(const A& alg, const P& p, const S& s, std::uint32_t k, const FEst& best)
             -> std::expected<S, init_failure_t<A, P>>
         {
             using Fail = init_failure_t<A, P>;
-            auto next  = alg.step(p, s);
+            auto next  = nxx::detail::checked_step(alg, p, s);
             if (!next) {
                 const auto& e = next.error();
-                return std::unexpected(Fail { e.code, A::id, counters { k, s.nfev + e.evals }, best, e.cause });
+                return std::unexpected(Fail { e.code, A::id, counters { k, s.nfev + e.evaluations }, best, e.cause });
             }
             return *std::move(next);
         }

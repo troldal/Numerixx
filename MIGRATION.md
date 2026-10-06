@@ -61,8 +61,14 @@ Some 1.x results were wrong, so Numerixx 2 returns different values or an error:
   wrong for second derivatives and for its `mdiff`; `v1.0.0` used ε^(1/3), which leaves errors around 1e-5 relative.
   Numerixx 2 chooses the step per stencil;
 - solvers that ran out of iterations and returned their last iterate as a success now return an error that carries
-  the best estimate;
+  the best estimate; `nxx::best(r)` and `nxx::best_x(r)` read the solution or that estimate in one call;
 - Newton on a function without a real root (for example x² + 1) could return a non-finite or arbitrary "root"; it now
   fails with the reason and the best estimate;
 - quadratics with complex roots no longer return NaN as a success;
-- bracketing without a sign change, and poles, are errors instead of "roots".
+- bracketing without a sign change, and poles, are errors instead of "roots". A pole fails with
+  `sign_change_not_root`; its best estimate's x locates the pole, and a detected pole's estimate carries no enclosure, so a
+  `first_of` chain does not rank it above another solver's estimate (a bracketing failure next to an undetected pole
+  still carries its enclosure: DESIGN §6.7 and §6.10, known limits until phase 3);
+- a NaN or infinite bracket end, which `v1.1.0-legacy`'s `validateBounds` does not check (it rejects only equal ends;
+  `numerixx/roots/impl/Common.impl.hpp` lines 41-47), fails in-band with `non_finite_input`;
+  equal ends fail in-band with `invalid_input` instead of throwing `NumerixxError`.

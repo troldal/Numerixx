@@ -132,7 +132,13 @@ namespace nxx
                     if constexpr (U::kind == 1)
                         return R { std::unexpect, fault<UE> { errc::callback_failed, cost_of(fn), cause_slot<UE>(r.error()) } };
                     else {
-                        return R { std::unexpect, r.error() };    // already a Numerixx fault: it reports its own cost
+                        // Already a Numerixx fault: it reports its own cost and cause. Its input codes become
+                        // non_finite_value (DESIGN §6.4, §12 item 22): an input code means "the caller's input was
+                        // rejected before iterating", and the nested callable's input is not the caller's input. Other
+                        // input codes (no_sign_change from a nested solve, ...) pass through unchanged.
+                        auto e = r.error();
+                        if (e.code == errc::invalid_input || e.code == errc::non_finite_input) e.code = errc::non_finite_value;
+                        return R { std::unexpect, e };    // copies, as nothrow_evaluation_v assumes
                     }
                 }
                 const X y = *std::move(r);
@@ -143,7 +149,9 @@ namespace nxx
     }    // namespace detail
 
     // One evaluation: NaN or +-inf -> errc::non_finite_value; the callback's own error -> errc::callback_failed with the
-    // error as cause. A failed evaluation reports its cost in fault::evals.
+    // error as cause; a Numerixx fault from the callback (derivative_of, a nested solve) -> that fault, with
+    // invalid_input and non_finite_input turned into non_finite_value. A failed evaluation reports its cost in
+    // fault::evaluations.
     template<class X, class F>
     constexpr auto evaluate(const F& fn, const X& x) noexcept(detail::nothrow_evaluation_v<F, X>)
         -> std::expected<X, fault<callback_error_t<F, X>>>

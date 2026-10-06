@@ -1,6 +1,6 @@
-// Canonical calls (DESIGN §6.14, normative), spike exit criterion 8 (§10.2): calls 1, 2, 3, 9 and 10, spelled as in the
-// table, with RUN-TIME brackets, guesses, tolerances and budgets. Run-time scalars come from volatile reads; tolerances
-// and budgets go through make() and are dereferenced only after checking. Each module phase adds its calls here.
+// Canonical calls (DESIGN §6.14, normative): calls 1, 2, 3, 9 and 10 (spike exit criterion 8, §10.2) and, from phase 1,
+// call 15, spelled as in the table, with RUN-TIME brackets, guesses, tolerances and budgets. Run-time scalars come from volatile reads;
+// tolerances and budgets go through make() and are dereferenced only after checking. Each module phase adds its calls here.
 #include <numerixx/roots.hpp>
 
 #include <doctest/doctest.h>
@@ -49,7 +49,7 @@ namespace
                    a->used == b->used && a->by == b->by && a->how == b->how;
         const auto& ea = a.error();
         const auto& eb = b.error();
-        return ea.code == eb.code && ea.where == eb.where && ea.used == eb.used && ea.best.has_value() == eb.best.has_value() &&
+        return ea.code == eb.code && ea.by == eb.by && ea.used == eb.used && ea.best.has_value() == eb.best.has_value() &&
                (!ea.best || ea.best->x == eb.best->x) && ea.cause == eb.cause;
     }
 }    // namespace
@@ -194,7 +194,7 @@ TEST_SUITE("usage")
         CHECK_FALSE(res.has_value());    // never "the root is the boundary"
         if (!res) {
             CHECK(res.error().code == nxx::errc::stalled);
-            CHECK(res.error().where == r::algos::secant);
+            CHECK(res.error().by == r::algos::secant);
             CHECK(res.error().best.has_value());
         }
         CHECK(nxx::best_x(res) == std::optional<double>(1.0));    // the best estimate, at the edge
@@ -276,7 +276,7 @@ TEST_SUITE("usage")
             CHECK_FALSE(res.has_value());
             if (!res) {
                 CHECK(res.error().code == nxx::errc::no_sign_change);
-                CHECK(res.error().where == r::algos::brent);
+                CHECK(res.error().by == r::algos::brent);
                 CHECK(res.error().used == nxx::counters { 0, 2 });
                 CHECK(nxx::best_x(res) == std::optional<double>(2.0));
             }
@@ -328,10 +328,38 @@ TEST_SUITE("usage")
             CHECK_FALSE(res.has_value());
             if (!res) {
                 CHECK(res.error().code == nxx::errc::budget_exhausted);
-                CHECK(res.error().where == r::algos::bisection);
+                CHECK(res.error().by == r::algos::bisection);
                 CHECK(res.error().used == nxx::counters { 3, 5 });
                 CHECK(res.error().best.has_value());
             }
         }
+    }
+
+    TEST_CASE("call 15: the best estimate, on success or failure")
+    {
+        const auto   f  = [](double x) { return x * x - 2.0; };
+        const double lo = rt(1.0);
+        const double hi = rt(2.0);
+
+        const auto res = r::brent {}(f, { lo, hi });
+        static_assert(std::is_same_v<decltype(nxx::best(res)), std::optional<r::root_estimate<double>>>);
+        const auto b = nxx::best(res);
+        CHECK(b.has_value());
+        if (res && b) { CHECK(*b == static_cast<const r::root_estimate<double>&>(*res)); }    // the solution's estimate
+
+        // A run-time budget too small: the failure's best estimate, through the same call.
+        const auto three = nxx::max_iterations::make(rt_ll(3));
+        CHECK(three.has_value());
+        if (three) {
+            const auto starved = r::bisection {}.with_budget(*three)(f, { lo, hi });
+            const auto sb      = nxx::best(starved);
+            CHECK_FALSE(starved.has_value());
+            CHECK(sb.has_value());
+            if (!starved) { CHECK(sb == starved.error().best); }
+            if (sb) { CHECK(nxx::best_x(starved) == std::optional<double>(sb->x)); }
+        }
+
+        // Nothing evaluated: no best estimate.
+        CHECK_FALSE(nxx::best(r::brent {}(f, { lo, lo })).has_value());
     }
 }

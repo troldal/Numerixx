@@ -16,7 +16,10 @@ NXX_BEGIN_HEADER
 namespace nxx
 {
     enum class errc : std::uint8_t {
-        // 1..31: input errors, found before iterating
+        // 1..31: input errors, found before iterating. An evaluation or a step never reports invalid_input or
+        // non_finite_input: nxx::evaluate maps a nested fault's, the driver a step's, and then and warm_fallback a
+        // stage 2's, to non_finite_value (DESIGN §6.3, §6.4, §6.7, §6.10); a fallible callback can pass the other input
+        // codes through (DESIGN §6.3).
         invalid_input = 1,
         no_sign_change,
         non_finite_input,
@@ -72,7 +75,7 @@ namespace nxx
     struct fault
     {
         errc                  code {};
-        std::uint32_t         evals = 0;    // evaluations consumed by the failing step
+        std::uint32_t         evaluations = 0;    // evaluations consumed by the failing step (D33), counters' name
         NXX_NO_UNIQUE_ADDRESS cause_slot<UE> cause {};
 
         friend constexpr bool operator==(const fault&, const fault&) = default;
@@ -95,9 +98,9 @@ namespace nxx
         using cause_type    = UE;
 
         errc                  code {};
-        algo                  where = algo::none;
+        algo                  by = algo::none;    // the algorithm that failed: the solution's name (DESIGN §6.3)
         counters              used {};
-        std::optional<Est>    best {};                    // best estimate so far; nullopt only if nothing was evaluated
+        std::optional<Est>    best {};                    // best estimate so far; nullopt only if no evaluation succeeded
         NXX_NO_UNIQUE_ADDRESS cause_slot<UE> cause {};    // the user's callback error, unchanged
 
         friend constexpr bool operator==(const failure&, const failure&) = default;
@@ -107,7 +110,7 @@ namespace nxx
     using result = std::expected<solution<Est>, failure<Est, UE>>;
 
     // The solution's x, or the failure's best->x, or nothing. Only for results whose solution has an x: a search result
-    // (a sign_bracket) has two ends and no single x.
+    // has no x: read r->lo() and r->hi() (DESIGN §6.3; no deleted sibling, §12.21).
     template<class R>
         requires requires(const R& r) { r->x; }
     constexpr auto best_x(const R& r)
@@ -117,6 +120,33 @@ namespace nxx
         if (r.error().best) return std::optional<X>(r.error().best->x);
         return std::optional<X> {};
     }
+
+    namespace detail
+    {
+        // Whether R is a Numerixx result: std::expected<solution<S>, failure<F, UE>>, where a search result has S != F
+        // (DESIGN §6.3). The combinators' classifiers check it before they read R::value_type or R::error_type (§6.10).
+        template<class R>
+        inline constexpr bool is_result_v = false;
+        template<class S, class F, class UE>
+        inline constexpr bool is_result_v<std::expected<solution<S>, failure<F, UE>>> = true;
+    }    // namespace detail
+
+    // The solution's estimate, or the failure's best estimate, or nothing (DESIGN §6.3): one std::optional for every
+    // result whose success and failure carry the same estimate, through first_of and any_solver too. A one-shot
+    // derivative's std::expected<T, fault<UE>> is not a result and has no best.
+    template<class E, class UE>
+    [[nodiscard]] constexpr auto best(const std::expected<solution<E>, failure<E, UE>>& r) -> std::optional<E>
+    {
+        if (r) return std::optional<E>(static_cast<const E&>(*r));
+        return r.error().best;
+    }
+
+    template<class S, class E, class UE>
+        requires(!std::is_same_v<S, E>)
+    void best(const std::expected<solution<S>, failure<E, UE>>&) NXX_DELETE("nxx::best: this result succeeds and fails with "
+                                                                            "different estimates (a search result: a sign_bracket, "
+                                                                            "then a root_estimate): read *r and r.error().best "
+                                                                            "separately");
 
     // nxx::is_fatal(e): whether a user's callback error stops first_of's fall-through. Customise it with a function
     // is_fatal(const YourError&) in your error type's namespace (found by ADL); the default is false.

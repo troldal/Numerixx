@@ -42,14 +42,22 @@ namespace
         return x * x - 2.0;
     };
 
+    // A newton whose step returns an input code itself, as a user-written step might (DESIGN §6.7).
+    using newton_t = decltype(r::newton {}.with_derivative(dsq2));
+    struct raw_input_step : newton_t
+    {
+        template<class P, class S>
+        constexpr auto step(const P&, const S&) const -> std::expected<S, nxx::fault<step_error>>
+        { return std::unexpected(nxx::fault<step_error> { nxx::errc::invalid_input, 1, step_error::domain }); }
+    };
+
     // ---- Types ---------------------------------------------------------------------------------------------------------
     template<class S, class F, class In>
     using problem_of = typename decltype(std::declval<const S&>().prepare(std::declval<const std::reference_wrapper<const F>&>(),
                                                                           std::declval<const In&>()))::value_type;
 
-    using sq2_t    = std::remove_const_t<decltype(sq2)>;
-    using g_neg_t  = std::remove_const_t<decltype(g_neg)>;
-    using newton_t = decltype(r::newton {}.with_derivative(dsq2));
+    using sq2_t   = std::remove_const_t<decltype(sq2)>;
+    using g_neg_t = std::remove_const_t<decltype(g_neg)>;
 
     using brent_view     = nxx::steps_view<r::brent<>, problem_of<r::brent<>, sq2_t, std::pair<double, double>>>;
     using bisection_view = nxx::steps_view<r::bisection<>, problem_of<r::bisection<>, sq2_t, nxx::bracket<double>>>;
@@ -284,7 +292,7 @@ TEST_SUITE("roots")
         CHECK(faults.size() == 1u);
         if (faults.size() == 1) {
             CHECK(faults[0].code == nxx::errc::non_finite_value);
-            CHECK(faults[0].evals == 1u);
+            CHECK(faults[0].evaluations == 1u);
         }
         const auto driver = sec(nan_at_0, 0.0);    // the driver reports the same failure
         if (driver) { FAIL_CHECK("the secant cannot start at a NaN"); }
@@ -310,7 +318,7 @@ TEST_SUITE("roots")
         CHECK(gfaults.size() == 1u);
         if (gfaults.size() == 1) {
             CHECK(gfaults[0].code == nxx::errc::callback_failed);
-            CHECK(gfaults[0].evals == 1u);
+            CHECK(gfaults[0].evaluations == 1u);
             CHECK(gfaults[0].cause == std::optional { step_error::domain });
         }
     }
@@ -335,8 +343,51 @@ TEST_SUITE("roots")
             CHECK_FALSE(elems[1].has_value());
             if (!elems[1]) {
                 CHECK(elems[1].error().code == nxx::errc::zero_derivative);
-                CHECK(elems[1].error().evals == 1u);    // the derivative evaluation
+                CHECK(elems[1].error().evaluations == 1u);    // the derivative evaluation
             }
+        }
+    }
+
+    TEST_CASE("steps_view: a step's input code becomes non_finite_value, with its evaluations and cause")
+    {
+        // detail::step_fault (DESIGN §6.3, §6.7), which the driver and steps_view apply to every step's fault: only the
+        // two input codes Numerixx's own callables produce are mapped; every other code passes unchanged.
+        // tests/usage/test_composition.cpp has the end-to-end rows for nested callables (mapped inside nxx::evaluate),
+        // because they need the deriv module.
+        using nxx::errc;
+        constexpr auto mapped = nxx::detail::step_fault(nxx::fault<int> { errc::invalid_input, 3, 7 });
+        static_assert(mapped.code == errc::non_finite_value && mapped.evaluations == 3 && mapped.cause == std::optional { 7 });
+        static_assert(nxx::detail::step_fault(nxx::fault<> { errc::non_finite_input, 2, {} }).code == errc::non_finite_value);
+        static_assert(nxx::detail::step_fault(nxx::fault<> { errc::non_finite_input, 2, {} }).evaluations == 2);
+        static_assert(nxx::detail::step_fault(nxx::fault<> { errc::callback_failed, 1, {} }).code == errc::callback_failed);
+        static_assert(nxx::detail::step_fault(nxx::fault<> { errc::zero_derivative, 1, {} }).code == errc::zero_derivative);
+        static_assert(nxx::detail::step_fault(nxx::fault<> { errc::out_of_domain, 1, {} }).code == errc::out_of_domain);
+        static_assert(!noexcept(nxx::detail::step_fault(std::declval<nxx::fault<int>>())));    // a user cause may throw (D10)
+
+        // A user-written step that returns an input code directly (nxx::evaluate already maps a callback's, DESIGN §6.4):
+        // detail::checked_step is the backstop. The code is mapped, the cause and the evaluations are kept, in the view
+        // and in the driver alike.
+        const auto raw = raw_input_step { r::newton {}.with_derivative(dsq2) };
+        const auto p   = raw.prepare(std::cref(g_neg), 1.0);
+        if (!p) {
+            FAIL_CHECK("prepare only checks that the guess is finite");
+            return;
+        }
+        std::vector<std::expected<r::newton_state<double>, nxx::fault<step_error>>> elems;
+        for (const auto& st : nxx::steps_view { raw, *p } | std::views::take(10)) elems.push_back(st);
+        CHECK(elems.size() == 2u);
+        if (elems.size() == 2 && !elems[1]) {
+            CHECK(elems[1].error().code == nxx::errc::non_finite_value);
+            CHECK(elems[1].error().evaluations == 1u);
+            CHECK(elems[1].error().cause == std::optional { step_error::domain });
+        }
+        const auto driver = nxx::iterate(raw, *p);
+        CHECK_FALSE(driver.has_value());
+        if (!driver) {
+            CHECK(driver.error().code == nxx::errc::non_finite_value);
+            CHECK(driver.error().used == nxx::counters { 1, 2 });    // f(1) in init, then the step's one evaluation
+            CHECK(driver.error().cause == std::optional { step_error::domain });
+            CHECK(driver.error().best.has_value());
         }
     }
 
@@ -348,7 +399,7 @@ TEST_SUITE("roots")
         CHECK_FALSE(pb.has_value());
         if (!pb) {
             CHECK(pb.error().code == nxx::errc::no_sign_change);
-            CHECK(pb.error().where == r::algos::brent);
+            CHECK(pb.error().by == r::algos::brent);
             CHECK(pb.error().used == nxx::counters { 0, 2 });
             CHECK(pb.error().best.has_value());
         }

@@ -71,7 +71,7 @@ target_compile_definitions(numerixx_test_core PRIVATE NUMERIXX_EXPECTED_VERSION=
 
 numerixx_add_test(roots
   SOURCES roots/test_solvers.cpp roots/test_soundness.cpp roots/test_combinators.cpp roots/test_steps.cpp
-          roots/test_any_solver.cpp roots/test_determinism.cpp
+          roots/test_any_solver.cpp roots/test_determinism.cpp roots/test_results.cpp roots/test_order.cpp
   LINK numerixx::roots)
 numerixx_add_test(deriv SOURCES deriv/test_deriv.cpp LINK numerixx::deriv)
 

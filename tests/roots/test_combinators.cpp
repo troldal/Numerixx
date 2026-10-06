@@ -12,6 +12,8 @@
 #include <cstdint>
 #include <expected>
 #include <functional>
+#include <limits>
+#include <numbers>
 #include <optional>
 #include <random>
 #include <type_traits>
@@ -101,7 +103,7 @@ namespace
         if (a) return same_estimate(*a, *b) && a->used == b->used && a->by == b->by && a->how == b->how;
         const auto& fa = a.error();
         const auto& fb = b.error();
-        return fa.code == fb.code && fa.where == fb.where && fa.used == fb.used && same_best(fa.best, fb.best) && fa.cause == fb.cause;
+        return fa.code == fb.code && fa.by == fb.by && fa.used == fb.used && same_best(fa.best, fb.best) && fa.cause == fb.cause;
     }
 
     // A curried solver or a stage that counts how often it runs.
@@ -211,7 +213,7 @@ TEST_SUITE("roots")
                 return;
             }
             CHECK(m.error().code == nxx::errc::zero_derivative);    // the last code
-            CHECK(m.error().where == r::algos::newton);
+            CHECK(m.error().by == r::algos::newton);
             CHECK(m.error().used == e_sec.error().used + e_zd.error().used);    // the total cost
             CHECK(same_best(m.error().best, e_sec.error().best));               // the better estimate, not the last
         }
@@ -223,7 +225,7 @@ TEST_SUITE("roots")
                 return;
             }
             CHECK(m.error().code == nxx::errc::budget_exhausted);
-            CHECK(m.error().where == r::algos::secant);
+            CHECK(m.error().by == r::algos::secant);
             CHECK(m.error().used == e_zd.error().used + e_sec.error().used);
             CHECK(same_best(m.error().best, e_sec.error().best));
         }
@@ -248,8 +250,8 @@ TEST_SUITE("roots")
         CHECK(b_narrow.enclosure->width() == 2.0 / 64.0);
         CHECK(b_narrow.enclosure->width() < b_wide.enclosure->width());
         CHECK(std::abs(b_wide.fx) < std::abs(b_narrow.fx));    // so the residual rule alone would pick the wide one
-        CHECK(r::better_than(b_narrow, b_wide));
-        CHECK_FALSE(r::better_than(b_wide, b_narrow));
+        CHECK(nxx::better_than(b_narrow, b_wide));
+        CHECK_FALSE(nxx::better_than(b_wide, b_narrow));
 
         for (const auto& m : { nxx::first_of(narrow, wide)(sq2), nxx::first_of(wide, narrow)(sq2) }) {
             if (m) {
@@ -257,13 +259,13 @@ TEST_SUITE("roots")
                 continue;
             }
             CHECK(m.error().code == nxx::errc::budget_exhausted);
-            CHECK(m.error().where == r::algos::bisection);
+            CHECK(m.error().by == r::algos::bisection);
             CHECK(m.error().used == e_narrow.error().used + e_wide.error().used);
             CHECK(same_best(m.error().best, e_narrow.error().best));
         }
     }
 
-    // better_than is a strict weak order (roots/bracket.hpp): an estimate with a sign-changing enclosure beats one without,
+    // better_than is a strict weak order (roots/bracket.hpp, DESIGN §6.7): an estimate with a sign-changing enclosure beats one without,
     // whatever the residuals, so the best estimate of a chain does not depend on grouping or fold order.
     TEST_CASE("combinators: first_of prefers the estimate with an enclosure when only one has one")
     {
@@ -306,6 +308,69 @@ TEST_SUITE("roots")
         }
     }
 
+    // The enclosure rule's premise is that an enclosure holds a sign change of a root (DESIGN §6.7, §7.2): a pole failure
+    // carries its estimate without the enclosure, so a chain does not rank the pole above an open method's estimate.
+    // Before, brent's final enclosure around pi/2 outranked the secant's estimate, and the chain's best was the pole
+    // (x = 1.5707963267948974, |f| about 1.2e15).
+    TEST_CASE("combinators: first_of does not rank a pole failure's estimate as the best")
+    {
+        const auto tangent  = [](double x) { return std::tan(x); };
+        const auto at_pole  = r::brent {}.on({ 1.0, 2.0 });
+        const auto starved  = r::secant {}.with_budget(2).on(3.0);
+        const auto e_pole   = at_pole(tangent);
+        const auto e_secant = starved(tangent);
+        if (e_pole || e_secant || !e_pole.error().best || !e_secant.error().best) {
+            FAIL_CHECK("precondition: brent finds the pole and the starved secant fails, both with a best estimate");
+            return;
+        }
+        CHECK(e_pole.error().code == nxx::errc::sign_change_not_root);
+        CHECK_FALSE(e_pole.error().best->enclosure.has_value());
+        CHECK(std::abs(e_pole.error().best->x - std::numbers::pi / 2.0) < 1e-12);
+        CHECK(std::abs(e_pole.error().best->fx) > 1e10);
+        CHECK(e_secant.error().code == nxx::errc::budget_exhausted);
+        CHECK(std::abs(e_secant.error().best->x - std::numbers::pi) < 1e-4);
+        CHECK(std::abs(e_secant.error().best->fx) < std::abs(e_pole.error().best->fx));
+
+        for (const auto& m : { nxx::first_of(at_pole, starved)(tangent), nxx::first_of(starved, at_pole)(tangent) }) {
+            if (m) {
+                FAIL_CHECK("the chain cannot succeed");
+                continue;
+            }
+            CHECK(same_best(m.error().best, e_secant.error().best));
+            CHECK(m.error().used == e_pole.error().used + e_secant.error().used);
+        }
+    }
+
+    // The same rule through then (DESIGN §6.7, §6.10): when stage 2 finds a pole in the search's bracket, the chain keeps
+    // stage 2's pole estimate. Before, then merged the search's estimate, a window end whose enclosure [1, 2] holds the
+    // pole, and it outranked the secant's estimate in first_of (best x = 1, |f| about 1.56, in both orders).
+    TEST_CASE("combinators: a then whose stage 2 finds a pole keeps the pole estimate without an enclosure (regression)")
+    {
+        const auto tangent = [](double x) { return std::tan(x); };
+        const auto search  = r::expand {}.on(nxx::bracket { 1.0, 2.0 });
+
+        const auto check_chain = [&](const auto& alone, const auto& chain) {
+            const auto e_alone = alone(tangent);
+            const auto got     = chain(tangent);
+            if (e_alone || got || !e_alone.error().best) {
+                FAIL_CHECK("precondition: the solver alone and the chain fail, the solver with a best estimate");
+                return;
+            }
+            CHECK(e_alone.error().code == nxx::errc::sign_change_not_root);
+            CHECK(got.error().code == nxx::errc::sign_change_not_root);
+            CHECK(got.error().used == e_alone.error().used);
+            CHECK(same_best(got.error().best, e_alone.error().best));
+        };
+        check_chain(r::brent {}.on({ 1.0, 2.0 }), nxx::then(search, r::brent {}));
+        check_chain(r::bisection {}.on({ 1.0, 2.0 }), nxx::then(search, r::bisection {}));
+
+        // The symptom as first seen: a first_of of the chain and a starved secant reported the search's window end.
+        const auto starved  = r::secant {}.with_budget(2).on(3.0);
+        const auto e_secant = starved(tangent);
+        const auto m        = nxx::first_of(nxx::then(search, r::brent {}), starved)(tangent);
+        CHECK((!m && !e_secant && same_best(m.error().best, e_secant.error().best)));
+    }
+
     TEST_CASE("combinators: first_of keeps a best estimate when only one attempt has one")
     {
         const auto e_inv = invalid(sq2);
@@ -333,7 +398,7 @@ TEST_SUITE("roots")
         if (m2) { FAIL_CHECK("the chain cannot succeed"); }
         else {
             CHECK(m2.error().code == nxx::errc::invalid_input);    // the last code
-            CHECK(m2.error().where == r::algos::bisection);
+            CHECK(m2.error().by == r::algos::bisection);
             CHECK(same_best(m2.error().best, e_zd.error().best));    // the earlier estimate survives
             CHECK(m2.error().used == e_zd.error().used);
         }
@@ -451,7 +516,7 @@ TEST_SUITE("roots")
         if (stopped) { FAIL_CHECK("a fatal error must stop the chain"); }
         else {
             CHECK(stopped.error().code == nxx::errc::callback_failed);
-            CHECK(stopped.error().where == r::algos::bisection);
+            CHECK(stopped.error().by == r::algos::bisection);
             CHECK(stopped.error().cause == std::optional { comb_user::eval_error::fatal });
             CHECK(same_result(stopped, bis(g_fatal)));
         }
@@ -552,9 +617,35 @@ TEST_SUITE("roots")
             return;
         }
         CHECK(all_fail.error().code == nxx::errc::budget_exhausted);
-        CHECK(all_fail.error().where == r::algos::bisection);
+        CHECK(all_fail.error().by == r::algos::bisection);
         CHECK(all_fail.error().used == e1.error().used + e2.error().used + e_w.error().used + e_n.error().used);
         CHECK(same_best(all_fail.error().best, e_n.error().best));
+    }
+
+    TEST_CASE("combinators: a first_of nested as the first alternative keeps its own storage (cl layout regression)")
+    {
+        // On cl, [[msvc::no_unique_address]] on first_of_t's leading empty policy overlapped the inner chain with the
+        // outer chain's second alternative, so first_of(first_of(a, b), c) ran a corrupted b (DESIGN §5.3).
+        const auto a     = r::newton {}.with_derivative(dsq2).on(0.0);
+        const auto b     = r::secant {}.with_budget(5).on(0.0);
+        const auto c     = r::bisection {}.on(nxx::bracket { 0.0, 2.0 });
+        const auto inner = nxx::first_of(a, b);
+        const auto left  = nxx::first_of(inner, c);
+        static_assert(sizeof(left) >= sizeof(inner) + sizeof(c));
+
+        // x^2 + 1 has no root: every alternative runs, and the merged failure depends on each one's state.
+        const auto no_root = [](double x) { return x * x + 1.0; };
+        const auto flat    = nxx::first_of(a, b, c)(no_root);
+        const auto nested  = left(no_root);
+        if (flat || nested) {
+            FAIL_CHECK("precondition: every alternative fails on x^2 + 1");
+            return;
+        }
+        CHECK(nested.error().code == flat.error().code);
+        CHECK(nested.error().used == flat.error().used);
+        CHECK(same_best(nested.error().best, flat.error().best));
+        CHECK(same_result(nested, flat));
+        CHECK(same_result(left(sq2), nxx::first_of(a, b, c)(sq2)));
     }
 
     // ---- then --------------------------------------------------------------------------------------------------------
@@ -614,7 +705,7 @@ TEST_SUITE("roots")
         CHECK(same_result(got, alone));
         if (!got) {
             CHECK(got.error().code == nxx::errc::no_sign_change);
-            CHECK(got.error().where == r::algos::bisection);
+            CHECK(got.error().by == r::algos::bisection);
             CHECK(got.error().best.has_value());
         }
         else {
@@ -628,7 +719,7 @@ TEST_SUITE("roots")
         CHECK(runs_s == 0u);
         if (!via_s) {
             CHECK(via_s.error().code == nxx::errc::budget_exhausted);
-            CHECK(via_s.error().where == r::algos::expand);
+            CHECK(via_s.error().by == r::algos::expand);
             CHECK(via_s.error().used.iterations == 3u);
         }
         else {
@@ -653,7 +744,7 @@ TEST_SUITE("roots")
             return;
         }
         CHECK(got3.error().code == nxx::errc::budget_exhausted);
-        CHECK(got3.error().where == r::algos::bisection);
+        CHECK(got3.error().by == r::algos::bisection);
         CHECK(got3.error().used == r1->used + r2.error().used);
         CHECK(same_best(got3.error().best, r2.error().best));
     }
@@ -695,6 +786,119 @@ TEST_SUITE("roots")
         CHECK(rp->used.evaluations == rs->used.evaluations + 1u);
         CHECK(rp->used.iterations == rs->used.iterations);
         CHECK(same_bits(rp->x, rs->x));    // same trajectory: the seed's f(x) is the value f returns there
+    }
+
+    TEST_CASE("combinators: stage 2 of then and warm_fallback reports an input code as non_finite_value (regression)")
+    {
+        // Stage 2 starts from stage 1's value, not the caller's input (DESIGN §6.10, §12 item 23). A projection that
+        // sends that value off the reals is non_finite_input for Newton alone, but not for the chain.
+        const auto off = [](double x) { return x > 1.2 ? std::numeric_limits<double>::quiet_NaN() : x; };
+        const auto nt  = r::newton {}.with_derivative(dsq2).with_projection(off);
+        const auto s1  = r::secant {}.on(3.0);
+        const auto r1  = s1(sq2);
+        const auto own = nt(sq2, 3.0);    // the caller's own guess: a genuine input error
+        if (!r1 || own) {
+            FAIL_CHECK("precondition: the secant succeeds and the projected Newton rejects 3");
+            return;
+        }
+        CHECK(own.error().code == nxx::errc::non_finite_input);
+
+        const auto staged = nxx::then(s1, nt);
+        const auto got    = staged(sq2);
+        if (got) {
+            FAIL_CHECK("stage 2 rejects its start");
+            return;
+        }
+        CHECK(got.error().code == nxx::errc::non_finite_value);
+        CHECK(got.error().by == r::algos::newton);
+        CHECK(got.error().used == r1->used);
+        CHECK(got.error().used == nxx::counters { 8, 10 });
+        CHECK(same_best(got.error().best, static_cast<const est_t&>(*r1)));
+
+        const auto s1w = r::secant {}.with_budget(3).on(3.0);
+        const auto e1w = s1w(sq2);
+        const auto wf  = nxx::warm_fallback(s1w, nt)(sq2);
+        if (wf || e1w) {
+            FAIL_CHECK("precondition: the starved secant and the fallback fail");
+            return;
+        }
+        CHECK(wf.error().code == nxx::errc::non_finite_value);
+        CHECK(wf.error().by == r::algos::newton);
+        CHECK(wf.error().used == e1w.error().used);
+        CHECK(wf.error().used == nxx::counters { 3, 5 });
+        CHECK(same_best(wf.error().best, e1w.error().best));
+
+        // A policy that stops on input errors gives the same outcome in either order: the bisection's root.
+        const auto bis    = r::bisection {}.on(nxx::bracket { 1.0, 2.0 });
+        const auto rb     = bis(sq2);
+        const auto first  = nxx::first_of_with(stop_on_input_error {}, staged, bis)(sq2);
+        const auto second = nxx::first_of_with(stop_on_input_error {}, bis, staged)(sq2);
+        const auto warm1  = nxx::first_of_with(stop_on_input_error {}, nxx::warm_fallback(s1w, nt), bis)(sq2);
+        if (!rb || !first || !second || !warm1) {
+            FAIL_CHECK("every first_of_with chain succeeds by bisection");
+            return;
+        }
+        CHECK(first->by == r::algos::bisection);
+        CHECK(same_estimate(*first, *rb));
+        CHECK(same_estimate(*second, *rb));
+        CHECK(same_estimate(*warm1, *rb));
+        CHECK(first->used == got.error().used + rb->used);
+        CHECK(second->used == rb->used);
+        CHECK(warm1->used == wf.error().used + rb->used);
+    }
+
+    TEST_CASE("combinators: a then whose stage 2 fails carries stage 1's estimate (regression)")
+    {
+        // f fails (NaN) for x <= 1. Stage 1 succeeds; stage 2 fails at its own start, before any running best exists.
+        // The failure keeps stage 1's estimate (DESIGN §3.4, §6.10), and every call of f is counted.
+        const auto    f_nan = [](double x) { return x <= 1.0 ? std::numeric_limits<double>::quiet_NaN() : x * x - 2.0; };
+        const auto    s1    = r::secant {}.on(3.0);
+        const auto    r1    = s1(f_nan);
+        std::uint32_t calls = 0;
+        if (!r1) {
+            FAIL_CHECK("precondition: the secant from 3 succeeds");
+            return;
+        }
+        const est_t s1_est = *r1;
+        CHECK(r1->used == nxx::counters { 8, 10 });
+
+        // Clamped to [0, 1], stage 2's start is 1, where f is NaN: its first evaluation fails.
+        const auto nt_clamp = nxx::then(s1, r::newton {}.with_derivative(dsq2).with_projection(r::clamp_to { 0.0, 1.0 }));
+        const auto got      = nt_clamp(nxx::fn::counted(f_nan, calls));
+        if (got) {
+            FAIL_CHECK("stage 2 fails at its clamped start");
+            return;
+        }
+        CHECK(got.error().code == nxx::errc::non_finite_value);
+        CHECK(got.error().used == nxx::counters { 8, 11 });
+        CHECK(calls == got.error().used.evaluations);
+        CHECK(same_best(got.error().best, s1_est));
+        CHECK(same_best(nxx::best(got), s1_est));
+
+        calls               = 0;
+        const auto sc_clamp = nxx::then(s1, r::secant {}.with_projection(r::clamp_to { 0.0, 1.0 }))(nxx::fn::counted(f_nan, calls));
+        if (sc_clamp) {
+            FAIL_CHECK("stage 2 fails at its clamped start");
+            return;
+        }
+        CHECK(sc_clamp.error().code == nxx::errc::non_finite_value);
+        CHECK(calls == sc_clamp.error().used.evaluations);
+        CHECK(same_best(sc_clamp.error().best, s1_est));
+
+        // A search stage 1: its sign_bracket gives the root_estimate that the failure carries.
+        const auto s_search = r::expand {}.on(nxx::bracket { 2.0, 2.5 });
+        const auto reject   = [](const auto&, const auto&) {
+            return nxx::result<est_t> { std::unexpect, nxx::failure<est_t> { nxx::errc::invalid_input, r::algos::bisection, {}, {}, {} } };
+        };
+        const auto rs = s_search(sq2);
+        const auto gs = nxx::then(s_search, reject)(sq2);
+        if (!rs || gs) {
+            FAIL_CHECK("precondition: expand succeeds and the rejecting stage fails");
+            return;
+        }
+        CHECK(gs.error().code == nxx::errc::non_finite_value);
+        CHECK(gs.error().used == rs->used);
+        CHECK(same_best(gs.error().best, rs->best()));
     }
 
     // ---- warm_fallback -----------------------------------------------------------------------------------------------
@@ -740,6 +944,34 @@ TEST_SUITE("roots")
         CHECK(same_result(ok, good(sq2)));
     }
 
+    // A pole is no start for an open method (DESIGN §3.4, §6.10): from the pole failure's x, Newton's step and the
+    // secant's are tiny, and their step criteria accepted the pole. Before, warm_fallback(brent, newton) on tan
+    // succeeded at |f| about 5.8e14 and (bisection, secant) at |f| about 652, both with stop_reason::criterion.
+    TEST_CASE("combinators: warm_fallback returns a stage-1 sign_change_not_root failure as is, without a restart (regression)")
+    {
+        const auto tangent = [](double x) { return std::tan(x); };
+        const auto dtan    = [](double x) { return 1.0 / (std::cos(x) * std::cos(x)); };
+
+        const auto check_pole = [&](const auto& s1, const auto& s2) {
+            std::uint32_t runs = 0;
+            const auto    e1   = s1(tangent);
+            const auto    got  = nxx::warm_fallback(s1, spy { s2, runs })(tangent);
+            CHECK(runs == 0u);
+            CHECK(same_result(got, e1));
+            if (got || !got.error().best) {
+                FAIL_CHECK("the chain fails with the pole estimate");
+                return;
+            }
+            CHECK(got.error().code == nxx::errc::sign_change_not_root);
+            CHECK(got.error().used == e1.error().used);
+            CHECK_FALSE(got.error().best->enclosure.has_value());
+            CHECK(std::abs(got.error().best->x - std::numbers::pi / 2.0) < 1e-12);
+        };
+        check_pole(r::brent {}.on(nxx::bracket { 1.0, 2.0 }), r::newton {}.with_derivative(dtan));
+        check_pole(r::bisection {}.on(nxx::bracket { 1.0, 2.0 }), r::secant {});
+        check_pole(nxx::then(r::expand {}.on(nxx::bracket { 1.0, 2.0 }), r::brent {}), r::newton {}.with_derivative(dtan));
+    }
+
     TEST_CASE("combinators: warm_fallback returns a stage-1 failure without a best estimate as is")
     {
         std::uint32_t runs = 0;
@@ -779,7 +1011,7 @@ TEST_SUITE("roots")
         CHECK(e2.error().code == nxx::errc::zero_derivative);
         CHECK(e2.error().used == nxx::counters { 1, 1 });    // seeded: only f'(0) is evaluated
         CHECK(got.error().code == nxx::errc::zero_derivative);
-        CHECK(got.error().where == r::algos::newton);
+        CHECK(got.error().by == r::algos::newton);
         CHECK(got.error().used == e1.error().used + e2.error().used);
         if (got.error().best) {
             CHECK(got.error().best->x == 0.0);

@@ -123,7 +123,7 @@ namespace
         if (a) return same_estimate(*a, *b) && a->used == b->used && a->by == b->by && a->how == b->how;
         const auto& fa = a.error();
         const auto& fb = b.error();
-        return fa.code == fb.code && fa.where == fb.where && fa.used == fb.used && same_best(fa.best, fb.best) && fa.cause == fb.cause;
+        return fa.code == fb.code && fa.by == fb.by && fa.used == fb.used && same_best(fa.best, fb.best) && fa.cause == fb.cause;
     }
 
     // A curried solver that counts how often it runs.
@@ -216,7 +216,7 @@ TEST_SUITE("roots")
         }
         CHECK(got.error().code == st.error().code);
         CHECK(got.error().code == nxx::errc::no_sign_change);    // the last code: bisection's
-        CHECK(got.error().where == r::algos::bisection);
+        CHECK(got.error().by == r::algos::bisection);
         CHECK(got.error().used == st.error().used);
         CHECK(same_best(got.error().best, st.error().best));
         CHECK(got.error().best.has_value());
@@ -262,7 +262,7 @@ TEST_SUITE("roots")
             return;
         }
         CHECK(got.error().code == nxx::errc::invalid_input);
-        CHECK(got.error().where == nxx::algo::none);
+        CHECK(got.error().by == nxx::algo::none);
         CHECK(got.error().used == nxx::counters {});
         CHECK_FALSE(got.error().best.has_value());
 
@@ -445,7 +445,7 @@ TEST_SUITE("roots")
         }
         CHECK(got.error().code == nxx::errc::callback_failed);
         CHECK(got.error().cause == std::optional { rt_user::eval_error::domain });
-        CHECK(got.error().where == r::algos::bisection);
+        CHECK(got.error().by == r::algos::bisection);
         CHECK(same_best(got.error().best, e1.error().best));
         CHECK(got.error().used == e1.error().used + e2.error().used);
 
@@ -456,7 +456,7 @@ TEST_SUITE("roots")
         else {
             CHECK(res.error().code == nxx::errc::callback_failed);
             CHECK(res.error().cause == std::optional { rt_user::eval_error::domain });
-            CHECK(res.error().where == r::algos::brent);
+            CHECK(res.error().by == r::algos::brent);
             CHECK_FALSE(res.error().best.has_value());
         }
     }
