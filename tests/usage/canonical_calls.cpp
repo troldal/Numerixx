@@ -1,6 +1,6 @@
 // Canonical calls (DESIGN §6.14, normative): calls 1, 2, 3, 9 and 10 (spike exit criterion 8, §10.2) and, from phase 1,
-// call 15, spelled as in the table, with RUN-TIME brackets, guesses, tolerances and budgets. Run-time scalars come from volatile reads;
-// tolerances and budgets go through make() and are dereferenced only after checking. Each module phase adds its calls here.
+// calls 13, 14 and 15, spelled as in the table, with RUN-TIME brackets, guesses, tolerances and budgets. Run-time scalars come from
+// volatile reads; tolerances and budgets go through make() and are dereferenced only after checking. Each module phase adds its calls here.
 #include <numerixx/roots.hpp>
 
 #include <doctest/doctest.h>
@@ -333,6 +333,68 @@ TEST_SUITE("usage")
                 CHECK(res.error().best.has_value());
             }
         }
+    }
+
+    TEST_CASE("call 13: a mixed tolerance literal")
+    {
+        const auto   f  = [](double x) { return x * x - 2.0; };
+        const double lo = rt(1.0);
+        const double hi = rt(2.0);
+
+        // The relative part is named, so the roles cannot be swapped (DESIGN §6.2).
+        const auto res = r::bisection { nxx::width_tol { 1e-10, nxx::rel_tolerance { 1e-8 } } }(f, { lo, hi });
+        CHECK(res.has_value());
+        if (res) {
+            CHECK(res->how == nxx::stop_reason::criterion);
+            CHECK(res->enclosure.has_value());
+            if (res->enclosure) {
+                const double width = res->enclosure->hi() - res->enclosure->lo();
+                CHECK(width <= 1e-10 + 1e-8 * (std::min)(std::abs(res->enclosure->lo()), std::abs(res->enclosure->hi())));
+                CHECK(width > 1e-10);    // the relative part counts: 1e-10 alone needs more halvings
+            }
+            CHECK(std::abs(res->x - sqrt2) <= 1e-10 + 1e-8 * sqrt2);
+        }
+
+        // At run time: the relative part through rel_tolerance<T>::make, then make(a, *rel); the same result.
+        const auto rel = nxx::rel_tolerance<double>::make(rt(1e-8));
+        CHECK(rel.has_value());
+        if (rel) {
+            const auto tol = nxx::width_tol<double>::make(rt(1e-10), *rel);
+            CHECK(tol.has_value());
+            if (tol) { CHECK(same_result(r::bisection { *tol }(f, { lo, hi }), res)); }
+            CHECK(nxx::width_tol<double>::make(rt(-1e-10), *rel) == std::unexpected(nxx::errc::invalid_input));
+
+            // From a validated tolerance, as a configuration holds it: width_tol{*abs, *rel} needs no check (§6.2).
+            const auto abs_tol = nxx::tolerance<double>::make(rt(1e-10));
+            CHECK(abs_tol.has_value());
+            if (abs_tol) { CHECK(same_result(r::bisection { nxx::width_tol { *abs_tol, *rel } }(f, { lo, hi }), res)); }
+        }
+    }
+
+    TEST_CASE("call 14: a run-time tolerance")
+    {
+        const auto   f  = [](double x) { return x * x - 2.0; };
+        const double lo = rt(1.0);
+        const double hi = rt(2.0);
+        const double t  = rt(1e-10);
+
+        bool solved = false;
+        if (auto tol = nxx::width_tol<double>::make(t)) {
+            const auto res = r::brent { *tol }(f, { lo, hi });
+            solved         = true;
+            CHECK(res.has_value());
+            if (res) {
+                CHECK(res->how == nxx::stop_reason::criterion);
+                CHECK(std::abs(res->x - sqrt2) <= 1e-10);
+                CHECK(same_result(res, r::brent { nxx::width_tol { 1e-10 } }(f, { lo, hi })));    // the literal's result
+            }
+        }
+        CHECK(solved);
+
+        // A tolerance that is not one fails in-band: no solver is built.
+        CHECK(nxx::width_tol<double>::make(rt(0.0)) == std::unexpected(nxx::errc::invalid_input));
+        CHECK(nxx::width_tol<double>::make(rt(-1e-10)) == std::unexpected(nxx::errc::invalid_input));
+        CHECK(nxx::width_tol<double>::make(rt(qnan)) == std::unexpected(nxx::errc::invalid_input));
     }
 
     TEST_CASE("call 15: the best estimate, on success or failure")

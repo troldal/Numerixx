@@ -112,6 +112,18 @@ numerixx_add_compile_fail_test(${_nxx_cf}/expand_with_stop.cpp
 numerixx_add_compile_fail_test(${_nxx_cf}/brent_with_stop_width.cpp
   LINK numerixx::roots
   EXPECT "this solver has its own tolerance: pass the width criterion to its constructor" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/brent_validated_tolerance.cpp
+  LINK numerixx::roots
+  EXPECT "wrap it: brent" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/bisection_validated_tolerance.cpp
+  LINK numerixx::roots
+  EXPECT "wrap it: bisection" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/bisection_with_stop_tolerance.cpp
+  LINK numerixx::roots
+  EXPECT "with_stop takes a criterion, not a number" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/bound_wrong_function.cpp
+  LINK numerixx::roots
+  EXPECT "this solver cannot take this function with its bound input" DELETE_REASON)
 
 # ---- Composition errors ------------------------------------------------------------------------------------------
 numerixx_add_compile_fail_test(${_nxx_cf}/first_of_without_on.cpp
@@ -153,7 +165,33 @@ numerixx_add_compile_fail_test(${_nxx_cf}/x_tol_zero_zero.cpp
   EXPECT "x_tol needs abs >= 0, 0 <= rel < 1, and abs > 0 or rel > 0")
 numerixx_add_compile_fail_test(${_nxx_cf}/rel_tolerance_as_tolerance.cpp
   LINK numerixx::core
-  EXPECT "rel_tolerance.*to 'refined<(nxx::)?tag::positive_tolerance")
+  EXPECT "a part alone is not a criterion" DELETE_REASON)
+# Role-typed mixed criteria (DESIGN §6.2): the relative part is always named with rel_tolerance.
+numerixx_add_compile_fail_test(${_nxx_cf}/width_tol_two_numbers.cpp
+  LINK numerixx::core
+  EXPECT "say which number is relative: width_tol\\{1e-10" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/x_tol_two_numbers.cpp
+  LINK numerixx::core
+  EXPECT "say which number is relative: x_tol\\{1e-10" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/width_tol_make_two_numbers.cpp
+  LINK numerixx::core
+  EXPECT "say which number is relative: make\\(a, \\*rel\\)" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/width_tol_relative_alone.cpp
+  LINK numerixx::core
+  EXPECT "a part alone is not a criterion: width_tol\\{a\\}" DELETE_REASON)
+# x_tol_abs_part_alone reaches the abs_tolerance path of the part-alone deletion (DESIGN §12.21 item 5).
+numerixx_add_compile_fail_test(${_nxx_cf}/x_tol_abs_part_alone.cpp
+  LINK numerixx::core
+  EXPECT "a part alone is not a criterion: x_tol\\{a\\}" DELETE_REASON)
+numerixx_add_compile_fail_test(${_nxx_cf}/width_tol_zero_zero.cpp
+  LINK numerixx::core
+  EXPECT "width_tol needs abs >= 0, 0 <= rel < 1, and abs > 0 or rel > 0")
+numerixx_add_compile_fail_test(${_nxx_cf}/width_tol_negative_abs_literal.cpp
+  LINK numerixx::core
+  EXPECT "an absolute tolerance must be finite and >= 0")
+numerixx_add_compile_fail_test(${_nxx_cf}/width_tol_runtime_parts.cpp
+  LINK numerixx::core
+  EXPECT "call to consteval function 'nxx::width_tol<double>.* is not a constant expression")
 
 # ---- The P2564 escalation probe (DESIGN §6.2 FLAG): compiles on GCC, Clang and clang-cl; fails on cl with C7595 ----
 numerixx_add_msvc_escalation_probe(${_nxx_cf}/probe_p2564_escalation.cpp LINK numerixx::roots)

@@ -113,10 +113,13 @@ int main()
     const auto tight = r::brent { nxx::width_tol { 1e-12 } }(f, { lo, hi });
     report("brent{width_tol{1e-12}}", tight);
     if (tight && tight->enclosure) std::println("  {:<38} the root is in [{}, {}]", "", tight->enclosure->lo(), tight->enclosure->hi());
+    // One number is absolute; a relative part is always named, so the two cannot be swapped (width_tol{1e-10, 1e-8}
+    // does not compile, and its error says which spelling to use).
+    report("brent{width_tol{1e-12, rel 1e-10}}", r::brent { nxx::width_tol { 1e-12, nxx::rel_tolerance { 1e-10 } } }(f, { lo, hi }));
 
     // Literals are checked at compile time (width_tol{-1.0} does not compile). Run-time values go through make(),
     // which returns a std::expected.
-    const auto tol    = nxx::width_tol<double>::make(user_tolerance, 0.0);
+    const auto tol    = nxx::width_tol<double>::make(user_tolerance);
     const auto budget = nxx::max_iterations::make(user_budget);
     if (tol && budget) report("brent{run-time tol}.with_budget(40)", r::brent { *tol }.with_budget(*budget)(f, { lo, hi }));
 
@@ -125,7 +128,7 @@ int main()
     report("newton with a numeric f'", r::newton {}.with_derivative(d::numeric {})(f, 1.0));    // counts f's calls too
     report("secant (derivative-free)", r::secant {}(f, 1.0));
     report("secant kept inside [0, 10]", r::secant {}.with_projection(r::clamp_to { 0.0, 10.0 })(f, 5.0));
-    // Open methods stop on successive iterates: x_tol{abs[, rel]}, or the default step_tol.
+    // Open methods stop on successive iterates: x_tol{abs} or x_tol{abs, nxx::rel_tolerance{rel}}, or the default step_tol.
     report("secant{x_tol{1e-12}}", r::secant { nxx::x_tol { 1e-12 } }(f, 1.0));
 
     std::println("\n4. Failures are values");

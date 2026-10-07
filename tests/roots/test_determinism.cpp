@@ -175,10 +175,11 @@ namespace
         v.push_back(observe("brent width_tol{1e-10} cubic [-3, 0]", r::brent { nxx::width_tol { 1e-10 } }(fn_cubic, { -3.0, 0.0 })));
         v.push_back(observe("brent horner [0, 1]", r::brent {}(fn_horner, { 0.0, 1.0 })));
         v.push_back(observe("brent root [0, 10]", r::brent {}(fn_root, { 0.0, 10.0 })));
-        v.push_back(
-            observe("brent width_tol{0, 1e-12} horner [1, 2]", r::brent { nxx::width_tol { 0.0, 1e-12 } }(fn_horner, { 1.0, 2.0 })));
+        v.push_back(observe("brent width_tol{0, 1e-12} horner [1, 2]",
+                            r::brent { nxx::width_tol { 0.0, nxx::rel_tolerance { 1e-12 } } }(fn_horner, { 1.0, 2.0 })));
         v.push_back(observe("secant sqrt2 from 1", r::secant {}(fn_sqrt2, 1.0)));
-        v.push_back(observe("secant x_tol{1e-12, 1e-10} horner from 2", r::secant { nxx::x_tol { 1e-12, 1e-10 } }(fn_horner, 2.0)));
+        v.push_back(observe("secant x_tol{1e-12, 1e-10} horner from 2",
+                            r::secant { nxx::x_tol { 1e-12, nxx::rel_tolerance { 1e-10 } } }(fn_horner, 2.0)));
         v.push_back(observe("secant cubic from 6", r::secant {}(fn_cubic, 6.0)));
         v.push_back(observe("secant f_tol{1e-9} root from 1", r::secant { nxx::f_tol { 1e-9 } }(fn_root, 1.0)));
         v.push_back(observe("newton sqrt2 from 1", r::newton {}.with_derivative(dfn_sqrt2)(fn_sqrt2, 1.0)));
@@ -288,7 +289,7 @@ TEST_SUITE("roots")
         SUBCASE("bisection")
         {
             check_repeatable("bisection sqrt2", true, r::bisection {}, r::bisection {}, fn_sqrt2, std::pair { 1.0, 2.0 });
-            const auto wt = r::bisection { nxx::width_tol { 1e-9, 1e-12 } };
+            const auto wt = r::bisection { nxx::width_tol { 1e-9, nxx::rel_tolerance { 1e-12 } } };
             check_repeatable("bisection width_tol exp", true, wt, wt.with_budget(3), fn_exp, std::pair { 0.0, 3.0 });
             check_repeatable("bisection budget failure",
                              false,
@@ -313,7 +314,7 @@ TEST_SUITE("roots")
         SUBCASE("secant")
         {
             check_repeatable("secant sqrt2", true, r::secant {}, r::secant {}, fn_sqrt2, 1.0);
-            const auto xt = r::secant { nxx::x_tol { 1e-12, 1e-9 } };
+            const auto xt = r::secant { nxx::x_tol { 1e-12, nxx::rel_tolerance { 1e-9 } } };
             check_repeatable("secant x_tol exp", true, xt, xt.with_budget(1), fn_exp, 0.5);
             check_repeatable("secant clamped",
                              false,

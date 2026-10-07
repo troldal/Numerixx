@@ -275,7 +275,7 @@ TEST_SUITE("roots")
             CAPTURE(p.hi);
             CAPTURE(abs);
             CAPTURE(rel);
-            const auto wt = nxx::width_tol<double>::make(abs, rel);
+            const auto wt = nxx::rel_tolerance<double>::make(rel).and_then([&](auto rp) { return nxx::width_tol<double>::make(abs, rp); });
             if (!wt) {
                 FAIL_CHECK("width_tol::make rejected a valid tolerance");
                 continue;
@@ -335,7 +335,7 @@ TEST_SUITE("roots")
             CAPTURE(p.hi);
             CAPTURE(abs);
             CAPTURE(rel);
-            const auto wt = nxx::width_tol<double>::make(abs, rel);
+            const auto wt = nxx::rel_tolerance<double>::make(rel).and_then([&](auto rp) { return nxx::width_tol<double>::make(abs, rp); });
             if (!wt) {
                 FAIL_CHECK("width_tol::make rejected a valid tolerance");
                 continue;
@@ -383,7 +383,7 @@ TEST_SUITE("roots")
             CAPTURE(abs);
             CAPTURE(rel);
             CAPTURE(ftol);
-            const auto xt = nxx::x_tol<double>::make(abs, rel);
+            const auto xt = nxx::rel_tolerance<double>::make(rel).and_then([&](auto rp) { return nxx::x_tol<double>::make(abs, rp); });
             const auto ft = nxx::tolerance<double>::make(ftol);
             if (!xt || !ft) {
                 FAIL_CHECK("make rejected a valid tolerance");
@@ -430,7 +430,7 @@ TEST_SUITE("roots")
             CAPTURE(abs);
             CAPTURE(rel);
             CAPTURE(ftol);
-            const auto xt = nxx::x_tol<double>::make(abs, rel);
+            const auto xt = nxx::rel_tolerance<double>::make(rel).and_then([&](auto rp) { return nxx::x_tol<double>::make(abs, rp); });
             const auto ft = nxx::tolerance<double>::make(ftol);
             if (!xt || !ft) {
                 FAIL_CHECK("make rejected a valid tolerance");
@@ -521,7 +521,7 @@ TEST_SUITE("roots")
             CAPTURE(p.lo);
             CAPTURE(p.hi);
             CAPTURE(rel);
-            const auto wt = nxx::width_tol<double>::make(0.0, rel);
+            const auto wt = nxx::rel_tolerance<double>::make(rel).and_then([](auto rp) { return nxx::width_tol<double>::make(0.0, rp); });
             if (!wt) {
                 FAIL_CHECK("width_tol::make rejected a valid tolerance");
                 continue;
@@ -738,16 +738,16 @@ TEST_SUITE("roots")
 
     TEST_CASE("soundness: a width tolerance whose threshold overflows never accepts an infinite width")
     {
-        // width_tol{max, 0.1} on [-max, max]: abs + rel min(|lo|, |hi|) = 1.1 max and the width 2 max were both computed
-        // as inf, so brent reported criterion before its first step (inf <= inf), at x = max, 1.9 max from the root.
-        // The checks compare halves, which cannot overflow.
+        // width_tol{max, nxx::rel_tolerance{0.1}} on [-max, max]: abs + rel min(|lo|, |hi|) = 1.1 max and the width 2 max were both
+        // computed as inf, so brent reported criterion before its first step (inf <= inf), at x = max, 1.9 max from the root. The checks
+        // compare halves, which cannot overflow.
         constexpr double big  = (std::numeric_limits<double>::max)();
         const double     root = -0.9 * big;
         const auto       fn   = [root](double x) {    // continuous and increasing; f(-max) = -1, f(max) = 0.5
             const double y = std::tanh(x / 1e306 - root / 1e306);
             return y > 0.0 ? 0.5 * y : y;
         };
-        const auto wt = nxx::width_tol<double>::make(big, 0.1);
+        const auto wt = nxx::width_tol<double>::make(big, nxx::rel_tolerance { 0.1 });
         if (!wt) {
             FAIL_CHECK("width_tol::make rejected a valid tolerance");
             return;

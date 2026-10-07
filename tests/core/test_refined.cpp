@@ -42,6 +42,28 @@ namespace
         if (!b) return std::unexpected(b.error());
         return config { *t, *b };
     }
+
+    // Negative requires-tests go through concepts: a negative requires-expression outside a template is ill-formed,
+    // not false (DESIGN §6.2).
+    template<class W, class... A>
+    concept make_accepts = requires(A... a) { W::make(a...); };
+    template<class... A>
+    concept width_tol_ctad = requires(A... a) { nxx::width_tol { a... }; };
+    template<class... A>
+    concept x_tol_ctad = requires(A... a) { nxx::x_tol { a... }; };
+
+    // Generic code that forwards a mixed tolerance (DESIGN §6.2 FLAG): through make(), never the consteval literal.
+    template<class T>
+    constexpr auto forward_parts(nxx::abs_tolerance<T> a, nxx::rel_tolerance<T> r)
+    { return nxx::width_tol<T>::make(a, r); }
+    template<class T>
+    constexpr auto forward_number(T a, nxx::rel_tolerance<T> r)
+    { return nxx::x_tol<T>::make(a, r); }
+    // A validated tolerance with a relative part goes through the constexpr constructor, so it forwards on cl too
+    // (DESIGN §6.2, §12.24).
+    template<class T>
+    constexpr auto forward_tolerance(nxx::tolerance<T> a, nxx::rel_tolerance<T> r)
+    { return nxx::width_tol { a, r }; }
 }    // namespace
 
 TEST_SUITE("core")
@@ -262,39 +284,240 @@ TEST_SUITE("core")
 
     TEST_CASE("mixed criteria: abs >= 0, 0 <= rel < 1, abs > 0 or rel > 0")
     {
-        constexpr nxx::x_tol relative_only { 0.0, 1e-8 };    // purely relative: legal
+        // Role-typed literals (DESIGN §6.2): one number is absolute, the relative part is always named.
+        constexpr nxx::x_tol relative_only { 0.0, nxx::rel_tolerance { 1e-8 } };    // purely relative: legal
         static_assert(std::is_same_v<decltype(relative_only), const nxx::x_tol<double>>);
         static_assert(relative_only.abs() == 0.0 && relative_only.rel() == 1e-8);
 
-        constexpr nxx::x_tol single { 1e-6 };    // one threshold: a tolerance
+        constexpr nxx::x_tol single { 1e-6 };    // one threshold: absolute
         static_assert(std::is_same_v<decltype(single), const nxx::x_tol<double>>);
         static_assert(single.abs() == 1e-6 && single.rel() == 0.0);
 
-        constexpr nxx::width_tol w { 0.0, 1e-3 };
+        constexpr nxx::width_tol w { 0.0, nxx::rel_tolerance { 1e-3 } };
         static_assert(std::is_same_v<decltype(w), const nxx::width_tol<double>>);
+        constexpr nxx::width_tol mixed { 1e-10, nxx::rel_tolerance { 1e-8 } };
+        static_assert(mixed.abs() == 1e-10 && mixed.rel() == 1e-8);
 
-        static_assert(!nxx::x_tol<double>::make(0.0, 0.0).has_value());
-        static_assert(nxx::x_tol<double>::make(0.0, 0.0).error() == nxx::errc::invalid_input);
-        static_assert(nxx::x_tol<double>::make(0.0, 1e-8).has_value());
-        static_assert(nxx::x_tol<double>::make(1e-8, 0.0).has_value());
-        static_assert(!nxx::x_tol<double>::make(-1e-8, 0.1).has_value());
-        static_assert(!nxx::x_tol<double>::make(1e-8, 1.0).has_value());
-        static_assert(!nxx::x_tol<double>::make(k_inf, 0.1).has_value());
-        static_assert(!nxx::x_tol<double>::make(k_nan, 0.1).has_value());
-        static_assert(!nxx::x_tol<double>::make(0.1, k_nan).has_value());
-        static_assert(!nxx::width_tol<double>::make(0.0, 0.0).has_value());
-        static_assert(nxx::width_tol<double>::make(0.0, 1e-3).has_value());
+        // Every CTAD form: a bare absolute part, a validated one, float and long double, an integer absolute part.
+        constexpr nxx::width_tol from_parts { nxx::abs_tolerance { 1e-10 }, nxx::rel_tolerance { 1e-8 } };
+        static_assert(std::is_same_v<decltype(from_parts), const nxx::width_tol<double>>);
+        static_assert(from_parts.abs() == mixed.abs() && from_parts.rel() == mixed.rel());
+        constexpr nxx::x_tol xf { 1e-4f, nxx::rel_tolerance { 1e-3f } };
+        static_assert(std::is_same_v<decltype(xf), const nxx::x_tol<float>>);
+        constexpr nxx::width_tol wl { 0.0L, nxx::rel_tolerance { 1e-12L } };
+        static_assert(std::is_same_v<decltype(wl), const nxx::width_tol<long double>>);
+        constexpr nxx::width_tol wi { 0, nxx::rel_tolerance { 1e-8 } };
+        static_assert(std::is_same_v<decltype(wi), const nxx::width_tol<double>>);
 
-        const auto xr = nxx::x_tol<double>::make(rt(0.0), rt(1e-8));
+        // make(abs, rel_tolerance) and make(abs_tolerance, rel_tolerance); make(T, T) is deleted.
+        static_assert(!nxx::x_tol<double>::make(0.0, nxx::rel_tolerance { 0.0 }).has_value());
+        static_assert(nxx::x_tol<double>::make(0.0, nxx::rel_tolerance { 0.0 }).error() == nxx::errc::invalid_input);
+        static_assert(nxx::x_tol<double>::make(0.0, nxx::rel_tolerance { 1e-8 }).has_value());
+        static_assert(nxx::x_tol<double>::make(1e-8, nxx::rel_tolerance { 0.0 }).has_value());
+        static_assert(!nxx::x_tol<double>::make(-1e-8, nxx::rel_tolerance { 0.1 }).has_value());
+        static_assert(!nxx::x_tol<double>::make(k_inf, nxx::rel_tolerance { 0.1 }).has_value());
+        static_assert(!nxx::x_tol<double>::make(k_nan, nxx::rel_tolerance { 0.1 }).has_value());
+        static_assert(!nxx::width_tol<double>::make(0.0, nxx::rel_tolerance { 0.0 }).has_value());
+        static_assert(nxx::width_tol<double>::make(0.0, nxx::rel_tolerance { 1e-3 }).has_value());
+        static_assert(nxx::width_tol<double>::make(nxx::abs_tolerance { 0.0 }, nxx::rel_tolerance { 1e-3 }).has_value());
+        static_assert(!nxx::width_tol<double>::make(nxx::abs_tolerance { 0.0 }, nxx::rel_tolerance { 0.0 }).has_value());
+
+        // make(abs): finite and > 0, as tolerance<T>::make.
+        static_assert(nxx::width_tol<double>::make(1e-10)->abs() == 1e-10);
+        static_assert(nxx::width_tol<double>::make(1e-10)->rel() == 0.0);
+        static_assert(nxx::x_tol<double>::make(0.0).error() == nxx::errc::invalid_input);
+        static_assert(!nxx::x_tol<double>::make(-1e-10).has_value());
+        static_assert(!nxx::x_tol<double>::make(k_inf).has_value());
+        static_assert(!nxx::width_tol<double>::make(k_nan).has_value());
+
+        const auto xr = nxx::rel_tolerance<double>::make(rt(1e-8)).and_then([](auto rp) { return nxx::x_tol<double>::make(rt(0.0), rp); });
         CHECK(xr.has_value());
         if (xr) { CHECK(xr->threshold(rt(100.0)) == doctest::Approx(1e-6)); }
         else {
-            FAIL_CHECK("x_tol<double>::make(0, 1e-8) failed");
+            FAIL_CHECK("x_tol<double>::make(0, rel 1e-8) failed");
         }
-        CHECK(nxx::x_tol<double>::make(rt(0.0), rt(0.0)) == std::unexpected(nxx::errc::invalid_input));
-        CHECK(nxx::width_tol<double>::make(rt(0.0), rt(0.0)) == std::unexpected(nxx::errc::invalid_input));
-        CHECK(nxx::x_tol<float>::make(0.0f, 1e-4f).has_value());
-        CHECK_FALSE(nxx::width_tol<long double>::make(0.0L, 0.0L).has_value());
+        CHECK(nxx::rel_tolerance<double>::make(rt(1.0)) == std::unexpected(nxx::errc::invalid_input));    // rel >= 1
+        CHECK(nxx::x_tol<double>::make(rt(0.0), nxx::rel_tolerance { 0.0 }) == std::unexpected(nxx::errc::invalid_input));
+        CHECK(nxx::width_tol<double>::make(rt(0.0), nxx::rel_tolerance { 0.0 }) == std::unexpected(nxx::errc::invalid_input));
+        CHECK(nxx::width_tol<double>::make(rt(0.0)) == std::unexpected(nxx::errc::invalid_input));
+        CHECK(nxx::x_tol<float>::make(0.0f, nxx::rel_tolerance { 1e-4f }).has_value());
+        CHECK(nxx::x_tol<float>::make(1e-4f).has_value());
+        CHECK_FALSE(nxx::width_tol<long double>::make(0.0L, nxx::rel_tolerance { 0.0L }).has_value());
+        CHECK(nxx::width_tol<long double>::make(1e-12L).has_value());
+    }
+
+    // The run-time mirror of the literal width_tol{a, nxx::rel_tolerance{r}} checks the absolute part in-band, so a
+    // mixed run-time tolerance takes two checks (DESIGN §6.2, revised on 2026-10-06, §12.21).
+    TEST_CASE("mixed criteria: make(a, *rel) succeeds for a valid a and fails with invalid_input for a negative one")
+    {
+        const auto R = nxx::rel_tolerance<double>::make(rt(1e-8));
+        CHECK(R.has_value());
+        if (R) {
+            const auto w = nxx::width_tol<double>::make(rt(1e-10), *R);
+            CHECK(w.has_value());
+            if (w) {
+                CHECK(w->abs() == 1e-10);
+                CHECK(w->rel() == 1e-8);
+            }
+            const auto x = nxx::x_tol<double>::make(rt(1e-10), *R);
+            CHECK(x.has_value());
+            if (x) {
+                CHECK(x->abs() == 1e-10);
+                CHECK(x->rel() == 1e-8);
+            }
+            // Purely relative at run time, and through validated role types: the same pair.
+            const auto p = nxx::width_tol<double>::make(0.0, *R);
+            CHECK(p.has_value());
+            if (p) { CHECK(p->abs() == 0.0); }
+            const auto A = nxx::abs_tolerance<double>::make(rt(1e-10));
+            CHECK(A.has_value());
+            if (A && w) {
+                const auto v = nxx::width_tol<double>::make(*A, *R);
+                CHECK(v.has_value());
+                if (v) { CHECK((v->abs() == w->abs() && v->rel() == w->rel())); }
+            }
+
+            // The absolute part is checked as abs_tolerance<T>::make checks it, with the same code.
+            CHECK(nxx::width_tol<double>::make(rt(-1e-10), *R) == std::unexpected(nxx::errc::invalid_input));
+            CHECK(nxx::x_tol<double>::make(rt(-1e-10), *R) == std::unexpected(nxx::errc::invalid_input));
+            CHECK(nxx::abs_tolerance<double>::make(rt(-1e-10)) == std::unexpected(nxx::errc::invalid_input));
+            CHECK(nxx::width_tol<double>::make(rt(k_inf), *R) == std::unexpected(nxx::errc::invalid_input));
+            CHECK(nxx::width_tol<double>::make(rt(k_nan), *R) == std::unexpected(nxx::errc::invalid_input));
+        }
+        else {
+            FAIL_CHECK("rel_tolerance<double>::make(1e-8) failed");
+        }
+    }
+
+    // DESIGN §6.2 FLAG: the mixed literal constructor is consteval, and cl 19.51 lacks P2564, so generic code that
+    // forwards a mixed tolerance calls make(abs_tolerance, rel_tolerance) or make(T, rel_tolerance). That compiles, and
+    // runs at compile time, on every compiler, cl included.
+    TEST_CASE("mixed criteria: generic code forwards the parts through make")
+    {
+        static_assert(forward_parts(nxx::abs_tolerance { 1e-10 }, nxx::rel_tolerance { 1e-8 })->rel() == 1e-8);
+        static_assert(forward_number(1e-10f, nxx::rel_tolerance { 1e-3f })->abs() == 1e-10f);
+        const auto A = nxx::abs_tolerance<double>::make(rt(0.0));
+        const auto R = nxx::rel_tolerance<double>::make(rt(1e-8));
+        CHECK((A && R));
+        if (A && R) {
+            CHECK(forward_parts(*A, *R).has_value());
+            CHECK(forward_number(rt(-1.0), *R) == std::unexpected(nxx::errc::invalid_input));
+        }
+    }
+
+    // A validated tolerance<T> takes a relative part (DESIGN §6.2, §12.24): it is finite and > 0, so the joint
+    // invariant holds without a check, and the constructor is constexpr, so run-time values and cl work too.
+    TEST_CASE("mixed criteria: a validated tolerance takes a relative part, as a literal, at run time and through make")
+    {
+        constexpr auto w = nxx::width_tol { nxx::tolerance { 1e-10 }, nxx::rel_tolerance { 1e-8 } };
+        static_assert(std::is_same_v<decltype(w), const nxx::width_tol<double>>);
+        static_assert(w.abs() == 1e-10 && w.rel() == 1e-8);
+        constexpr auto x = nxx::x_tol { nxx::tolerance { 1e-6f }, nxx::rel_tolerance { 1e-3f } };
+        static_assert(std::is_same_v<decltype(x), const nxx::x_tol<float>>);
+        static_assert(x.abs() == 1e-6f && x.rel() == 1e-3f);
+        constexpr auto wl = nxx::width_tol<long double> { nxx::tolerance { 1e-12L }, nxx::rel_tolerance { 1e-9L } };
+        static_assert(wl.abs() == 1e-12L && wl.rel() == 1e-9L);
+        constexpr auto xe = nxx::x_tol<double> { nxx::tolerance { 1e-10 }, nxx::rel_tolerance { 1e-8 } };
+        static_assert(xe.abs() == 1e-10 && xe.rel() == 1e-8);
+        static_assert(nxx::width_tol<double>::make(nxx::tolerance { 1e-10 }, nxx::rel_tolerance { 1e-8 })->rel() == 1e-8);
+        static_assert(nxx::x_tol<float>::make(nxx::tolerance { 1e-6f }, nxx::rel_tolerance { 1e-3f })->abs() == 1e-6f);
+        static_assert(forward_tolerance(nxx::tolerance { 1e-10 }, nxx::rel_tolerance { 1e-8 }).rel() == 1e-8);
+        static_assert(std::is_same_v<decltype(nxx::width_tol<double>::make(nxx::tolerance { 1e-10 }, nxx::rel_tolerance { 1e-8 })),
+                                     std::expected<nxx::width_tol<double>, nxx::errc>>);
+
+        // The other spellings keep their overloads: none of them becomes ambiguous.
+        static_assert(nxx::width_tol { 1e-10, nxx::rel_tolerance { 1e-8 } }.abs() == 1e-10);
+        static_assert(nxx::width_tol<double> { 0, nxx::rel_tolerance { 1e-8 } }.abs() == 0.0);
+        static_assert(nxx::x_tol { nxx::abs_tolerance { 1e-10 }, nxx::rel_tolerance { 1e-8 } }.abs() == 1e-10);
+        static_assert(make_accepts<nxx::width_tol<double>, nxx::tolerance<double>, nxx::rel_tolerance<double>>);
+        static_assert(make_accepts<nxx::x_tol<double>, nxx::tolerance<double>, nxx::rel_tolerance<double>>);
+        static_assert(make_accepts<nxx::width_tol<double>, int, nxx::rel_tolerance<double>>);
+        static_assert(width_tol_ctad<nxx::tolerance<double>, nxx::rel_tolerance<double>>);
+        static_assert(x_tol_ctad<nxx::tolerance<float>, nxx::rel_tolerance<float>>);
+
+        // The roles stay typed: two tolerances, a bare relative number, swapped roles and mixed scalar types are not
+        // constructible.
+        static_assert(!std::is_constructible_v<nxx::width_tol<double>, nxx::tolerance<double>, nxx::tolerance<double>>);
+        static_assert(!std::is_constructible_v<nxx::width_tol<double>, nxx::tolerance<double>, double>);
+        static_assert(!std::is_constructible_v<nxx::x_tol<double>, nxx::rel_tolerance<double>, nxx::tolerance<double>>);
+        static_assert(!std::is_constructible_v<nxx::width_tol<double>, nxx::tolerance<float>, nxx::rel_tolerance<double>>);
+        static_assert(!make_accepts<nxx::width_tol<double>, nxx::tolerance<double>, double>);
+        static_assert(!make_accepts<nxx::width_tol<double>, nxx::tolerance<double>, nxx::tolerance<double>>);
+        static_assert(!make_accepts<nxx::x_tol<double>, nxx::tolerance<double>, nxx::rel_tolerance<float>>);
+        static_assert(!width_tol_ctad<nxx::tolerance<double>, nxx::tolerance<double>>);
+
+        // Run-time values: the parts are validated once; the criterion then needs no check.
+        const auto T = nxx::tolerance<double>::make(rt(1e-10));
+        const auto R = nxx::rel_tolerance<double>::make(rt(1e-8));
+        CHECK((T && R));
+        if (T && R) {
+            const auto a = nxx::width_tol { *T, *R };
+            CHECK((a.abs() == 1e-10 && a.rel() == 1e-8));
+            const auto b = nxx::x_tol<double> { *T, *R };
+            CHECK((b.abs() == 1e-10 && b.rel() == 1e-8));
+            const auto c = nxx::width_tol<double>::make(*T, *R);
+            CHECK(c.has_value());
+            if (c) { CHECK((c->abs() == 1e-10 && c->rel() == 1e-8)); }
+            const auto d = nxx::x_tol<double>::make(*T, *R);
+            CHECK(d.has_value());
+            if (d) { CHECK((d->threshold(100.0) == b.threshold(100.0))); }
+            const auto e = forward_tolerance(*T, *R);
+            CHECK((e.abs() == a.abs() && e.rel() == a.rel()));
+            // The same pair as the two-check path make(a, *rel).
+            const auto f = nxx::width_tol<double>::make(rt(1e-10), *R);
+            CHECK(f.has_value());
+            if (f) { CHECK((f->abs() == a.abs() && f->rel() == a.rel())); }
+        }
+    }
+
+    TEST_CASE("mixed criteria: two bare numbers and a part alone are rejected")
+    {
+        // Two bare numbers: deleted, with a reason (compile-fail width_tol_two_numbers, x_tol_two_numbers).
+        static_assert(!std::is_constructible_v<nxx::width_tol<double>, double, double>);
+        static_assert(!std::is_constructible_v<nxx::x_tol<double>, double, double>);
+        static_assert(!std::is_constructible_v<nxx::width_tol<double>, double, int>);
+        static_assert(!std::is_constructible_v<nxx::x_tol<float>, float, float>);
+        // A part alone: deleted, with a reason (compile-fail width_tol_relative_alone).
+        static_assert(!std::is_constructible_v<nxx::width_tol<double>, nxx::rel_tolerance<double>>);
+        static_assert(!std::is_constructible_v<nxx::width_tol<double>, nxx::abs_tolerance<double>>);
+        static_assert(!std::is_constructible_v<nxx::x_tol<double>, nxx::rel_tolerance<double>>);
+        static_assert(!std::is_constructible_v<nxx::x_tol<double>, nxx::abs_tolerance<double>>);
+        // Swapped roles, and a relative part of another scalar type: no constructor.
+        static_assert(!std::is_constructible_v<nxx::width_tol<double>, nxx::rel_tolerance<double>, double>);
+        static_assert(!std::is_constructible_v<nxx::width_tol<double>, double, nxx::abs_tolerance<double>>);
+        static_assert(!std::is_constructible_v<nxx::x_tol<double>, nxx::rel_tolerance<double>, nxx::abs_tolerance<double>>);
+        static_assert(!std::is_constructible_v<nxx::width_tol<double>, double, nxx::rel_tolerance<float>>);
+        // The legal mixed spellings are constructible (the constructor is consteval, so only the type is tested here).
+        static_assert(std::is_constructible_v<nxx::width_tol<double>, double, nxx::rel_tolerance<double>>);
+        static_assert(std::is_constructible_v<nxx::width_tol<double>, nxx::abs_tolerance<double>, nxx::rel_tolerance<double>>);
+        static_assert(std::is_constructible_v<nxx::x_tol<double>, double, nxx::rel_tolerance<double>>);
+        static_assert(std::is_constructible_v<nxx::x_tol<float>, float, nxx::rel_tolerance<float>>);
+        // The absolute form is unchanged.
+        static_assert(std::is_constructible_v<nxx::width_tol<double>, nxx::tolerance<double>>);
+        static_assert(std::is_constructible_v<nxx::x_tol<double>, nxx::tolerance<double>>);
+
+        // make: the relative part is typed (compile-fail width_tol_make_two_numbers).
+        static_assert(make_accepts<nxx::width_tol<double>, double>);
+        static_assert(make_accepts<nxx::width_tol<double>, double, nxx::rel_tolerance<double>>);
+        static_assert(make_accepts<nxx::width_tol<double>, nxx::abs_tolerance<double>, nxx::rel_tolerance<double>>);
+        static_assert(make_accepts<nxx::x_tol<double>, double, nxx::rel_tolerance<double>>);
+        static_assert(!make_accepts<nxx::width_tol<double>, double, double>);
+        static_assert(!make_accepts<nxx::x_tol<double>, double, double>);
+        static_assert(!make_accepts<nxx::width_tol<double>, nxx::abs_tolerance<double>, double>);
+        static_assert(!make_accepts<nxx::width_tol<double>, nxx::rel_tolerance<double>>);
+        static_assert(!make_accepts<nxx::width_tol<double>, double, nxx::rel_tolerance<float>>);
+
+        // Through CTAD: the deletion guides lead two numbers and a part to the deleted constructors.
+        static_assert(!width_tol_ctad<double, double>);
+        static_assert(!width_tol_ctad<double, int>);
+        static_assert(!width_tol_ctad<nxx::rel_tolerance<double>>);
+        static_assert(!width_tol_ctad<nxx::abs_tolerance<double>>);
+        static_assert(!width_tol_ctad<nxx::rel_tolerance<double>, double>);
+        static_assert(!x_tol_ctad<double, double>);
+        static_assert(!x_tol_ctad<nxx::rel_tolerance<double>>);
+        static_assert(width_tol_ctad<nxx::tolerance<double>>);
+        static_assert(x_tol_ctad<nxx::tolerance<float>>);
+        CHECK(true);
     }
 
     TEST_CASE("is_refined_v: validated inputs, never plain scalars")

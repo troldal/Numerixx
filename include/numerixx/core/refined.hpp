@@ -11,6 +11,7 @@
 #include <concepts>
 #include <cstdint>
 #include <expected>
+#include <type_traits>
 
 NXX_BEGIN_HEADER
 
@@ -95,6 +96,36 @@ namespace nxx
     using abs_tolerance = detail::refined<tag::abs_tolerance, T>;    // finite, >= 0: the absolute part of a mixed test
     template<real T>
     using rel_tolerance = detail::refined<tag::rel_tolerance, T>;    // 0 <= r < 1; roles are not interchangeable
+
+    // Traits for the reasoned deletions of the role-typed criteria (DESIGN §6.2) and of the solvers (§7.2).
+    namespace detail
+    {
+        // A bare number: what a refined literal is spelled with, and what a criterion never takes as its relative part.
+        template<class A>
+        inline constexpr bool is_bare_number_v = std::is_arithmetic_v<std::remove_cvref_t<A>> || real<std::remove_cvref_t<A>>;
+        // The criterion type that a deletion guide names for bare numbers: an integer literal names width_tol<double>.
+        template<class A>
+        using bare_scalar_t = std::conditional_t<real<std::remove_cvref_t<A>>, std::remove_cvref_t<A>, double>;
+
+        // R is the relative part of a T criterion: rel_tolerance<T> exactly, so that no bare number converts into it.
+        template<class R, class T>
+        inline constexpr bool is_rel_v = std::same_as<std::remove_cvref_t<R>, rel_tolerance<T>>;
+
+        // A part of a mixed tolerance, abs_tolerance<U> or rel_tolerance<U>, which alone is not a criterion.
+        template<class R>
+        inline constexpr bool is_tolerance_part_v = false;
+        template<real U>
+        inline constexpr bool is_tolerance_part_v<refined<tag::abs_tolerance, U>> = true;
+        template<real U>
+        inline constexpr bool is_tolerance_part_v<refined<tag::rel_tolerance, U>> = true;
+
+        // What a solver's constructor rejects with a reason (§7.2): a bare number, a validated tolerance<U>
+        // (brent{*tol}) or a part. One list, so that every solver deletion and brent's guide reject the same inputs.
+        template<class R>
+        inline constexpr bool not_a_criterion_v = is_bare_number_v<R> || is_tolerance_part_v<R>;
+        template<real U>
+        inline constexpr bool not_a_criterion_v<refined<tag::positive_tolerance, U>> = true;
+    }    // namespace detail
 
     // 1 .. 2^32 - 1 iterations.
     class max_iterations

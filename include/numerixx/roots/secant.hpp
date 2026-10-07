@@ -61,9 +61,15 @@ namespace nxx::roots
             requires(is_criterion_v<C> && !criterion_for_v<C, view_kind::point>)
         explicit secant(C) NXX_DELETE("width_tol needs a bracketing method (the view has no enclosure()); use x_tol or step_tol");
 
+        // A bare number, a validated tolerance or one of its parts is not a criterion (DESIGN §6.6, §7.2). A value
+        // that stop_type converts from is left out, so secant<options<x_tol<double>>>{tol} still builds (through
+        // x_tol's converting constructor), as does a user criterion with one. The text sends a tolerance to
+        // x_tol{*tol}, which is constexpr, and a part to make, because the mixed literal is consteval.
         template<class R>
-            requires((std::is_arithmetic_v<R> || real<R>) && !std::is_convertible_v<R, stop_type>)
-        explicit secant(R) NXX_DELETE("a tolerance is a criterion, not a number: write secant{nxx::x_tol{1e-10}}");
+            requires(nxx::detail::not_a_criterion_v<R> && !std::is_convertible_v<R, stop_type>)
+        explicit secant(R) NXX_DELETE("a tolerance is a criterion, not a number: write secant{nxx::x_tol{1e-10}}; a validated "
+                                      "tolerance is not a criterion either; wrap it: secant{nxx::x_tol{*tol}}; a part "
+                                      "(abs_tolerance, rel_tolerance) is not one either: build the criterion with nxx::x_tol<T>::make");
 
         constexpr secant(nxx::detail::from_options_t, Opt o) : opt_(std::move(o)) {}
 

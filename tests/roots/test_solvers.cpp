@@ -1076,7 +1076,7 @@ TEST_SUITE("roots")
 
     // A solver with its own tolerance (brent) takes a width criterion only in its constructor. Its intrinsic test runs
     // before the stop criterion, so a width criterion given to with_stop or rebuild, alone or at any depth of || and
-    // &&, reported stop_reason::criterion once brent's own tolerance held: width 6.66e-16 for width_tol{1e-20, 0} on
+    // &&, reported stop_reason::criterion once brent's own tolerance held: width 6.66e-16 for width_tol{1e-20} on
     // x^2 - 2 over [1, 2] (DESIGN §6.8). with_stop deletes it with a reason and rebuild is constrained, so both are
     // false here rather than hard errors. Solvers without their own tolerance (bisection) keep taking it.
     template<class S, class C>
@@ -1141,7 +1141,7 @@ TEST_SUITE("roots")
     {
         constexpr T tiny = (std::numeric_limits<T>::min)();
         const auto  quad = [](T x) { return x * x - T(2); };
-        const auto  res  = nr::brent { nxx::width_tol { tiny, T(0) } }(quad, { T(1), T(2) });
+        const auto  res  = nr::brent { nxx::width_tol { tiny } }(quad, { T(1), T(2) });
         if (res) {
             CHECK(res->how == nxx::stop_reason::resolution_limit);
             if (res->enclosure) {
@@ -1230,6 +1230,124 @@ TEST_SUITE("roots")
     static_assert(std::is_constructible_v<nr::brent<user_width>, double>);
     static_assert(std::is_constructible_v<nr::bisection<nxx::options<user_width>>, double>);
     static_assert(brent_from<user_width>);
+
+    // A validated tolerance, or one of its parts, is not a criterion either (DESIGN §6.6, §7.2): each solver's bare-number
+    // deletion takes them (compile-fail cases brent_validated_tolerance through brent's guide and
+    // bisection_validated_tolerance through the implicit guide). brent{*tol} was a long CTAD error with no reason.
+    template<class T>
+    concept secant_from = requires(T t) { nr::secant { t }; };
+    using tol_t         = nxx::tolerance<double>;
+    using abs_tl_t      = nxx::abs_tolerance<double>;
+    using rel_tl_t      = nxx::rel_tolerance<double>;
+    using xt_t          = nxx::x_tol<double>;
+    static_assert(!brent_from<tol_t> && !brent_from<abs_tl_t> && !brent_from<rel_tl_t>);
+    static_assert(!bisection_from<tol_t> && !bisection_from<abs_tl_t> && !bisection_from<rel_tl_t>);
+    static_assert(!secant_from<tol_t> && !secant_from<abs_tl_t> && !secant_from<rel_tl_t>);
+    static_assert(!newton_from<tol_t> && !newton_from<abs_tl_t> && !newton_from<rel_tl_t>);
+    static_assert(!std::is_constructible_v<nr::brent<>, tol_t> && !std::is_constructible_v<nr::bisection<>, tol_t>);
+    static_assert(!std::is_constructible_v<nr::secant<>, tol_t> && !std::is_constructible_v<nr::newton<>, tol_t>);
+    // The remedies build, and a solver whose own criterion converts from a tolerance still takes one: the deletion
+    // leaves out what the criterion type converts from (width_tol and x_tol from tolerance<T>, not from a part).
+    static_assert(brent_from<wt_t> && secant_from<xt_t>);
+    static_assert(std::is_constructible_v<nr::brent<wt_t>, tol_t>);
+    static_assert(std::is_constructible_v<nr::bisection<nxx::options<wt_t>>, tol_t>);
+    static_assert(std::is_constructible_v<nr::secant<nxx::options<xt_t>>, tol_t>);
+    static_assert(std::is_constructible_v<nr::newton<nxx::options<xt_t>>, tol_t>);
+    static_assert(!std::is_constructible_v<nr::brent<wt_t>, abs_tl_t> && !std::is_constructible_v<nr::brent<wt_t>, rel_tl_t>);
+    static_assert(!std::is_constructible_v<nr::secant<nxx::options<xt_t>>, rel_tl_t>);
+    static_assert(!std::is_constructible_v<nr::secant<nxx::options<xt_t>>, abs_tl_t>);
+    static_assert(!std::is_constructible_v<nr::bisection<nxx::options<wt_t>>, abs_tl_t>);
+    static_assert(!std::is_constructible_v<nr::bisection<nxx::options<wt_t>>, rel_tl_t>);
+    static_assert(!std::is_constructible_v<nr::newton<nxx::options<xt_t>>, abs_tl_t>);
+    static_assert(!std::is_constructible_v<nr::newton<nxx::options<xt_t>>, rel_tl_t>);
+
+    // DESIGN §3.5, §10.3 phase 1 (A1): every default is achievable, >= 4 eps. The thresholds are read from each solver's
+    // own default criterion, so a change of default is checked, not only the criterion types (tests/core/test_criteria.cpp
+    // checks floored_width and step_tol themselves).
+    template<class T>
+    constexpr T solver_four_eps = T(4) * std::numeric_limits<T>::epsilon();
+
+    TEST_CASE_TEMPLATE("solvers: the defaults are achievable: each solver's default threshold >= 4 eps", T, float, double, long double)
+    {
+        constexpr auto bisection_stop = nr::bisection<> {}.options().stop;
+        constexpr auto brent_tol      = nr::brent<> {}.tolerance();
+        constexpr auto newton_stop    = nr::newton<> {}.options().stop;
+        constexpr auto secant_stop    = nr::secant<> {}.options().stop;
+        static_assert(bisection_stop.factor<T>() >= solver_four_eps<T>);
+        static_assert(brent_tol.factor<T>() >= solver_four_eps<T>);
+        static_assert(bisection_stop.threshold(T(0)) >= solver_four_eps<T>);    // the absolute floor at 0
+        static_assert(brent_tol.threshold(T(0)) >= solver_four_eps<T>);
+        static_assert(newton_stop.threshold(T(1)) >= solver_four_eps<T>);
+        static_assert(secant_stop.threshold(T(1)) >= solver_four_eps<T>);
+        static_assert(newton_stop.threshold(T(0)) >= solver_four_eps<T>);
+        static_assert(secant_stop.threshold(T(0)) >= solver_four_eps<T>);
+        static_assert(newton_stop.threshold(T(1e6)) >= solver_four_eps<T> * T(1e6));    // relative above 1
+        static_assert(secant_stop.threshold(T(1e6)) >= solver_four_eps<T> * T(1e6));
+        CHECK(true);
+    }
+
+    // with_stop takes a criterion (DESIGN §6.6): a number, a validated tolerance and a part get one reason, on every
+    // facade (compile-fail case bisection_with_stop_tolerance); the search facade deletes with_stop as a whole. Before,
+    // they reached the criterion catch-all and its false reason "this criterion does not apply to this solver".
+    static_assert(!with_stop_accepts<nr::bisection<>, double> && !with_stop_accepts<nr::bisection<>, tol_t>);
+    static_assert(!with_stop_accepts<nr::bisection<>, abs_tl_t> && !with_stop_accepts<nr::bisection<>, rel_tl_t>);
+    static_assert(!with_stop_accepts<nr::brent<>, double> && !with_stop_accepts<nr::brent<>, tol_t>);
+    static_assert(!with_stop_accepts<nr::brent<>, abs_tl_t> && !with_stop_accepts<nr::brent<>, rel_tl_t>);
+    static_assert(!with_stop_accepts<nr::secant<>, double> && !with_stop_accepts<nr::secant<>, tol_t>);
+    static_assert(!with_stop_accepts<nr::secant<>, abs_tl_t> && !with_stop_accepts<nr::secant<>, rel_tl_t>);
+    static_assert(!with_stop_accepts<nr::newton<>, double> && !with_stop_accepts<nr::newton<>, tol_t>);
+    static_assert(!with_stop_accepts<nr::newton<>, abs_tl_t> && !with_stop_accepts<nr::newton<>, rel_tl_t>);
+    static_assert(!with_stop_accepts<nr::expand<>, double> && !with_stop_accepts<nr::expand<>, tol_t>);
+    static_assert(!with_stop_accepts<nr::expand<>, abs_tl_t> && !with_stop_accepts<nr::expand<>, rel_tl_t>);
+    static_assert(!with_stop_accepts<nr::bisection<>, int> && !with_stop_accepts<nr::secant<>, float>);
+    // Each remedy the reason names compiles on the solvers it names: width_tol on bisection (brent takes it in its
+    // constructor), x_tol on the open methods, f_tol on all four.
+    static_assert(with_stop_accepts<nr::bisection<>, wt_t> && !with_stop_accepts<nr::brent<>, wt_t>);
+    static_assert(with_stop_accepts<nr::secant<>, xt_t> && with_stop_accepts<nr::newton<>, xt_t>);
+    static_assert(with_stop_accepts<nr::bisection<>, ft_t> && with_stop_accepts<nr::brent<>, ft_t>);
+    static_assert(with_stop_accepts<nr::secant<>, ft_t> && with_stop_accepts<nr::newton<>, ft_t>);
+    // A criterion that does not apply keeps its own reason (bisection_with_stop_x_tol); the two deletions are disjoint.
+    static_assert(!with_stop_accepts<nr::bisection<>, xt_t> && !with_stop_accepts<nr::secant<>, wt_t>);
+
+    // A curried solver is not invocable with a function its solver cannot take (DESIGN §6.6): bound::operator() has a
+    // deleted sibling with a reason (compile-fail case bound_wrong_function), which keeps std::is_invocable_v false.
+    using bound_brent_t  = decltype(nr::brent {}.on(std::pair { 1.0, 2.0 }));
+    using bound_newton_t = decltype(nr::newton {}.on(1.0));
+    static_assert(std::is_invocable_v<const bound_brent_t&, const sq2_t&>);
+    static_assert(!std::is_invocable_v<const bound_brent_t&, const takes_text&>);
+    static_assert(!std::is_invocable_v<nr::bisection<>, takes_text, std::pair<double, double>>);
+    static_assert(!std::is_invocable_v<const bound_newton_t&, const sq2_t&>);    // newton needs a derivative
+
+    // The remedies the reasons name, with a run-time tolerance: the constructor texts (wrap it: brent{nxx::width_tol{*tol}},
+    // build a part's criterion with make) and the with_stop text (width_tol, x_tol, f_tol).
+    TEST_CASE("solvers: the remedies of the tolerance reasons build and solve at run time")
+    {
+        const auto tol      = nxx::tolerance<double>::make(opaque(1e-10));
+        const auto abs_part = nxx::abs_tolerance<double>::make(opaque(1e-10));
+        const auto rel_part = nxx::rel_tolerance<double>::make(opaque(1e-12));
+        if (tol && abs_part && rel_part) {
+            const auto near_root2 = [](const auto& res) { return res && std::abs(res->x - root2) <= 1e-9; };
+            CHECK(near_root2(nr::brent { nxx::width_tol { *tol } }(sq2, { 1.0, 2.0 })));
+            CHECK(near_root2(nr::bisection { nxx::width_tol { *tol } }(sq2, { 1.0, 2.0 })));
+            CHECK(near_root2(nr::secant { nxx::x_tol { *tol } }(sq2, 1.5)));
+            CHECK(near_root2(nr::newton { nxx::x_tol { *tol } }.with_derivative(dsq2)(sq2, 1.5)));
+            CHECK(near_root2(nr::bisection {}.with_stop(nxx::width_tol { *tol })(sq2, { 1.0, 2.0 })));
+            CHECK(near_root2(nr::secant {}.with_stop(nxx::x_tol { *tol })(sq2, 1.5)));
+            CHECK(near_root2(nr::newton {}.with_derivative(dsq2).with_stop(nxx::x_tol { *tol })(sq2, 1.5)));
+            CHECK(near_root2(nr::brent {}.with_stop(nxx::f_tol { *tol })(sq2, { 1.0, 2.0 })));
+            CHECK(near_root2(nr::brent { nxx::width_tol { *tol } }.with_stop(nxx::f_tol { *tol })(sq2, { 1.0, 2.0 })));
+            const auto wt = nxx::width_tol<double>::make(*abs_part, *rel_part);
+            const auto xt = nxx::x_tol<double>::make(abs_part->value());
+            if (wt && xt) {
+                CHECK(near_root2(nr::brent { *wt }(sq2, { 1.0, 2.0 })));
+                CHECK(near_root2(nr::secant { *xt }(sq2, 1.5)));
+            }
+            else
+                FAIL_CHECK("make rejected valid parts");
+        }
+        else
+            FAIL_CHECK("make rejected valid tolerances");
+    }
 
     // The facades check the solver protocol (DESIGN §6.6), so a solver that lacks part of it makes std::is_invocable_v
     // false, with a reasoned deletion (compile-fail case solver_incomplete), rather than a hard error inside
