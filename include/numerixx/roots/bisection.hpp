@@ -58,11 +58,18 @@ namespace nxx::roots
         template<class C>
             requires(is_criterion_v<C> && !criterion_for_v<C, view_kind::enclosure>)
         explicit bisection(C) NXX_DELETE("x_tol and step_tol compare successive iterates; bracketing methods converge on the "
-                                         "enclosure: use width_tol{abs[, rel]} or floored_width{}");
+                                         "enclosure: use width_tol{abs}, width_tol{abs, nxx::rel_tolerance{rel}} or floored_width{}");
 
+        // A bare number, a validated tolerance or one of its parts is not a criterion (DESIGN §6.6, §7.2). A value
+        // that stop_type converts from is left out, so bisection<options<width_tol<double>>>{tol} still builds (through
+        // width_tol's converting constructor), as does a user criterion with one. The text sends a tolerance to
+        // width_tol{*tol}, which is constexpr, and a part to make, because the mixed literal is consteval.
         template<class R>
-            requires((std::is_arithmetic_v<R> || real<R>) && !std::is_convertible_v<R, stop_type>)
-        explicit bisection(R) NXX_DELETE("a tolerance is a criterion, not a number: write bisection{nxx::width_tol{1e-10}}");
+            requires(nxx::detail::not_a_criterion_v<R> && !std::is_convertible_v<R, stop_type>)
+        explicit bisection(R) NXX_DELETE("a tolerance is a criterion, not a number: write bisection{nxx::width_tol{1e-10}}; "
+                                         "a validated tolerance is not a criterion either; wrap it: bisection{nxx::width_tol{*tol}}; "
+                                         "a part (abs_tolerance, rel_tolerance) is not one either: build the criterion with "
+                                         "nxx::width_tol<T>::make");
 
         constexpr bisection(nxx::detail::from_options_t, Opt o) : opt_(std::move(o)) {}
 

@@ -154,8 +154,20 @@ namespace nxx
             return self.rebuild(O2 { std::move(stop), o.budget, o.derivative, o.projection, o.observer });
         }
 
+        // Not a criterion at all: a number, a validated tolerance (tolerance<T>) or a part (abs_tolerance<T>,
+        // rel_tolerance<T>). The text names the tests in x first and says what each one bounds (DESIGN §6.6, §9.3). It
+        // and the criterion catch-all below are disjoint, so cl reports no ambiguity (C2668), and this header needs no
+        // tolerance trait.
         template<class Self, class C>
-            requires(!criterion_for_v<C, Self::views>)
+            requires(!is_criterion_v<C>)
+        void with_stop(this const Self&, C) NXX_DELETE("with_stop takes a criterion, not a number or a validated tolerance: wrap "
+                                                       "it in the test you mean: width_tol{*tol} (bisection; brent takes its "
+                                                       "width in its constructor) bounds the error in x; x_tol{*tol} (open "
+                                                       "methods) bounds only the last step in x; f_tol{*tol} bounds only "
+                                                       "|f(x)|; a part (abs_tolerance, rel_tolerance) is not a criterion either");
+
+        template<class Self, class C>
+            requires(is_criterion_v<C> && !criterion_for_v<C, Self::views>)
         void with_stop(this const Self&, C) NXX_DELETE("this criterion does not apply to this solver: bracketing methods "
                                                        "converge on the enclosure (width_tol, floored_width), open methods on "
                                                        "successive iterates (x_tol, step_tol)");
@@ -225,11 +237,16 @@ namespace nxx
         constexpr bound(S solver, In in) : solver_(std::move(solver)), in_(std::move(in)) {}
 
         // Constrained, so std::is_invocable_v on a curried solver is false (not a hard error) for a function it cannot
-        // take.
+        // take. The deleted sibling keeps it false and gives a reason; the solver's own call states the cause (DESIGN §6.6).
         template<class F>
             requires std::is_invocable_v<const S&, const F&, const In&>
         constexpr auto operator()(const F& fn) const
         { return solver_(fn, in_); }
+
+        template<class F>
+            requires(!std::is_invocable_v<const S&, const F&, const In&>)
+        void operator()(const F&) const NXX_DELETE("this solver cannot take this function with its bound input: call "
+                                                   "solver(f, input) for the reason");
 
         constexpr const S&  solver() const noexcept { return solver_; }
         constexpr const In& input() const noexcept { return in_; }

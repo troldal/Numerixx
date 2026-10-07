@@ -34,6 +34,31 @@ namespace
         static const mp50 value { "1e-45" };
         return value;
     }
+
+    // A validated tolerance and its parts are not criteria (DESIGN §6.6, §7.2), in any scalar type.
+    template<class T>
+    concept brent_from = requires(T t) { nr::brent { t }; };
+    template<class T>
+    concept bisection_from = requires(T t) { nr::bisection { t }; };
+    template<class T>
+    concept secant_from = requires(T t) { nr::secant { t }; };
+    template<class T>
+    concept newton_from = requires(T t) { nr::newton { t }; };
+    template<class S, class C>
+    concept with_stop_accepts = requires(const S& s, const C& c) { s.with_stop(c); };
+    static_assert(!brent_from<nxx::tolerance<mp50>> && !brent_from<nxx::abs_tolerance<mp50>> && !brent_from<nxx::rel_tolerance<mp50>>);
+    static_assert(!bisection_from<nxx::tolerance<mp50>> && !bisection_from<nxx::abs_tolerance<mp50>> &&
+                  !bisection_from<nxx::rel_tolerance<mp50>>);
+    static_assert(!secant_from<nxx::tolerance<mp50>> && !secant_from<nxx::abs_tolerance<mp50>> && !secant_from<nxx::rel_tolerance<mp50>>);
+    static_assert(!newton_from<nxx::tolerance<mp50>> && !newton_from<nxx::abs_tolerance<mp50>> && !newton_from<nxx::rel_tolerance<mp50>>);
+    static_assert(std::is_constructible_v<nr::brent<nxx::width_tol<mp50>>, nxx::tolerance<mp50>>);
+    static_assert(std::is_constructible_v<nr::bisection<nxx::options<nxx::width_tol<mp50>>>, nxx::tolerance<mp50>>);
+    static_assert(std::is_constructible_v<nr::secant<nxx::options<nxx::x_tol<mp50>>>, nxx::tolerance<mp50>>);
+    static_assert(std::is_constructible_v<nr::newton<nxx::options<nxx::x_tol<mp50>>>, nxx::tolerance<mp50>>);
+    static_assert(!std::is_constructible_v<nr::bisection<nxx::options<nxx::width_tol<mp50>>>, nxx::rel_tolerance<mp50>>);
+    static_assert(!std::is_constructible_v<nr::secant<nxx::options<nxx::x_tol<mp50>>>, nxx::abs_tolerance<mp50>>);
+    static_assert(!with_stop_accepts<nr::bisection<>, nxx::tolerance<mp50>> && !with_stop_accepts<nr::secant<>, mp50>);
+    static_assert(with_stop_accepts<nr::bisection<>, nxx::width_tol<mp50>> && with_stop_accepts<nr::brent<>, nxx::f_tol<mp50>>);
 }    // namespace
 
 TEST_SUITE("multiprecision")
@@ -62,6 +87,43 @@ TEST_SUITE("multiprecision")
         static_assert(nxx::is_real_v<mp50>);
     }
 
+    // DESIGN §3.5, §10.3 phase 1 (A1): every module default is achievable, >= 4 eps. cpp_bin_float_50 is not a literal
+    // type, so the static_asserts that tests/roots/test_solvers.cpp makes for float, double and long double cannot be
+    // made here: this run-time check reads each solver's own default criterion, calls its factor and thresholds, and
+    // computes 4 eps at run time (the variable template four_eps<T> is constexpr and cannot be instantiated for mp50).
+    TEST_CASE("cpp_bin_float_50 the defaults are achievable: the solvers' default thresholds >= 4 eps")
+    {
+        const mp50 four_eps = mp50 { 4 } * std::numeric_limits<mp50>::epsilon();
+        const mp50 one { 1 };
+        const mp50 zero { 0 };
+        const auto bisection_stop = nr::bisection<> {}.options().stop;    // floored_width
+        const auto brent_tol      = nr::brent<> {}.tolerance();           // floored_width
+        const auto newton_stop    = nr::newton<> {}.options().stop;       // step_tol<3, 5>
+        const auto secant_stop    = nr::secant<> {}.options().stop;       // step_tol<7, 10>
+        CHECK(bisection_stop.factor<mp50>() >= four_eps);
+        CHECK(brent_tol.factor<mp50>() >= four_eps);
+        CHECK(bisection_stop.threshold(one) >= four_eps);
+        CHECK(bisection_stop.threshold(zero) >= four_eps);    // the absolute floor at 0
+        CHECK(brent_tol.threshold(zero) >= four_eps);
+        CHECK(newton_stop.threshold(one) >= four_eps);
+        CHECK(secant_stop.threshold(one) >= four_eps);
+        CHECK(newton_stop.threshold(zero) >= four_eps);
+        CHECK(secant_stop.threshold(zero) >= four_eps);
+
+        // Relative above 1: still >= 4 eps |x|.
+        const mp50 big { 1e6 };
+        CHECK(bisection_stop.threshold(big) >= four_eps * big);
+        CHECK(newton_stop.threshold(big) >= four_eps * big);
+        CHECK(secant_stop.threshold(big) >= four_eps * big);
+
+        // The comparison can fail: at p = 168 digits, step_tol<99, 100> asks for 2^-ceil(0.99 p) = 2^-167, below
+        // 4 eps = 2^(3 - p) = 2^-165, and so does a threshold of 2 eps, which the integer check on digits approved on
+        // 2026-10-04 accepted (DESIGN §12.21 item 11).
+        static_assert(std::numeric_limits<mp50>::digits == 168);
+        CHECK_FALSE(nxx::step_tol<99, 100>::threshold(one) >= four_eps);
+        CHECK_FALSE(mp50 { 2 } * std::numeric_limits<mp50>::epsilon() >= four_eps);
+    }
+
     TEST_CASE("cpp_bin_float_50 bisection converges to the square root of 2")
     {
         // floored_width{} at 168 bits needs 165 halvings of [1, 2]: the default budget (200) is sized for it, so the
@@ -88,6 +150,76 @@ TEST_SUITE("multiprecision")
         }
         else
             FAIL_CHECK("brent failed on x^2 - 2 in cpp_bin_float_50");
+    }
+
+    // Role-typed mixed criteria at run time (DESIGN §6.2): cpp_bin_float_50 is not a literal type, so its paths are
+    // make() and the constexpr constructor from a validated tolerance; the relative part is a rel_tolerance<mp50>, and
+    // make(T, T) is deleted.
+    TEST_CASE("cpp_bin_float_50 mixed width tolerance through make(abs, rel_tolerance)")
+    {
+        const mp50 abs_part { "1e-40" };
+        const mp50 rel_part { "1e-40" };
+        const auto R = nxx::rel_tolerance<mp50>::make(rel_part);
+        CHECK(R.has_value());
+        if (R) {
+            const auto tol = nxx::width_tol<mp50>::make(abs_part, *R);
+            CHECK(tol.has_value());
+            if (tol) {
+                CHECK(tol->abs() == abs_part);
+                CHECK(tol->rel() == rel_part);
+                const auto res = nr::brent { *tol }(mp_quad, { mp50 { 1 }, mp50 { 2 } });
+                CHECK(res.has_value());
+                if (res) {
+                    CHECK(res->how == nxx::stop_reason::criterion);
+                    CHECK(abs(res->x - mp_root2()) <= abs_part + rel_part * mp_root2());
+                }
+            }
+            CHECK(nxx::width_tol<mp50>::make(-abs_part, *R) == std::unexpected(nxx::errc::invalid_input));
+            CHECK(nxx::x_tol<mp50>::make(mp50 { 0 }, *R).has_value());    // purely relative
+        }
+        CHECK(nxx::width_tol<mp50>::make(abs_part).has_value());
+        CHECK(nxx::x_tol<mp50>::make(mp50 { 0 }) == std::unexpected(nxx::errc::invalid_input));
+    }
+
+    // The remedy of brent's reason for a validated tolerance, brent{nxx::width_tol{*tol}}, at run time.
+    TEST_CASE("cpp_bin_float_50 brent with a wrapped validated tolerance")
+    {
+        const auto tol = nxx::tolerance<mp50>::make(mp50 { "1e-40" });
+        CHECK(tol.has_value());
+        if (tol) {
+            const auto res = nr::brent { nxx::width_tol { *tol } }(mp_quad, { mp50 { 1 }, mp50 { 2 } });
+            CHECK(res.has_value());
+            if (res) {
+                CHECK(res->how == nxx::stop_reason::criterion);
+                CHECK(abs(res->x - mp_root2()) <= tol->value());
+            }
+        }
+    }
+
+    // A validated tolerance with a relative part (DESIGN §6.2, §12.24): the constexpr constructor takes run-time
+    // values, and make(tolerance, rel_tolerance) cannot fail.
+    TEST_CASE("cpp_bin_float_50 a validated tolerance with a relative part, through the constructor and make")
+    {
+        static_assert(std::is_constructible_v<nxx::width_tol<mp50>, nxx::tolerance<mp50>, nxx::rel_tolerance<mp50>>);
+        static_assert(std::is_constructible_v<nxx::x_tol<mp50>, nxx::tolerance<mp50>, nxx::rel_tolerance<mp50>>);
+        static_assert(!std::is_constructible_v<nxx::width_tol<mp50>, nxx::tolerance<mp50>, mp50>);
+        const auto T = nxx::tolerance<mp50>::make(mp50 { "1e-40" });
+        const auto R = nxx::rel_tolerance<mp50>::make(mp50 { "1e-40" });
+        CHECK((T && R));
+        if (T && R) {
+            const auto w = nxx::width_tol { *T, *R };
+            static_assert(std::is_same_v<decltype(w), const nxx::width_tol<mp50>>);
+            CHECK((w.abs() == T->value() && w.rel() == R->value()));
+            const auto m = nxx::x_tol<mp50>::make(*T, *R);
+            CHECK(m.has_value());
+            if (m) { CHECK((m->abs() == T->value() && m->rel() == R->value())); }
+            const auto res = nr::brent { w }(mp_quad, { mp50 { 1 }, mp50 { 2 } });
+            CHECK(res.has_value());
+            if (res) {
+                CHECK(res->how == nxx::stop_reason::criterion);
+                CHECK(abs(res->x - mp_root2()) <= T->value() + R->value() * mp_root2());
+            }
+        }
     }
 
     TEST_CASE("cpp_bin_float_50 newton converges to the square root of 2")

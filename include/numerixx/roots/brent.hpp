@@ -1,8 +1,8 @@
 // Brent's method, zeroin (DESIGN §7.2, §6.8): inverse quadratic interpolation and secant steps safeguarded by
-// bisection. Its tolerance is a width criterion, width_tol{abs[, rel]} or floored_width{} (the default):
-// tol1 = max(threshold / 2, 2 eps |b|), where threshold is the tolerance's enclosure form (width_tol: abs + rel
-// min(|lo|, |hi|)) and 2 eps |b| is Brent's resolution floor (a smaller step would not move b). Its intrinsic stop
-// (|c - b| / 2 <= tol1) therefore meets the threshold whenever the threshold is attainable, and reports
+// bisection. Its tolerance is a width criterion, width_tol{abs}, width_tol{abs, nxx::rel_tolerance{rel}} or
+// floored_width{} (the default): tol1 = max(threshold / 2, 2 eps |b|), where threshold is the tolerance's enclosure
+// form (width_tol: abs + rel min(|lo|, |hi|)) and 2 eps |b| is Brent's resolution floor (a smaller step would not move
+// b). Its intrinsic stop (|c - b| / 2 <= tol1) therefore meets the threshold whenever the threshold is attainable, and reports
 // stop_reason::criterion exactly then, as every width criterion guarantees (DESIGN §9.3). With a tolerance below the
 // floor it stops at the floor, with width <= 4 eps |b|: stop_reason::criterion if that width still meets the threshold,
 // stop_reason::resolution_limit otherwise. The external stop defaults to never{}, so there are not two sources of
@@ -113,12 +113,19 @@ namespace nxx::roots
 
         template<class C>
             requires(is_criterion_v<C> && !detail::width_tolerance_v<C>)
-        explicit brent(C) NXX_DELETE("brent's tolerance is a width criterion: width_tol{abs[, rel]} or floored_width{} "
+        explicit brent(C) NXX_DELETE("brent's tolerance is a width criterion: width_tol{abs}, "
+                                     "width_tol{abs, nxx::rel_tolerance{rel}} or floored_width{} "
                                      "(x_tol and step_tol compare successive iterates; bracketing methods converge on the enclosure)");
 
+        // A bare number, a validated tolerance or one of its parts is not a criterion (DESIGN §6.6, §7.2). A value
+        // that Tol converts from is left out, so brent<width_tol<double>>{tol} still builds (through
+        // width_tol's converting constructor), as does a user criterion with one. The text sends a tolerance to
+        // width_tol{*tol}, which is constexpr, and a part to make, because the mixed literal is consteval.
         template<class R>
-            requires((std::is_arithmetic_v<R> || real<R>) && !std::is_convertible_v<R, Tol>)
-        explicit brent(R) NXX_DELETE("a tolerance is a criterion, not a number: write brent{nxx::width_tol{1e-10}}");
+            requires(nxx::detail::not_a_criterion_v<R> && !std::is_convertible_v<R, Tol>)
+        explicit brent(R) NXX_DELETE("a tolerance is a criterion, not a number: write brent{nxx::width_tol{1e-10}}; a validated "
+                                     "tolerance is not a criterion either; wrap it: brent{nxx::width_tol{*tol}}; a part "
+                                     "(abs_tolerance, rel_tolerance) is not one either: build the criterion with nxx::width_tol<T>::make");
 
         // Constrained as rebuild is, so no options that carry a width criterion build a brent, not even through the
         // detail key (DESIGN §6.8). The constraint spells brent<Tol, Opt>, not the injected-class-name: in the deduction
@@ -238,11 +245,12 @@ namespace nxx::roots
         requires is_criterion_v<C>
     brent(C) -> brent<C>;
 
-    // A bare number deduces brent<>, whose deleted constructor gives the reason. Without this guide, Clang 19.1 deduced
-    // brent<double> from the implicit guide of brent(Tol) despite its constraint, and brent<double> has no constructor
-    // left for a double (the deletion skips numbers its own Tol accepts): a bare "no matching constructor".
+    // A bare number, a validated tolerance or a part deduces brent<>, whose deleted constructor gives the reason
+    // (DESIGN §7.2). Without this guide, Clang 19.1 deduced brent<double> from the implicit guide of brent(Tol) despite
+    // its constraint, and brent<double> has no constructor left for a double (the deletion skips numbers its own Tol
+    // accepts): a bare "no matching constructor"; brent{*tol} was a long CTAD error with no reason.
     template<class R>
-        requires(std::is_arithmetic_v<R> || real<R>)
+        requires nxx::detail::not_a_criterion_v<R>
     brent(R) -> brent<>;
 }    // namespace nxx::roots
 

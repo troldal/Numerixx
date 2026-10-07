@@ -336,13 +336,13 @@ TEST_SUITE("core")
         CHECK(absolute(pv { 1.0, 0.0 }, pv { 1.0 + 5e-7, 0.0 }, {}) == verdict::converged);
         CHECK(absolute(pv { 1.0, 0.0 }, pv { 1.0 + 2e-6, 0.0 }, {}) == verdict::proceed);
 
-        const nxx::x_tol relative { 0.0, 1e-8 };
+        const nxx::x_tol relative { 0.0, nxx::rel_tolerance { 1e-8 } };
         CHECK(relative.threshold(1e6) == doctest::Approx(1e-2));
         CHECK(relative(pv { 1e6, 0.0 }, pv { 1e6 + 5e-3, 0.0 }, {}) == verdict::converged);
         CHECK(relative(pv { 1e6, 0.0 }, pv { 1e6 + 2e-2, 0.0 }, {}) == verdict::proceed);
         CHECK(relative(pv { 0.0, 0.0 }, pv { 1e-300, 0.0 }, {}) == verdict::proceed);    // purely relative: no floor at 0
 
-        const nxx::x_tol mixed { 1e-6, 1e-3 };
+        const nxx::x_tol mixed { 1e-6, nxx::rel_tolerance { 1e-3 } };
         CHECK(mixed.threshold(-10.0) == doctest::Approx(1e-6 + 1e-2));
         static_assert(nxx::x_tol { 1e-6 }(pv { 1.0, 0.0 }, pv { 1.0, 0.0 }, {}) == verdict::converged);
     }
@@ -369,7 +369,7 @@ TEST_SUITE("core")
         CHECK(absolute(ev {}, ev { 1.0, 0.0, 1.0, 1.0005 }, {}) == verdict::converged);
         CHECK(absolute(ev {}, ev { 1.0, 0.0, 1.0, 1.002 }, {}) == verdict::proceed);
 
-        const nxx::width_tol relative { 0.0, 1e-3 };
+        const nxx::width_tol relative { 0.0, nxx::rel_tolerance { 1e-3 } };
         CHECK(relative.threshold(1000.0, 1000.5) == doctest::Approx(1.0));
         CHECK(relative.threshold(-1000.5, -1000.0) == doctest::Approx(1.0));    // min(|lo|, |hi|) = 1000
         CHECK(relative(ev {}, ev { 1000.0, 0.0, 1000.0, 1000.5 }, {}) == verdict::converged);
@@ -385,13 +385,13 @@ TEST_SUITE("core")
         // converged although 2 max > 1.5 max. Saturated at max, the threshold is still a lower bound of the exact one,
         // and it stays a constant expression (GCC rejects an overflow there).
         constexpr double         big = (std::numeric_limits<double>::max)();
-        constexpr nxx::width_tol wide { big, 0.5 };
+        constexpr nxx::width_tol wide { big, nxx::rel_tolerance { 0.5 } };
         static_assert(wide.threshold(-big, big) == big);
         static_assert(wide.threshold(big) == big);
         CHECK(wide(ev {}, ev { big, 0.0, -big, big }, {}) == verdict::proceed);            // 2 max > 1.5 max
         CHECK(wide(ev {}, ev { big, 0.0, 0.25 * big, big }, {}) == verdict::converged);    // a finite width still passes
 
-        constexpr nxx::x_tol far { 1e308, 0.5 };
+        constexpr nxx::x_tol far { 1e308, nxx::rel_tolerance { 0.5 } };
         static_assert(far.threshold(big) == big);
         CHECK(far(pv { -big, 0.0 }, pv { big, 0.0 }, {}) == verdict::proceed);    // distance 2 max > 1e308 + max / 2
     }

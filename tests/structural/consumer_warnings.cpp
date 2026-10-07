@@ -136,13 +136,13 @@ namespace consumer
         const auto a = r::bisection { nxx::width_tol { 1e-10 } || nxx::max_evaluations { 20 } }(f, { 1.0, 2.0 });
         const auto b = r::secant { nxx::x_tol { 1e-12 } && nxx::min_iterations { 3 } }(f, 1.0);
         const auto c = r::newton { nxx::never {} || nxx::max_evaluations { 10 } }.with_derivative(df)(f, 1.0);
-        const auto d = r::newton { nxx::x_tol { 1e-12, 1e-10 } || nxx::f_tol { 1e-14 } }.with_derivative(df)(f, 1.0);
-        const auto e = r::brent { nxx::width_tol { 1e-12, 1e-10 } }(f, { 1.0, 2.0 });
+        const auto d = r::newton { nxx::x_tol { 1e-12, nxx::rel_tolerance { 1e-10 } } || nxx::f_tol { 1e-14 } }.with_derivative(df)(f, 1.0);
+        const auto e = r::brent { nxx::width_tol { 1e-12, nxx::rel_tolerance { 1e-10 } } }(f, { 1.0, 2.0 });
         const auto g = r::bisection {}.with_stop(nxx::floored_width { 40 } || nxx::f_tol { 1e-9 }).with_budget(200)(f, { 1.0, 2.0 });
         const auto h = r::secant {}.with_stop(nxx::step_tol<1, 2> {} || nxx::f_tol { 1e-12 })(f, 1.0);
 
         // Run-time tolerances go through make().
-        const auto tol = nxx::width_tol<double>::make(1e-9, 0.0);
+        const auto tol = nxx::width_tol<double>::make(1e-9);
         const bool i   = tol && r::bisection { *tol }(f, { 1.0, 2.0 }).has_value();
         return a.has_value() && b.has_value() && c.has_value() && d.has_value() && e.has_value() && g.has_value() && h.has_value() && i;
     }

@@ -332,3 +332,86 @@ one.
   `then(expand, brent)` and Newton, on tan, with stage 2 never run).
   With the `then` pole case above, `gcc`, `gcc-noexcept` and `clang` run 299 CTest tests (2 added), `msvc` 297,
   `gcc-multiprecision` 310 (2 added).
+- Changed: the mixed criteria `x_tol` and `width_tol` name their relative part, so the two numbers can no longer be
+  swapped. One number is absolute, `width_tol{1e-10}`; mixed is `width_tol{1e-10, nxx::rel_tolerance{1e-8}}` and
+  purely relative `width_tol{0.0, nxx::rel_tolerance{1e-8}}` (the same for `x_tol`), each the same (abs, rel) pair
+  as the old positional `width_tol{abs, rel}`, so no threshold changes. The two-number literal (`width_tol{1e-10, 1e-8}`,
+  also with run-time numbers) is deleted with "say which number is relative: …", and a part alone
+  (`width_tol{nxx::rel_tolerance{1e-8}}`, `width_tol{nxx::abs_tolerance{1e-10}}`) with "a part alone is not a
+  criterion: …", which names both spellings and their run-time paths; the second was a deduction failure with no
+  reason. At run time `make(T, T)` is deleted with a reason that names the direct remedy, "say which number is
+  relative: make(a, *rel) with rel = rel_tolerance<T>::make(r); make(a) for an absolute tolerance"; `make(abs)` is
+  added (finite and > 0, as `tolerance<T>::make`), `make(abs, rel_tolerance<T>)` mirrors the mixed literal and checks
+  the absolute part in-band (finite and >= 0), and `make(abs_tolerance<T>, rel_tolerance<T>)` delegates to it; every
+  failure is `invalid_input`. The mixed literal constructor is consteval, and cl 19.51 lacks P2564, so generic code
+  that forwards the parts calls `make` (DESIGN §6.2 FLAG). bisection's reason for `x_tol` and brent's for a criterion
+  that is not a width criterion now quote `width_tol{abs}, width_tol{abs, nxx::rel_tolerance{rel}} or floored_width{}`
+  (DESIGN §3.3, §6.2, §6.8, §6.14 calls 13 and 14, §12.20 decisions 3 and 4, §12.21 items 4 and 5, §12.24).
+- Added: a validated tolerance takes a relative part, `width_tol{*tol, *rel}` and `x_tol{*tol, *rel}` with `tol` a
+  `tolerance<T>`, as a literal or with run-time values, and `make(tolerance<T>, rel_tolerance<T>)`. A `tolerance<T>`
+  is finite and > 0, so the constructor checks nothing and is constexpr: it forwards through a constexpr template on
+  cl too, and `make` cannot fail. Before, every way of adding a relative part to a validated tolerance failed with
+  only the compiler's error (106 lines on GCC 16.1 for the literal). A literal with a `float` relative part,
+  `width_tol{1e-10, nxx::rel_tolerance{1e-8f}}`, builds a `float` criterion and narrows the absolute part (to 0 below
+  about 7e-46), with a warning only under `-Wconversion` on GCC and Clang: write both parts in one type (DESIGN §6.2,
+  §12.24).
+- Tests for these changes: the compile-fail cases `width_tol_two_numbers`, `x_tol_two_numbers`,
+  `width_tol_make_two_numbers` (whose EXPECT names `make(a, *rel)`) and `width_tol_relative_alone`, each with its
+  reason; `x_tol_zero_zero` rewritten to `x_tol{0.0, nxx::rel_tolerance{0.0}}`, and `rel_tolerance_as_tolerance`,
+  which now reaches the part-alone reason (35 / 33 diagnostic lines to 15 / 13 on GCC 16.1, 20 / 19 to 8 / 7 on
+  Clang 22.1.8); doctest cases in `tests/core/test_refined.cpp` (`make(a, *rel)` for a valid and a negative `a`,
+  generic code that forwards the parts through `make`, a validated tolerance with a relative part as a literal, with
+  explicit T, through `make`, forwarded and at run time, and concept and `is_constructible` tests for two numbers, a
+  part alone, swapped roles, two tolerances and `make`) besides the rewritten literal and `make` case; the
+  refined-forwarding case in the P2564 probe; canonical calls 13 and 14 in `tests/usage/canonical_calls.cpp`, call 13
+  also with `width_tol{*abs, *rel}`; and two `cpp_bin_float_50` cases. The tests, the quick tour and the determinism
+  table use the new spellings; the table's labels and values are unchanged.
+- A validated tolerance, or one of its parts, given to a solver's constructor gets a reason. `brent{*tol}` and
+  `bisection{*tol}`, with `tol` a `tolerance<double>` from `make()`, failed class template argument deduction with no
+  reason (104 lines on GCC 16 and 59 on Clang 22 for bisection); they now report it in the first error (13 / 11 lines
+  on GCC 16.1, 8 / 7 on Clang 22.1.8). No new deletion: the bare-number deletions of `brent`, `bisection`, `secant`
+  and `newton`, and brent's deduction guide, now take `tolerance<T>`, `abs_tolerance<T>` and `rel_tolerance<T>` too,
+  read from one trait, and the text gains the remedies: "…; a validated tolerance is not a criterion either; wrap it:
+  brent{nxx::width_tol{*tol}}; a part (abs_tolerance, rel_tolerance) is not one either: build the criterion with
+  nxx::width_tol<T>::make" (secant and newton name `x_tol`). A solver whose criterion type converts from a tolerance
+  still takes one, `brent<width_tol<double>>{*tol}` (DESIGN §6.6, §7.2, §12.20 decision 12, §12.21 item 2).
+- `with_stop` given something that is not a criterion, a number (`with_stop(1e-10)`), a validated tolerance or a part,
+  got the false reason "this criterion does not apply to this solver …". A deleted sibling now says "with_stop takes a
+  criterion, not a number or a validated tolerance: wrap it in the test you mean: width_tol{*tol} (bisection; brent
+  takes its width in its constructor) bounds the error in x; x_tol{*tol} (open methods) bounds only the last step in
+  x; f_tol{*tol} bounds only |f(x)|; …", and the criterion catch-all keeps its reason for criteria that do not apply.
+  On Clang 22.1.8 the `with_stop` misuse cases list the new overload among their candidates (26 / 25 to 32 / 31
+  lines); GCC's counts are unchanged (DESIGN §6.6, §12.21 item 3).
+- A curried solver given a function it cannot take, `brent{}.on({1.0, 2.0})(g)`, gets a reason: "this solver cannot
+  take this function with its bound input: call solver(f, input) for the reason". It was Clang's bare "no matching
+  function for call to object of type 'bound<…>'" (GCC showed the facade's reason at line 33 of 41); `std::is_invocable_v`
+  stays `false` (DESIGN §6.6).
+- Tests for these changes: the compile-fail cases `brent_validated_tolerance` (through brent's guide),
+  `bisection_validated_tolerance` (through the implicit guide), `bisection_with_stop_tolerance` and
+  `bound_wrong_function`, each with its reason; static asserts in `tests/roots/test_solvers.cpp` that the four solvers
+  reject a tolerance and both parts, that a solver over `width_tol` or `x_tol` still takes a tolerance but not a part,
+  that `with_stop` on bisection, brent, secant, newton and expand rejects a number, a tolerance and a part while each
+  remedy the text names compiles where it names it, and that a curried solver is not invocable with a wrong function;
+  a doctest case that solves with each remedy from run-time tolerances; and `cpp_bin_float_50` static asserts (each of
+  the four solvers rejects a tolerance and both parts, each over `width_tol` or `x_tol` takes a tolerance, bisection
+  and secant over those reject a part, and `with_stop` on bisection, secant and brent) and a case. The existing
+  `*_number_tolerance` and `with_stop` cases pass with unchanged regexes.
+- Tests added by the test audit of this PR (DESIGN §6.2, §7.2): the compile-fail cases `x_tol_abs_part_alone` (the
+  `x_tol` copy of the part-alone text, and the only case that reaches its `abs_tolerance` path, §12.21 item 5),
+  `width_tol_zero_zero`, `width_tol_negative_abs_literal` and `width_tol_runtime_parts`, each with a control; the
+  EXPECT of the two-number and part-alone cases now includes the criterion's name, and those four deletion cases spell
+  the failing line as a plain variable, so that cl reports C2280 at the declaration rather than only C2131; and
+  `is_constructible` checks that the legal mixed spellings stay constructible.
+- The defaults are now checked achievable as the solvers use them, and in `cpp_bin_float_50` too (DESIGN §3.5, A1).
+  A `TEST_CASE_TEMPLATE` in `tests/roots/test_solvers.cpp` reads each solver's own default criterion
+  (`bisection<>{}.options().stop`, `brent<>{}.tolerance()`, `newton<>{}.options().stop`, `secant<>{}.options().stop`)
+  and `static_assert`s that its thresholds are >= 4 eps for `float`, `double` and `long double`; the checks on
+  `floored_width` and `step_tol` themselves passed with an unachievable solver default (with Newton's default changed to
+  `step_tol<99, 100>`, the new asserts fail). `cpp_bin_float_50` is not a literal type, so a run-time case in the
+  multiprecision test binary reads the same defaults at 0, 1 and 10^6 and compares them with 4 eps computed at run
+  time (4 eps · 10^6 at 10^6). It also checks that the comparison rejects a threshold below 4 eps (`step_tol<99, 100>`,
+  2^-167 at 168 digits); without the 4 eps floor in `floored_width::factor`, 6 of its 14 checks fail (DESIGN §12.21
+  item 11).
+- With the changes of this PR, all 12 presets pass from a fresh configure: `gcc`, `gcc-noexcept`, `clang`,
+  `clang-asan`, `clang-cl` and the four Emscripten presets run 333 CTest tests (34 added), `msvc` 331,
+  `gcc-multiprecision` 348 (38 added) and `integration` 8.

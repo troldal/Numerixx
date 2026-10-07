@@ -1,5 +1,5 @@
 // Compile-fail (DESIGN §3.3 tier A, §6.2): a rel_tolerance where a tolerance is expected. The roles are distinct types,
-// not interchangeable.
+// not interchangeable; a part alone reaches the reasoned deletion of x_tol.
 #include <numerixx/core.hpp>
 
 int main()

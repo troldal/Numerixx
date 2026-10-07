@@ -13,6 +13,7 @@
 #include <numerixx/core/scalar.hpp>
 
 #include <algorithm>
+#include <concepts>
 #include <cstdint>
 #include <expected>
 #include <limits>
@@ -177,7 +178,7 @@ namespace nxx
         { return tag::abs_tolerance::check(abs) && tag::rel_tolerance::check(rel) && (abs > T(0) || rel > T(0)); }
 
         // abs + rel_part (rel_part = rel * s >= 0), saturated at the largest finite value instead of overflowing to inf.
-        // An overflowing sum accepted an infinite width: width_tol{1.7e308, 0.5} on [-1.7e308, 1.7e308] computed
+        // An overflowing sum accepted an infinite width: width_tol{1.7e308, nxx::rel_tolerance{0.5}} on [-1.7e308, 1.7e308] computed
         // 2.55e308 and 3.4e308 as inf, and inf <= inf (brent then stopped before its first step, since tol1 = inf / 2).
         // The test uses halves, which cannot overflow and round like the full sum (scaling by 2 is exact), so it
         // saturates exactly when the rounded sum would overflow, and every other sum is computed as before. An abs that
@@ -191,6 +192,13 @@ namespace nxx
     }    // namespace detail
 
     // |x_k - x_{k-1}| <= abs + rel * |x_k|. Open methods and systems only.
+    //
+    // Role-typed (DESIGN §6.2): one number is absolute, x_tol{1e-10}; the relative part is always named, mixed
+    // x_tol{1e-10, nxx::rel_tolerance{1e-8}} and purely relative x_tol{0.0, nxx::rel_tolerance{1e-8}}, so the roles
+    // cannot be swapped. A validated tolerance<T> takes a relative part too, x_tol{*tol, *rel}, also at run time. Two
+    // bare numbers, and a part alone, are deleted with reasons. At run time: make(abs), make(abs, rel_tolerance),
+    // make(abs_tolerance, rel_tolerance) and make(tolerance, rel_tolerance). The mixed literal constructor is consteval,
+    // and cl 19.51 lacks P2564, so generic code that forwards the parts calls make() (§6.2 FLAG).
     template<real T>
     class x_tol : public criterion_base
     {
@@ -204,23 +212,70 @@ namespace nxx
 
         constexpr x_tol(tolerance<T> a) noexcept : abs_(a.value()), rel_(T(0)) {}
 
-        // x_tol{0.0, 1e-8} (purely relative) is legal; x_tol{0.0, 0.0} is not.
-        consteval x_tol(T a, T r) : abs_(a), rel_(r)
+        // The parts are checked by their own literals (abs finite and >= 0, 0 <= rel < 1); only the joint invariant is
+        // left: x_tol{0.0, nxx::rel_tolerance{1e-8}} (purely relative) is legal, x_tol{0.0, nxx::rel_tolerance{0.0}} is
+        // not. R is a template so that a bare number never converts into the relative part.
+        template<class R>
+            requires detail::is_rel_v<R, T>
+        consteval x_tol(abs_tolerance<T> a, R r) : abs_(a.value()),
+                                                   rel_(r.value())
         {
-            if (!detail::mixed_tolerance_ok(a, r))
+            if (!(abs_ > T(0) || rel_ > T(0)))
                 detail::literal_violates_invariant("x_tol needs abs >= 0, 0 <= rel < 1, and abs > 0 or rel > 0");
         }
 
-        static constexpr auto make(T a, T r) noexcept -> std::expected<x_tol, errc>
+        // A validated absolute tolerance with a relative part (DESIGN §6.2, §12.24): tolerance<T> is finite and > 0, so
+        // the joint invariant holds and nothing is left to check. constexpr, not consteval, so it takes run-time values
+        // and forwards on cl. A is a template so that a bare number never converts into tolerance<T> here, which would
+        // make {1e-10, nxx::rel_tolerance{1e-8}} ambiguous with the mixed literal.
+        template<class A, class R>
+            requires(std::same_as<std::remove_cvref_t<A>, tolerance<T>> && detail::is_rel_v<R, T>)
+        constexpr x_tol(A a, R r) noexcept : abs_(a.value()),
+                                             rel_(r.value())
+        {}
+
+        template<class A, class B>
+            requires(detail::is_bare_number_v<A> && detail::is_bare_number_v<B>)
+        x_tol(A, B) NXX_DELETE("say which number is relative: x_tol{1e-10, nxx::rel_tolerance{1e-8}}; purely relative: "
+                               "x_tol{0.0, nxx::rel_tolerance{1e-8}}; one number is absolute: x_tol{1e-10}");
+
+        template<class R>
+            requires detail::is_tolerance_part_v<std::remove_cvref_t<R>>
+        x_tol(R) NXX_DELETE("a part alone is not a criterion: x_tol{a} is absolute (x_tol<T>::make(a) for a number a at run time); "
+                            "x_tol{0.0, nxx::rel_tolerance{r}} is purely relative (make(0.0, *rel) at run time)");
+
+        // An absolute tolerance: finite and > 0, as tolerance<T>::make checks.
+        static constexpr auto make(T a) noexcept -> std::expected<x_tol, errc>
         {
-            if (!detail::mixed_tolerance_ok(a, r)) return std::unexpected(errc::invalid_input);
-            return x_tol { detail::trust_me {}, a, r };
+            if (!tag::positive_tolerance::check(a)) return std::unexpected(errc::invalid_input);
+            return x_tol { detail::trust_me {}, a, T(0) };
         }
 
-        // The same, from validated role types (a configuration holds abs_tolerance and rel_tolerance, so the roles
-        // cannot be swapped); only the joint invariant abs > 0 || rel > 0 is left to check.
-        static constexpr auto make(abs_tolerance<T> a, rel_tolerance<T> r) noexcept -> std::expected<x_tol, errc>
-        { return make(a.value(), r.value()); }
+        // The run-time mirror of the literal x_tol{a, nxx::rel_tolerance{r}}: the absolute part is checked in-band
+        // (finite and >= 0), with the joint invariant abs > 0 || rel > 0.
+        template<class R>
+            requires detail::is_rel_v<R, T>
+        static constexpr auto make(T a, R r) noexcept -> std::expected<x_tol, errc>
+        {
+            if (!detail::mixed_tolerance_ok(a, r.value())) return std::unexpected(errc::invalid_input);
+            return x_tol { detail::trust_me {}, a, r.value() };
+        }
+
+        // The same, from validated role types (a configuration holds abs_tolerance and rel_tolerance).
+        template<class R>
+            requires detail::is_rel_v<R, T>
+        static constexpr auto make(abs_tolerance<T> a, R r) noexcept -> std::expected<x_tol, errc>
+        { return make(a.value(), r); }
+
+        // From a validated absolute tolerance: it cannot fail (tolerance<T> is finite and > 0). It returns std::expected
+        // like the two-argument make forms; there is no one-argument make for a validated value (DESIGN §6.2).
+        template<class A, class R>
+            requires(std::same_as<std::remove_cvref_t<A>, tolerance<T>> && detail::is_rel_v<R, T>)
+        static constexpr auto make(A a, R r) noexcept -> std::expected<x_tol, errc>
+        { return x_tol { a, r }; }
+
+        static void make(T, T) NXX_DELETE("say which number is relative: make(a, *rel) with rel = rel_tolerance<T>::make(r); "
+                                          "make(a) for an absolute tolerance");
 
         constexpr T abs() const noexcept { return abs_; }
         constexpr T rel() const noexcept { return rel_; }
@@ -237,8 +292,20 @@ namespace nxx
 
     template<real T>
     x_tol(T) -> x_tol<T>;
+    template<class A, real T>
+        requires detail::is_bare_number_v<A>
+    x_tol(A, rel_tolerance<T>) -> x_tol<T>;
     template<real T>
-    x_tol(T, T) -> x_tol<T>;
+    x_tol(abs_tolerance<T>, rel_tolerance<T>) -> x_tol<T>;
+    template<real T>
+    x_tol(tolerance<T>, rel_tolerance<T>) -> x_tol<T>;
+    // So that the deleted constructors report their reasons, not CTAD.
+    template<class A, class B>
+        requires(detail::is_bare_number_v<A> && detail::is_bare_number_v<B>)
+    x_tol(A, B) -> x_tol<detail::bare_scalar_t<A>>;
+    template<class R>
+        requires detail::is_tolerance_part_v<R>
+    x_tol(R) -> x_tol<typename R::value_type>;
 
     // |dx| <= 2^-ceil(p * Num / Den) * max(|x|, 1), p = digits of T: the open-method defaults (Newton step_tol<3, 5>,
     // secant step_tol<7, 10>). The absolute floor at scale 1 lets a root at 0 terminate.
@@ -262,7 +329,8 @@ namespace nxx
     };
 
     // hi - lo <= abs + rel * min(|lo|, |hi|): every point of the enclosure, the returned x included, is within
-    // tolerance. Bracketing methods only.
+    // tolerance. Bracketing methods only. Role-typed like x_tol (DESIGN §6.2): width_tol{1e-10} is absolute,
+    // width_tol{1e-10, nxx::rel_tolerance{1e-8}} mixed, width_tol{0.0, nxx::rel_tolerance{1e-8}} purely relative.
     template<real T>
     class width_tol : public criterion_base
     {
@@ -276,22 +344,69 @@ namespace nxx
 
         constexpr width_tol(tolerance<T> a) noexcept : abs_(a.value()), rel_(T(0)) {}
 
-        consteval width_tol(T a, T r) : abs_(a), rel_(r)
+        // The parts are already checked by their literals; only the joint invariant is left.
+        template<class R>
+            requires detail::is_rel_v<R, T>
+        consteval width_tol(abs_tolerance<T> a, R r) : abs_(a.value()),
+                                                       rel_(r.value())
         {
-            if (!detail::mixed_tolerance_ok(a, r))
+            if (!(abs_ > T(0) || rel_ > T(0)))
                 detail::literal_violates_invariant("width_tol needs abs >= 0, 0 <= rel < 1, and abs > 0 or rel > 0");
         }
 
-        static constexpr auto make(T a, T r) noexcept -> std::expected<width_tol, errc>
+        // A validated absolute tolerance with a relative part (DESIGN §6.2, §12.24): tolerance<T> is finite and > 0, so
+        // the joint invariant holds and nothing is left to check. constexpr, not consteval, so it takes run-time values
+        // and forwards on cl. A is a template so that a bare number never converts into tolerance<T> here, which would
+        // make {1e-10, nxx::rel_tolerance{1e-8}} ambiguous with the mixed literal.
+        template<class A, class R>
+            requires(std::same_as<std::remove_cvref_t<A>, tolerance<T>> && detail::is_rel_v<R, T>)
+        constexpr width_tol(A a, R r) noexcept : abs_(a.value()),
+                                                 rel_(r.value())
+        {}
+
+        template<class A, class B>
+            requires(detail::is_bare_number_v<A> && detail::is_bare_number_v<B>)
+        width_tol(A, B) NXX_DELETE("say which number is relative: width_tol{1e-10, nxx::rel_tolerance{1e-8}}; purely relative: "
+                                   "width_tol{0.0, nxx::rel_tolerance{1e-8}}; one number is absolute: width_tol{1e-10}");
+
+        template<class R>
+            requires detail::is_tolerance_part_v<std::remove_cvref_t<R>>
+        width_tol(R) NXX_DELETE("a part alone is not a criterion: width_tol{a} is absolute "
+                                "(width_tol<T>::make(a) for a number a at run time); "
+                                "width_tol{0.0, nxx::rel_tolerance{r}} is purely relative (make(0.0, *rel) at run time)");
+
+        // An absolute tolerance: finite and > 0, as tolerance<T>::make checks.
+        static constexpr auto make(T a) noexcept -> std::expected<width_tol, errc>
         {
-            if (!detail::mixed_tolerance_ok(a, r)) return std::unexpected(errc::invalid_input);
-            return width_tol { detail::trust_me {}, a, r };
+            if (!tag::positive_tolerance::check(a)) return std::unexpected(errc::invalid_input);
+            return width_tol { detail::trust_me {}, a, T(0) };
         }
 
-        // The same, from validated role types (a configuration holds abs_tolerance and rel_tolerance, so the roles
-        // cannot be swapped); only the joint invariant abs > 0 || rel > 0 is left to check.
-        static constexpr auto make(abs_tolerance<T> a, rel_tolerance<T> r) noexcept -> std::expected<width_tol, errc>
-        { return make(a.value(), r.value()); }
+        // The run-time mirror of the literal width_tol{a, nxx::rel_tolerance{r}}: the absolute part is checked in-band
+        // (finite and >= 0), with the joint invariant abs > 0 || rel > 0.
+        template<class R>
+            requires detail::is_rel_v<R, T>
+        static constexpr auto make(T a, R r) noexcept -> std::expected<width_tol, errc>
+        {
+            if (!detail::mixed_tolerance_ok(a, r.value())) return std::unexpected(errc::invalid_input);
+            return width_tol { detail::trust_me {}, a, r.value() };
+        }
+
+        // The same, from validated role types (a configuration holds abs_tolerance and rel_tolerance).
+        template<class R>
+            requires detail::is_rel_v<R, T>
+        static constexpr auto make(abs_tolerance<T> a, R r) noexcept -> std::expected<width_tol, errc>
+        { return make(a.value(), r); }
+
+        // From a validated absolute tolerance: it cannot fail (tolerance<T> is finite and > 0). It returns std::expected
+        // like the two-argument make forms; there is no one-argument make for a validated value (DESIGN §6.2).
+        template<class A, class R>
+            requires(std::same_as<std::remove_cvref_t<A>, tolerance<T>> && detail::is_rel_v<R, T>)
+        static constexpr auto make(A a, R r) noexcept -> std::expected<width_tol, errc>
+        { return width_tol { a, r }; }
+
+        static void make(T, T) NXX_DELETE("say which number is relative: make(a, *rel) with rel = rel_tolerance<T>::make(r); "
+                                          "make(a) for an absolute tolerance");
 
         constexpr T abs() const noexcept { return abs_; }
         constexpr T rel() const noexcept { return rel_; }
@@ -314,8 +429,20 @@ namespace nxx
 
     template<real T>
     width_tol(T) -> width_tol<T>;
+    template<class A, real T>
+        requires detail::is_bare_number_v<A>
+    width_tol(A, rel_tolerance<T>) -> width_tol<T>;
     template<real T>
-    width_tol(T, T) -> width_tol<T>;
+    width_tol(abs_tolerance<T>, rel_tolerance<T>) -> width_tol<T>;
+    template<real T>
+    width_tol(tolerance<T>, rel_tolerance<T>) -> width_tol<T>;
+    // So that the deleted constructors report their reasons, not CTAD.
+    template<class A, class B>
+        requires(detail::is_bare_number_v<A> && detail::is_bare_number_v<B>)
+    width_tol(A, B) -> width_tol<detail::bare_scalar_t<A>>;
+    template<class R>
+        requires detail::is_tolerance_part_v<R>
+    width_tol(R) -> width_tol<typename R::value_type>;
 
     // w <= max(2^(1 - bits), 4 eps) * max(1, min(|lo|, |hi|)): the default tolerance of bracketing methods. The
     // absolute floor at scale 1 makes roots at 0 terminate. bits defaults to the digits of T.
