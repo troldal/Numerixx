@@ -1,0 +1,95 @@
+name: ci
+
+on:
+  push:
+    branches: [dev, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gcc:
+    runs-on: ubuntu-latest
+    container: gcc:16
+    env:
+      CPM_SOURCE_CACHE: /__w/.cpm
+    steps:
+      - run: apt-get update && apt-get install -y cmake ninja-build
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v4
+        with:
+          path: /__w/.cpm
+          key: cpm-gcc-${{ hashFiles('tests/CMakeLists.txt') }}
+      - run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+      - run: cmake --build build
+      - run: ctest --test-dir build --output-on-failure
+
+  clang:
+    runs-on: ubuntu-26.04
+    env:
+      CPM_SOURCE_CACHE: ${{ github.workspace }}/.cpm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v4
+        with:
+          path: .cpm
+          key: cpm-clang-${{ hashFiles('tests/CMakeLists.txt') }}
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang-22 libc++-22-dev libc++abi-22-dev
+      - run: >
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++-22
+          -DCMAKE_CXX_FLAGS=-stdlib=libc++ -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++
+      - run: cmake --build build
+      - run: ctest --test-dir build --output-on-failure
+
+  windows:
+    runs-on: windows-2025-vs2026
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [cl, clang-cl]
+    env:
+      CPM_SOURCE_CACHE: 'C:\cpm' # short on purpose: long paths lose files silently (MAX_PATH)
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v4
+        with:
+          path: 'C:\cpm'
+          key: cpm-windows-${{ hashFiles('tests/CMakeLists.txt') }}
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+      - run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=${{ matrix.compiler }}
+      - run: cmake --build build
+      - run: ctest --test-dir build --output-on-failure
+
+  emscripten:
+    runs-on: ubuntu-26.04
+    env:
+      CPM_SOURCE_CACHE: ${{ github.workspace }}/.cpm
+      EMSDK_VERSION: '6.0.10'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v4
+        with:
+          path: ~/emsdk
+          key: emsdk-${{ env.EMSDK_VERSION }}
+      - uses: actions/cache@v4
+        with:
+          path: .cpm
+          key: cpm-emscripten-${{ hashFiles('tests/CMakeLists.txt') }}
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - run: |
+          [ -d ~/emsdk ] || git clone --depth 1 https://github.com/emscripten-core/emsdk.git ~/emsdk
+          ~/emsdk/emsdk install "$EMSDK_VERSION"
+          ~/emsdk/emsdk activate "$EMSDK_VERSION"
+      - run: |
+          source ~/emsdk/emsdk_env.sh
+          emcmake cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build
+          ctest --test-dir build --output-on-failure

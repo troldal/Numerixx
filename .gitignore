@@ -40,3 +40,8 @@ out/
 
 # IDEs and editors
 .vs/
+
+# IDE and local build state
+.idea/
+build/
+.cpm/
