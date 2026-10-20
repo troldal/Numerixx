@@ -45,3 +45,6 @@ out/
 .idea/
 build/
 .cpm/
+
+# Throwaway prototypes
+.scratch/
