@@ -12,8 +12,12 @@ namespace nxx {
 
     /// A real-number type: a built-in floating-point type, or a user type that specialises std::numeric_limits and
     /// provides the arithmetic operators.
+    ///
+    /// The type must be bounded and inexact, like a floating-point type: the algorithms rely on a finite max() and a
+    /// positive epsilon(). Exact types such as rationals are rejected.
     template<typename T>
     concept real = std::numeric_limits<T>::is_specialized && !std::numeric_limits<T>::is_integer
+                   && std::numeric_limits<T>::is_bounded && !std::numeric_limits<T>::is_exact
                    && std::constructible_from<T, int> && std::totally_ordered<T> && requires(T const a, T const b) {
                           { a + b } -> std::convertible_to<T>;
                           { a - b } -> std::convertible_to<T>;

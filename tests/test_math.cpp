@@ -2,6 +2,7 @@
 
 #include <boost/multiprecision/cpp_bin_float.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
 #include <doctest/doctest.h>
 
 #include <cmath>
@@ -16,6 +17,8 @@ using dec50 = mp::cpp_dec_float_50;
 static_assert(nxx::real<float> && nxx::real<double> && nxx::real<long double>);
 static_assert(nxx::real<bin50> && nxx::real<bin50_et> && nxx::real<dec50>);
 static_assert(!nxx::real<int> && !nxx::real<unsigned>);
+// Exact and unbounded: epsilon is 0 and max is not a bound, so cbrt_epsilon and isfinite would be meaningless.
+static_assert(!nxx::real<mp::cpp_rational>);
 
 static_assert(nxx::math::abs(-2.5) == 2.5 && nxx::math::abs(2.5) == 2.5 && nxx::math::abs(0.0) == 0.0);
 static_assert(nxx::math::isfinite(0.0) && nxx::math::isfinite(std::numeric_limits<double>::max()));

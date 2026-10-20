@@ -36,6 +36,26 @@ static_assert(derivative(square, 3.0, 0.5) == 6.0);
 static_assert(derivative(cube, 2.0, 0.25) == 12.0 + 0.0625);
 static_assert(nxx::math::abs(*derivative(cube, 2.0) - 12.0) < 1e-8);
 
+// Failures are error values in constant expressions too: they are detected before the arithmetic that would produce
+// an infinity or a NaN.
+namespace {
+
+    constexpr double dmax = std::numeric_limits<double>::max();
+    constexpr auto half = [](double x) { return x / 2; };
+    constexpr auto infinite = [](double) { return std::numeric_limits<double>::infinity(); };
+    constexpr auto not_a_number = [](double) { return std::numeric_limits<double>::quiet_NaN(); };
+    constexpr auto non_finite = std::unexpected(nxx::deriv::error::non_finite);
+
+} // namespace
+
+static_assert(derivative(infinite, 1.0, 0.5) == non_finite); // inf - inf is never formed
+static_assert(derivative(not_a_number, 1.0, 0.5) == non_finite);
+static_assert(derivative(cube, 1.0, 1e-300) == non_finite); // x + h == x - h == x: no division by zero
+static_assert(derivative(half, 0.0, dmax) == non_finite); // the distance between x +- h would overflow
+static_assert(derivative(half, dmax, 1.0) == non_finite); // x + h == x - h == max
+static_assert(derivative(half, -dmax * 0.9, dmax / 5) == non_finite); // x - h would overflow
+static_assert(derivative(half, 0.0, dmax / 8) == 0.5); // large but representable steps still work
+
 // Integer arguments are not real numbers.
 template<typename X>
 concept differentiable_at = requires(X x) { derivative(square, x); };
@@ -106,4 +126,17 @@ TEST_CASE("deriv: a non-finite estimate is an error")
         return x < 0.0 ? -std::numeric_limits<double>::max() : std::numeric_limits<double>::max();
     };
     CHECK(derivative(huge, 0.0, 0.5) == std::unexpected(nxx::deriv::error::non_finite)); // the difference overflows
+
+    // Before the fix, the distance between the points overflowed to infinity and the result was a successful 0.
+    CHECK(derivative(half, 0.0, dmax) == std::unexpected(nxx::deriv::error::non_finite));
+
+    // fn is not called at a point that would overflow, nor when h is below the resolution of x.
+    int calls = 0;
+    auto const counted = [&calls](double x) {
+        ++calls;
+        return x;
+    };
+    CHECK(derivative(counted, dmax, 1.0) == std::unexpected(nxx::deriv::error::non_finite));
+    CHECK(derivative(counted, 1.0, 1e-300) == std::unexpected(nxx::deriv::error::non_finite));
+    CHECK(calls == 0);
 }

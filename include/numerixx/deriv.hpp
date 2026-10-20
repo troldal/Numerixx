@@ -7,12 +7,15 @@
 #include <cassert>
 #include <concepts>
 #include <expected>
+#include <limits>
 #include <type_traits>
 
 namespace nxx::deriv {
 
     enum class error {
-        non_finite ///< The estimate is infinite or NaN: fn returned a non-finite value, or the difference overflowed.
+        /// No finite estimate: fn returned an infinite or NaN value, the difference or the quotient overflowed, x + h
+        /// or x - h would overflow, or h is below the resolution of x.
+        non_finite
     };
 
     namespace detail {
@@ -30,19 +33,29 @@ namespace nxx::deriv {
 
     /// The derivative of fn at x by the central difference (fn(x + h) - fn(x - h)) / 2h, with error O(h^2).
     ///
-    /// fn is called twice. The divisor is the distance between the two points actually evaluated, since x + h and
-    /// x - h are rounded. Precondition: h > 0.
+    /// fn is called twice, and only at finite points. The divisor is the distance between the two points actually
+    /// evaluated, since x + h and x - h are rounded. Precondition: h > 0.
+    ///
+    /// The function never throws by itself; an exception thrown by fn or by T's operations passes through unchanged.
+    /// Failures are checked before the arithmetic that would produce them, so they are also error values in constant
+    /// expressions, except an overflow of the final difference or quotient, which GCC rejects at compile time.
     template<real T, typename F>
     requires std::invocable<F &, T const &> && std::convertible_to<std::invoke_result_t<F &, T const &>, T>
     [[nodiscard]] constexpr std::expected<T, error> derivative(F &&fn, T const &x, std::type_identity_t<T> const &h)
     {
         assert(h > T(0));
+        // With |x| + 2h <= max, the points and their distance are finite, so nothing overflows before fn is called.
+        T const largest = (std::numeric_limits<T>::max)();
+        if (!(h <= largest / T(4) && math::abs(x) <= largest - T(2) * h)) return std::unexpected(error::non_finite);
         T const xp = x + h;
         T const xm = x - h;
+        T const dx = xp - xm;
+        if (dx == T(0)) return std::unexpected(error::non_finite); // h is below the resolution of x
         T const fp = static_cast<T>(fn(xp));
         T const fm = static_cast<T>(fn(xm));
-        T const d = (fp - fm) / (xp - xm);
-        if (!math::isfinite(d)) return std::unexpected(error::non_finite);
+        if (!math::isfinite(fp) || !math::isfinite(fm)) return std::unexpected(error::non_finite);
+        T const d = (fp - fm) / dx;
+        if (!math::isfinite(d)) return std::unexpected(error::non_finite); // the difference or the quotient overflowed
         return d;
     }
 

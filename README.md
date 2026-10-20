@@ -1,8 +1,9 @@
 # Numerixx
 
 A header-only C++23 library of numerical methods, in the spirit of GSL: small algorithms that combine, work with any
-real type (including Boost.Multiprecision) and run in constant expressions. Nothing throws; results are
-`std::expected`.
+real type (including Boost.Multiprecision) and run in constant expressions. Numerixx itself never throws or catches:
+failures are returned as `std::expected`, and an exception thrown by your callback or your number type passes through
+unchanged.
 
 Numerixx 2 is in development on the `dev` branch and currently provides numerical derivatives. Numerixx 1.x is at the
 tag `v1.1.0-legacy`.
