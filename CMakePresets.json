@@ -1,0 +1,77 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "windows",
+      "hidden": true,
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "clang-cl",
+      "displayName": "clang-cl + MSVC STL",
+      "inherits": "windows",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "clang-cl"
+      }
+    },
+    {
+      "name": "cl",
+      "displayName": "MSVC",
+      "inherits": "windows",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "cl"
+      }
+    },
+    {
+      "name": "gcc",
+      "displayName": "GCC",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    },
+    {
+      "name": "clang",
+      "displayName": "Clang",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "clang++"
+      }
+    },
+    {
+      "name": "emscripten",
+      "displayName": "Emscripten",
+      "inherits": "base",
+      "toolchainFile": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake"
+    }
+  ],
+  "buildPresets": [
+    { "name": "clang-cl", "configurePreset": "clang-cl" },
+    { "name": "cl", "configurePreset": "cl" },
+    { "name": "gcc", "configurePreset": "gcc" },
+    { "name": "clang", "configurePreset": "clang" },
+    { "name": "emscripten", "configurePreset": "emscripten" }
+  ],
+  "testPresets": [
+    { "name": "base", "hidden": true, "output": { "outputOnFailure": true } },
+    { "name": "clang-cl", "inherits": "base", "configurePreset": "clang-cl" },
+    { "name": "cl", "inherits": "base", "configurePreset": "cl" },
+    { "name": "gcc", "inherits": "base", "configurePreset": "gcc" },
+    { "name": "clang", "inherits": "base", "configurePreset": "clang" },
+    { "name": "emscripten", "inherits": "base", "configurePreset": "emscripten" }
+  ]
+}

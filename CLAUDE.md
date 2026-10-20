@@ -6,32 +6,36 @@ as in the STL. Numerixx 1.x is at the tag `v1.1.0-legacy`.
 
 ## Goal and success criteria
 
-Current milestone: numerical derivatives of a scalar function (`nxx::deriv`). An item is done when its `static_assert`
-and run-time tests pass on every toolchain below, locally and in CI.
-- [x] Central difference with a default step, on `double` and Boost.Multiprecision (29ba464, CI run 39437081443)
-- [ ] Higher-order central stencils, and forward and backward stencils
-- [ ] Ridders' extrapolation with an error estimate
-- [ ] Second derivatives
+Current milestone: numerical derivatives of a scalar function (`nxx::deriv`). Its phases and checkboxes are in
+`docs/plan.md`; a phase is done when its `static_assert` and run-time tests pass on every toolchain below, locally and
+in CI.
 
 ## Layout
 
 - `include/numerixx/` public headers; the library is header-only, so there is no `src/`
 - `tests/` doctest, with standalone Boost.Multiprecision for the multiprecision cases
 - `cmake/CPM.cmake` fetches the test dependencies; the library itself has none
-- `.github/workflows/ci.yml` CI on GCC, Clang with libc++, MSVC, clang-cl and Emscripten
+- `CMakePresets.json` one preset per toolchain, used locally and in CI (`.github/workflows/ci.yml`)
+- `docs/plan.md` current plan; `docs/design.md` design decisions
 
 ## Build and test
 
-Run from the project root. There are no presets yet; `<tc>` names the build directory of one toolchain. The agent's
-shell lacks the MSVC environment, so wrap the MSVC and clang-cl commands:
-`cmd /c '"C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat" >nul && <command>'`.
-- Configure: `cmake -S . -B build/<tc> -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=<compiler> -DCPM_SOURCE_CACHE=C:/cpm`
-- Build: `cmake --build build/<tc>`
-- Run affected tests: `build/<tc>/tests/numerixx_tests --test-case="deriv:*"`
-- Full suite: `ctest --test-dir build/<tc> --output-on-failure`
-- Emscripten: run `emsdk_env` first, then `emcmake cmake ...`; the tests run under node.
-- Primary toolchain: clang-cl + MSVC STL, x64. Also must build with MSVC `cl`, GCC 16 and Clang 22 (MinGW and WSL),
-  and Emscripten.
+Run from the project root, with `CPM_SOURCE_CACHE=C:/cpm` in the environment (a long path loses files to MAX_PATH).
+Presets: `clang-cl`, `cl`, `gcc`, `clang`, `emscripten`; each builds Debug into `build/<preset>`.
+- Configure: `cmake --preset <preset>`
+- Build: `cmake --build --preset <preset>`
+- Run affected tests: `build/<preset>/tests/numerixx_tests --test-case="deriv:*"` (one doctest executable)
+- Full suite: `ctest --preset <preset>`
+- `clang-cl` and `cl` need the MSVC environment, which the agent's shell lacks: run them from a batch file that first
+  calls `"C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"`.
+- `g++` on PATH is Strawberry Perl's; configure `gcc` with `-DCMAKE_CXX_COMPILER=C:/Toolchains/GCC16/bin/g++.exe` and
+  put `C:/Toolchains/GCC16/bin` first on PATH.
+- `emscripten` needs `EMSDK` set: source `C:/Toolchains/emsdk/emsdk_env.sh` first. The tests run under node.
+- WSL (openSUSE Tumbleweed) has GCC 16 and Clang 23. Build there from a copy of the tracked and new files (a tar of
+  `git ls-files` and `git ls-files --others --exclude-standard`), not from `/mnt/c`: `build/<preset>` would clash
+  with the Windows builds, and the untracked CLion build folders are gigabytes.
+- Primary toolchain: clang-cl + MSVC STL, x64. Also must build with MSVC `cl`, GCC and Clang (MinGW and WSL), and
+  Emscripten.
 
 ## Project-specific constraints
 
