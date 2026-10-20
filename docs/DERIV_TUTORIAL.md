@@ -1,10 +1,10 @@
-# How `nxx::deriv` works: a guided tour of Phase 1
+# How `nxx::deriv` works: a guided tour
 
 This tutorial walks through the current implementation of numerical derivatives in Numerixx 2: two headers,
-`include/numerixx/math.hpp` and `include/numerixx/deriv.hpp`, about 130 lines in all. It starts with how to call the
-library, then explains the mathematics behind the formula and the default step, and finally goes through the code line
-by line, including the C++ details that let the same code run on `double`, on Boost.Multiprecision types and at
-compile time.
+`include/numerixx/math.hpp` and `include/numerixx/deriv.hpp`. It starts with how to call the library, then explains the
+mathematics behind the central difference and its default step, goes through the code line by line, including the C++
+details that let the same code run on `double`, on Boost.Multiprecision types and at compile time, and ends with the
+higher-order and one-sided stencils (section 8).
 
 ## 1. Using it
 
@@ -17,9 +17,14 @@ auto const d = nxx::deriv::derivative(f, 1.0);         // default step
 auto const e = nxx::deriv::derivative(f, 1.0, 1e-4);   // explicit step h
 
 if (d) std::println("{}", *d);                         // 2.7182818284569006 (exact: 2.7182818284590451)
+
+using nxx::deriv::Central, nxx::deriv::Forward;
+auto const g = nxx::deriv::derivative<Central<4>>(f, 1.0);   // higher order: 4 evaluations
+auto const k = nxx::deriv::derivative<Forward<2>>(f, 1.0);   // one-sided: never evaluates f below x
 ```
 
-There are two overloads, with and without a step. Both return `std::expected<T, nxx::deriv::error>`: either the
+There are two overloads, with and without a step. The optional template argument chooses the stencil (section 8); by
+default it is `Central<2>`, the central difference of sections 2 to 7. Both return `std::expected<T, nxx::deriv::error>`: either the
 estimate, or `error::non_finite` if no finite estimate exists (section 5 lists the cases). Numerixx itself never
 throws. The demo program
 (`demo/deriv_demo.cpp`) runs every example in this tutorial.
@@ -105,7 +110,7 @@ Read it as a checklist:
 
 - **`numeric_limits` is specialised and not integer.** The algorithm needs `epsilon()` and `max()`, and an integer
   type would make the difference quotient meaningless. `derivative(f, 1)` with an `int` argument does not compile.
-- **Bounded and inexact**, like a floating-point type. `isfinite` compares with `max()`, and `cbrt_epsilon` needs a
+- **Bounded and inexact**, like a floating-point type. `isfinite` compares with `max()`, and `root_epsilon` needs a
   positive `epsilon()`. An exact rational type such as Boost's `cpp_rational` has epsilon 0 and no meaningful
   `max()`, so it is rejected at compile time.
 - **Constructible from `int`.** Constants are written `T(1)`, `T(2)`, which works for every real type. A `double`
@@ -150,9 +155,10 @@ constexpr bool isfinite(T const &x)
 - `|x| <= max` is false for an infinity.
 - `(std::numeric_limits<T>::max)()` is in parentheses so that a `max` macro (from `<windows.h>`) cannot expand there.
 
-### `cbrt_epsilon`
+### `root_epsilon`
 
-The default step needs `eps^(1/3)`. `cbrt_epsilon` computes it in two stages.
+The default step of the central difference needs `eps^(1/3)`; a stencil of order p needs `eps^(1/(p+1))` (section 8).
+`root_epsilon<N, T>()` computes `eps^(1/N)` in two stages. This section follows the case N = 3.
 
 **Stage 1: scale epsilon into (radix^-3, 1].** Epsilon is tiny (2^-52 for `double`, about 1e-49 for a 50-digit type).
 The code multiplies it by radix^3 (8 for binary types, 1000 for decimal ones) until one more multiplication would pass
@@ -161,8 +167,8 @@ The code multiplies it by radix^3 (8 for binary types, 1000 for decimal ones) un
 ```cpp
 T a = std::numeric_limits<T>::epsilon();
 T scale = T(1);
-while (a * radix3 <= T(1)) {
-    a = a * radix3;
+while (a * radix_n <= T(1)) {      // radix_n = radix^N
+    a = a * radix_n;
     scale = scale * radix;
 }
 ```
@@ -174,7 +180,7 @@ Multiplying by a power of the radix only changes the exponent, so this is exact.
 **Stage 2: Newton's iteration for cbrt(a).** To solve `y^3 = a`, Newton's method iterates
 
 ```
-y <- (2y + a / y^2) / 3
+y <- (2y + a / y^2) / 3          in general, for y^N = a:  y <- ((N-1) y + a / y^(N-1)) / N
 ```
 
 Starting at y = 1, which is at or above the root because a <= 1, every iterate stays above the root (by the
@@ -185,40 +191,44 @@ next iterate is not smaller:
 ```cpp
 T y = T(1);
 while (true) {
-    T const next = (T(2) * y + a / (y * y)) / T(3);
+    T y_n1 = T(1);
+    for (int i = 1; i < N; ++i) y_n1 = y_n1 * y;          // y^(N-1)
+    T const next = (T(N - 1) * y + a / y_n1) / T(N);
     if (!(next < y)) break;
     y = next;
 }
 return y / scale;
 ```
 
-Stage 1 is what makes stage 2 fast. With a in (radix^-3, 1], the root lies in (1/radix, 1], close to the start, so
+Stage 1 is what makes stage 2 fast. With a in (radix^-N, 1], the root lies in (1/radix, 1], close to the start, so
 Newton converges in a handful of steps. Started from 1 against eps itself, it would need dozens of slow steps to come
 down to 6e-6.
 
 For `double` the result is `cbrt(0.5) / 2^17 = 0.7937 / 131072 = 6.055e-6`, which the tests check against
-`std::cbrt(epsilon)` to a relative error of at most 2 eps.
+`std::cbrt(epsilon)` to a relative error of at most 2 eps; the other roots are checked against `pow(epsilon, 1/N)`.
 
 ## 5. The derivative (`deriv.hpp`)
 
-Here is the explicit-step overload in full:
+`derivative` handles every stencil (section 8 covers the general case). For the default `Central<2>`, its compile-time
+checks and branches reduce to this:
 
 ```cpp
-template<real T, typename F>
-requires std::invocable<F &, T const &> && std::convertible_to<std::invoke_result_t<F &, T const &>, T>
+template<typename S = Central<2>, real T, typename F>
+requires detail::stencil<S> && std::invocable<F &, T const &>
+         && std::convertible_to<std::invoke_result_t<F &, T const &>, T>
 [[nodiscard]] constexpr std::expected<T, error> derivative(F &&fn, T const &x, std::type_identity_t<T> const &h)
 {
     assert(h > T(0));
     // With |x| + 2h <= max, the points and their distance are finite, so nothing overflows before fn is called.
     T const largest = (std::numeric_limits<T>::max)();
     if (!(h <= largest / T(4) && math::abs(x) <= largest - T(2) * h)) return std::unexpected(error::non_finite);
-    T const xp = x + h;
     T const xm = x - h;
+    T const xp = x + h;
     T const dx = xp - xm;
     if (dx == T(0)) return std::unexpected(error::non_finite); // h is below the resolution of x
-    T const fp = static_cast<T>(fn(xp));
     T const fm = static_cast<T>(fn(xm));
-    if (!math::isfinite(fp) || !math::isfinite(fm)) return std::unexpected(error::non_finite);
+    T const fp = static_cast<T>(fn(xp));
+    if (!math::isfinite(fm) || !math::isfinite(fp)) return std::unexpected(error::non_finite);
     T const d = (fp - fm) / dx;
     if (!math::isfinite(d)) return std::unexpected(error::non_finite); // the difference or the quotient overflowed
     return d;
@@ -229,6 +239,10 @@ Each line has a reason.
 
 ### The signature
 
+- **`typename S = Central<2>`** and **`detail::stencil<S>`**: the stencil is a type, the first template argument, so
+  `derivative(f, x)` keeps working while `derivative<Central<4>>(f, x)` picks another rule. The concept accepts only
+  `Central`, `Forward` and `Backward` in their allowed orders; anything else is rejected by the constraint, not by a
+  hard error.
 - **`requires std::invocable<F &, T const &>`**: fn must be callable with a `T`. The `F &` is there because the body
   calls `fn(...)` on a named reference, which is an lvalue. The result must convert to T, so fn may return an
   expression template or another type that converts.
@@ -292,20 +306,20 @@ Emscripten's default.
 ### The default-step overload
 
 ```cpp
-template<real T>
+template<int Order, real T>
 constexpr T default_step(T const &x)                     // in nxx::deriv::detail
 {
     T const scale = math::abs(x) < T(1) ? T(1) : math::abs(x);
-    return math::cbrt_epsilon<T>() * scale;
+    return math::root_epsilon<Order + 1, T>() * scale;
 }
 
-template<real T, typename F>
+template<typename S = Central<2>, real T, typename F>
 requires /* as above */
 [[nodiscard]] constexpr std::expected<T, error> derivative(F &&fn, T const &x)
-{ return nxx::deriv::derivative(fn, x, detail::default_step(x)); }
+{ return nxx::deriv::derivative<S>(fn, x, detail::default_step<detail::make_table(S{}).order>(x)); }
 ```
 
-This is section 2's `eps^(1/3) * max(|x|, 1)`. The call is written `nxx::deriv::derivative`, fully qualified: an
+For `Central<2>` (order 2) this is section 2's `eps^(1/3) * max(|x|, 1)`. The call is written `nxx::deriv::derivative`, fully qualified: an
 unqualified call would also look in the namespaces of T and F (argument-dependent lookup), where a user type could
 provide its own `derivative` and silently take over.
 
@@ -324,7 +338,7 @@ only for fn built from arithmetic.
 
 ## 7. How it is tested
 
-`tests/test_deriv.cpp` follows three rules from the project:
+`tests/test_deriv.cpp` and `tests/test_stencils.cpp` follow three rules from the project:
 
 - **Exact cases as `static_assert`.** Quadratics and cubics with power-of-two steps, where the result is known exactly
   (section 6), are checked at compile time; the same cases also run at run time.
@@ -334,12 +348,13 @@ only for fn built from arithmetic.
   that happened to pass.
 
 The same tests run on `float`, `double` and the three Boost.Multiprecision types, on five toolchains (clang-cl, MSVC,
-GCC, Clang and Emscripten).
+GCC, Clang and Emscripten). For the stencils, a `static_assert` also checks every table against the moment conditions
+of section 8, with a moment function written in the test file, independent of the library's formulas.
 
-## 8. Looking ahead: stencils
+## 8. Stencils
 
-Phase 2 (`PHASE2_API.md`) generalises the central difference to *stencils*. This section explains how they work; the
-code does not have them yet.
+The central difference is the simplest of a family of *stencils* (`PHASE2_API.md`). This section explains how they
+work, then how the code implements them.
 
 A stencil is a fixed recipe for f'(x) from a few values of f near x: a list of offsets (nodes) and weights,
 
@@ -461,12 +476,47 @@ The same moment equations give second derivatives: require M_2 = 2 * den and the
 {-1, 0, 1} that gives {1, -2, 1}, the classic `(f(x+h) - 2 f(x) + f(x-h)) / h^2`. So Phase 4 can reuse Phase 2's table
 type and evaluator.
 
-## 9. Limits of Phase 1, and what comes next
+### In the code
 
-- **Only second order.** Higher-order central rules reach more digits with more evaluations: about `eps^(4/5)` with
-  four points and `eps^(6/7)` with six (section 8).
-- **Two-sided only.** It evaluates on both sides of x, so it fails at the edge of fn's domain (`log` at 0 returns
-  `non_finite`). One-sided rules are part of Phase 2.
+The stencils are three class templates, `Central<P>` (even P from 2 to 10), `Forward<P>` and `Backward<P>` (P from 1
+to 6). They are empty: the type only names the rule. The caps are numerical: beyond `Central<10>` the gain is under
+half a digit even for 50-digit types, and the one-sided rounding factor S is already 27.7 at P = 6.
+
+**The tables** are computed at compile time by `detail::make_table`, from closed forms in exact integer arithmetic
+(`long long`, `std::gcd`, `std::lcm`), and put over one common denominator:
+
+- Central, P = 2m: the coefficient of `f(x + k h) - f(x - k h)` is `(-1)^(k+1) (m!)^2 / (k (m-k)! (m+k)!)`. For m = 2
+  this gives 2/3 and -1/12, the {1, -8, 8, -1}/12 derived above.
+- Forward, P: `w_0 = -(1 + 1/2 + ... + 1/P)` and `w_k = (-1)^(k+1) C(P, k) / k`. For P = 2: -3/2, 2, -1/2.
+- Backward: Forward mirrored.
+
+The largest numerator is 2100 (`Central<10>`), exact in every real type, even `float`.
+
+**The evaluator** has two branches, chosen at compile time:
+
+- Two nodes (`Central<2>`, `Forward<1>`, `Backward<1>`): `(f_hi - f_lo) / (x_hi - x_lo)`, dividing by the distance
+  between the points actually evaluated, as in section 5. `Central<2>` is the Phase 1 code, bit for bit.
+- More nodes: `sum_k numerator_k * f(x + n_k h)`, divided once by `denominator * h`. Dividing by the outer-node distance
+  would correct the rounding of the outer points only, and with more than two weights it makes the error larger (4x
+  for `Central<4>`). One division keeps the results exact for polynomials when x and h are short binary fractions,
+  which the tests use.
+
+**The input check** of section 5 generalises with `K = max |node|` and `Q = max(2K, denominator)`: `h <= max / (2Q)`
+and `|x| <= max - Q h`. Every point lies within K h of x, so at least about K h below max, and the divisor is at most
+`Q h <= max / 2`. The margin is needed: with no margin (`Q = K`), `max - Q h` can round up by half an ulp, and a point
+one ulp below max can then round up to infinity. For `Central<2>`, Q = 2: exactly the check of section 5. With more
+nodes, the zero distance becomes "h does not move x on one of its sides" (`x + h == x` or `x - h == x`); both sides
+are needed because at a power of the radix the spacing differs on the two sides of x. Each value of fn is checked
+before it is added to the sum.
+
+**The default step** is `root_epsilon<P + 1>() * max(|x|, 1)`, as derived above, without the stencil's constant
+`(S / (p C))^(1/(p+1))`. Those constants lie between 1.4 and 2.0, and leaving one out costs at most a factor 1.64 in
+error.
+
+## 9. Limits, and what comes next
+
+- **Fixed rules only.** The stencils are the three families; a user cannot supply their own weights, and a stencil
+  cannot be chosen at run time except by a `switch` over `derivative<S>` calls.
 - **No error estimate.** The caller cannot tell how accurate a result is. Ridders' extrapolation (Phase 3) provides
   one and is robust to a poor initial step.
 - **The step assumes f varies on the scale `max(|x|, 1)`.** For faster-varying functions, pass a step.

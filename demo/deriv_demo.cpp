@@ -4,12 +4,15 @@
 
 #include <cmath>
 #include <expected>
+#include <limits>
 #include <print>
 #include <string_view>
 
 namespace {
 
+    using nxx::deriv::Central;
     using nxx::deriv::derivative;
+    using nxx::deriv::Forward;
 
     std::string_view to_string(nxx::deriv::error e)
     {
@@ -51,8 +54,9 @@ namespace {
                 std::println("   h = 1e-{:<2}  error {:.1e}", k, std::abs(*d - std::cos(1.0)));
         }
         if (auto const d = derivative(sin, 1.0))
-            std::println(
-                "   default h = {:.1e}  error {:.1e}", nxx::math::cbrt_epsilon<double>(), std::abs(*d - std::cos(1.0)));
+            std::println("   default h = {:.1e}  error {:.1e}",
+                nxx::math::root_epsilon<3, double>(),
+                std::abs(*d - std::cos(1.0)));
     }
 
     template<typename T>
@@ -108,6 +112,31 @@ namespace {
         std::println("   {:<28} {:.17g}", "exact", std::cbrt(2.0));
     }
 
+    template<typename S>
+    void stencil_error(std::string_view name)
+    {
+        auto const exp = [](double x) { return std::exp(x); };
+        if (auto const d = derivative<S>(exp, 1.0))
+            std::println("   {:<12} relative error {:.1e}", name, std::abs(*d - std::exp(1.0)) / std::exp(1.0));
+    }
+
+    void stencils()
+    {
+        // A central rule of order P costs P evaluations and reaches about eps^(P/(P+1)) with its default step.
+        std::println("\n7. Higher-order stencils: d/dx exp(x) at x = 1");
+        stencil_error<Central<2>>("Central<2>");
+        stencil_error<Central<4>>("Central<4>");
+        stencil_error<Central<6>>("Central<6>");
+        stencil_error<Central<10>>("Central<10>");
+
+        // One-sided rules never evaluate fn on the other side of x, so they work at the edge of fn's domain.
+        std::println("\n8. One-sided stencils: fn defined only for x >= 0 (exp, NaN below 0), at x = 0");
+        auto const right = [](double x) { return x < 0.0 ? std::numeric_limits<double>::quiet_NaN() : std::exp(x); };
+        show("Central<2>", derivative<Central<2>>(right, 0.0));
+        show("Forward<2>", derivative<Forward<2>>(right, 0.0));
+        show("Forward<4>", derivative<Forward<4>>(right, 0.0));
+    }
+
 } // namespace
 
 int main()
@@ -118,4 +147,5 @@ int main()
     compile_time();
     errors();
     composition();
+    stencils();
 }

@@ -26,7 +26,7 @@ target_include_directories(boost_multiprecision SYSTEM INTERFACE
         ${boost_multiprecision_SOURCE_DIR}/include ${boost_config_SOURCE_DIR}/include)
 target_compile_definitions(boost_multiprecision INTERFACE BOOST_MP_STANDALONE)
 
-add_executable(numerixx_tests test_math.cpp test_deriv.cpp)
+add_executable(numerixx_tests test_math.cpp test_deriv.cpp test_stencils.cpp)
 target_link_libraries(numerixx_tests PRIVATE numerixx::numerixx doctest::doctest_with_main boost_multiprecision)
 if (MSVC)
     target_compile_options(numerixx_tests PRIVATE /W4 /WX /permissive-)

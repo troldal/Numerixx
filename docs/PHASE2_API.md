@@ -111,7 +111,7 @@ Checked in exact rational arithmetic for every allowed P: each satisfies the mom
 The truncation error is `C h^P f^(P+1)`; the rounding error is about `S eps |f| / h`.
 
 **Why the caps (Central P <= 10, one-sided P <= 6).** The integers are not the limit: the largest numerator is 2100,
-exact even in `float`, and the intermediate factorials (up to 20!) fit in `long long`. The caps are numerical:
+exact even in `float`, and the largest intermediate, 5 * 10! for `Central<10>`, is far inside `long long`. The caps are numerical:
 - `Central<10>` loses about D/11 of a type's D digits; beyond it the gain is under half a digit even for a 50-digit
   type, while fn must be smooth over a wider and wider stencil.
 - One-sided rounding amplification grows fast (S = 27.7 for P = 6, against 2.28 for `Central<10>`).
@@ -129,12 +129,15 @@ them (one more table each) is gone. They cost one evaluation less than order 2 b
   with more nodes divide `sum_k n_k f_k` by `T(den) * h` in a single division: dividing by the outer-node distance
   would cancel the outer-node rounding only for two-node rules and enlarges it for the others (4x for `Central<4>`).
   Node rounding then adds about `S / 2 * eps * |x f'| / h`, the same order as the rounding of fn itself.
-- **Failures before arithmetic**, as Phase 1 does (`design.md`): with `Q = max(hi - lo, den)`, where `lo` and `hi`
-  are the outermost nodes, the input check is `h <= max / (2 Q)` and `|x| <= max - Q h`. Every node lies within
-  `(hi - lo) h <= Q h` of x and the divisor is at most `Q h <= max / 2`, so all are finite and fn is only called at
-  finite points; the check itself cannot overflow. For `Central<2>` (Q = 2) this is exactly the Phase 1 check. `x + h == x` (h below the resolution of
-  x) is `non_finite`, as `dx == 0` is in Phase 1. fn's values are checked before they are combined; the final result is
-  checked last.
+- **Failures before arithmetic**, as Phase 1 does (`design.md`): with `K = max(|lo|, |hi|)`, where `lo` and `hi` are
+  the outermost nodes, and `Q = max(2K, den)`, the input check is `h <= max / (2 Q)` and `|x| <= max - Q h`. Every node
+  lies within `K h` of x, so at least about `K h` below max: enough that rounding cannot tie a node up to infinity,
+  which a margin of 0 allowed (implementation review: `Forward<1>` one ulp below max). The divisor is at most
+  `Q h <= max / 2`, so all are finite and fn is only called at finite points; the check itself cannot overflow. For
+  `Central<2>` (Q = 2) this is exactly the Phase 1 check. h below the resolution of x on either side
+  (`x + h == x` or `x - h == x`) is `non_finite`, as `dx == 0` is in Phase 1; one side is not enough, since at a power
+  of the radix the spacing differs on the two sides. fn's values are checked before they are combined; the final
+  result is checked last.
 - **Arithmetic.** Numerators enter as `T(n)`; fn values go through `static_cast<T>` as in Phase 1; the sum accumulates
   in a `T`. Only `+ - * /`.
 - **Default step** `root_epsilon<P + 1, T>() * max(|x|, 1)`, without the order-dependent constant

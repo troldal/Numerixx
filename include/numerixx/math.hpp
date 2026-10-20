@@ -45,32 +45,38 @@ namespace nxx {
         constexpr bool isfinite(T const &x)
         { return x == x && math::abs(x) <= (std::numeric_limits<T>::max)(); }
 
-        /// The cube root of machine epsilon.
+        /// The N-th root of machine epsilon, N >= 2.
         ///
-        /// Epsilon is first scaled into (radix^-3, 1] by powers of radix^3, which is exact. Newton's iteration for the
-        /// cube root of the scaled value then starts at 1, above the root, and decreases until rounding stops it.
-        template<real T>
-        constexpr T cbrt_epsilon()
+        /// Epsilon is first scaled into (radix^-N, 1] by powers of radix^N, which is exact. Newton's iteration for the
+        /// N-th root of the scaled value then starts at 1, above the root, and decreases until rounding stops it.
+        template<int N, real T>
+        constexpr T root_epsilon()
         {
+            static_assert(N >= 2);
             T const radix = static_cast<T>(std::numeric_limits<T>::radix);
-            T const radix3 = radix * radix * radix;
+            T radix_n = T(1);
+            for (int i = 0; i < N; ++i) radix_n = radix_n * radix;
 
             // Multiplying by a power of the radix changes only the exponent, so a and scale stay exact, and
-            // eps = a / scale^3 gives cbrt(eps) = cbrt(a) / scale. For double, 2^-52 becomes a = 0.5 with scale = 2^17.
+            // eps = a / scale^N gives eps^(1/N) = a^(1/N) / scale. For double and N = 3, 2^-52 becomes a = 0.5 with
+            // scale = 2^17.
             T a = std::numeric_limits<T>::epsilon();
             T scale = T(1);
-            while (a * radix3 <= T(1)) {
-                a = a * radix3;
+            while (a * radix_n <= T(1)) {
+                a = a * radix_n;
                 scale = scale * radix;
             }
 
-            // Newton's iteration for y^3 = a. From y = 1, at or above the root since a <= 1, every iterate stays above
-            // the root (by the inequality of arithmetic and geometric means) and decreases; in floating point it stops
-            // decreasing once it reaches the root to within rounding. The scaling put the root in (1/radix, 1], so this
-            // takes a few steps; started from 1 against eps itself, it would take dozens.
+            // Newton's iteration for y^N = a: y <- ((N - 1) y + a / y^(N-1)) / N. From y = 1, at or above the root
+            // since a <= 1, every iterate stays above the root (by the inequality of arithmetic and geometric means)
+            // and decreases; in floating point it stops decreasing once it reaches the root to within rounding. The
+            // scaling put the root in (1/radix, 1], so this takes a few steps; started from 1 against eps itself, it
+            // would take dozens.
             T y = T(1);
             while (true) {
-                T const next = (T(2) * y + a / (y * y)) / T(3);
+                T y_n1 = T(1);
+                for (int i = 1; i < N; ++i) y_n1 = y_n1 * y;
+                T const next = (T(N - 1) * y + a / y_n1) / T(N);
                 if (!(next < y)) break;
                 y = next;
             }

@@ -75,7 +75,7 @@ TEST_CASE("deriv: central difference with the default step")
     CHECK(close(derivative(exp, -20.0), std::exp(-20.0), 5e-9));
 
     // For |x| < 1 the step is absolute, and so is the accuracy: the error of x^3 is h^2 = 3.7e-11 at any small x.
-    double const h = nxx::math::cbrt_epsilon<double>();
+    double const h = nxx::math::root_epsilon<3, double>();
     CHECK(close(derivative(cube, 1e-6), 3e-12 + h * h, 1e-9));
     CHECK(close(derivative(cube, 0.0), h * h, 1e-9));
 }

@@ -5,8 +5,8 @@ real type (including Boost.Multiprecision) and run in constant expressions. Nume
 failures are returned as `std::expected`, and an exception thrown by your callback or your number type passes through
 unchanged.
 
-Numerixx 2 is in development on the `dev` branch and currently provides numerical derivatives. Numerixx 1.x is at the
-tag `v1.1.0-legacy`.
+Numerixx 2 is in development on the `dev` branch and currently provides numerical derivatives: central and one-sided
+finite differences of orders up to 10. Numerixx 1.x is at the tag `v1.1.0-legacy`.
 
 ```cpp
 #include <numerixx/deriv.hpp>
@@ -14,6 +14,10 @@ tag `v1.1.0-legacy`.
 
 auto d = nxx::deriv::derivative([](double x) { return std::sin(x); }, 1.0); // central difference
 if (d) { /* *d is cos(1) to about 1e-10 */ }
+
+using nxx::deriv::Central, nxx::deriv::Forward;
+auto d4 = nxx::deriv::derivative<Central<4>>([](double x) { return std::sin(x); }, 1.0); // about 1e-13
+auto df = nxx::deriv::derivative<Forward<2>>([](double x) { return std::sqrt(x); }, 0.5); // never evaluates below x
 
 static_assert(*nxx::deriv::derivative([](double x) { return x * x; }, 3.0, 0.5) == 6.0);
 ```
