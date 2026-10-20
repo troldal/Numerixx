@@ -10,3 +10,9 @@ else ()
     target_compile_options(numerixx_deriv_demo PRIVATE
             -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion -Werror)
 endif ()
+
+# Builds and runs the demo: under Emscripten through node (CMAKE_CROSSCOMPILING_EMULATOR); natively it is empty.
+add_custom_target(run_deriv_demo
+        COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:numerixx_deriv_demo>
+        DEPENDS numerixx_deriv_demo
+        USES_TERMINAL)
