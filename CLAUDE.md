@@ -53,6 +53,10 @@ Presets: `clang-cl`, `cl`, `gcc`, `clang`, `emscripten`; each builds Debug into 
   `+ - * /`, comparisons and the `nxx::math` helpers; write `T(1)`, never a `double` literal; never `auto` on an
   arithmetic expression (Boost's expression templates).
 - **Emscripten.** Everything must build there: no threads, stack traces or other platform facilities.
+- **Naming.** Functions, concepts and enumerations follow the standard library (`derivative`, `isfinite`, `real`,
+  `error::non_finite`). Classes and class templates, meaning types that can have member functions, are PascalCase
+  (`Central<P>`, `Estimate<T>`). No digits in a class name where a template parameter belongs (`Central<4>`, not
+  `Central4`).
 - **Callbacks** are named `fn`. Qualify internal calls (`nxx::deriv::...`) so user types cannot hijack them by ADL.
 - **Tests.** Reference values come from closed forms or independent high-precision sources, never from Numerixx
   itself; each tolerance is justified by an error estimate in a comment.
