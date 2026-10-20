@@ -39,7 +39,6 @@
 // ===== Standard Library Includes
 #include <source_location>
 #include <sstream>
-#include <stacktrace>
 #include <stdexcept>
 #include <utility>
 
@@ -58,7 +57,7 @@ namespace nxx
         explicit NumerixxError(const std::string&            str,
                                const NumerixxErrorType       type  = NumerixxErrorType::General,
                                const std::source_location&   loc   = std::source_location::current(),
-          std::stacktrace trace = std::stacktrace())
+          boost::stacktrace::stacktrace trace = boost::stacktrace::stacktrace())
         : std::runtime_error{ str }, m_type{ type }, m_location{ loc }, m_backtrace{ std::move(trace) }
       // m_os { hwinfo::getOSInfo() },
       // m_cpu { hwinfo::getCpuInfo() },
@@ -81,7 +80,7 @@ namespace nxx
         }
 
         [[nodiscard]]
-        virtual const std::stacktrace &stack() const noexcept
+        virtual const boost::stacktrace::stacktrace &stack() const noexcept
         {
             return m_backtrace;
         }
@@ -96,7 +95,7 @@ namespace nxx
             logStream << "Function: " << m_location.function_name() << "\n\t";
             logStream << "Line: " << m_location.line() << "\n\t";
             logStream << "Column: " << m_location.column() << "\n\n";
-            logStream << "Stacktrace:\n" << std::to_string(m_backtrace) << "\n";
+            logStream << "Stacktrace:\n" << boost::stacktrace::to_string(m_backtrace) << "\n";
             // logStream << "OS:\n" << m_os << "\n";
             // logStream << "CPU:\n" << m_cpu << "\n";
             // logStream << "RAM:\n" << m_ram << "\n";
@@ -106,7 +105,7 @@ namespace nxx
     private:
         NumerixxErrorType             m_type { NumerixxErrorType::General };
         std::source_location          m_location;
-        std::stacktrace m_backtrace;
+        boost::stacktrace::stacktrace m_backtrace;
         // hwinfo::OS                    m_os;
         // hwinfo::CPU                   m_cpu;
         // hwinfo::RAM                   m_ram;
@@ -120,7 +119,7 @@ namespace nxx
                        const NumerixxErrorType       type  = NumerixxErrorType::General,
                        T                             data  = {},
                        const std::source_location&   loc   = std::source_location::current(),
-          std::stacktrace trace = std::stacktrace())
+          boost::stacktrace::stacktrace trace = boost::stacktrace::stacktrace())
         : NumerixxError(str, type, loc, std::move(trace)), m_data{ std::move(data) }
       {}
 
