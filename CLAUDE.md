@@ -14,6 +14,7 @@ in CI.
 
 - `include/numerixx/` public headers; the library is header-only, so there is no `src/`
 - `tests/` doctest, with standalone Boost.Multiprecision for the multiprecision cases
+- `demo/` small demo programs (`NUMERIXX_BUILD_DEMOS`, on when top level), e.g. `build/<preset>/demo/numerixx_deriv_demo`
 - `cmake/CPM.cmake` fetches the test dependencies; the library itself has none
 - `CMakePresets.json` one preset per toolchain, used locally and in CI (`.github/workflows/ci.yml`)
 - `docs/plan.md` current plan; `docs/design.md` design decisions

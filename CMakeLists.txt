@@ -11,3 +11,8 @@ if (NUMERIXX_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif ()
+
+option(NUMERIXX_BUILD_DEMOS "Build the Numerixx demos" ${PROJECT_IS_TOP_LEVEL})
+if (NUMERIXX_BUILD_DEMOS)
+    add_subdirectory(demo)
+endif ()
