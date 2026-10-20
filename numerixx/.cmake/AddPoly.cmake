@@ -1,0 +1,7 @@
+if (NOT NUMERIXX_POLY_ADDED)
+    message(STATUS "[Numerixx]: Including numerixx::poly library")
+    add_library(nxx_poly INTERFACE)
+    target_include_directories(nxx_poly INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../poly>)
+    add_library(numerixx::poly ALIAS nxx_poly)
+    set(NUMERIXX_POLY_ADDED TRUE)
+endif ()

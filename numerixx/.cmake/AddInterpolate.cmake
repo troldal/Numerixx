@@ -1,0 +1,7 @@
+if (NOT NUMERIXX_INTERPOLATE_ADDED)
+    message(STATUS "[Numerixx]: Including numerixx::interpolate library")
+    add_library(nxx_interpolate INTERFACE)
+    target_include_directories(nxx_interpolate INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../interpolate>)
+    add_library(numerixx::interpolate ALIAS nxx_interpolate)
+    set(NUMERIXX_INTERPOLATE_ADDED TRUE)
+endif ()

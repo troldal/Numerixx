@@ -1,0 +1,7 @@
+if (NOT NUMERIXX_MULTIROOTS_ADDED)
+    message(STATUS "[Numerixx]: Including numerixx::multiroots library")
+    add_library(nxx_multiroots INTERFACE)
+    target_include_directories(nxx_multiroots INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../multiroots>)
+    add_library(numerixx::multiroots ALIAS nxx_multiroots)
+    set(NUMERIXX_MULTIROOTS_ADDED TRUE)
+endif ()

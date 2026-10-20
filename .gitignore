@@ -35,23 +35,8 @@
 venv*/
 
 # Build directories
-build/
 cmake-build-*/
 out/
-docs/_build/
-
-# CMake and CPM
-CMakeUserPresets.json
-compile_commands.json
-.cpm/
-.cache/
 
 # IDEs and editors
 .vs/
-.idea/
-.vscode/
-
-# Claude Code: CLAUDE.md and .claude/agents/ are shared; personal files stay local
-CLAUDE.local.md
-.claude/settings.local.json
-.claude/worktrees/
