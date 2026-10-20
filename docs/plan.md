@@ -17,10 +17,11 @@ phase's `static_assert` and run-time tests pass on GCC, Clang, MSVC, clang-cl an
 
 API approved: `docs/PHASE2_API.md`.
 
-- [ ] Higher-order central stencils, `Central<P>` for even P up to 10
-- [ ] Forward and backward stencils, `Forward<P>` and `Backward<P>` for P up to 6, for points where fn can be evaluated
-  on one side only
-- [ ] `root_epsilon<N, T>` replaces `cbrt_epsilon`
+- [x] Higher-order central stencils, `Central<P>` for even P up to 10 (56cffb1)
+- [x] Forward and backward stencils, `Forward<P>` and `Backward<P>` for P up to 6, for points where fn can be evaluated
+  on one side only (56cffb1)
+- [x] `root_epsilon<N, T>` replaces `cbrt_epsilon` (56cffb1)
+- [x] CI passes on all five toolchains (run 39486718887)
 
 ### Phase 3: Ridders' extrapolation
 
