@@ -14,7 +14,15 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 #==============================================================================
 # FIND DEPENDENCIES
 #==============================================================================
-find_package(Boost REQUIRED)
+include(${CMAKE_CURRENT_LIST_DIR}/../cmake/CPM.cmake)
+
+CPMAddPackage(
+        NAME Boost
+        VERSION 1.92.0
+        URL https://github.com/boostorg/boost/releases/download/boost-1.92.0/boost-1.92.0-cmake.tar.xz
+        URL_HASH SHA256=9bed76128d4e46755dbe818487788c6fceb6f72b378f4daa49b7e1e600d9088d
+        OPTIONS "BOOST_ENABLE_CMAKE ON" "BOOST_SKIP_INSTALL_RULES ON"
+        "BUILD_SHARED_LIBS OFF" "BOOST_INCLUDE_LIBRARIES multiprecision\\\;multi_array")
 
 #==============================================================================
 # DEFINE NUMERIXX LIBRARIES
@@ -25,6 +33,9 @@ if (NUMERIXX_MULTIROOTS OR NUMERIXX_OPTIMIZE)
 endif ()
 
 if (NUMERIXX_INTERPOLATE OR NUMERIXX_MULTIROOTS OR NUMERIXX_ALL)
+    # Use Blaze's own kernels by default, so that no BLAS or LAPACK is required.
+    set(BLAZE_BLAS_MODE OFF CACHE BOOL "Enables/Disable the BLAS mode.")
+    set(USE_LAPACK OFF CACHE BOOL "Checks for the presence of LAPACK during configuration.")
     add_subdirectory(.external/blaze SYSTEM)
 endif ()
 
@@ -119,7 +130,8 @@ add_library(numerixx::all ALIAS nxx_all)
 #==============================================================================
 target_link_libraries(nxx_utility
         INTERFACE
-        Boost::boost)
+        Boost::multiprecision
+        Boost::multi_array)
 
 if (NUMERIXX_DERIV OR NUMERIXX_ALL)
     target_link_libraries(nxx_deriv

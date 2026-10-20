@@ -15,8 +15,20 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 #==================================================================================================================
 include(SetDefaultWarnings)
 include(EnableLTO)
-find_package(Boost REQUIRED)
-find_package(sciplot CONFIG REQUIRED)
+include(${CMAKE_CURRENT_LIST_DIR}/../cmake/CPM.cmake)
+
+# sciplot is header-only; its own CMake project builds examples and writes to the package registry.
+CPMAddPackage(
+        NAME sciplot
+        GITHUB_REPOSITORY sciplot/sciplot
+        VERSION 0.3.1
+        DOWNLOAD_ONLY YES)
+add_library(sciplot INTERFACE)
+add_library(sciplot::sciplot ALIAS sciplot)
+target_include_directories(sciplot SYSTEM INTERFACE ${sciplot_SOURCE_DIR})
+
+# Every demo includes _external.hpp, which includes sciplot.
+link_libraries(sciplot::sciplot)
 #find_package(fmt CONFIG REQUIRED)
 
 #=================================================================================================================
