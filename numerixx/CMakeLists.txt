@@ -22,7 +22,8 @@ CPMAddPackage(
         URL https://github.com/boostorg/boost/releases/download/boost-1.92.0/boost-1.92.0-cmake.tar.xz
         URL_HASH SHA256=9bed76128d4e46755dbe818487788c6fceb6f72b378f4daa49b7e1e600d9088d
         OPTIONS "BOOST_ENABLE_CMAKE ON" "BOOST_SKIP_INSTALL_RULES ON"
-        "BUILD_SHARED_LIBS OFF" "BOOST_INCLUDE_LIBRARIES multiprecision\\\;multi_array")
+        "BUILD_SHARED_LIBS OFF" "BOOST_INCLUDE_LIBRARIES multiprecision\\\;multi_array\\\;stacktrace"
+        "CMAKE_CXX_SCAN_FOR_MODULES OFF") # Boost uses no modules here; MinGW GCC fails to read the scan's mapper
 
 #==============================================================================
 # DEFINE NUMERIXX LIBRARIES
@@ -141,7 +142,7 @@ target_link_libraries(nxx_utility
         INTERFACE
         Boost::multiprecision
         Boost::multi_array
-        $<$<CXX_COMPILER_ID:GNU>:stdc++exp>) # std::stacktrace
+        Boost::stacktrace)
 
 if (NUMERIXX_DERIV OR NUMERIXX_ALL)
     target_link_libraries(nxx_deriv

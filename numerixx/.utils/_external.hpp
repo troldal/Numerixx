@@ -6,5 +6,5 @@
 #pragma system_header
 
 #include <boost/multiprecision/cpp_bin_float.hpp>
-// #include <boost/stacktrace.hpp>
+#include <boost/stacktrace.hpp>
 // #include <hwinfo/hwinfo.hpp>
