@@ -1,0 +1,8 @@
+if (NOT NUMERIXX_DERIV_ADDED)
+    message(STATUS "[Numerixx]: Including numerixx::deriv library")
+    message(STATUS "CMAKE_CURRENT_LIST_DIR: ${CMAKE_CURRENT_LIST_DIR}/../deriv")
+    add_library(nxx_deriv INTERFACE)
+    target_include_directories(nxx_deriv INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../deriv>)
+    add_library(numerixx::deriv ALIAS nxx_deriv)
+    set(NUMERIXX_DERIV_ADDED TRUE)
+endif ()
