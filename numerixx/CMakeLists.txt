@@ -33,10 +33,19 @@ if (NUMERIXX_MULTIROOTS OR NUMERIXX_OPTIMIZE)
 endif ()
 
 if (NUMERIXX_INTERPOLATE OR NUMERIXX_MULTIROOTS OR NUMERIXX_ALL)
-    # Use Blaze's own kernels by default, so that no BLAS or LAPACK is required.
+    # Blaze uses its own BLAS kernels; its LAPACK calls (e.g. gesv in blaze::solve) link to OpenBLAS below.
     set(BLAZE_BLAS_MODE OFF CACHE BOOL "Enables/Disable the BLAS mode.")
     set(USE_LAPACK OFF CACHE BOOL "Checks for the presence of LAPACK during configuration.")
     add_subdirectory(.external/blaze SYSTEM)
+
+    # LAPACK is built from C sources, so no Fortran compiler is needed.
+    CPMAddPackage(
+            NAME OpenBLAS
+            VERSION 0.3.34
+            URL https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.34/OpenBLAS-0.3.34.tar.gz
+            URL_HASH SHA256=cd7e129868320cc2d033afa920e31202dfe0b8066a5b66661900ccc0f197dfed
+            OPTIONS "BUILD_STATIC_LIBS ON" "BUILD_SHARED_LIBS OFF" "BUILD_TESTING OFF"
+            "NOFORTRAN ON" "C_LAPACK ON" "BUILD_WITHOUT_LAPACKE ON")
 endif ()
 
 
@@ -131,7 +140,8 @@ add_library(numerixx::all ALIAS nxx_all)
 target_link_libraries(nxx_utility
         INTERFACE
         Boost::multiprecision
-        Boost::multi_array)
+        Boost::multi_array
+        $<$<CXX_COMPILER_ID:GNU>:stdc++exp>) # std::stacktrace
 
 if (NUMERIXX_DERIV OR NUMERIXX_ALL)
     target_link_libraries(nxx_deriv
@@ -151,7 +161,8 @@ if (NUMERIXX_INTERPOLATE OR NUMERIXX_ALL)
             nxx_utility
             nxx_poly
             nxx_deriv
-            blaze)
+            blaze
+            openblas)
 endif ()
 
 if (NUMERIXX_OPTIMIZE OR NUMERIXX_ALL)
@@ -189,7 +200,8 @@ if (NUMERIXX_MULTIROOTS OR NUMERIXX_ALL)
             nxx_roots
             nxx_poly
             nxx_interpolate
-            blaze)
+            blaze
+            openblas)
 endif ()
 
 
