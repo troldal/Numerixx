@@ -141,6 +141,7 @@ namespace {
         stencil_error<Central<2>>("Central<2>");
         stencil_error<Central<4>>("Central<4>");
         stencil_error<Central<6>>("Central<6>");
+        stencil_error<Central<8> >("Central<8>");
         stencil_error<Central<10>>("Central<10>");
 
         // One-sided rules never evaluate fn on the other side of x, so they work at the edge of fn's domain.
@@ -148,6 +149,7 @@ namespace {
         auto const right = [](double x) { return x < 0.0 ? std::numeric_limits<double>::quiet_NaN() : std::exp(x); };
         show("Central<2>", derivative<Central<2>>(right, 0.0));
         show("Forward<2>", derivative<Forward<2>>(right, 0.0));
+        show("Forward<3>", derivative<Forward<3> >(right, 0.0));
         show("Forward<4>", derivative<Forward<4>>(right, 0.0));
     }
 

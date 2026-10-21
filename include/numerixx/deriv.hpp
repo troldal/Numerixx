@@ -170,7 +170,6 @@ namespace nxx::deriv {
     {
     };
 
-    /** @cond INTERNAL */
     namespace detail {
 
         /**
@@ -789,7 +788,6 @@ namespace nxx::deriv {
         }
 
     } // namespace detail
-    /** @endcond */
 
     /**
      * @brief The derivative of @p fn at @p x by method @p M with step @p h.

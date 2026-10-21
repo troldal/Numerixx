@@ -61,8 +61,7 @@ namespace nxx {
         // A NaN is the only value that compares unequal to itself. max is parenthesised so that a max macro, as defined
         // by <windows.h>, cannot expand there.
         template<real T>
-        constexpr bool isfinite(T const &x)
-        { return x == x && math::abs(x) <= (std::numeric_limits<T>::max)(); }
+        constexpr bool isfinite(T const &x) { return x == x && math::abs(x) <= (std::numeric_limits<T>::max)(); } // NOLINT
 
         /**
          * @brief The N-th root of machine epsilon, the building block of finite-difference steps.
