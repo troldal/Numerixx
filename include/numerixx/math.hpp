@@ -96,17 +96,23 @@ namespace nxx {
                 scale = scale * radix;
             }
 
-            // Newton's iteration for y^N = a: y <- ((N - 1) y + a / y^(N-1)) / N. From y = 1, at or above the root
+            // Newton's iteration for y^N = a: y <- y + (a / y^(N-1) - y) / N. From y = 1, at or above the root
             // since a <= 1, every iterate stays above the root (by the inequality of arithmetic and geometric means)
             // and decreases; in floating point it stops decreasing once it reaches the root to within rounding. The
             // scaling put the root in (1/radix, 1], so this takes a few steps; started from 1 against eps itself, it
             // would take dozens. y^(N-1) cannot underflow: if a was scaled, then radix^N <= 1/eps and y > 1/radix, so
             // y^(N-1) > radix^(1-N) >= radix eps; otherwise a = eps and y^(N-1) >= eps^((N-1)/N) >= eps.
+            //
+            // The update is written as a correction to y. Near the root a / y^(N-1) - y is exact (the operands are
+            // within a factor 2), and the rounding errors of a / y^(N-1), up to about N/2 ulps from the N - 1
+            // products, are divided by N, so the result is within an ulp: at most 0.58 ulps for float and double,
+            // N = 2 ... 5000, against 60-digit roots. The textbook form ((N - 1) y + a / y^(N-1)) / N rounds a sum
+            // of size N y, worth up to an ulp of y, so its stopping test could fire 1.8 ulps above the root.
             T y = T(1);
             while (true) {
                 T y_n1 = T(1);
                 for (int i = 1; i < N; ++i) y_n1 = y_n1 * y;
-                T const next = (T(N - 1) * y + a / y_n1) / T(N);
+                T const next = T(y + T(a / y_n1 - y) / T(N));
                 if (!(next < y)) break;
                 y = next;
             }

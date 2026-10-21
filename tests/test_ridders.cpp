@@ -93,6 +93,25 @@ namespace {
 
     double some_function(double x) { return x + 1; }
 
+    // f = (max h) (a t + b t^3) with t = (x - 1) / h, so f'(1) = a max, and the central difference at step s is
+    // D(s) = max (a + b s^2 / h^2): every tableau entry is finite, but two of opposite sign can differ by more than
+    // max. a = 0.9, b = -1.2: D(h) = -0.3 max and D(h/2) = 0.6 max extrapolate to A[1][1] = 0.9 max, which differs
+    // from its parent D(h) by 1.2 max.
+    constexpr double h_change = 0x1p-51;
+    constexpr auto opposite_change = [](double x) {
+        double const t = (x - 1.0) / h_change;
+        return (dmax * h_change) * (0.9 * t - 1.2 * t * t * t);
+    };
+    // a = 0.5, b = -1.4: D(h) = -0.9 max and D(h/2) = 0.15 max differ by 1.05 max within the tableau update.
+    constexpr double h_levels = 0x1p-20;
+    constexpr auto opposite_levels = [](double x) {
+        double const t = (x - 1.0) / h_levels;
+        return (dmax * h_levels) * (0.5 * t - 1.4 * t * t * t);
+    };
+    constexpr double deps = std::numeric_limits<double>::epsilon();
+
+    constexpr bool within(double a, double b, double tolerance) { return nxx::math::abs(a - b) <= tolerance; }
+
 } // namespace
 
 // Polynomials with dyadic x and h are exact at every level (binary types only: decimal division need not round
@@ -118,6 +137,21 @@ static_assert(derivative<Ridders>(identity, 1.0, 1e-300) == non_finite); // h be
 // and is computed for Ridders only, so the stencil result is a constant expression again.
 static_assert(derivative(huge, 0.0, 1e-300) == 0.0);
 static_assert(derivative<Ridders>(huge, 0.0, 1e-300) == Estimate<double>{ .value = 0.0, .abs_error = dmax });
+
+// Regression: finite tableau entries of opposite sign near max differ by more than max. The change from the parent
+// and the disagreement overflowed to an infinite estimate (a compile error here), and the tableau update overflowed
+// (a compile error here, a restart at run time). Now the change saturates at max, like the floor: the result is
+// untrusted, the restart below h_change meets the resolution of x, and the first tableau's result is returned. Its
+// value is 0.9 max to within the rounding of fn's few operations, a few eps relative, so 4 eps.
+static_assert(derivative<Ridders>(opposite_change, 1.0, h_change)->abs_error == dmax);
+static_assert(within(derivative<Ridders>(opposite_change, 1.0, h_change)->value, 0.9 * dmax, 4 * deps * dmax));
+// The tableau update that would exceed max counts as a non-finite level, so the tableau restarts below it at h/4,
+// where the cubic is exact up to rounding: the estimate covers the actual error and is near the rounding floor, about
+// eps relative to max / 2.
+static_assert(within(derivative<Ridders>(opposite_levels, 1.0, h_levels)->value,
+    dmax / 2,
+    *derivative<Ridders>(opposite_levels, 1.0, h_levels)->abs_error));
+static_assert(*derivative<Ridders>(opposite_levels, 1.0, h_levels)->abs_error <= 4 * deps * (dmax / 2));
 
 // The uniform return type: stencils leave the error estimate empty, Ridders fills it in.
 static_assert(!derivative(cube, 2.0, 0.25)->abs_error.has_value());
@@ -148,6 +182,17 @@ TEST_CASE("ridders: polynomials, the uniform type and the conversion at run time
     CHECK(*derivative<Ridders>(cube, 0.5f, 0.25f)->abs_error == floor_at(cube, 0.5f, 1.0f / 16));
     CHECK(derivative(huge, 0.0, 1e-300) == 0.0);
     CHECK(derivative<Ridders>(huge, 0.0, 1e-300) == Estimate<double>{ .value = 0.0, .abs_error = dmax });
+    auto const change = derivative<Ridders>(opposite_change, 1.0, h_change);
+    REQUIRE(change.has_value());
+    CHECK(change->abs_error == dmax);
+    CHECK(within(change->value, 0.9 * dmax, 4 * deps * dmax));
+    auto const levels = derivative<Ridders>(opposite_levels, 1.0, h_levels);
+    REQUIRE(levels.has_value());
+    CHECK(within(levels->value, dmax / 2, *levels->abs_error));
+    CHECK(*levels->abs_error <= 4 * deps * (dmax / 2));
+    // Compile time and run time agree.
+    constexpr auto levels_at_compile_time = derivative<Ridders>(opposite_levels, 1.0, h_levels);
+    CHECK(levels == levels_at_compile_time);
     CHECK(!derivative(cube, 2.0, 0.25)->abs_error.has_value());
     CHECK(!derivative<Central<4>>(cube, 2.0, 0.25)->abs_error.has_value());
     CHECK(derivative<Ridders>(cube, 2.0, 1.0 / 16)->abs_error.has_value());

@@ -497,6 +497,41 @@ namespace nxx::deriv {
         }
 
         /**
+         * @brief Whether a + b is finite, decided without forming it.
+         *
+         * Dividing by the radix is exact, so a + b exceeds max exactly when a / radix + b / radix exceeds max / radix,
+         * and the scaled sum cannot overflow. Ridders' tableau entries are finite, but two of opposite sign can differ
+         * by more than max, which constant evaluation would reject.
+         *
+         * @tparam T The real type.
+         * @param a A finite value.
+         * @param b A finite value.
+         * @return true if a + b is finite.
+         */
+        template<real T>
+        constexpr bool sum_fits(T const &a, T const &b)
+        {
+            T const radix = static_cast<T>(std::numeric_limits<T>::radix);
+            T const largest = (std::numeric_limits<T>::max)();
+            return math::abs(T(a / radix + b / radix)) <= T(largest / radix);
+        }
+
+        /**
+         * @brief |a - b|, saturated at max where it would overflow, like the rounding floor.
+         *
+         * @tparam T The real type.
+         * @param a A finite value.
+         * @param b A finite value.
+         * @return |a - b|, at most max.
+         */
+        template<real T>
+        constexpr T distance(T const &a, T const &b)
+        {
+            if (!detail::sum_fits(a, T(T(0) - b))) return (std::numeric_limits<T>::max)();
+            return math::abs(T(a - b));
+        }
+
+        /**
          * @brief The difference (fn(x_hi) - fn(x_lo)) / (x_hi - x_lo), the central difference and both two-node rules.
          *
          * Divides by the distance between the points actually evaluated, not by the nominal one: the points are
@@ -673,13 +708,19 @@ namespace nxx::deriv {
                     if (finite) {
                         row[0] = level->value;
                         T factor = T(1);
-                        for (std::size_t j = 1; j <= i; ++j) {
+                        // Both the difference and the sum are checked before they are formed: finite entries of
+                        // opposite sign can differ by more than max.
+                        for (std::size_t j = 1; j <= i && finite; ++j) {
                             factor = T(factor * T(4));
-                            row[j] = T(row[j - 1] + (row[j - 1] - prev[j - 1]) / (factor - T(1)));
-                            finite = finite && math::isfinite(row[j]);
+                            finite = detail::sum_fits(row[j - 1], T(T(0) - prev[j - 1]));
+                            if (!finite) break;
+                            T const step = T((row[j - 1] - prev[j - 1]) / (factor - T(1)));
+                            finite = detail::sum_fits(row[j - 1], step);
+                            if (!finite) break;
+                            row[j] = T(row[j - 1] + step);
                         }
                     }
-                    // fn is not finite within h_i of x (or finite values overflowed): every earlier level's interval
+                    // fn is not finite within h_i of x (or an entry would exceed max): every earlier level's interval
                     // contained the bad point, so the whole tableau goes, and a new one starts below the failing step.
                     if (!finite) {
                         restart = true;
@@ -696,7 +737,7 @@ namespace nxx::deriv {
                     bool improved = false;
                     bool exact = false;
                     for (std::size_t j = 1; j <= i; ++j) {
-                        T const change = math::abs(T(row[j] - prev[j - 1]));
+                        T const change = detail::distance(row[j], prev[j - 1]);
                         if (change == T(0)) {
                             best = row[j];
                             best_error = level_floor;
@@ -728,7 +769,7 @@ namespace nxx::deriv {
 
                 // The best entry must also agree with the most recent diagonal entry, which catches one that only
                 // looked good (aliasing). This cut the prototype's uncovered cases from 3.9% to under 1%.
-                T const disagreement = math::abs(T(best - diagonal));
+                T const disagreement = detail::distance(best, diagonal);
                 T const abs_error = best_error < disagreement ? disagreement : best_error;
                 Estimate<T> const result{ best, abs_error };
 
