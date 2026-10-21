@@ -1,26 +1,29 @@
-/// @file
-/// @brief The real-number concept and the constexpr helpers shared by the Numerixx algorithms.
-///
-/// The helpers use only comparisons and + - * /, so they work in constant expressions, give the same result on every
-/// compiler, and accept user-defined types such as boost::multiprecision::cpp_bin_float_50.
+/**
+ * @file
+ * @brief The real-number concept and the constexpr helpers shared by the Numerixx algorithms.
+ *
+ * The helpers use only comparisons and + - * /, so they work in constant expressions, give the same result on every
+ * compiler, and accept user-defined types such as boost::multiprecision::cpp_bin_float_50.
+ */
 
 #pragma once
 
 #include <concepts>
 #include <limits>
 
-/// @brief Numerixx: numerical algorithms for built-in and user-defined real types.
+/** @brief Numerixx: numerical algorithms for built-in and user-defined real types. */
 namespace nxx {
 
-    /// @brief A real-number type: a built-in floating-point type, or a user type such as a Boost.Multiprecision number.
-    ///
-    /// The type specialises std::numeric_limits as bounded, inexact and non-integer, so it has a finite max() and a
-    /// positive epsilon(). It is constructible from int and totally ordered, and its + - * / and unary minus return
-    /// something convertible to the type, so expression templates are allowed. Exact types such as rationals are
-    /// rejected.
-    ///
-    /// @tparam T The candidate type.
-    //
+    /**
+     * @brief A real-number type: a built-in floating-point type, or a user type such as a Boost.Multiprecision number.
+     *
+     * The type specialises std::numeric_limits as bounded, inexact and non-integer, so it has a finite max() and a
+     * positive epsilon(). It is constructible from int and totally ordered, and its + - * / and unary minus return
+     * something convertible to the type, so expression templates are allowed. Exact types such as rationals are
+     * rejected.
+     *
+     * @tparam T The candidate type.
+     */
     // Constructible from int, because constants are written T(1), T(2): a double literal would silently lose
     // precision in a wider type. The operators' results need only convert to T, because Boost.Multiprecision with
     // expression templates returns an expression object from a + b, not a T.
@@ -35,12 +38,14 @@ namespace nxx {
                           { -a } -> std::convertible_to<T>;
                       };
 
-    /// @brief Constexpr helpers for any nxx::real, built from comparisons and + - * / only.
+    /** @brief Constexpr helpers for any nxx::real, built from comparisons and + - * / only. */
     namespace math {
 
-        /// @brief The absolute value of @p x.
-        /// @param x The value.
-        /// @return |x|.
+        /**
+         * @brief The absolute value of @p x.
+         * @param x The value.
+         * @return |x|.
+         */
         template<real T>
         constexpr T abs(T const &x)
         {
@@ -48,24 +53,26 @@ namespace nxx {
             return x;
         }
 
-        /// @brief Whether @p x is finite.
-        /// @param x The value.
-        /// @return false for infinities and NaN, true otherwise.
-        //
+        /**
+         * @brief Whether @p x is finite.
+         * @param x The value.
+         * @return false for infinities and NaN, true otherwise.
+         */
         // A NaN is the only value that compares unequal to itself. max is parenthesised so that a max macro, as defined
         // by <windows.h>, cannot expand there.
         template<real T>
         constexpr bool isfinite(T const &x)
         { return x == x && math::abs(x) <= (std::numeric_limits<T>::max)(); }
 
-        /// @brief The N-th root of machine epsilon, the building block of finite-difference steps.
-        ///
-        /// Accurate to within an ulp, and the same at compile time and run time.
-        ///
-        /// @tparam N The root, N >= 2.
-        /// @tparam T The real type whose epsilon is taken.
-        /// @return eps^(1/N) for T.
-        //
+        /**
+         * @brief The N-th root of machine epsilon, the building block of finite-difference steps.
+         *
+         * Accurate to within an ulp, and the same at compile time and run time.
+         *
+         * @tparam N The root, N >= 2.
+         * @tparam T The real type whose epsilon is taken.
+         * @return eps^(1/N) for T.
+         */
         // Epsilon is first scaled into (radix^-N, 1] by powers of radix^N, which is exact. Newton's iteration for the
         // N-th root of the scaled value then starts at 1, above the root, and decreases until rounding stops it.
         template<int N, real T>

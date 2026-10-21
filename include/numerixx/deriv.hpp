@@ -1,13 +1,15 @@
-/// @file
-/// @brief Numerical derivatives of a scalar function by finite differences.
-///
-/// derivative() estimates f'(x) from values of fn near x, by a stencil: Central<P>, or Forward<P> and Backward<P> where
-/// fn is defined on one side of x only. Results are std::expected; Numerixx itself never throws.
-///
-/// @code
-/// auto const d = nxx::deriv::derivative<nxx::deriv::Central<4>>([](double x) { return std::exp(x); }, 1.0);
-/// if (d) { /* *d is e to about 1e-13 */ }
-/// @endcode
+/**
+ * @file
+ * @brief Numerical derivatives of a scalar function by finite differences.
+ *
+ * derivative() estimates f'(x) from values of fn near x, by a stencil: `Central<P>`, or `Forward<P>` and `Backward<P>`
+ * where fn is defined on one side of x only. Results are std::expected; Numerixx itself never throws.
+ *
+ * @code
+ * auto const d = nxx::deriv::derivative<nxx::deriv::Central<4>>([](double x) { return std::exp(x); }, 1.0);
+ * if (d) use(*d); // e to about 1e-13
+ * @endcode
+ */
 
 #pragma once
 
@@ -22,17 +24,19 @@
 #include <numeric>
 #include <type_traits>
 
-/// @brief Numerical derivatives of scalar functions.
+/** @brief Numerical derivatives of scalar functions. */
 namespace nxx::deriv {
 
-    /// @brief Why derivative() returned no estimate.
+    /** @brief Why derivative() returned no estimate. */
     enum class error {
-        /// No finite estimate: fn returned an infinite or NaN value, the sum or the quotient overflowed, a point
-        /// x + k h would overflow, or h is below the resolution of x.
+        /**
+         * No finite estimate: fn returned an infinite or NaN value, the sum or the quotient overflowed, a point
+         * x + k h would overflow, or h is below the resolution of x.
+         */
         non_finite
     };
 
-    /// @cond INTERNAL
+    /** @cond INTERNAL */
     namespace detail {
 
         // The orders the stencil families accept. Beyond the caps the gain is under half a digit even for 50-digit
@@ -41,42 +45,48 @@ namespace nxx::deriv {
         constexpr bool valid_one_sided(int p) { return p >= 1 && p <= 6; }
 
     } // namespace detail
-    /// @endcond
+    /** @endcond */
 
-    /// @brief Central stencil of accuracy order @p P, the default stencil of derivative().
-    ///
-    /// Nodes -P/2 ... P/2 without 0: P evaluations of fn, and an error of about eps^(P/(P+1)) with the default step.
-    /// Central<2> is the central difference (fn(x + h) - fn(x - h)) / 2h.
-    ///
-    /// @tparam P The accuracy order: even, 2 <= P <= 10.
+    /**
+     * @brief Central stencil of accuracy order @p P, the default stencil of derivative().
+     *
+     * Nodes -P/2 ... P/2 without 0: P evaluations of fn, and an error of about eps^(P/(P+1)) with the default step.
+     * `Central<2>` is the central difference (fn(x + h) - fn(x - h)) / 2h.
+     *
+     * @tparam P The accuracy order: even, 2 <= P <= 10.
+     */
     template<int P>
     struct Central
     {
         static_assert(detail::valid_central(P), "Central<P> needs an even order P from 2 to 10");
     };
 
-    /// @brief One-sided stencil of accuracy order @p P that never evaluates fn below x.
-    ///
-    /// Nodes 0 ... P: P + 1 evaluations of fn, including fn(x). For fn defined on one side of x only: the error is
-    /// larger than for a Central stencil of the same order, and order 1 reaches only about eps^(1/2).
-    ///
-    /// @tparam P The accuracy order: 1 <= P <= 6.
+    /**
+     * @brief One-sided stencil of accuracy order @p P that never evaluates fn below x.
+     *
+     * Nodes 0 ... P: P + 1 evaluations of fn, including fn(x). For fn defined on one side of x only: the error is
+     * larger than for a Central stencil of the same order, and order 1 reaches only about eps^(1/2).
+     *
+     * @tparam P The accuracy order: 1 <= P <= 6.
+     */
     template<int P>
     struct Forward
     {
         static_assert(detail::valid_one_sided(P), "Forward<P> needs an order P from 1 to 6");
     };
 
-    /// @brief Forward<P> mirrored: nodes -P ... 0, so fn is never evaluated above x.
-    ///
-    /// @tparam P The accuracy order: 1 <= P <= 6.
+    /**
+     * @brief `Forward<P>` mirrored: nodes -P ... 0, so fn is never evaluated above x.
+     *
+     * @tparam P The accuracy order: 1 <= P <= 6.
+     */
     template<int P>
     struct Backward
     {
         static_assert(detail::valid_one_sided(P), "Backward<P> needs an order P from 1 to 6");
     };
 
-    /// @cond INTERNAL
+    /** @cond INTERNAL */
     namespace detail {
 
         template<typename S>
@@ -202,23 +212,24 @@ namespace nxx::deriv {
         }
 
     } // namespace detail
-    /// @endcond
+    /** @endcond */
 
-    /// @brief The derivative of @p fn at @p x by stencil @p S with step @p h.
-    ///
-    /// fn is called once per node of S, and only at finite points. Failures are detected before the arithmetic that
-    /// would produce them, so they are error values in constant expressions too, except an overflow of the final sum or
-    /// quotient, which GCC rejects at compile time. Exceptions thrown by fn or by T pass through unchanged.
-    ///
-    /// @tparam S The stencil: Central<P> (by default Central<2>), Forward<P> or Backward<P>.
-    /// @tparam T The real type, deduced from @p x.
-    /// @tparam F A callable taking T const & and returning something convertible to T.
-    /// @param fn The function to differentiate.
-    /// @param x The point.
-    /// @param h The step; it converts to T, so a double step works for a multiprecision T.
-    /// @pre h > 0, and h well above ulp(x).
-    /// @return The estimate of f'(x), or error::non_finite.
-    //
+    /**
+     * @brief The derivative of @p fn at @p x by stencil @p S with step @p h.
+     *
+     * fn is called once per node of S, and only at finite points. Failures are detected before the arithmetic that
+     * would produce them, so they are error values in constant expressions too, except an overflow of the final sum or
+     * quotient, which GCC rejects at compile time. Exceptions thrown by fn or by T pass through unchanged.
+     *
+     * @tparam S The stencil: `Central<P>` (by default `Central<2>`), `Forward<P>` or `Backward<P>`.
+     * @tparam T The real type, deduced from @p x.
+     * @tparam F A callable taking T const & and returning something convertible to T.
+     * @param fn The function to differentiate.
+     * @param x The point.
+     * @param h The step; it converts to T, so a double step works for a multiprecision T.
+     * @pre h > 0, and h well above ulp(x).
+     * @return The estimate of f'(x), or error::non_finite.
+     */
     // By Taylor's theorem, sum_k w_k f(x + n_k h) = sum_j M_j h^j f^(j)(x) / j!, with the moments M_j = sum_k w_k
     // n_k^j. The weights make M_0 = 0, M_1 = denominator and M_j = 0 for 2 <= j <= order, so the sum divided by
     // denominator * h is f'(x) plus a truncation error of order h^order. For Central<2>, the even terms cancel:
@@ -297,18 +308,20 @@ namespace nxx::deriv {
         }
     }
 
-    /// @brief The derivative of @p fn at @p x by stencil @p S with the default step.
-    ///
-    /// The step is eps^(1/(P+1)) * max(|x|, 1) for a stencil of order P. It balances truncation against rounding when
-    /// fn varies on the scale max(|x|, 1), and the error is then about eps^(P/(P+1)); pass a step when fn varies
-    /// faster, or when the derivative is much smaller than that error.
-    ///
-    /// @tparam S The stencil: Central<P> (by default Central<2>), Forward<P> or Backward<P>.
-    /// @tparam T The real type, deduced from @p x.
-    /// @tparam F A callable taking T const & and returning something convertible to T.
-    /// @param fn The function to differentiate.
-    /// @param x The point.
-    /// @return The estimate of f'(x), or error::non_finite.
+    /**
+     * @brief The derivative of @p fn at @p x by stencil @p S with the default step.
+     *
+     * The step is eps^(1/(P+1)) * max(|x|, 1) for a stencil of order P. It balances truncation against rounding when
+     * fn varies on the scale max(|x|, 1), and the error is then about eps^(P/(P+1)); pass a step when fn varies
+     * faster, or when the derivative is much smaller than that error.
+     *
+     * @tparam S The stencil: `Central<P>` (by default `Central<2>`), `Forward<P>` or `Backward<P>`.
+     * @tparam T The real type, deduced from @p x.
+     * @tparam F A callable taking T const & and returning something convertible to T.
+     * @param fn The function to differentiate.
+     * @param x The point.
+     * @return The estimate of f'(x), or error::non_finite.
+     */
     template<typename S = Central<2>, real T, typename F>
     requires detail::stencil<S> && std::invocable<F &, T const &>
              && std::convertible_to<std::invoke_result_t<F &, T const &>, T>
