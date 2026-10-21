@@ -167,6 +167,31 @@ namespace {
         if (e) std::println("   {:<28} {:.1e}", "actual error", std::abs(e->value - 100.0));
     }
 
+    void ridders_compile_time()
+    {
+        std::println("\n10. Ridders at compile time, error estimate included");
+
+        // The tableau is exact for a cubic once two levels agree: 12 exactly, with the rounding floor as the estimate.
+        constexpr auto cube = [](double x) { return x * x * x; };
+        constexpr auto d = derivative<Ridders>(cube, 2.0, 1.0 / 16);
+        static_assert(d.has_value() && d->value == 12.0 && d->abs_error.has_value());
+        show("d/dx x^3 at x = 2", d);
+
+        // Runge's function with the default step. The compiler runs the whole method, restart rules included, and
+        // checks the actual error against the estimate: f'(x) = -50 x / (1 + 25 x^2)^2, -25 / 7.25^2 at x = 1/2.
+        constexpr auto runge = [](double x) { return 1.0 / (1.0 + 25.0 * x * x); };
+        constexpr auto r = derivative<Ridders>(runge, 0.5);
+        constexpr double exact = -25.0 / (7.25 * 7.25);
+        static_assert(r.has_value() && nxx::math::abs(r->value - exact) <= *r->abs_error);
+        show("d/dx 1/(1 + 25x^2) at 1/2", r);
+        std::println("   {:<28} {:.1e}", "actual error", nxx::math::abs(r->value - exact));
+
+        // Failures are values in constant expressions too: fn is NaN below 0, so every level around 0 fails.
+        constexpr auto half_line = [](double x) { return x < 0.0 ? std::numeric_limits<double>::quiet_NaN() : x; };
+        static_assert(derivative<Ridders>(half_line, 0.0).error() == nxx::deriv::error::non_finite);
+        show("d/dx x on x >= 0, at 0", derivative<Ridders>(half_line, 0.0));
+    }
+
 } // namespace
 
 int main()
@@ -179,4 +204,5 @@ int main()
     composition();
     stencils();
     ridders();
+    ridders_compile_time();
 }

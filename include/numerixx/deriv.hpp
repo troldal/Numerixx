@@ -48,7 +48,16 @@ namespace nxx::deriv {
      * @brief A derivative estimate: the value, and an estimate of its absolute error when the method provides one.
      *
      * Converts implicitly to T. Where a conversion is not considered (auto, std::format, and the operator templates of
-     * Boost.Multiprecision), write `e.value` or `T(e)`.
+     * Boost.Multiprecision), write `e.value` or `T(e)`. The conversion also applies where it may surprise: `if (*r)`
+     * tests the value against 0, not whether there is a result, and `int n = *r` truncates the value.
+     *
+     * @code
+     * auto const r = nxx::deriv::derivative<nxx::deriv::Ridders>(fn, 1.0);
+     * if (r) {
+     *     double const slope = *r;                          // the conversion
+     *     double const bound = r->abs_error.value_or(0.0); // present for Ridders, empty for the stencils
+     * }
+     * @endcode
      *
      * @tparam T The real type.
      */
@@ -124,10 +133,23 @@ namespace nxx::deriv {
     /**
      * @brief Ridders' extrapolation, with an error estimate.
      *
-     * Central differences at h, h/2, h/4, ... are extrapolated until rounding stops the improvement, so the step need
-     * not be tuned; the method restarts below a step at which fn is not finite or the result is not trustworthy. It
-     * costs 2 evaluations of fn per level, typically 10 to 16 for double and at most 64. The error estimate assumes
-     * that fn is accurate to about epsilon.
+     * Central differences at h, h/2, h/4, ... are extrapolated in Richardson's tableau until rounding stops the
+     * improvement, so the step need not be tuned: the initial step should be larger than the best step of the central
+     * difference, and by default it is max(|x|, 1) / 32. The method stops when an extrapolated entry equals its parent,
+     * after two levels that improve nothing, or at the resolution of x. It restarts below a step at which fn is not
+     * finite, and below one whose result has at most two correct bits by its own estimate while that estimate is far
+     * above rounding (a pole between the samples, aliasing).
+     *
+     * It costs 2 evaluations of fn per level, typically 10 to 16 for double and at most 64. The result's abs_error is
+     * the change of the best entry from its parent, but at least the rounding error of the difference it came from and
+     * at least its distance to the latest diagonal entry. It assumes that fn is accurate to about epsilon, and is
+     * optimistic for a noisier fn. Like the stencils, it runs in constant expressions.
+     *
+     * @code
+     * // The default initial step 1/32 reaches below 0, where log is NaN, so the method restarts below it.
+     * auto const r = nxx::deriv::derivative<nxx::deriv::Ridders>([](double x) { return std::log(x); }, 0.01);
+     * if (r) use(r->value, *r->abs_error); // 100 to about 1e-13 relative
+     * @endcode
      */
     struct Ridders
     {
@@ -148,12 +170,25 @@ namespace nxx::deriv {
         template<typename S>
         concept stencil = is_stencil<S>;
 
-        // Closed on purpose: the methods are the stencils and Ridders, and users cannot add one.
+        /**
+         * @brief The methods derivative() accepts: the stencils and Ridders.
+         *
+         * Closed on purpose: users cannot add a method.
+         *
+         * @tparam M The method type.
+         */
         template<typename M>
         concept method = stencil<M> || std::same_as<M, Ridders>;
 
-        // F & in the constraint, because fn is called as a named reference, an lvalue, through std::invoke with a T
-        // const lvalue: member pointers work, and so does a callable that rejects rvalues.
+        /**
+         * @brief A function derivative() can differentiate at a T.
+         *
+         * F & in the constraint, because fn is called as a named reference, an lvalue, through std::invoke with a T
+         * const lvalue: member pointers work, and so does a callable that rejects rvalues.
+         *
+         * @tparam F The callable type.
+         * @tparam T The real type.
+         */
         template<typename F, typename T>
         concept callable =
             std::invocable<F &, T const &> && std::convertible_to<std::invoke_result_t<F &, T const &>, T>;
@@ -291,7 +326,15 @@ namespace nxx::deriv {
             return t;
         }
 
-        // max(|x|, 1): the scale on which the default steps assume fn varies, so that a step is relative for large |x|.
+        /**
+         * @brief max(|x|, 1): the scale on which the default steps assume fn varies.
+         *
+         * So that a step is relative for large |x| and absolute near 0.
+         *
+         * @tparam T The real type.
+         * @param x The point.
+         * @return max(|x|, 1).
+         */
         template<real T>
         constexpr T scale(T const &x)
         { return math::abs(x) < T(1) ? T(1) : math::abs(x); }
@@ -308,12 +351,21 @@ namespace nxx::deriv {
         constexpr T default_step(T const &x)
         { return math::root_epsilon<Order + 1, T>() * detail::scale(x); }
 
-        // With K = max(|lo|, |hi|) the largest node and Q = max(2K, denominator), the check h <= max / 2Q and
-        // |x| <= max - Q h keeps every point and the divisor finite, so nothing overflows before fn is called. A point
-        // lies within K h of x, so it stays at least about K h below max: max - Q h is rounded by at most half an ulp
-        // of max, and K h of margin keeps a rounded point from tying up to infinity, as it could with a margin of 0
-        // (Q = K). The divisor is at most Q h <= max / 2. The check cannot overflow itself: Q h <= max / 2, and
-        // max - Q h only subtracts. For Central<2>, and for every level of Ridders, Q = 2.
+        /**
+         * @brief Whether every point x + k h and the divisor of a rule are finite: h <= max / 2q and |x| <= max - q h.
+         *
+         * With K = max(|lo|, |hi|) the largest node and q = max(2K, denominator), nothing overflows before fn is
+         * called. A point lies within K h of x, so it stays at least about K h below max: max - q h is rounded by at
+         * most half an ulp of max, and K h of margin keeps a rounded point from tying up to infinity, as it could with
+         * a margin of 0 (q = K). The divisor is at most q h <= max / 2. The check cannot overflow itself: q h <= max /
+         * 2, and max - q h only subtracts. For Central<2>, and for every level of Ridders, q = 2.
+         *
+         * @tparam T The real type.
+         * @param x The point, finite.
+         * @param h The step, > 0 and finite.
+         * @param q max(2K, denominator) of the rule.
+         * @return true if the rule can be evaluated without overflow.
+         */
         template<real T>
         constexpr bool fits(T const &x, T const &h, int q)
         {
@@ -321,20 +373,39 @@ namespace nxx::deriv {
             return h <= largest / T(2 * q) && math::abs(x) <= largest - T(q) * h;
         }
 
-        // A two-point difference, with the values and the spacing it came from, which Ridders needs for its rounding
-        // floor; the two-node stencils use the value only.
+        /**
+         * @brief A two-point difference, with the values and the spacing it came from.
+         *
+         * Ridders needs the values and the spacing for its rounding floor; the two-node stencils use the value only.
+         *
+         * @tparam T The real type.
+         */
         template<real T>
         struct Difference
         {
+            /** @brief (f_hi - f_lo) / dx. */
             T value;
+
+            /** @brief fn at the lower point. */
             T f_lo;
+
+            /** @brief fn at the upper point. */
             T f_hi;
+
+            /** @brief The distance between the points as evaluated, > 0. */
             T dx;
         };
 
-        // The rounding floor of a difference, its rounding error when fn is accurate to about eps:
-        // (eps |f_lo| + eps |f_hi|) / dx, eps applied term by term so that the sum cannot overflow, and saturated at
-        // max where the division would overflow (a large fn over a tiny step), which constant evaluation would reject.
+        /**
+         * @brief The rounding floor of a difference: its rounding error when fn is accurate to about eps.
+         *
+         * (eps |f_lo| + eps |f_hi|) / dx, eps applied term by term so that the sum cannot overflow, and saturated at
+         * max where the division would overflow (a large fn over a tiny step), which constant evaluation would reject.
+         *
+         * @tparam T The real type.
+         * @param d The difference.
+         * @return The floor, at most max.
+         */
         template<real T>
         constexpr T rounding_floor(Difference<T> const &d)
         {
@@ -345,9 +416,21 @@ namespace nxx::deriv {
             return sum / d.dx;
         }
 
-        // Divides by the distance between the points actually evaluated, not by the nominal one: the points are
-        // rounded, and at x = 1 with h = 1e-5 their spacing can differ from 2h by about 1e-11 relative, as much as the
-        // error aimed for.
+        /**
+         * @brief The difference (fn(x_hi) - fn(x_lo)) / (x_hi - x_lo), the central difference and both two-node rules.
+         *
+         * Divides by the distance between the points actually evaluated, not by the nominal one: the points are
+         * rounded, and at x = 1 with h = 1e-5 their spacing can differ from 2h by about 1e-11 relative, as much as the
+         * error aimed for.
+         *
+         * @tparam T The real type.
+         * @tparam F The callable type.
+         * @param fn The function.
+         * @param x_lo The lower point, finite.
+         * @param x_hi The upper point, finite.
+         * @return The difference with fn's values and the spacing, or error::non_finite if the points coincide, fn is
+         *         not finite at one of them, or the quotient overflows.
+         */
         template<real T, typename F>
         constexpr std::expected<Difference<T>, error> difference(F &fn, T const &x_lo, T const &x_hi)
         {
@@ -366,10 +449,22 @@ namespace nxx::deriv {
             return Difference<T>{ d, f_lo, f_hi, dx };
         }
 
-        // By Taylor's theorem, sum_k w_k f(x + n_k h) = sum_j M_j h^j f^(j)(x) / j!, with the moments M_j =
-        // sum_k w_k n_k^j. The weights make M_0 = 0, M_1 = denominator and M_j = 0 for 2 <= j <= order, so the sum
-        // divided by denominator * h is f'(x) plus a truncation error of order h^order. For Central<2>, the even terms
-        // cancel: (f(x + h) - f(x - h)) / 2h = f'(x) + h^2/6 f'''(x) + O(h^4).
+        /**
+         * @brief The derivative of fn at x by stencil S with step h.
+         *
+         * By Taylor's theorem, sum_k w_k f(x + n_k h) = sum_j M_j h^j f^(j)(x) / j!, with the moments M_j =
+         * sum_k w_k n_k^j. The weights make M_0 = 0, M_1 = denominator and M_j = 0 for 2 <= j <= order, so the sum
+         * divided by denominator * h is f'(x) plus a truncation error of order h^order. For Central<2>, the even
+         * terms cancel: (f(x + h) - f(x - h)) / 2h = f'(x) + h^2/6 f'''(x) + O(h^4).
+         *
+         * @tparam S The stencil.
+         * @tparam T The real type.
+         * @tparam F The callable type.
+         * @param fn The function.
+         * @param x The point; a NaN x fails the overflow check.
+         * @param h The step, > 0 and finite.
+         * @return The estimate, or error::non_finite.
+         */
         template<typename S, real T, typename F>
         constexpr std::expected<T, error> stencil_derivative(F &fn, T const &x, T const &h)
         {
@@ -416,7 +511,14 @@ namespace nxx::deriv {
             }
         }
 
-        // An array of N copies of v, so that T need not be default-constructible.
+        /**
+         * @brief An array of N copies of v, so that T need not be default-constructible.
+         *
+         * @tparam N The size.
+         * @tparam T The real type.
+         * @param v The value.
+         * @return The array.
+         */
         template<std::size_t N, real T>
         constexpr std::array<T, N> filled(T const &v)
         {
@@ -424,20 +526,37 @@ namespace nxx::deriv {
                        std::make_index_sequence<N>{});
         }
 
-        // Levels Ridders may attempt in all, restarts included: at most 2 * 32 = 64 evaluations of fn. Only a guard:
-        // a result takes 5 to 11 levels for double and float, 10 to 19 for 50 and 100 digits, up to 18 near an edge.
+        /**
+         * @brief The levels Ridders may attempt in all, restarts included: at most 2 * 32 = 64 evaluations of fn.
+         *
+         * Only a guard: a result takes 5 to 11 levels for double and float, 10 to 19 for 50 and 100 digits, up to 18
+         * near an edge.
+         */
         inline constexpr int ridders_levels = 32;
 
-        // Ridders' extrapolation, from Ridders (1982) and Richardson extrapolation with its a posteriori error estimate
-        // (Burden et al., Numerical Analysis; Sidi, Practical Extrapolation Methods, 2003). The constants are our own,
-        // chosen with a prototype (docs/PHASE3_API.md): ratio 2, two levels of stall, the rounding floor, the
-        // untrusted-result test.
-        //
-        // Level i is the central difference D_i at h_i = h_start / 2^i. Its error expansion has even powers of h only,
-        // so column j of the tableau removes the h^(2j) term, in Burden's difference form
-        //     A[i][j] = A[i][j-1] + (A[i][j-1] - A[i-1][j-1]) / (4^j - 1),
-        // which cannot overflow below max (the product form (4^j A[i][j-1] - A[i-1][j-1]) / (4^j - 1) can) and is exact
-        // when the two parents are equal. Only the previous row is kept.
+        /**
+         * @brief Ridders' extrapolation of the central difference at x, from the initial step h.
+         *
+         * From Ridders (1982) and Richardson extrapolation with its a posteriori error estimate (Burden et al.,
+         * Numerical Analysis; Sidi, Practical Extrapolation Methods, 2003). The constants are our own, chosen with a
+         * prototype (docs/PHASE3_API.md): ratio 2, two levels of stall, the rounding floor, the untrusted-result test.
+         *
+         * Level i is the central difference D_i at h_i = h_start / 2^i. Its error expansion has even powers of h only,
+         * so column j of the tableau removes the h^(2j) term, in Burden's difference form
+         *
+         *     A[i][j] = A[i][j-1] + (A[i][j-1] - A[i-1][j-1]) / (4^j - 1),
+         *
+         * which cannot overflow below max (the product form (4^j A[i][j-1] - A[i-1][j-1]) / (4^j - 1) can) and is
+         * exact when the two parents are equal. Only the previous row is kept.
+         *
+         * @tparam T The real type.
+         * @tparam F The callable type.
+         * @param fn The function.
+         * @param x The point, finite.
+         * @param h The initial step, > 0 and finite.
+         * @return The best entry with its error estimate; if the levels run out during restarts, the last untrusted
+         *         result; error::non_finite if no tableau reached two finite levels.
+         */
         template<real T, typename F>
         constexpr std::expected<Estimate<T>, error> ridders(F &fn, T const &x, T const &h)
         {
