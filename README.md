@@ -34,6 +34,9 @@ CPMAddPackage("gh:troldal/Numerixx#dev")
 target_link_libraries(app PRIVATE numerixx::numerixx)
 ```
 
+The API documentation is generated with Doxygen: build the target `numerixx_docs`, or run `doxygen docs/Doxyfile` in
+the project root.
+
 ## License
 
 MIT

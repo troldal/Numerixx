@@ -17,6 +17,7 @@ in CI.
 - `demo/` small demo programs (`NUMERIXX_BUILD_DEMOS`, on when top level), e.g. `build/<preset>/demo/numerixx_deriv_demo`
 - `cmake/CPM.cmake` fetches the test dependencies; the library itself has none
 - `CMakePresets.json` one preset per toolchain, used locally and in CI (`.github/workflows/ci.yml`)
+- `docs/Doxyfile` the API documentation settings, used by the docs targets in `docs/CMakeLists.txt`
 - `docs/plan.md` current plan; `docs/design.md` design decisions; also a technique survey, a tutorial and API
   proposals (`docs/PHASE2_API.md`)
 
@@ -28,6 +29,9 @@ Presets: `clang-cl`, `cl`, `gcc`, `clang`, `emscripten`; each builds Debug into 
 - Build: `cmake --build --preset <preset>`
 - Run affected tests: `build/<preset>/tests/numerixx_tests --test-case="deriv:*"` (one doctest executable)
 - Full suite: `ctest --preset <preset>`
+- Docs: `cmake --build --preset <preset> --target numerixx_docs` (or `numerixx_docs_internal`, which adds the `detail`
+  namespaces) writes `build/<preset>/docs/public/html`; a Doxygen warning fails it. The targets exist when Doxygen
+  1.10 or later is found (Strawberry Perl's 1.10 is first on PATH; 1.18 is in `C:/Program Files/doxygen/bin`).
 - `clang-cl` and `cl` need the MSVC environment, which the agent's shell lacks: run them from a batch file that first
   calls `"C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"`.
 - `g++` on PATH is Strawberry Perl's; configure `gcc` with `-DCMAKE_CXX_COMPILER=C:/Toolchains/GCC16/bin/g++.exe` and

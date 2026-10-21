@@ -1,0 +1,24 @@
+# Doxygen configuration for the Numerixx API documentation; only the settings that differ from the defaults.
+# Paths are relative to the project root: run `doxygen docs/Doxyfile` there, or build the target numerixx_docs
+# (numerixx_docs_internal also documents the detail namespaces, by enabling the INTERNAL section).
+
+PROJECT_NAME           = Numerixx
+PROJECT_BRIEF          = "Numerical methods for built-in and user-defined real types"
+OUTPUT_DIRECTORY       = build/docs
+
+INPUT                  = include/numerixx README.md
+FILE_PATTERNS          = *.hpp
+USE_MDFILE_AS_MAINPAGE = README.md
+STRIP_FROM_PATH        = include
+STRIP_FROM_INC_PATH    = include
+
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+
+# Warnings are errors, as for the code: every public entity, parameter and return value must be documented.
+QUIET                  = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_IF_INCOMPLETE_DOC = YES
+WARN_NO_PARAMDOC       = YES
+WARN_AS_ERROR          = FAIL_ON_WARNINGS
