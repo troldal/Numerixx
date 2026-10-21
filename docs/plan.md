@@ -27,9 +27,9 @@ API approved: `docs/PHASE2_API.md`.
 
 API approved: `docs/PHASE3_API.md`.
 
-- [ ] `derivative<Ridders>` with an error estimate, restarting below failing or untrusted steps
-- [ ] One return type for every method, `std::expected<Estimate<T>, error>`, implicitly convertible to T
-- [ ] CI passes on all five toolchains
+- [x] `derivative<Ridders>` with an error estimate, restarting below failing or untrusted steps (1023248)
+- [x] One return type for every method, `std::expected<Estimate<T>, error>`, implicitly convertible to T (1023248)
+- [x] CI passes on all five toolchains (run 39605999468)
 
 ### Phase 4: second derivatives
 
