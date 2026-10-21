@@ -20,6 +20,7 @@
 #include <concepts>
 #include <cstddef>
 #include <expected>
+#include <functional>
 #include <limits>
 #include <numeric>
 #include <type_traits>
@@ -30,8 +31,8 @@ namespace nxx::deriv {
     /** @brief Why derivative() returned no estimate. */
     enum class error {
         /**
-         * No finite estimate: fn returned an infinite or NaN value, the sum or the quotient overflowed, a point
-         * x + k h would overflow, or h is below the resolution of x.
+         * No finite estimate: x is not finite, fn returned an infinite or NaN value, the sum or the quotient
+         * overflowed, a point x + k h would overflow, or h is below the resolution of x.
          */
         non_finite
     };
@@ -314,9 +315,11 @@ namespace nxx::deriv {
             T const dx = x_hi - x_lo;
             if (dx == T(0)) return std::unexpected(error::non_finite); // h is below the resolution of x
             // fn may return an expression template, and every intermediate is a T const, never auto: an unevaluated
-            // expression would hold references to its operands, which can dangle.
-            T const f_lo = static_cast<T>(fn(x_lo));
-            T const f_hi = static_cast<T>(fn(x_hi));
+            // expression would hold references to its operands, which can dangle. fn is called through std::invoke
+            // with a T const lvalue, exactly as the constraint std::invocable<F &, T const &> promises, so member
+            // pointers work and so does a callable that rejects rvalues.
+            T const f_lo = static_cast<T>(std::invoke(fn, x_lo));
+            T const f_hi = static_cast<T>(std::invoke(fn, x_hi));
             // Checked before subtracting, so inf - inf is never formed: constant evaluation rejects arithmetic that
             // produces a NaN (and on GCC an overflow), so the failure would be a compile error instead of an error
             // value.
@@ -335,7 +338,8 @@ namespace nxx::deriv {
             if (T(x + h) == x || T(x - h) == x) return std::unexpected(error::non_finite);
             T sum = T(0);
             for (std::size_t k = 0; k < size; ++k) {
-                T const fk = static_cast<T>(fn(point(table.nodes[k])));
+                T const xk = point(table.nodes[k]); // a T const lvalue, as for two nodes
+                T const fk = static_cast<T>(std::invoke(fn, xk));
                 // Checked before it is added, so inf - inf is never formed (see above).
                 if (!math::isfinite(fk)) return std::unexpected(error::non_finite);
                 sum = T(sum + T(table.numerators[k]) * fk);
@@ -365,6 +369,8 @@ namespace nxx::deriv {
              && std::convertible_to<std::invoke_result_t<F &, T const &>, T>
     [[nodiscard]] constexpr std::expected<T, error> derivative(F &&fn, T const &x)
     {
+        // Checked first: a NaN x would give a NaN step and trip the h > 0 precondition of the overload below.
+        if (!math::isfinite(x)) return std::unexpected(error::non_finite);
         // Qualified, so that argument-dependent lookup cannot pick a derivative() from the namespace of T or F.
         return nxx::deriv::derivative<S>(fn, x, detail::default_step<detail::make_table(S{}).order>(x));
     }

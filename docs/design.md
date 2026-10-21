@@ -25,7 +25,9 @@ Decisions in force. Each one says why; change it here before changing the code.
 - `isfinite(x)` is `x == x && |x| <= max`: NaN is the only value unequal to itself.
 - `root_epsilon<N, T>()` scales epsilon into (radix^-N, 1] by powers of radix^N, which is exact, then runs Newton's
   iteration for `y^N = a` from 1 down to the root and stops when the iterate stops decreasing. One function serves
-  every default step (N = p + 1 for a stencil of order p); it replaced `cbrt_epsilon`.
+  every default step (N = p + 1 for a stencil of order p); it replaced `cbrt_epsilon`. Any N >= 2 works: each
+  scaling step multiplies by the radix one factor at a time and stops once the value passes 1, so radix^N, which
+  overflows for large N (2^128 for float), is never formed.
 
 ## Derivatives (`deriv.hpp`)
 
@@ -54,7 +56,11 @@ Decisions in force. Each one says why; change it here before changing the code.
 - Numerixx never throws and never catches: an exception thrown by fn or by T's operations passes through unchanged.
   Catching would break builds without exceptions, such as Emscripten's default.
 - `fn` must be invocable with `T const &` and return something convertible to `T`; the result is converted with
-  `static_cast<T>` before any arithmetic, so expression templates do not escape.
+  `static_cast<T>` before any arithmetic, so expression templates do not escape. Every call is
+  `std::invoke(fn, point)` with `point` a `T const` lvalue, exactly what the constraint promises: member-function
+  pointers work, and so do callables that reject rvalues.
+- The default-step overload rejects a non-finite x before computing the step: a NaN x would give a NaN step and trip
+  the `h > 0` precondition, which stays an `assert` for caller-supplied steps.
 - The step parameter is `std::type_identity_t<T>`, so `T` is deduced from `x` alone and a `double` step converts to a
   multiprecision `T`.
 - Two-node rules (`Central<2>`, `Forward<1>`, `Backward<1>`) divide by the distance between the points actually

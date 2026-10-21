@@ -45,6 +45,10 @@ static_assert(close(nxx::math::root_epsilon<5, double>(), 0x1.8406003b2ae5cp-11,
 static_assert(close(nxx::math::root_epsilon<7, double>(), 0x1.7c6a1f29e2ce6p-8, 2));
 static_assert(close(nxx::math::root_epsilon<11, double>(), 0x1.3545598e5c232p-5, 2));
 static_assert(close(nxx::math::root_epsilon<3, float>(), 0x1.428a3p-8f, 2));
+// Regression: radix^N used to be formed up front and overflowed for large N (2^128 for float), which constant
+// evaluation rejects. References 2^(-23/128) and 2^(-52/2000), computed and rounded as above.
+static_assert(close(nxx::math::root_epsilon<128, float>(), 0x1.c40ab6p-1f, 2));
+static_assert(close(nxx::math::root_epsilon<2000, double>(), 0x1.f6db004386a07p-1, 2));
 
 TEST_CASE("math: root_epsilon matches the exact roots")
 {
@@ -55,6 +59,8 @@ TEST_CASE("math: root_epsilon matches the exact roots")
     CHECK(close(nxx::math::root_epsilon<7, double>(), 0x1.7c6a1f29e2ce6p-8, 2));
     CHECK(close(nxx::math::root_epsilon<11, double>(), 0x1.3545598e5c232p-5, 2));
     CHECK(close(nxx::math::root_epsilon<3, float>(), 0x1.428a3p-8f, 2));
+    CHECK(close(nxx::math::root_epsilon<128, float>(), 0x1.c40ab6p-1f, 2));
+    CHECK(close(nxx::math::root_epsilon<2000, double>(), 0x1.f6db004386a07p-1, 2));
     // long double differs by platform; std::cbrt is within an ulp for the exact argument eps.
     CHECK(close(nxx::math::root_epsilon<3, long double>(), std::cbrt(std::numeric_limits<long double>::epsilon()), 2));
 

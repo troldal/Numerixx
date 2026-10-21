@@ -153,6 +153,18 @@ static_assert(derivative<Backward<1>>(saturating, -(dmax - 0x1p+971), 0x1.8p+971
 static_assert(derivative<Backward<2>>(power<1>, -1.0, 0x1.8p-54) == non_finite);
 static_assert(derivative<Central<4>>(power<1>, -1.0, 0x1.8p-54) == non_finite);
 
+// Regression: a non-finite x with the default step gave a NaN or infinite step, and a NaN step tripped the h > 0
+// precondition (an abort in debug builds, a compile error in constant expressions) instead of returning non_finite.
+namespace {
+    constexpr double qnan = std::numeric_limits<double>::quiet_NaN();
+    constexpr double inf = std::numeric_limits<double>::infinity();
+} // namespace
+static_assert(derivative(power<1>, qnan) == non_finite);
+static_assert(derivative<Central<6>>(power<1>, qnan) == non_finite);
+static_assert(derivative<Forward<2>>(power<1>, qnan) == non_finite);
+static_assert(derivative<Backward<1>>(power<1>, qnan) == non_finite);
+static_assert(derivative(power<1>, inf) == non_finite && derivative<Forward<2>>(power<1>, -inf) == non_finite);
+
 namespace {
 
     // The default step on f = x^(p+1) at x = 1, where the truncation error is exactly M_(p+1) / den * h^p
@@ -282,6 +294,15 @@ TEST_CASE("deriv: stencil failures")
     CHECK(derivative<Forward<1>>(saturating_counted, dmax - 0x1p+971, 0x1.8p+971) == non_finite);
     CHECK(derivative<Backward<2>>(counted, -1.0, 0x1.8p-54) == non_finite);
     CHECK(derivative<Central<4>>(counted, -1.0, 0x1.8p-54) == non_finite);
+    CHECK(calls == 0);
+
+    // A non-finite x with the default step: no step is computed and fn is not called.
+    CHECK(derivative(counted, qnan) == non_finite);
+    CHECK(derivative<Central<6>>(counted, qnan) == non_finite);
+    CHECK(derivative<Forward<2>>(counted, qnan) == non_finite);
+    CHECK(derivative<Backward<1>>(counted, qnan) == non_finite);
+    CHECK(derivative(counted, inf) == non_finite);
+    CHECK(derivative<Forward<2>>(counted, -inf) == non_finite);
     CHECK(calls == 0);
 }
 

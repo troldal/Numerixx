@@ -80,16 +80,19 @@ namespace nxx {
         {
             static_assert(N >= 2);
             T const radix = static_cast<T>(std::numeric_limits<T>::radix);
-            T radix_n = T(1);
-            for (int i = 0; i < N; ++i) radix_n = radix_n * radix;
 
             // Multiplying by a power of the radix changes only the exponent, so a and scale stay exact, and
             // eps = a / scale^N gives eps^(1/N) = a^(1/N) / scale. For double and N = 3, 2^-52 becomes a = 0.5 with
-            // scale = 2^17.
+            // scale = 2^17. Each step tries a * radix^N one factor of radix at a time and stops as soon as the value
+            // passes 1, so no intermediate exceeds radix: forming radix^N itself would overflow for large N (2^128 for
+            // float), which constant evaluation rejects. For such N no step is taken, and a stays eps.
             T a = std::numeric_limits<T>::epsilon();
             T scale = T(1);
-            while (a * radix_n <= T(1)) {
-                a = a * radix_n;
+            while (true) {
+                T b = a;
+                for (int i = 0; i < N && b <= T(1); ++i) b = b * radix;
+                if (!(b <= T(1))) break;
+                a = b;
                 scale = scale * radix;
             }
 
@@ -97,7 +100,8 @@ namespace nxx {
             // since a <= 1, every iterate stays above the root (by the inequality of arithmetic and geometric means)
             // and decreases; in floating point it stops decreasing once it reaches the root to within rounding. The
             // scaling put the root in (1/radix, 1], so this takes a few steps; started from 1 against eps itself, it
-            // would take dozens.
+            // would take dozens. y^(N-1) cannot underflow: if a was scaled, then radix^N <= 1/eps and y > 1/radix, so
+            // y^(N-1) > radix^(1-N) >= radix eps; otherwise a = eps and y^(N-1) >= eps^((N-1)/N) >= eps.
             T y = T(1);
             while (true) {
                 T y_n1 = T(1);
