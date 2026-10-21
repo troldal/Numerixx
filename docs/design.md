@@ -31,6 +31,16 @@ Decisions in force. Each one says why; change it here before changing the code.
 
 ## Derivatives (`deriv.hpp`)
 
+- One entry point, `derivative<M>(fn, x[, h])`, for every method M: the stencils and `Ridders` (`PHASE3_API.md`). The
+  method concept `detail::method` is closed (`stencil<M> || same_as<M, Ridders>`), not a trait users could
+  specialise. Each public overload dispatches once with `if constexpr`.
+- Every method returns `std::expected<Estimate<T>, error>`, `Estimate<T> = {value, std::optional<T> abs_error}`: one
+  return type for every method (user decision). The stencils leave `abs_error` empty, because a stencil can only bound
+  its truncation error with extra evaluations, and the rounding part alone would mislead. `Estimate` converts
+  implicitly to T (user decision); it stays an aggregate. Restricting the conversion to T exactly (a deleted
+  conversion template) would stop `if (*r)` and `int n = *r`, but makes `r == 6.0` ambiguous on Clang, so it was not
+  done. The defaulted `==` compares both members; without it, `==` would compare only the values, through the
+  conversion.
 - Stencils are the class templates `Central<P>` (even P, 2 to 10), `Forward<P>` and `Backward<P>` (1 to 6), the first
   template argument of `derivative`, defaulting to `Central<2>` (`PHASE2_API.md`). They are empty tags; their tables
   are internal (`detail::make_table`), because no current use needs user-written stencils. The caps are numerical:
@@ -39,9 +49,9 @@ Decisions in force. Each one says why; change it here before changing the code.
 - The weights come from closed forms, computed at compile time in exact integer arithmetic and put over one common
   denominator, so they are exact in every real type (the largest numerator is 2100). Fornberg's general algorithm is
   not needed for three fixed families.
-- Results are `std::expected<T, nxx::deriv::error>`. The one error so far is `non_finite`: fn returned an infinite or
-  NaN value, the sum or quotient overflowed, a point `x + k h` would overflow, or h is below the resolution of x. A
-  non-positive step is a precondition violation (`assert`).
+- The one error so far is `non_finite`: x is not finite, fn returned an infinite or NaN value, the sum or quotient
+  overflowed, a point `x + k h` would overflow, or h is below the resolution of x. Its documentation reserves more
+  values. A non-positive or non-finite step is a precondition violation (`assert`).
 - Failures are detected before the arithmetic that would produce them: with `K = max |node|` and `Q = max(2K, den)`,
   the input check `h <= max / 2Q` and `|x| <= max - Q h` keeps every point at least about `K h` below max and the
   divisor finite (for `Central<2>`, Q = 2: `h <= max/4`, `|x| <= max - 2h`). The margin matters: with Q = K, rounding
@@ -72,10 +82,34 @@ Decisions in force. Each one says why; change it here before changing the code.
   against rounding error (O(eps / h)) when fn varies on a scale of `max(|x|, 1)`, giving an error of about
   `eps^(p/(p+1))`. The order-dependent constant `(S / (p C))^(1/(p+1))` is left out; it lies between 1.4 and 2.0 and
   costs at most a factor 1.64. Callers pass a step when fn varies faster.
+- The two-point difference is one helper, `detail::difference`, returning the value and the rounding floor
+  `(eps |f_lo| + eps |f_hi|) / (x_hi - x_lo)`; the two-node stencils and every Ridders level use it.
+
+## Ridders (`derivative<Ridders>`)
+
+The specification, with the evidence for each rule and constant, is `PHASE3_API.md` ("Algorithm" and "The
+constants"); the code is implemented from Ridders (1982) and Richardson extrapolation, not from Numerical Recipes.
+In short:
+- Central differences at `h_start / 2^i`, in a tableau in Burden's difference form (it cannot overflow below max and
+  is exact for equal parents), keeping only the previous row; the rows are filled from `T(0)`, so T need not be
+  default-constructible.
+- Each extrapolated entry's estimate is its change from its diagonal parent, floored at the rounding floor; the result
+  is the best entry, with `abs_error = max(its estimate, |best - latest diagonal|)`.
+- Stops on exact agreement with the diagonal parent, after two levels without improvement, at the resolution of x
+  (checked after the overflow check, so x +- h is only formed when finite), or after 32 attempted levels (64
+  evaluations).
+- Restarts below the failing step when a level fails (fn not finite, a non-finite entry, the overflow check), and
+  below the starting step when the result is untrusted (`4 abs_error >= |value|` and `abs_error > 64 floor`); the
+  restart discards the tableau, the best entry and the stall counter.
+- The default initial step is `max(|x|, 1) / 32`.
 
 ## Tests
 
 - doctest. Every constexpr function has `static_assert` tests next to run-time tests of the same cases.
+- Ridders: the actual error must be within 6 times the estimate, and the estimate within twice the independent
+  Python prototype's value for the case (for the multiprecision types, which the prototype does not model, twice the
+  first C++ run's). Polynomials with dyadic x and h are exact, with the rounding floor of the predicted level as the
+  estimate (binary types only).
 - Stencil tables are checked by `static_assert` against the moment conditions of their order, with a moment function
   in the test file, independent of the closed forms in the library. Run-time tolerances are `(C + 2S) eps^(p/(p+1))`:
   truncation plus rounding of fn's values and of the points, a bound that the measured errors stay 4 to 16 times

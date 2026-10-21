@@ -22,10 +22,10 @@ namespace {
 
     // |a - b| <= tol * |b|
     template<typename T>
-    bool close(std::expected<T, nxx::deriv::error> const &a, T const &b, T const &tol)
+    bool close(std::expected<nxx::deriv::Estimate<T>, nxx::deriv::error> const &a, T const &b, T const &tol)
     {
         using std::abs;
-        return a.has_value() && abs(*a - b) <= tol * abs(b);
+        return a.has_value() && abs(T(a->value - b)) <= tol * abs(b);
     }
 
 } // namespace

@@ -13,6 +13,7 @@ namespace {
     using nxx::deriv::Central;
     using nxx::deriv::derivative;
     using nxx::deriv::Forward;
+    using nxx::deriv::Ridders;
 
     std::string_view to_string(nxx::deriv::error e)
     {
@@ -30,6 +31,19 @@ namespace {
             std::println("   {:<28} {:.17g}", label, *d);
         else
             std::println("   {:<28} error: {}", label, to_string(d.error()));
+    }
+
+    // A derivative estimate, with its error estimate when the method provides one (Ridders). std::format does not
+    // consider the conversion to T, so the value is passed explicitly.
+    template<typename T>
+    void show(std::string_view label, std::expected<nxx::deriv::Estimate<T>, nxx::deriv::error> const &d)
+    {
+        if (!d)
+            std::println("   {:<28} error: {}", label, to_string(d.error()));
+        else if (d->abs_error)
+            std::println("   {:<28} {:.17g} +- {:.1e}", label, d->value, *d->abs_error);
+        else
+            std::println("   {:<28} {:.17g}", label, d->value);
     }
 
     void default_step()
@@ -137,6 +151,22 @@ namespace {
         show("Forward<4>", derivative<Forward<4>>(right, 0.0));
     }
 
+    void ridders()
+    {
+        // Ridders adapts the step and estimates its own error: compare the estimate with the actual error.
+        std::println("\n9. Ridders' extrapolation, with an error estimate");
+        auto const exp = [](double x) { return std::exp(x); };
+        auto const d = derivative<Ridders>(exp, 1.0);
+        show("d/dx exp(x) at x = 1", d);
+        if (d) std::println("   {:<28} {:.1e}", "actual error", std::abs(d->value - std::exp(1.0)));
+
+        // Near the edge of fn's domain the default initial step is too large; Ridders restarts below it.
+        auto const log = [](double x) { return std::log(x); };
+        auto const e = derivative<Ridders>(log, 0.01);
+        show("d/dx log(x) at x = 0.01", e);
+        if (e) std::println("   {:<28} {:.1e}", "actual error", std::abs(e->value - 100.0));
+    }
+
 } // namespace
 
 int main()
@@ -148,4 +178,5 @@ int main()
     errors();
     composition();
     stencils();
+    ridders();
 }

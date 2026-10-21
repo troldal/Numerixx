@@ -25,7 +25,11 @@ API approved: `docs/PHASE2_API.md`.
 
 ### Phase 3: Ridders' extrapolation
 
-- [ ] Ridders' method with an error estimate
+API approved: `docs/PHASE3_API.md`.
+
+- [ ] `derivative<Ridders>` with an error estimate, restarting below failing or untrusted steps
+- [ ] One return type for every method, `std::expected<Estimate<T>, error>`, implicitly convertible to T
+- [ ] CI passes on all five toolchains
 
 ### Phase 4: second derivatives
 

@@ -4,7 +4,7 @@ This tutorial walks through the current implementation of numerical derivatives 
 `include/numerixx/math.hpp` and `include/numerixx/deriv.hpp`. It starts with how to call the library, then explains the
 mathematics behind the central difference and its default step, goes through the code line by line, including the C++
 details that let the same code run on `double`, on Boost.Multiprecision types and at compile time, and ends with the
-higher-order and one-sided stencils (section 8).
+higher-order and one-sided stencils (section 8) and Ridders' extrapolation (section 9).
 
 ## 1. Using it
 
@@ -16,18 +16,20 @@ auto const f = [](double x) { return std::exp(x); };
 auto const d = nxx::deriv::derivative(f, 1.0);         // default step
 auto const e = nxx::deriv::derivative(f, 1.0, 1e-4);   // explicit step h
 
-if (d) std::println("{}", *d);                         // 2.7182818284569006 (exact: 2.7182818284590451)
+if (d) std::println("{}", d->value);                   // 2.7182818284569006 (exact: 2.7182818284590451)
 
-using nxx::deriv::Central, nxx::deriv::Forward;
+using nxx::deriv::Central, nxx::deriv::Forward, nxx::deriv::Ridders;
 auto const g = nxx::deriv::derivative<Central<4>>(f, 1.0);   // higher order: 4 evaluations
 auto const k = nxx::deriv::derivative<Forward<2>>(f, 1.0);   // one-sided: never evaluates f below x
+auto const r = nxx::deriv::derivative<Ridders>(f, 1.0);      // adapts its step; r->abs_error estimates the error
 ```
 
-There are two overloads, with and without a step. The optional template argument chooses the stencil (section 8); by
-default it is `Central<2>`, the central difference of sections 2 to 7. Both return `std::expected<T, nxx::deriv::error>`: either the
-estimate, or `error::non_finite` if no finite estimate exists (section 5 lists the cases). Numerixx itself never
-throws. The demo program
-(`demo/deriv_demo.cpp`) runs every example in this tutorial.
+There are two overloads, with and without a step. The optional template argument chooses the method: a stencil
+(section 8) or Ridders (section 9); by default it is `Central<2>`, the central difference of sections 2 to 7. Every
+method returns `std::expected<Estimate<T>, nxx::deriv::error>`: either an `Estimate`, or `error::non_finite` if no
+finite estimate exists (section 5 lists the cases). An `Estimate` holds `value` and `abs_error`, an
+`std::optional<T>` that only Ridders fills in, and converts implicitly to T, so `double slope = *d;` works. Numerixx
+itself never throws. The demo program (`demo/deriv_demo.cpp`) runs every example in this tutorial.
 
 ## 2. The formula: the central difference
 
@@ -209,16 +211,18 @@ For `double` the result is `cbrt(0.5) / 2^17 = 0.7937 / 131072 = 6.055e-6`, whic
 
 ## 5. The derivative (`deriv.hpp`)
 
-`derivative` handles every stencil (section 8 covers the general case). For the default `Central<2>`, its compile-time
-checks and branches reduce to this:
+`derivative` handles every method (sections 8 and 9 cover the others): one `if constexpr` sends Ridders to
+`detail::ridders` and the stencils to `detail::stencil_derivative`, whose result is wrapped as
+`Estimate{d, std::nullopt}`. For the default `Central<2>`, the compile-time checks and branches reduce to this (shown
+as one function returning the value; in the code the two-point part is the helper `detail::difference`, which
+Ridders shares):
 
 ```cpp
-template<typename S = Central<2>, real T, typename F>
-requires detail::stencil<S> && std::invocable<F &, T const &>
-         && std::convertible_to<std::invoke_result_t<F &, T const &>, T>
-[[nodiscard]] constexpr std::expected<T, error> derivative(F &&fn, T const &x, std::type_identity_t<T> const &h)
+template<typename M = Central<2>, real T, typename F>
+requires detail::method<M> && detail::callable<F, T>
+[[nodiscard]] constexpr std::expected<T, error> derivative_value(F &&fn, T const &x, std::type_identity_t<T> const &h)
 {
-    assert(h > T(0));
+    assert(h > T(0) && math::isfinite(h));
     // With |x| + 2h <= max, the points and their distance are finite, so nothing overflows before fn is called.
     T const largest = (std::numeric_limits<T>::max)();
     if (!(h <= largest / T(4) && math::abs(x) <= largest - T(2) * h)) return std::unexpected(error::non_finite);
@@ -226,8 +230,8 @@ requires detail::stencil<S> && std::invocable<F &, T const &>
     T const xp = x + h;
     T const dx = xp - xm;
     if (dx == T(0)) return std::unexpected(error::non_finite); // h is below the resolution of x
-    T const fm = static_cast<T>(fn(xm));
-    T const fp = static_cast<T>(fn(xp));
+    T const fm = static_cast<T>(std::invoke(fn, xm));
+    T const fp = static_cast<T>(std::invoke(fn, xp));
     if (!math::isfinite(fm) || !math::isfinite(fp)) return std::unexpected(error::non_finite);
     T const d = (fp - fm) / dx;
     if (!math::isfinite(d)) return std::unexpected(error::non_finite); // the difference or the quotient overflowed
@@ -313,13 +317,18 @@ constexpr T default_step(T const &x)                     // in nxx::deriv::detai
     return math::root_epsilon<Order + 1, T>() * scale;
 }
 
-template<typename S = Central<2>, real T, typename F>
-requires /* as above */
-[[nodiscard]] constexpr std::expected<T, error> derivative(F &&fn, T const &x)
-{ return nxx::deriv::derivative<S>(fn, x, detail::default_step<detail::make_table(S{}).order>(x)); }
+template<typename M = Central<2>, real T, typename F>
+requires detail::method<M> && detail::callable<F, T>
+[[nodiscard]] constexpr std::expected<Estimate<T>, error> derivative(F &&fn, T const &x)
+{
+    if (!math::isfinite(x)) return std::unexpected(error::non_finite);
+    if constexpr (std::same_as<M, Ridders>) return nxx::deriv::derivative<M>(fn, x, T(detail::scale(x) / T(32)));
+    else return nxx::deriv::derivative<M>(fn, x, detail::default_step<detail::make_table(M{}).order>(x));
+}
 ```
 
-For `Central<2>` (order 2) this is section 2's `eps^(1/3) * max(|x|, 1)`. The call is written `nxx::deriv::derivative`, fully qualified: an
+For `Central<2>` (order 2) this is section 2's `eps^(1/3) * max(|x|, 1)`; for Ridders the initial step is
+`max(|x|, 1) / 32` (section 9). The call is written `nxx::deriv::derivative`, fully qualified: an
 unqualified call would also look in the namespaces of T and F (argument-dependent lookup), where a user type could
 provide its own `derivative` and silently take over.
 
@@ -513,13 +522,65 @@ before it is added to the sum.
 `(S / (p C))^(1/(p+1))`. Those constants lie between 1.4 and 2.0, and leaving one out costs at most a factor 1.64 in
 error.
 
-## 9. Limits, and what comes next
+## 9. Ridders' extrapolation
 
-- **Fixed rules only.** The stencils are the three families; a user cannot supply their own weights, and a stencil
-  cannot be chosen at run time except by a `switch` over `derivative<S>` calls.
-- **No error estimate.** The caller cannot tell how accurate a result is. Ridders' extrapolation (Phase 3) provides
-  one and is robust to a poor initial step.
-- **The step assumes f varies on the scale `max(|x|, 1)`.** For faster-varying functions, pass a step.
+A stencil needs a good step, and cannot say how accurate its result is. Ridders' method (`derivative<Ridders>`)
+solves both: it computes central differences at a sequence of steps and extrapolates them, until rounding stops the
+improvement, and it estimates its own error on the way. The full specification, with the evidence for every rule, is
+`PHASE3_API.md`.
+
+### Extrapolating the central difference
+
+Section 2 showed that the central difference has an error expansion in even powers of h:
+
+```
+D(h) = f'(x) + c_2 h^2 + c_4 h^4 + c_6 h^6 + ...
+```
+
+So D(h) and D(h/2) share the same c_2, and `(4 D(h/2) - D(h)) / 3` cancels the h^2 term. That is Richardson
+extrapolation (the four-point stencil of section 8 is exactly this). Repeating it gives a tableau: `A[i][0] = D(h/2^i)`
+and, in Burden's difference form,
+
+```
+A[i][j] = A[i][j-1] + (A[i][j-1] - A[i-1][j-1]) / (4^j - 1)
+```
+
+where column j has cancelled the terms up to h^(2j). Each new level i halves the step and adds one row; only the
+previous row is kept.
+
+### Knowing when to stop
+
+Moving down the tableau lowers the truncation error, but each halving of h doubles the rounding error of D. So each
+extrapolated entry gets an error estimate, its change from its diagonal parent `|A[i][j] - A[i-1][j-1]|`, but never
+less than the rounding floor `eps (|f(x+h)| + |f(x-h)|) / 2h` of the difference it came from. Without the floor, the
+estimate (the smallest of many noisy differences) was too small in more than half of the prototype's cases. The
+method keeps the entry with the smallest estimate and stops after two levels that improve nothing, when an entry
+equals its parent exactly (nothing left to learn), or at the resolution of x. The result's `abs_error` is also at
+least the distance from the best entry to the latest diagonal entry: a best entry that only looked good is caught
+there.
+
+### Restarting below a bad step
+
+Two things make a step bad. If fn is not finite at x +- h (a domain edge, a pole on a sample), every earlier level's
+interval contained the bad point, so the tableau is discarded and restarted at h/2. And if the result has at most two
+correct bits while its estimate is far above the rounding floor, fn misbehaves within the step without producing an
+infinity (a pole between the samples, or aliasing: sin(64 pi x) vanishes at every sample of h = 1/32 and 1/64), so
+the method restarts below its starting step. At most 32 levels are attempted in all, 64 evaluations of fn.
+
+### What it costs and gives
+
+For double, typically 10 to 16 evaluations and an error near 1e-15 relative, with an estimate that covered the
+actual error in 99% of the prototype's 2,700 random cases and was about 7 times conservative at the median. Compare
+`Central<6>`: 6 evaluations, about 1e-14, no estimate. The estimate assumes fn is accurate to about eps; a noisier fn
+makes it optimistic.
+
+## 10. Limits, and what comes next
+
+- **Fixed rules only.** The methods are the three stencil families and Ridders; a user cannot supply their own
+  weights, and a method cannot be chosen at run time except by a `switch` over `derivative<M>` calls.
+- **Only Ridders estimates its error.** The stencils leave `abs_error` empty.
+- **The step assumes f varies on the scale `max(|x|, 1)`.** For a stencil and a faster-varying function, pass a step,
+  or use Ridders.
 
 `DERIV_TECHNIQUES.md` surveys the alternatives (complex step, automatic differentiation, contour integrals) and why
 they are deferred.
