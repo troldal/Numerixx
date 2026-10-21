@@ -83,9 +83,24 @@ namespace nxx::deriv {
     /** @cond INTERNAL */
     namespace detail {
 
-        // The orders the stencil families accept. Beyond the caps the gain is under half a digit even for 50-digit
-        // types (central), or the rounding amplification is too large (one-sided: 27.7 for P = 6).
+        /**
+         * @brief Whether `Central<p>` exists: p even, 2 <= p <= 10.
+         *
+         * Beyond the cap the gain is under half a digit even for 50-digit types.
+         *
+         * @param p The accuracy order.
+         * @return true if the order is accepted.
+         */
         constexpr bool valid_central(int p) { return p >= 2 && p <= 10 && p % 2 == 0; }
+
+        /**
+         * @brief Whether `Forward<p>` and `Backward<p>` exist: 1 <= p <= 6.
+         *
+         * Beyond the cap the rounding amplification, the sum of the absolute weights, is too large (27.7 for p = 6).
+         *
+         * @param p The accuracy order.
+         * @return true if the order is accepted.
+         */
         constexpr bool valid_one_sided(int p) { return p >= 1 && p <= 6; }
 
     } // namespace detail
@@ -158,15 +173,31 @@ namespace nxx::deriv {
     /** @cond INTERNAL */
     namespace detail {
 
+        /**
+         * @brief Whether S is a stencil: false except for the three families with an accepted order.
+         *
+         * @tparam S The type.
+         */
         template<typename S>
         inline constexpr bool is_stencil = false;
+
+        /** @brief `Central<P>` is a stencil if P is accepted. @tparam P The accuracy order. */
         template<int P>
         inline constexpr bool is_stencil<Central<P>> = valid_central(P);
+
+        /** @brief `Forward<P>` is a stencil if P is accepted. @tparam P The accuracy order. */
         template<int P>
         inline constexpr bool is_stencil<Forward<P>> = valid_one_sided(P);
+
+        /** @brief `Backward<P>` is a stencil if P is accepted. @tparam P The accuracy order. */
         template<int P>
         inline constexpr bool is_stencil<Backward<P>> = valid_one_sided(P);
 
+        /**
+         * @brief The stencils: `Central<P>`, `Forward<P>` and `Backward<P>` with an accepted order.
+         *
+         * @tparam S The type.
+         */
         template<typename S>
         concept stencil = is_stencil<S>;
 
@@ -193,17 +224,36 @@ namespace nxx::deriv {
         concept callable =
             std::invocable<F &, T const &> && std::convertible_to<std::invoke_result_t<F &, T const &>, T>;
 
-        // f'(x) ~= sum_k numerators[k] * fn(x + nodes[k] * h) / (denominator * h), with error O(h^order). The weights
-        // are integers over one denominator, so they are exact in every real type and the evaluator divides once.
+        /**
+         * @brief The weights of a stencil: f'(x) ~= sum_k numerators[k] * fn(x + nodes[k] * h) / (denominator * h).
+         *
+         * The error is O(h^order). The weights are integers over one denominator, so they are exact in every real
+         * type and the evaluator divides once.
+         *
+         * @tparam N The number of nodes.
+         */
         template<std::size_t N>
         struct Table
         {
-            std::array<int, N> nodes; // strictly increasing
+            /** @brief The nodes, in units of h, strictly increasing. */
+            std::array<int, N> nodes;
+
+            /** @brief The weight of each node, times denominator. */
             std::array<int, N> numerators;
+
+            /** @brief The common denominator of the weights, > 0. */
             int denominator;
+
+            /** @brief The accuracy order. */
             int order;
         };
 
+        /**
+         * @brief n!, exact for n <= 20; make_table needs at most 10!.
+         *
+         * @param n The argument.
+         * @return n!.
+         */
         constexpr long long factorial(std::size_t n)
         {
             long long f = 1;
@@ -220,14 +270,21 @@ namespace nxx::deriv {
         // the table holds integers only. The largest intermediate is 10! times 5 (Central<10>), far inside long long,
         // and the largest numerator is 2100, exact in every real type.
 
-        // Central, P = 2m, on the nodes -m ... -1, 1 ... m. A first derivative is odd, so the weights are
-        // antisymmetric, w(-k) = -w(k), and the rule reads f'(x) ~= sum_{k=1..m} a_k (f(x + k h) - f(x - k h)) / h with
-        //
-        //     a_k = (-1)^(k+1) (m!)^2 / (k (m-k)! (m+k)!).
-        //
-        // Worked example, Central<4> (m = 2): a_1 = (2!)^2 / (1 * 1! * 3!) = 4/6 = 2/3 and a_2 = -(2!)^2 / (2 * 0! *
-        // 4!) = -4/48 = -1/12. The common denominator is lcm(3, 12) = 12, so a_1 = 8/12 and a_2 = -1/12, and the table
-        // is nodes {-2, -1, 1, 2}, numerators {1, -8, 8, -1}, denominator 12.
+        /**
+         * @brief The table of `Central<P>`, P = 2m, on the nodes -m ... -1, 1 ... m.
+         *
+         * A first derivative is odd, so the weights are antisymmetric, w(-k) = -w(k), and the rule reads
+         * f'(x) ~= sum_{k=1..m} a_k (f(x + k h) - f(x - k h)) / h with
+         *
+         *     a_k = (-1)^(k+1) (m!)^2 / (k (m-k)! (m+k)!).
+         *
+         * Worked example, `Central<4>` (m = 2): a_1 = (2!)^2 / (1 * 1! * 3!) = 4/6 = 2/3 and
+         * a_2 = -(2!)^2 / (2 * 0! * 4!) = -4/48 = -1/12. The common denominator is lcm(3, 12) = 12, so a_1 = 8/12 and
+         * a_2 = -1/12, and the table is nodes {-2, -1, 1, 2}, numerators {1, -8, 8, -1}, denominator 12.
+         *
+         * @tparam P The accuracy order.
+         * @return The table, P nodes.
+         */
         template<int P>
         constexpr Table<std::size_t{ P }> make_table(Central<P>)
         {
@@ -266,16 +323,23 @@ namespace nxx::deriv {
             return t;
         }
 
-        // Forward, P, on the nodes 0, 1, ..., P. The rule is f'(x) ~= sum_{k=0..P} w_k f(x + k h) / h with
-        //
-        //     w_0 = -(1 + 1/2 + ... + 1/P)   and   w_k = (-1)^(k+1) C(P, k) / k,  k = 1 ... P.
-        //
-        // The denominator of C(P, k) / k divides k, and that of the harmonic sum in w_0 divides lcm(1, ..., P), so
-        // lcm(1, ..., P) is a common denominator of all the weights and no gcd reduction is needed.
-        //
-        // Worked example, Forward<2>: common = lcm(1, 2) = 2. k = 1: C(2, 1) = 2, so w_1 = +2/1 = 4/2; k = 2: C(2, 2) =
-        // 1, so w_2 = -1/2; w_0 = -(1 + 1/2) = -(2/2 + 1/2) = -3/2. The table is nodes {0, 1, 2}, numerators
-        // {-3, 4, -1}, denominator 2: f'(x) ~= (-3 f(x) + 4 f(x + h) - f(x + 2h)) / 2h.
+        /**
+         * @brief The table of `Forward<P>`, on the nodes 0, 1, ..., P.
+         *
+         * The rule is f'(x) ~= sum_{k=0..P} w_k f(x + k h) / h with
+         *
+         *     w_0 = -(1 + 1/2 + ... + 1/P)   and   w_k = (-1)^(k+1) C(P, k) / k,  k = 1 ... P.
+         *
+         * The denominator of C(P, k) / k divides k, and that of the harmonic sum in w_0 divides lcm(1, ..., P), so
+         * lcm(1, ..., P) is a common denominator of all the weights and no gcd reduction is needed.
+         *
+         * Worked example, `Forward<2>`: common = lcm(1, 2) = 2. k = 1: C(2, 1) = 2, so w_1 = +2/1 = 4/2; k = 2:
+         * C(2, 2) = 1, so w_2 = -1/2; w_0 = -(1 + 1/2) = -(2/2 + 1/2) = -3/2. The table is nodes {0, 1, 2},
+         * numerators {-3, 4, -1}, denominator 2: f'(x) ~= (-3 f(x) + 4 f(x + h) - f(x + 2h)) / 2h.
+         *
+         * @tparam P The accuracy order.
+         * @return The table, P + 1 nodes.
+         */
         template<int P>
         constexpr Table<std::size_t{ P + 1 }> make_table(Forward<P>)
         {
@@ -304,13 +368,20 @@ namespace nxx::deriv {
             return t;
         }
 
-        // Backward, P, on the nodes -P, ..., -1, 0: Forward<P> with h replaced by -h. Substituting -h into the forward
-        // rule gives f'(x) ~= sum_k w_k f(x - k h) / (-h) = sum_k (-w_k) f(x + (-k) h) / h, so each node k becomes -k
-        // and each weight w_k becomes -w_k. The forward table is read from its end so that the nodes still increase,
-        // which the evaluator relies on (nodes[0] and nodes[size - 1] are the outermost nodes).
-        //
-        // Worked example, Backward<2>: from Forward<2>, nodes {0, 1, 2} with numerators {-3, 4, -1}, to nodes
-        // {-2, -1, 0} with numerators {1, -4, 3}, denominator 2: f'(x) ~= (f(x - 2h) - 4 f(x - h) + 3 f(x)) / 2h.
+        /**
+         * @brief The table of `Backward<P>`, on the nodes -P, ..., -1, 0: `Forward<P>` with h replaced by -h.
+         *
+         * Substituting -h into the forward rule gives f'(x) ~= sum_k w_k f(x - k h) / (-h) =
+         * sum_k (-w_k) f(x + (-k) h) / h, so each node k becomes -k and each weight w_k becomes -w_k. The forward
+         * table is read from its end so that the nodes still increase, which the evaluator relies on (nodes[0] and
+         * nodes[size - 1] are the outermost nodes).
+         *
+         * Worked example, `Backward<2>`: from `Forward<2>`, nodes {0, 1, 2} with numerators {-3, 4, -1}, to nodes
+         * {-2, -1, 0} with numerators {1, -4, 3}, denominator 2: f'(x) ~= (f(x - 2h) - 4 f(x - h) + 3 f(x)) / 2h.
+         *
+         * @tparam P The accuracy order.
+         * @return The table, P + 1 nodes.
+         */
         template<int P>
         constexpr Table<std::size_t{ P + 1 }> make_table(Backward<P>)
         {
@@ -339,14 +410,23 @@ namespace nxx::deriv {
         constexpr T scale(T const &x)
         { return math::abs(x) < T(1) ? T(1) : math::abs(x); }
 
-        // A rule of order p has truncation error O(h^p) and rounding error O(eps / h). A step of
-        // eps^(1/(p+1)) * max(|x|, 1) balances the two, scaled so that the step is relative for large |x|.
-        //
-        // In detail, the error is about C h^p |f^(p+1)| + S eps |f| / h, where C is the stencil's error constant and S
-        // the sum of its absolute weights. It is smallest at h = (S eps |f| / (p C |f^(p+1)|))^(1/(p+1)), with an
-        // error of order eps^(p/(p+1)). f and its derivatives are unknown, so the step assumes that f varies on the
-        // scale max(|x|, 1) and drops the constant (S / (p C))^(1/(p+1)), which lies between 1.4 and 2.0 for these
-        // stencils and costs at most a factor 1.64 in error. For Central<2>: h = eps^(1/3) * max(|x|, 1).
+        /**
+         * @brief The default step of a stencil of order p: eps^(1/(p+1)) * max(|x|, 1).
+         *
+         * A rule of order p has truncation error O(h^p) and rounding error O(eps / h), and this step balances the
+         * two, scaled so that the step is relative for large |x|.
+         *
+         * In detail, the error is about C h^p |f^(p+1)| + S eps |f| / h, where C is the stencil's error constant and
+         * S the sum of its absolute weights. It is smallest at h = (S eps |f| / (p C |f^(p+1)|))^(1/(p+1)), with an
+         * error of order eps^(p/(p+1)). f and its derivatives are unknown, so the step assumes that f varies on the
+         * scale max(|x|, 1) and drops the constant (S / (p C))^(1/(p+1)), which lies between 1.4 and 2.0 for these
+         * stencils and costs at most a factor 1.64 in error. For `Central<2>`: h = eps^(1/3) * max(|x|, 1).
+         *
+         * @tparam Order The accuracy order p of the stencil.
+         * @tparam T The real type.
+         * @param x The point, finite.
+         * @return The step.
+         */
         template<int Order, real T>
         constexpr T default_step(T const &x)
         { return math::root_epsilon<Order + 1, T>() * detail::scale(x); }
