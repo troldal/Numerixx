@@ -119,14 +119,30 @@ namespace nxx::deriv {
             return f;
         }
 
-        // The weights come from closed forms, computed in exact rational arithmetic. The largest intermediate is 10!
-        // times 5 (Central<10>), far inside long long, and the largest numerator is 2100.
+        // make_table builds the Table of a stencil at compile time. The weights of a first-derivative rule are fixed by
+        // its nodes: they are the unique solution of the moment conditions M_0 = 0, M_1 = denominator and M_j = 0 for
+        // 2 <= j <= order (see derivative() and docs/DERIV_TUTORIAL.md, section 8). Equivalently, they come from
+        // differentiating the polynomial that interpolates fn at the nodes. For the three families that solution has a
+        // closed form, so each overload evaluates the closed form in exact rational arithmetic (long long numerators
+        // and denominators, reduced with gcd), then puts all weights over one common denominator (their lcm), so that
+        // the table holds integers only. The largest intermediate is 10! times 5 (Central<10>), far inside long long,
+        // and the largest numerator is 2100, exact in every real type.
 
-        // Central, P = 2m: the coefficient of fn(x + k h) - fn(x - k h) is (-1)^(k+1) (m!)^2 / (k (m-k)! (m+k)!).
+        // Central, P = 2m, on the nodes -m ... -1, 1 ... m. A first derivative is odd, so the weights are
+        // antisymmetric, w(-k) = -w(k), and the rule reads f'(x) ~= sum_{k=1..m} a_k (f(x + k h) - f(x - k h)) / h with
+        //
+        //     a_k = (-1)^(k+1) (m!)^2 / (k (m-k)! (m+k)!).
+        //
+        // Worked example, Central<4> (m = 2): a_1 = (2!)^2 / (1 * 1! * 3!) = 4/6 = 2/3 and a_2 = -(2!)^2 / (2 * 0! *
+        // 4!) = -4/48 = -1/12. The common denominator is lcm(3, 12) = 12, so a_1 = 8/12 and a_2 = -1/12, and the table
+        // is nodes {-2, -1, 1, 2}, numerators {1, -8, 8, -1}, denominator 12.
         template<int P>
         constexpr Table<std::size_t{ P }> make_table(Central<P>)
         {
             constexpr std::size_t m = P / 2;
+
+            // Step 1: a_k = num[k] / den[k] in lowest terms, for k = 1 ... m (index 0 is unused), and the running lcm
+            // of the denominators.
             std::array<long long, m + 1> num{};
             std::array<long long, m + 1> den{};
             long long common = 1;
@@ -136,14 +152,18 @@ namespace nxx::deriv {
                 long long const g = std::gcd(n, d);
                 n /= g;
                 d /= g;
-                num[k] = k % 2 == 1 ? n : -n;
+                num[k] = k % 2 == 1 ? n : -n; // the sign (-1)^(k+1)
                 den[k] = d;
                 common = std::lcm(common, d);
             }
+
+            // Step 2: scale every a_k to the common denominator, w = a_k * common, and store the pair of nodes -k and
+            // +k with the weights -w and +w. The nodes increase through the table: -m ... -1 at indices 0 ... m - 1,
+            // then 1 ... m at indices m ... 2m - 1, so node -k goes to index m - k and node +k to index m + k - 1.
             Table<std::size_t{ P }> t{};
             for (std::size_t k = 1; k <= m; ++k) {
                 int const node = static_cast<int>(k);
-                int const w = static_cast<int>(num[k] * (common / den[k]));
+                int const w = static_cast<int>(num[k] * (common / den[k])); // exact: den[k] divides common
                 t.nodes[m - k] = -node;
                 t.numerators[m - k] = -w;
                 t.nodes[m + k - 1] = node;
@@ -154,24 +174,36 @@ namespace nxx::deriv {
             return t;
         }
 
-        // Forward, P: w_0 = -(1 + 1/2 + ... + 1/P) and w_k = (-1)^(k+1) C(P, k) / k. Every denominator divides
-        // lcm(1, ..., P), which is therefore the common denominator.
+        // Forward, P, on the nodes 0, 1, ..., P. The rule is f'(x) ~= sum_{k=0..P} w_k f(x + k h) / h with
+        //
+        //     w_0 = -(1 + 1/2 + ... + 1/P)   and   w_k = (-1)^(k+1) C(P, k) / k,  k = 1 ... P.
+        //
+        // The denominator of C(P, k) / k divides k, and that of the harmonic sum in w_0 divides lcm(1, ..., P), so
+        // lcm(1, ..., P) is a common denominator of all the weights and no gcd reduction is needed.
+        //
+        // Worked example, Forward<2>: common = lcm(1, 2) = 2. k = 1: C(2, 1) = 2, so w_1 = +2/1 = 4/2; k = 2: C(2, 2) =
+        // 1, so w_2 = -1/2; w_0 = -(1 + 1/2) = -(2/2 + 1/2) = -3/2. The table is nodes {0, 1, 2}, numerators
+        // {-3, 4, -1}, denominator 2: f'(x) ~= (-3 f(x) + 4 f(x + h) - f(x + 2h)) / 2h.
         template<int P>
         constexpr Table<std::size_t{ P + 1 }> make_table(Forward<P>)
         {
             constexpr std::size_t p = P;
             long long common = 1;
             for (std::size_t k = 1; k <= p; ++k) common = std::lcm(common, static_cast<long long>(k));
+
             Table<std::size_t{ P + 1 }> t{};
-            long long w0 = 0;
-            long long binomial = 1;
+            long long w0 = 0; // w_0 * common, accumulated term by term
+            long long binomial = 1; // C(P, k), updated from C(P, k - 1)
             for (std::size_t k = 1; k <= p; ++k) {
                 long long const kk = static_cast<long long>(k);
-                binomial = binomial * (P - kk + 1) / kk; // C(P, k), exact at every step
+                // C(P, k) = C(P, k - 1) (P - k + 1) / k; the division is exact, since C(P, k - 1) (P - k + 1) = k C(P,
+                // k).
+                binomial = binomial * (P - kk + 1) / kk;
+                // w_k * common = (-1)^(k+1) C(P, k) * (common / k); common / k is exact because k divides common.
                 long long const w = (k % 2 == 1 ? 1 : -1) * binomial * (common / kk);
                 t.nodes[k] = static_cast<int>(k);
                 t.numerators[k] = static_cast<int>(w);
-                w0 -= common / kk;
+                w0 -= common / kk; // the term -1/k of w_0, times common
             }
             t.nodes[0] = 0;
             t.numerators[0] = static_cast<int>(w0);
@@ -180,7 +212,13 @@ namespace nxx::deriv {
             return t;
         }
 
-        // Backward: Forward mirrored, nodes and weights negated, and reversed so that the nodes increase.
+        // Backward, P, on the nodes -P, ..., -1, 0: Forward<P> with h replaced by -h. Substituting -h into the forward
+        // rule gives f'(x) ~= sum_k w_k f(x - k h) / (-h) = sum_k (-w_k) f(x + (-k) h) / h, so each node k becomes -k
+        // and each weight w_k becomes -w_k. The forward table is read from its end so that the nodes still increase,
+        // which the evaluator relies on (nodes[0] and nodes[size - 1] are the outermost nodes).
+        //
+        // Worked example, Backward<2>: from Forward<2>, nodes {0, 1, 2} with numerators {-3, 4, -1}, to nodes
+        // {-2, -1, 0} with numerators {1, -4, 3}, denominator 2: f'(x) ~= (f(x - 2h) - 4 f(x - h) + 3 f(x)) / 2h.
         template<int P>
         constexpr Table<std::size_t{ P + 1 }> make_table(Backward<P>)
         {
@@ -188,7 +226,7 @@ namespace nxx::deriv {
             Table<std::size_t{ P + 1 }> const f = detail::make_table(Forward<P>{});
             Table<std::size_t{ P + 1 }> t{};
             for (std::size_t i = 0; i <= p; ++i) {
-                t.nodes[i] = -f.nodes[p - i];
+                t.nodes[i] = -f.nodes[p - i]; // index i of the result is index p - i of the forward table, mirrored
                 t.numerators[i] = -f.numerators[p - i];
             }
             t.denominator = f.denominator;
