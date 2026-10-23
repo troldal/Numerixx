@@ -24,9 +24,10 @@ auto const H = [&calls](double T) {
     return book::shomate_H(book::nitrogen, T);
 };
 auto const r = derivative<Ridders>(H, T0);
-if (r)
+if (r) {
     std::println("cp = {:.12f} +- {:.1e}, {} evaluations",
         r->value, *r->abs_error, calls);
+}
 // </ridders-cp>
     // clang-format on
     if (!r) return 1;

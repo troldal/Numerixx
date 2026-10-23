@@ -30,8 +30,9 @@ for (double const h : {1e-2, 1e-8}) {
 // T0 + 1e-14 K rounds back to T0 (the doubles near 1000
 // are farther apart than that), so there is no difference
 auto const tiny = derivative(H, T0, 1e-14);
-if (!tiny && tiny.error() == nxx::deriv::error::non_finite)
+if (!tiny && tiny.error() == nxx::deriv::error::non_finite) {
     std::println("h = 1e-14 K: non_finite");
+}
 // </too-small>
     // clang-format on
 
