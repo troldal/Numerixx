@@ -18,16 +18,14 @@ int main()
     // clang-format off
 // <multiprecision>
 using mp50 = boost::multiprecision::cpp_bin_float_50;
-// -> mp50: make the result a number, not an expression
-// template that refers to x (Boost's types may return one).
+// -> mp50: a number, not an expression template
 auto const f = [](mp50 const &x) -> mp50 { return exp(x); };
 mp50 const x = 1;
 auto const d = derivative<Central<6>>(f, x);
 // A double step converts to mp50: h0 = 1/32.
 auto const r = derivative<Ridders>(f, x, 0.03125);
 if (!d || !r) return 1;
-// Boost's operators do not see the conversion of an
-// Estimate: write mp50(*r) or r->value.
+// Boost's operators need mp50(*r) or r->value
 mp50 const e = exp(mp50(1));
 mp50 const error = abs(mp50(*r) - e);
 std::println("Central<6>: {}", d->value.str(50));

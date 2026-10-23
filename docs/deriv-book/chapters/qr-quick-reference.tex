@@ -1,0 +1,86 @@
+% Quick reference (practice author): the book's last page, input after the references (PLAN.md sections 1.2, 1.4).
+% It repeats by design the five-row method choice T0 of section 1.5 and the two lessons of the edge (style decision
+% 16). Unnumbered; listed in the contents. Refer to it with \hyperref[ch:quick-reference]{...} or \pageref.
+%% NEW-MACRO: a run-in heading of the quick-reference page (a paragraph heading fails inside multicols here).
+\newcommand{\qrhead}[1]{\par\noindent\textbf{#1}\enspace}
+\chapter*{Quick reference}\phantomsection\label{ch:quick-reference}
+\addcontentsline{toc}{chapter}{Quick reference}\markboth{Quick reference}{}
+\begin{fullwidth}
+\small\setstretch{1.0}\setlength{\parskip}{4pt plus 1pt}
+\setlength{\columnsep}{8mm}
+\begin{multicols}{2}
+\raggedright
+
+\qrhead{Include.} \texttt{\#include <numerixx/deriv.hpp>}, namespace \code{nxx::deriv}; header-only, C++23; CMake
+target \code{numerixx::numerixx} (\cref{sec:api-synopsis}).
+
+\qrhead{The call} (\cref{sec:api-derivative}).
+\begin{itemize}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
+  \item \code{derivative(fn, x)}: \code{Central<2>}, $f'$, default step;
+  \item \code{derivative(fn, x, h)}: your step, \code{h > 0};
+  \item \code{derivative<M>(fn, x)}: the method \code{M};
+  \item \code{derivative<M, N>(fn, x)}, with or without \code{h}: the derivative order \code{N}, 1 to 4 or
+    \code{order::second} and so on.
+\end{itemize}
+\code{fn} takes a \code{T}; \code{x} fixes \code{T}, any \code{nxx::real} type.
+
+\qrhead{The result.} A \code{std::expected<Estimate<T>, error>}. \code{if (d)}, read \code{d->value};
+\code{d->abs_error} holds Ridders' error estimate, an estimate and not a bound, and is empty for the stencils.
+Otherwise \code{d.error()} is \code{error::non_finite}. The minimal check is \code{if (!d)} (\cref{sec:using-result}).
+
+\qrhead{Failures.} \code{non_finite}: \code{x} not finite; \code{fn} infinite or NaN at a sample; an overflow; a step
+below the resolution of \code{x}. A step $\le 0$ is a bug (\code{assert}). A float fourth derivative warns at compile
+time.
+
+\qrhead{Methods} (relative accuracy in double at the default step).
+\begin{itemize}\setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}
+  \item \code{Central<P>}, P = 2, 4, \ldots, 10: $P + N - 1$ evaluations; about $\epsmach^{P/(P+N)}$, for $f'$
+    \num{\valExpCentralTwoRelError} (P = 2) and \num{\valExpCentralFourRelError} (P = 4).
+  \item \code{Forward<P>}, \code{Backward<P>}, P = 1 to 6: $P + N$ evaluations, never below (above) $x$; larger
+    errors than \code{Central<P>}.
+  \item \code{Ridders}: a median of \num{\valRiddersEvalsMedianFirst} evaluations for $f'$, at most 64, 65, 128 and
+    129 for $f'$ to $f''''$; about \num{\valHeadlineRiddersFirstDigits} digits for $f'$; an error estimate.
+\end{itemize}
+
+\columnbreak
+\qrhead{Choosing a method} (\cref{tab:method-summary}; the full table is \cref{tab:method-choice}).\par\smallskip
+{\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}>{\raggedright}p{27mm}>{\raggedright}p{26mm}>{\raggedright\arraybackslash}p{25mm}@{}}
+\toprule
+Situation & Method and step & Cost and accuracy\\
+\midrule
+Inside an iteration; $f$ smooth and cheap & \code{Central<2>}, the default step & 2 evaluations; about
+  \num{\valHeadlineFirstDigits} digits in double\\ \addlinespace[2pt]
+A value to report, with an error estimate & \code{Ridders}, the default initial step & typically
+  \num{\valRiddersEvalsMedianFirst}, at most \num{\valRiddersMaxEvalsFirst}; about
+  \num{\valHeadlineRiddersFirstDigits} digits\\ \addlinespace[2pt]
+$f$ defined on one side of $x$ only & \code{Forward<2>} or \code{Backward<2>}, the default step & 3 evaluations;
+  about \num{\valExpForwardTwoRelError} on $\mathrm{e}^x$\\ \addlinespace[2pt]
+$f$ varies on a scale $w$ far from $\max(\abs{x}, 1)$ & \code{Central<2>}, $h = \epsmach^{1/3} w$ & 2 evaluations;
+  as in the first row\\ \addlinespace[2pt]
+$f$ accurate to $\noise > \epsmach$ only (a solver output) & \code{Central<2>}, $h = \noise^{1/3} \max(\abs{x}, 1)$ &
+  2 evaluations; about $\noise^{2/3}$\\
+\bottomrule
+\end{tabular}}
+
+\qrhead{No error estimate? Check it} (\cref{sec:using-check}). Repeat at $2h$ and $h/2$ and count the agreeing
+digits, or compare with \code{Central<4>} or with Ridders' method. Where $f' \approx 0$, judge the absolute error.
+Check the sign against the physics.
+
+\qrhead{The pitfalls that matter most} (\cref{sec:using-pitfalls}).
+\begin{itemize}\setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}
+  \item \emph{The step's scale is in your units.} The default step assumes that $f$ varies on the scale
+    $\max(\abs{x}, 1)$; at a large $\abs{x}$ with a narrow feature, or at $\abs{x} \ll 1$, pass $h$.
+  \item \emph{Evaluable is not valid.} A fit sampled outside its range returns numbers: make it return NaN there,
+    and use \code{Forward<P>} or \code{Backward<P>} at the edge.
+  \item \emph{Evaluable is not smooth.} A kink or a range break within a step of $x$ gives a wrong value from every
+    method, without failing; only Ridders' estimate flags it.
+  \item \emph{\code{auto} on the result.} \code{auto e = *d} is an \code{Estimate}; write \code{d->value}.
+\end{itemize}
+
+\qrhead{Where to look.} Every name: \cref{ch:api}. Weights, default steps and Ridders' constants: \cref{ch:tables}.
+Accuracy: \cref{tab:accuracy-matrix}; cost: \cref{tab:cost}; guarantees and their hypotheses:
+\cref{sec:guarantees-guarantees}.
+
+\end{multicols}
+\end{fullwidth}

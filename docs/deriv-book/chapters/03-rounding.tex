@@ -1,0 +1,369 @@
+% Chapter 3: Rounding and the choice of step (fundamentals author). PLAN.md section 1.4.
+% Uses F3 (fig:v-curve), F4 (fig:step-scale), F4b (fig:step-scale-small), F5 (fig:float-double), F17 (fig:noise),
+% S3 (sb:ulp), S4 (sb:actual-distance), S5 (sb:step-constant), E3 (code/03-rounding-step.cpp),
+% E4 (code/03-rounding-scale.cpp), E17 (code/03-rounding-noise.cpp).
+\chapter{Rounding and the choice of step}\label{ch:rounding}
+
+\Cref{ch:taylor} predicts that a smaller step gives a smaller error: halve $h$, and the error of the central
+difference falls by four. A computer does not follow the prediction for long. Pass the step yourself, as the third
+argument of \code{derivative}, and compare a moderate step with a tiny one:
+\snippet{03-rounding-step}{explicit-step}
+The step of \SI{e-8}{\kelvin} is worse than the step of \SI{e-2}{\kelvin}, by orders of magnitude. This chapter
+explains why, finds the best step, and shows how the library's default step is built, when it is wrong, and what to
+do then.
+
+\section{Floating-point numbers in brief}\label{sec:rounding-fp}
+
+A \code{double} stores a number with \valDigitsDouble{} binary digits, about 16 significant decimal digits. Numbers
+are therefore spaced: just above 1 the next \code{double} is $1 + \epsmach$, where
+\begin{equation*}
+  \epsmach = 2^{-52} \approx \num{\valEpsDouble}
+\end{equation*}
+is the \emph{machine epsilon} of the type.\mnote{\code{std::numeric_limits<T>::epsilon()} in C++.} The spacing grows
+in proportion to the numbers themselves: near \num{1000} the doubles are \num{\valUlpAtOneThousand} apart. Every
+arithmetic operation rounds its exact result to the nearest representable number, which changes it by at most half a
+spacing, a relative error of at most $\epsmach / 2$.\cite{higham2002,goldberg1991} A value of $f$ computed by a few
+dozen operations is therefore wrong by a few units of $\epsmach$ relative, sometimes less, sometimes more. We model
+that with one number: each value of $f$ carries an error of about $\epsmach \abs{f}$. Nothing more about floating
+point is needed to follow this chapter; \cref{ch:floating-point} has the details.
+
+\section{The two errors and the V}\label{sec:rounding-v}
+
+\Cref{fig:v-curve} shows the error of the central difference for the heat capacity of nitrogen over fifteen decades
+of step. From the right, the error falls along a line of slope 2, as \cref{ch:taylor} predicts, until about
+\SI{0.01}{\kelvin}; from there to the left it \emph{rises} again, along a line of slope $-1$, and at the smallest
+steps the result has no correct digit at all. The curve has the shape of a V.
+
+\begin{figure}
+\sidecaption{The V. Relative error of \code{Central<2>} for the heat capacity of nitrogen at
+$T_0 = \SI{1000}{\kelvin}$ against the step $h$, over the whole range of steps, with the model
+$E(h) / \cp$ of \cref{eq:error-model} dashed. Right of the bottom truncation dominates and the error falls as $h^2$;
+left of it rounding dominates and the error grows as $1/h$. The default step sits near the bottom. Data
+\code{data/step-error-cp.csv}.\label{fig:v-curve}}
+\centering
+\input{figures/03-rounding-v-curve}
+\end{figure}
+
+The right branch is the truncation error of \cref{eq:central-error}. The left branch is rounding. The central
+difference subtracts $f(x - h)$ from $f(x + h)$, two numbers that agree in more and more of their leading digits as
+$h$ shrinks. The subtraction itself is exact, but it removes the digits the two values share and leaves only those in
+which they differ, and those include the rounding errors of both values. The rounding errors were tiny compared with
+$f$; they are not tiny compared with the difference. This loss of digits is called \emph{cancellation}.
+
+A pocket calculator that keeps six significant digits shows the whole V in four lines. Differentiate $\mathrm{e}^x$ at
+$x = 1$, where $f'(1) = \mathrm{e} = 2.71828\ldots$, rounding each value of $f$ to six digits:
+\begin{center}\small
+\begin{tabular}{@{}lllll@{}}
+\toprule
+$h$ & $f(1 + h)$ & $f(1 - h)$ & estimate & error\\
+\midrule
+$0.1$ & $3.00417$ & $2.45960$ & $2.72285$ & $+0.0046$\\
+$0.01$ & $2.74560$ & $2.69123$ & $2.71850$ & $+0.00022$\\
+$0.001$ & $2.72100$ & $2.71556$ & $2.72000$ & $+0.0017$\\
+$0.0001$ & $2.71855$ & $2.71801$ & $2.70000$ & $-0.018$\\
+\bottomrule
+\end{tabular}
+\end{center}
+From $h = 0.1$ to $0.01$ the error falls by the factor 20, close to the 100 of the truncation error alone. Below
+that it rises. At $h = 0.0001$ the two values share their first three digits; their difference, $0.00054$, has only
+two digits left, and the last of them is rounding. A \code{double} keeps about 16 digits instead of six, so the same
+happens at smaller steps, but it happens.
+
+Both errors can be written down. If each value of $f$ is off by up to about $\epsmach \abs{f}$, the difference
+$f(x + h) - f(x - h)$ is off by up to about $2 \epsmach \abs{f}$, and after the division by $2h$ the estimate of $f'$
+by up to about $\epsmach \abs{f} / h$. Adding the truncation error of \cref{eq:central-error} gives the \emph{error
+model} of the central difference,
+\begin{equation}
+  E(h) = \etrunc(h) + \eround(h) = \frac{h^2}{6} \abs{f'''(x)} + \frac{\epsmach \abs{f(x)}}{h}.
+  \label{eq:error-model}
+\end{equation}
+The first term falls with $h$ and the second grows; their sum is the V. The dashed line in \cref{fig:v-curve} is this
+model for the thread, and the measured curve follows it, with one difference: on the rounding branch the measured
+errors scatter below the model. The rounding errors of the two values have random signs and partly cancel, so the
+model gives their typical largest size, not their actual size at a particular step.
+
+Two remarks on the model. It gives an \emph{absolute} error, in the unit of $f'$ (\si{\joule\per\mole\per\kelvin}
+for the thread); the figure divides it by $\cp$. And it has a second rounding hidden in it: the points $x \pm h$ are
+themselves rounded to doubles, so the distance between them is not exactly $2h$. The library removes that error for
+the central difference by dividing by the distance actually evaluated (\cref{sb:actual-distance}).
+
+\begin{sidebar}[label=sb:actual-distance]{Dividing by the distance actually evaluated}
+The points $x + h$ and $x - h$ are computed, so they are rounded: the function is evaluated at
+$x_+ = \fl(x + h)$ and $x_- = \fl(x - h)$, each within half a spacing of the intended point, so their distance can
+differ from $2h$ by up to about $\epsmach \abs{x}$. Dividing by the nominal $2h$ would add a relative error of about
+$\epsmach \abs{x} / (2h)$. At the default step $h = \epsmach^{1/3} \abs{x}$ that is $\epsmach^{2/3} / 2$: as large as
+the accuracy aimed for.
+
+The two-node rules (\code{Central<2>}, \code{Forward<1>} and \code{Backward<1>} for $f'$) therefore divide by
+$x_+ - x_-$ as evaluated. The quotient is then the exact slope of the secant through the two points where $f$ was
+actually evaluated, and only the rounding of the values of $f$ remains. The subtraction $x_+ - x_-$ is itself exact
+when $x_+ \le 2 x_-$ (for positive $x$), by Sterbenz's lemma:\cite{sterbenz1974} two floating-point numbers within a
+factor of two of each other have an exactly representable difference.\cite{higham2002} That holds roughly for
+$h \le \abs{x} / 3$. For larger steps the subtraction rounds once, a relative error of at most $\epsmach / 2$, which
+is harmless.
+
+Rules with more nodes divide by $\den h$, a multiple of the nominal step, instead: dividing their weighted sum by the
+distance between the outer nodes would correct the rounding of those two points only and, for \code{Central<4>},
+make the error four times larger. They keep a rounding term from the points, about
+$(\ampl / 2)\, \epsmach \abs{x f'} / h$, with $\ampl$ the sum of the absolute weights (\cref{ch:stencils}).
+\end{sidebar}
+
+\section{The best step and the best accuracy}\label{sec:rounding-best}
+
+The bottom of the V is where the model is smallest. Setting the derivative of \cref{eq:error-model} with respect to
+$h$ to zero, $h \abs{f'''} / 3 - \epsmach \abs{f} / h^2 = 0$, gives the \emph{best step}
+\begin{equation}
+  \hbest = \left( \frac{3 \epsmach \abs{f}}{\abs{f'''}} \right)^{1/3},
+  \qquad
+  E(\hbest) = \frac{3}{2} \frac{\epsmach \abs{f}}{\hbest}.
+  \label{eq:best-step}
+\end{equation}
+Both depend on $f$ and $f'''$, which we do not know; their dependence on $\epsmach$ is what matters. Suppose $f$
+varies on a length scale $\scale$, so that each derivative is about the previous one divided by $\scale$:
+$\abs{f'} \approx \abs{f} / \scale$ and $\abs{f'''} \approx \abs{f} / \scale^3$. Then
+\begin{equation*}
+  \hbest \approx 3^{1/3} \epsmach^{1/3} \scale,
+  \qquad
+  \frac{E(\hbest)}{\abs{f'}} \approx \epsmach^{2/3}.
+\end{equation*}
+For a \code{double}, $\epsmach^{1/3} = \num{\valRootEpsThreeDouble}$ and $\epsmach^{2/3} = \num{\valModelCentralTwoFirstDouble}$:
+at its best step the central difference keeps about 10 to 11 of the 16 digits.\cite{nocedal2006} The same argument for
+the forward difference, with its error $h \abs{f''} / 2$, gives a best step near $\epsmach^{1/2} \scale$ and a
+relative error near $\epsmach^{1/2} = \num{\valModelForwardOneFirstDouble}$, about 8 digits. That difference, not the
+cost, is why the central difference is the default.
+
+The relative figure $\epsmach^{2/3}$ rests on the assumption $\abs{f} \approx \scale \abs{f'}$. The rounding term of
+\cref{eq:error-model} grows with $\abs{f}$, not with $\abs{f'}$, so a function whose values are large compared with
+$\scale \abs{f'}$ loses accuracy in proportion. For the thread, $\abs{\enth} / (\scale \abs{\cp}) =
+\num{\valCpRelativeFactor}$ at $T_0$, close to 1. Had the enthalpy been referred to \SI{0}{\kelvin}, or included an
+enthalpy of formation, $\abs{\enth}$ would be larger and the derivative proportionally less accurate, although $\cp$
+would be the same. Near a point where $f'$ vanishes, the relative error has no meaning at all, while the absolute error
+stays near $\epsmach^{2/3} \abs{f} / \scale$.
+
+On the thread the measured curve reaches its lowest point, \num{\valCpBestRelError}, at \SI{\valCpBestStep}{\kelvin}.
+That is below the model, because the rounding errors happen to cancel there; a neighbouring step does several times
+worse. The model's level, not the luckiest point, is what to expect.
+
+\section{The default step}\label{sec:rounding-default}
+
+The library does not know $f$, so it cannot compute $\hbest$. It takes the formula of \cref{sec:rounding-best}
+without its constant, with the scale
+\begin{equation}
+  h = \epsmach^{1/3} \scale, \qquad \scale = \max(\abs{x}, 1).
+  \label{eq:default-step}
+\end{equation}
+For large $\abs{x}$ the step is relative, a fixed fraction of $x$: functions of a physical quantity often vary on a
+scale comparable to its size, as the enthalpy varies with $T/\SI{1000}{\kelvin}$. Near zero $\abs{x}$ says nothing
+about that scale, and the step becomes absolute, $\epsmach^{1/3}$ in the units of $x$. This choice of scale is
+standard in numerical optimisation.\cite{dennis1996} For the thread, $\scale = \SI{1000}{\kelvin}$ and the default
+step is \SI{\valCpDefaultStep}{\kelvin}; the relative error is \num{\valCpDefaultRelError}, on the model line near the
+bottom of the V (\cref{fig:v-curve}). Every stencil of the library has a default step of the same form,
+$\epsmach^{1/(\aorder + \dorder)} \scale$ (\cref{ch:stencils,ch:orders}).
+
+Dropping the constant $3^{1/3} \approx \valStepConstantCentralTwoFirst$ makes the default step smaller than the model's
+best step, by that factor when $f$ varies on the scale $\scale$. It costs little, and the scale itself is only a
+guess (\cref{sb:step-constant}).
+
+\begin{sidebar}[label=sb:step-constant]{The error model behind the default step, and why its constant is dropped}
+For a rule of accuracy order $\aorder$ for the $\dorder$-th derivative, the error model is
+$E(h) = \errc h^{\aorder} \abs{f^{(\aorder + \dorder)}} + \ampl \epsmach \abs{f} / h^{\dorder}$, with the error
+constant $\errc$ and the sum of absolute weights $\ampl$ of the rule (\cref{ch:stencils}); for the central difference
+$\errc = 1/6$, $\ampl = 1$ and $\dorder = 1$, which is \cref{eq:error-model}. It is smallest at
+\begin{equation*}
+  \hbest = \left( \frac{\dorder \ampl \epsmach \abs{f}}{\aorder \errc \abs{f^{(\aorder + \dorder)}}}
+  \right)^{1/(\aorder + \dorder)},
+\end{equation*}
+and if $f$ varies on the scale $\scale$, this is $k \epsmach^{1/(\aorder + \dorder)} \scale$ with the constant
+$k = (\dorder \ampl / (\aorder \errc))^{1/(\aorder + \dorder)}$. The default step leaves $k$ out, so it equals
+$\hbest / k$. With $h = \hbest / k$ the model error grows by the factor
+\begin{equation*}
+  \frac{E(\hbest / k)}{E(\hbest)} = \frac{\dorder k^{-\aorder} + \aorder k^{\dorder}}{\aorder + \dorder}.
+\end{equation*}
+For the central difference, $k = 3^{1/3} \approx \valStepConstantCentralTwoFirst$, and the factor is
+$7 \cdot 3^{1/3} / 9 \approx 1.12$: the default step loses about a tenth of the best accuracy. The library's
+documentation gives the range for all its first-derivative rules: $k$ between 1.4 and 2.0, at a cost of at most a
+factor 1.64. For higher derivatives $k$ is larger
+(\valStepConstantCentralTwoSecond{} for \code{Central<2>} and $f''$, \valStepConstantCentralTwoFourth{} for $f^{(4)}$)
+and so is the cost (\cref{ch:orders}).
+
+Why leave $k$ out at all? Because it only matters when the scale assumption holds, and that assumption is the weaker
+link: a function that varies faster than $\scale$ wants a smaller step anyway, and on the library's test functions
+that vary faster than $\max(\abs{x}, 1)$, half the default step did better for every order, $f'$ included. So the library keeps one convention,
+$\epsmach^{1/(\aorder + \dorder)} \scale$, for every rule and order, and leaves the scale to the caller
+(\cref{sec:rounding-scale}). The derivation in full is in \cref{ch:derivations}.
+\end{sidebar}
+
+A step must also be large enough to move $x$. The doubles near \SI{1000}{\kelvin} are
+\SI{\valUlpAtOneThousand}{\kelvin} apart, so $T_0 + \SI{e-14}{\kelvin}$ rounds back to $T_0$, and the two points of
+the central difference would coincide. The library checks for this and returns \code{error::non_finite} rather than
+divide by zero:
+\needspace{7\baselineskip}
+\snippet{03-rounding-step}{too-small}
+The default step is far from this limit, since $\epsmach^{1/3} \scale$ is many spacings of $x$; a step you pass
+yourself may not be. The resolution of $x$ and the rounding of $x + h$ are the subject of the sidebar below
+(\cref{sb:ulp}).
+
+\begin{sidebar}[label=sb:ulp]{Machine epsilon, ulps and the rounding of $x + h$}
+Machine epsilon $\epsmach$ is the spacing of the floating-point numbers just above 1. The spacing at a number $x$ is
+its \emph{unit in the last place}, $\ulp(x)$: for a \code{double}, $\ulp(x) = \epsmach \cdot 2^{e}$ where $2^{e} \le
+\abs{x} < 2^{e+1}$. So $\ulp(1) = \epsmach = \num{\valUlpAtOne}$, the spacing just below 1 is half of that,
+\num{\valUlpBelowOne}, and $\ulp(1000) = \num{\valUlpAtOneThousand}$. Rounding to the nearest number makes an error
+of at most $\ulp(x) / 2$, a relative error of at most $\epsmach / 2$; this bound, the \emph{unit roundoff}, is what
+many texts call $u$. This book speaks of $\epsmach$ only: the library's rounding model uses $\epsmach$, a factor 2 of
+safety on a single rounding.
+
+Since $x + h$ is rounded, the point the function sees is $\fl(x + h)$, not $x + h$. If $h$ is below half a spacing of
+$x$, $\fl(x + h) = x$: the step has no effect, and the library reports \code{error::non_finite}, because no difference
+can be formed. Near a power of two the spacing differs on the two sides: below $2^e$ the numbers are twice as dense as
+above it. A step can then move $x$ downwards and not upwards, or the reverse, so the library checks both $x + h$ and
+$x - h$ for the rules with more than two nodes (\cref{ch:api}). The documented precondition is a step well above
+$\ulp(x)$.
+\end{sidebar}
+
+\section{When the default step is wrong: the scale of $f$}\label{sec:rounding-scale}
+
+The default step assumes that $f$ varies on the scale $\max(\abs{x}, 1)$, in the units of $x$. Two common situations
+break that assumption, and the remedy is the same for both.
+
+\paragraph{A narrow feature at a large $\abs{x}$.} Take a function that changes from $-1$ to $1$ over a width of
+about $w = 0.5$ around $x_0 = 1000$, such as $\tanh((x - x_0) / w)$, and differentiate it at $x = x_0 + 0.2$. An
+engineering example is a smoothed switch or a sharp transition, in a variable whose size is far larger than the
+width of the transition. Here $\scale = \num{1000.2}$, so the default step is \num{\valScaleDefaultStep}. That is small
+against the width, but not small enough: the truncation error grows as $(h/w)^2$, not as $(h/\scale)^2$, and the
+relative error is \num{\valScaleDefaultRelError}. \Cref{fig:step-scale} shows why: the default step sits far right of
+the V's bottom. The remedy is to replace $\scale$
+by the scale on which $f$ varies, here $w$:
+\begin{equation*}
+  h = \epsmach^{1/3} w,
+\end{equation*}
+which gives the step \num{\valScaleFitStep} and the error \num{\valScaleFitRelError}, at the bottom of the V. Ridders'
+method with an initial step on the same scale, $w/4$, is just as good: it returns an error of
+\num{\valScaleRiddersUserRelError} with an estimate that covers it (\cref{ch:ridders}).
+\needspace{13\baselineskip}
+\snippet{03-rounding-scale}{narrow-feature}
+
+\begin{figure}
+\sidecaption{The V for a narrow feature at a large $\abs{x}$, $\tanh((x - x_0)/w)$ with $x_0 = 1000$ and $w = 0.5$, at
+$x = x_0 + 0.2$. The default step $\epsmach^{1/3} \scale$ sits far to the right of the minimum, and the step
+$\epsmach^{1/3} w$ built from the feature's width lands at it. The default step assumes that $f$ varies on the scale
+$\max(\abs{x}, 1)$; replace $\scale$ by the scale on which $f$ varies. Data \code{data/step-scale.csv}.%
+\label{fig:step-scale}}
+\centering
+\input{figures/03-rounding-step-scale}
+\end{figure}
+
+\paragraph{A small $\abs{x}$ in your units.} A mole fraction of $10^{-6}$, a strain of $10^{-4}$ or a time constant in
+seconds of a fast process all have $\scale = 1$, so the default step is $\epsmach^{1/3}$, as large as the variable
+itself or larger. Take $y \ln y$, which appears in every entropy of mixing, at $y = 10^{-6}$. The default step is
+\num{\valSmallDefaultStep}, which exceeds $y$; the central difference samples $y - h < 0$, where the logarithm is not
+defined, and the call fails with \code{error::non_finite}. With the step $\epsmach^{1/3} y = \num{\valSmallFitStep}$
+the relative error is \num{\valSmallFitRelError}, as accurate as at any ordinary point (\cref{fig:step-scale-small}).
+The 1 in $\max(\abs{x}, 1)$ is in your units.
+\snippet{03-rounding-scale}{small-x}
+Here the failure is loud, because the logarithm returns NaN below zero. A function that is defined across the bound
+but meaningless there, such as a fit sampled outside its range, would return a wrong value without complaint; the
+one-sided rules of \cref{ch:stencils} are the tool for such an edge.
+
+\begin{marginfigure}
+\centering
+\input{figures/03-rounding-step-scale-small}
+\caption{The V of \code{Central<2>} for $y \ln y$ at $y = 10^{-6}$. Steps above $y$ cross zero, so the curve stops
+and the default step fails, while $\epsmach^{1/3} y$ gives the expected accuracy. The 1 in $\max(\abs{x}, 1)$ is in
+your units. Data \code{data/step-scale-small.csv}.\label{fig:step-scale-small}}
+\end{marginfigure}
+
+\paragraph{Finding the scale.} The scale $w$ is the distance over which $f$ changes its character, in the units of
+$x$, and it can usually be read off the model. For a transition it is the width of the transition. For a function
+with a singularity or a bound at $a$, such as $1/(x - a)$ or $\ln(x - a)$, it is the distance $\abs{x - a}$. For an
+Arrhenius factor $\exp(-E_a / (\Rgas T))$, whose logarithmic derivative is $E_a / (\Rgas T^2)$, it is
+$\Rgas T^2 / E_a$, much smaller than $T$ for a large activation energy. For an interpolated table it is the spacing
+of the table's nodes. A rough value is enough: a factor of two in $w$ costs at most a factor of four in the error
+of \code{Central<2>}.
+
+In both cases, if the scale is hard to judge, Ridders' method with an initial step a few times smaller than the
+scale chooses its own step and reports an error estimate (\cref{ch:ridders}).
+
+\section{When $f$ is less accurate than $\epsmach$}\label{sec:rounding-noise}
+
+The error model assumes that each value of $f$ is accurate to about $\epsmach$. Many engineering functions are not.
+The output of an iterative solver stopped at a relative tolerance of $10^{-8}$, a flash calculation, or a simulation
+that iterates to convergence is accurate only to that tolerance, and its error changes irregularly from one argument
+to the next: it is \emph{noise}. Call its relative size the \emph{noise level} $\noise$. It takes the place of
+$\epsmach$ in the rounding term of \cref{eq:error-model},
+\begin{equation*}
+  E(h) = \frac{h^2}{6} \abs{f'''} + \frac{\noise \abs{f}}{h},
+\end{equation*}
+and the argument of \cref{sec:rounding-best} carries over with $\noise$ for $\epsmach$: the best step is about
+$\noise^{1/3} \scale$ and the best relative accuracy about $\noise^{2/3}$.\cite{more2012} A solver converged to
+$10^{-8}$ gives about five correct digits, not eleven, and only at a step $(\noise / \epsmach)^{1/3}$ times the
+default.
+
+A smooth function is not noisy just because it is inaccurate. A fitted correlation, like the thread's Shomate
+polynomial, may describe its substance to four digits, yet its values are smooth to the last digit; its derivative is
+the fit's derivative, accurate to $\epsmach^{2/3}$, and whether the fit's slope is the substance's slope is a question
+for the fit. Noise means irregular errors from point to point.
+
+\begin{marginfigure}
+\centering
+\input{figures/03-rounding-noise}
+\caption{The V of \code{Central<2>} on $\mathrm{e}^x$ at 1 with the values perturbed by a relative noise
+$\noise = 10^{-10}$ and $10^{-8}$, against the clean curve. The rounding branch lifts to $\noise \abs{f} / h$ and the
+minimum moves right and up; the dot marks the step $\noise^{1/3}$ for $\noise = 10^{-8}$. Data
+\code{data/step-error-noise.csv}.\label{fig:noise}}
+\end{marginfigure}
+
+\Cref{fig:noise} measures this on $\mathrm{e}^x$ at $x = 1$, whose values are multiplied by $1 + \noise u$ with $u$
+drawn uniformly from $[-1, 1]$, the same $u$ for the same $x$, as a converged solver would give. For
+$\noise = 10^{-8}$ the default step returns an error of \num{\valNoiseEightDefaultRelError}; the step
+$\noise^{1/3} = \num{\valNoiseEightFitStep}$ gives \num{\valNoiseEightFitRelError}, close to the model's
+$\noise^{2/3} = \num{\valNoiseEightModelBestRelError}$:
+\snippet{03-rounding-noise}{noisy-function}
+So pass the step when $f$ is noisy: $h = \noise^{1/3} \scale$, with $\noise$ the solver's tolerance or your best
+estimate of the accuracy of $f$.
+
+If the noise level is not known, it can be measured. Evaluate $f$ at a handful of points spaced far more closely
+than the scale on which $f$ varies, and form their successive differences, as in a difference table. The smooth part
+of $f$ contributes almost nothing to the higher differences at such a spacing, so what they show is the noise, and
+their spread estimates $\noise \abs{f}$. Mor\'e and Wild turn this idea into a reliable procedure.\cite{more2012} The
+library does not do it for you: a noise-aware step is one of its deferred features (\cref{ch:using}).
+
+Ridders' method does not help here as much as elsewhere. Its error estimate assumes that $f$ is accurate to about
+$\epsmach$, so for a noisy $f$ it can be optimistic. Over \valRiddersPointsPerFunction{} points in $[0.2, 3]$ the
+estimate covered the actual error in \SI{\valNoiseCleanRiddersCoverage}{\percent} of the cases for the clean
+$\mathrm{e}^x$, but only in \SI{\valNoiseEightRiddersCoverage}{\percent} for $\noise = 10^{-8}$, where the worst
+error was \valNoiseEightRiddersWorstRatio{} times its estimate. \Cref{ch:using} differentiates a friction factor that
+comes from a solver, with this rule.
+
+\section{Float, double and more digits}\label{sec:rounding-types}
+
+Everything above holds for any number type, with its own $\epsmach$. A \code{float} has
+$\epsmach = \num{\valEpsFloat}$, so its central difference reaches only about $\epsmach^{2/3} =
+\num{\valModelCentralTwoFirstFloat}$, at a default step of \num{\valFloatDefaultStep} for $\abs{x} \le 1$
+(\cref{fig:float-double}). On $\mathrm{e}^x$ at $x = 1$ the default step gives \num{\valFloatDefaultRelError} in
+\code{float}; the lowest point of the measured curve, \num{\valFloatBestRelError}, is again a lucky cancellation. A
+type with 50 decimal digits has $\epsmach = \num{\valEpsMultiprecision}$ and reaches far beyond \code{double}
+(\cref{ch:using}). For engineering work in \code{double}, the first derivative is rarely the limit; higher derivatives
+are, and \cref{ch:orders} shows how fast they lose digits.
+
+\begin{marginfigure}
+\centering
+\input{figures/03-rounding-float-double}
+\caption{The V of \code{Central<2>} for \code{float} and \code{double} on $\mathrm{e}^x$ at 1. Each curve bottoms out
+near $\epsmach^{2/3}$ of its type, dashed. Data \code{data/step-error-float.csv}.\label{fig:float-double}}
+\end{marginfigure}
+
+\section{A checklist for the step}\label{sec:rounding-checklist}
+
+Before you accept the default step, answer five questions.
+\begin{enumerate}
+  \item \emph{On what scale does $f$ vary, in the units of $x$?} If it is not about $\max(\abs{x}, 1)$, pass
+    $h = \epsmach^{1/3} w$ for \code{Central<2>}, with $w$ that scale (\cref{sec:rounding-scale}).
+  \item \emph{Is there a bound within a step of $x$}, such as zero for a mole fraction or the end of a fit's range?
+    Use a smaller step, or a one-sided rule (\cref{ch:stencils}).
+  \item \emph{How accurate is $f$?} If it is a solver output or otherwise noisy at a level $\noise$ above
+    $\epsmach$, pass $h = \noise^{1/3} \scale$ and expect about $\noise^{2/3}$ (\cref{sec:rounding-noise}).
+  \item \emph{Which method and order?} The default step depends on both; a step chosen for one rule is wrong for
+    another (\cref{ch:orders}).
+  \item \emph{Unsure?} Use Ridders' method, which chooses its own step and estimates its error (\cref{ch:ridders}), or
+    check a stencil's result by repeating it with a doubled and a halved step (\cref{sec:using-check}).
+\end{enumerate}

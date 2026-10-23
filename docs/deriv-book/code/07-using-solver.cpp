@@ -18,19 +18,16 @@ using nxx::deriv::Ridders;
 
 // clang-format off
 // <implicit-function>
-// The Darcy friction factor f(Re) of a pipe with relative
-// roughness 1e-4, from the Colebrook equation written in
-// x = 1/sqrt(f): G(x) = x + 2 log10(1e-4/3.7 + 2.51 x/Re)
-// = 0. G grows with x, so bisection on [1, 20] finds the
-// root, to the relative tolerance eta.
+// The Darcy friction factor f(Re): the Colebrook equation
+// in x = 1/sqrt(f), relative roughness 1e-4, is G(x) = 0.
+// G grows with x: bisect on [1, 20] to the tolerance eta.
 double friction(double Re, double eta)
 {
     auto const G = [Re](double x) {
         return x
             + 2 * std::log10(1e-4 / 3.7 + 2.51 * x / Re);
     };
-    double lo = 1.0;
-    double hi = 20.0;
+    double lo = 1.0, hi = 20.0;
     while (hi - lo > eta * hi) {
         double const mid = (lo + hi) / 2;
         if (G(mid) > 0)

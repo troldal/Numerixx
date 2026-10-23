@@ -10,12 +10,12 @@
 #include <expected>
 #include <print>
 
-// clang-format off
-// <newton>
 // H(T) - H(298.15 K) of nitrogen in J/mol, T in K.
 double H(double T)
 { return book::shomate_H(book::nitrogen, T); }
 
+// clang-format off
+// <newton>
 struct Newton
 {
     double T;  // the last iterate, K
