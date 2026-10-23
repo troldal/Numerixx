@@ -78,8 +78,10 @@ Decisions in force. Each one says why; change it here before changing the code.
   Differences, terms and partial sums are checked before they are formed (`sum_fits`, which decides a + b by
   a / radix + b / radix, exact; and |f_k| <= max / |numerator| before each term), so neither the NaN of inf - inf nor
   an overflow before the final quotient is ever formed; the second difference also checks its one-sided quotients,
-  conservatively (|a| / max < b / 2). Every check against max / |c| is `>=`, since max / |c| can round up. The
-  exception is an overflow of the final quotient (or of the repeated divisions
+  conservatively (|a| / max < b / 2). A term c f_k is decided exactly (`product_fits`: below fl(max / |c|) it fits,
+  above it does not, and the tie by the scaled product, exact like `sum_fits`). The divisions by `den * h` and h are
+  ordered so that none underflows spuriously (h first when `den * h > 1 > h`). The rounding of a value of fn is
+  `eps |f|`, but at least `denorm_min` for a nonzero subnormal value, where rounding is absolute. The exception is an overflow of the final quotient (or of the repeated divisions
   by h for N >= 2), which is checked afterwards: guarding it exactly needs overflow tests accurate to the last unit, so
   in constant evaluation on GCC it is a compile error rather than an error value. Overflow is detected, not avoided:
   halving the operands would make it impossible, but halving is not exact in decimal types and a step near max has no

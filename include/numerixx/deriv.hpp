@@ -641,6 +641,32 @@ namespace nxx::deriv {
         }
 
         /**
+         * @brief Whether a * b is finite, for b >= 1, decided without forming it.
+         *
+         * With q = max / b, rounded: a < q gives a b <= max (if q rounded up, the value below it is at most the exact
+         * max / b), and a > q a product beyond max. Only a = q is undecided by the comparison, and there the scaled
+         * product (q / radix) * b, exact up to its own rounding and near max / radix, cannot overflow: dividing by the
+         * radix is exact, as in sum_fits. So nothing is rejected that fits, unlike a plain a >= q, which rejected
+         * max * 1, and nothing that overflows is accepted, unlike a > q, which accepted 6 fl(max / 6) (a tie to
+         * infinity in double).
+         *
+         * @tparam T The real type.
+         * @param a A value, >= 0 and finite.
+         * @param b A value, >= 1 and finite.
+         * @return true if a * b is finite.
+         */
+        template<real T>
+        constexpr bool product_fits(T const &a, T const &b)
+        {
+            T const radix = static_cast<T>(std::numeric_limits<T>::radix);
+            T const largest = (std::numeric_limits<T>::max)();
+            T const q = largest / b;
+            if (a < q) return true;
+            if (a > q) return false;
+            return T(T(q / radix) * b) <= T(largest / radix);
+        }
+
+        /**
          * @brief a * b for a, b >= 0, saturated at max.
          *
          * @tparam T The real type.
@@ -651,10 +677,66 @@ namespace nxx::deriv {
         template<real T>
         constexpr T saturating_product(T const &a, T const &b)
         {
-            T const largest = (std::numeric_limits<T>::max)();
-            // >=, since max / b can round up (see weighted_sum).
-            if (b > T(1) && a >= T(largest / b)) return largest;
+            if (b > T(1) && !detail::product_fits(a, b)) return (std::numeric_limits<T>::max)();
             return T(a * b);
+        }
+
+        /**
+         * @brief The rounding error of a value of fn that is accurate to about eps: eps |f|, but at least the spacing
+         * of the numbers below the normal range, where rounding is absolute; 0 for f = 0.
+         *
+         * Without the absolute part, a fn whose values are subnormal had a rounding floor of 0, and Ridders reported
+         * a result 192 denorm_min off with an estimate of 0. For normal values this is exactly eps |f|.
+         *
+         * @tparam T The real type.
+         * @param f A value of fn, finite.
+         * @return The rounding error, >= 0.
+         */
+        template<real T>
+        constexpr T value_rounding(T const &f)
+        {
+            T const e = std::numeric_limits<T>::epsilon() * math::abs(f);
+            T const tiny = T(std::numeric_limits<T>::denorm_min());
+            if (f != T(0) && e < tiny) return tiny;
+            return e;
+        }
+
+        /**
+         * @brief a / (dh h^(N-1)) with dh = denominator * h, without forming h^(N-1) and without a spurious
+         * underflow or overflow where the order of the divisions can avoid it.
+         *
+         * Dividing by dh first, then by h, keeps every intermediate between a and the result when dh <= 1 or h >= 1.
+         * When dh > 1 > h, that order shrinks the value before the divisions by h grow it back, and the first quotient
+         * can underflow to 0 although the result is normal (`Central<10>` for f'''' with h = 19 * 2^-22 returned 0
+         * for a result of 2.6e-308). Then the divisions by h come first and dh last: the intermediates exceed the
+         * result by at most the factor dh, so only a result within that factor of max can overflow spuriously, which
+         * is reported as non_finite rather than as a silent 0. For N = 1 there is a single division either way.
+         *
+         * @tparam N The derivative order.
+         * @tparam Saturating Whether each division saturates at max (for the rounding floors).
+         * @tparam T The real type.
+         * @param a The dividend.
+         * @param dh denominator * h, > 0.
+         * @param h The step, > 0.
+         * @return The quotient.
+         */
+        template<int N, bool Saturating, real T>
+        constexpr T divide_by_powers(T const &a, T const &dh, T const &h)
+        {
+            auto const divide = [](T const &p, T const &q) -> T {
+                if constexpr (Saturating)
+                    return detail::saturating_quotient(p, q);
+                else
+                    return T(p / q);
+            };
+            T v = a;
+            if (dh > T(1) && h < T(1)) {
+                for (int i = 1; i < N; ++i) v = divide(v, h);
+                return divide(v, dh);
+            }
+            v = divide(v, dh);
+            for (int i = 1; i < N; ++i) v = divide(v, h);
+            return v;
         }
 
         /**
@@ -693,8 +775,8 @@ namespace nxx::deriv {
         template<real T>
         constexpr T rounding_floor(Difference<T> const &d)
         {
-            T const eps = std::numeric_limits<T>::epsilon();
-            return detail::saturating_quotient(T(eps * math::abs(d.f_lo) + eps * math::abs(d.f_hi)), d.dx);
+            return detail::saturating_quotient(
+                T(detail::value_rounding(d.f_lo) + detail::value_rounding(d.f_hi)), d.dx);
         }
 
         /**
@@ -814,10 +896,9 @@ namespace nxx::deriv {
         template<real T>
         constexpr T second_floor(SecondDifference<T> const &d, T const &f0)
         {
-            T const eps = std::numeric_limits<T>::epsilon();
-            T const e0 = eps * math::abs(f0);
-            T const hi = detail::saturating_quotient(T(eps * math::abs(d.f_hi) + e0), d.h_hi);
-            T const lo = detail::saturating_quotient(T(e0 + eps * math::abs(d.f_lo)), d.h_lo);
+            T const e0 = detail::value_rounding(f0);
+            T const hi = detail::saturating_quotient(T(detail::value_rounding(d.f_hi) + e0), d.h_hi);
+            T const lo = detail::saturating_quotient(T(e0 + detail::value_rounding(d.f_lo)), d.h_lo);
             return detail::saturating_quotient(detail::saturating_sum(hi, lo), T(T(d.h_hi + d.h_lo) / T(2)));
         }
 
@@ -867,7 +948,6 @@ namespace nxx::deriv {
         constexpr std::expected<WeightedSum<T>, error>
             weighted_sum(F &fn, Table<Size> const &t, T const &x, T const &h, std::optional<T> const &f0)
         {
-            T const largest = (std::numeric_limits<T>::max)();
             T sum = T(0);
             T magnitude = T(0);
             T f_minus = T(0);
@@ -886,16 +966,11 @@ namespace nxx::deriv {
                 if (node == -1) f_minus = fk;
                 if (node == 1) f_plus = fk;
                 T const size = T(c < 0 ? -c : c);
-                // >=, not >: max / |c| can round up, and then |c| times it overflows (6 fl(max / 6) ties to infinity
-                // in double).
-                if (c != 0 && math::abs(fk) >= T(largest / size)) return std::unexpected(error::non_finite);
+                if (c != 0 && !detail::product_fits(math::abs(fk), size)) return std::unexpected(error::non_finite);
                 T const term = T(T(c) * fk);
                 if (!detail::sum_fits(sum, term)) return std::unexpected(error::non_finite);
                 sum = T(sum + term);
-                if constexpr (Magnitude) {
-                    T const eps = std::numeric_limits<T>::epsilon();
-                    magnitude = T(magnitude + size * T(eps * math::abs(fk)));
-                }
+                if constexpr (Magnitude) magnitude = T(magnitude + size * detail::value_rounding(fk));
             }
             return WeightedSum<T>{ sum, magnitude, f_minus, f_plus };
         }
@@ -963,8 +1038,8 @@ namespace nxx::deriv {
                     // for two-node rules and enlarge it for the others (4x for Central<4>), so the divisor is
                     // denominator * h, then h N - 1 more times, never h^N (h^4 underflows below 1.2e-77 in double):
                     // with dyadic x and a power-of-two h the result is then exact for polynomials of degree up to
-                    // N + order - 1. The divisions cannot overflow spuriously: for h >= 1 each quotient is at most
-                    // the one before, otherwise the last is the largest. Node rounding adds about
+                    // N + order - 1. The divisions are ordered so that they neither underflow nor overflow
+                    // spuriously (divide_by_powers). Node rounding adds about
                     // S / 2 * eps * |x f'| / h^N, the same order as fn's rounding. Neighbouring points must differ:
                     // at h near 0.6 ulp(x), x + h and x + 2h round to the same value, and the rule would return a
                     // finite but wrong value.
@@ -978,8 +1053,7 @@ namespace nxx::deriv {
                     std::optional<T> const none;
                     auto const s = detail::weighted_sum<false>(fn, table, x, h, none);
                     if (!s) return std::unexpected(s.error());
-                    T d = s->value / (T(table.denominator) * h);
-                    for (int i = 1; i < N; ++i) d = T(d / h);
+                    T const d = detail::divide_by_powers<N, false>(s->value, T(T(table.denominator) * h), h);
                     if (!math::isfinite(d)) return std::unexpected(error::non_finite); // the quotient overflowed
                     return d;
                 }
@@ -1083,14 +1157,10 @@ namespace nxx::deriv {
                 T const slope = detail::saturating_quotient(detail::distance(s->f_plus, s->f_minus), T(T(2) * h));
                 T const spread = T(T(eps / T(2)) * T(math::abs(x) + T(2) * h)) * T(weights);
                 T const divisor = T(table.denominator) * h;
-                T value = s->value / divisor;
-                T rounding = detail::saturating_quotient(s->magnitude, divisor);
-                T points = detail::saturating_quotient(detail::saturating_product(spread, slope), divisor);
-                for (int i = 1; i < N; ++i) {
-                    value = T(value / h);
-                    rounding = detail::saturating_quotient(rounding, h);
-                    points = detail::saturating_quotient(points, h);
-                }
+                T const value = detail::divide_by_powers<N, false>(s->value, divisor, h);
+                T const rounding = detail::divide_by_powers<N, true>(s->magnitude, divisor, h);
+                T const points =
+                    detail::divide_by_powers<N, true>(detail::saturating_product(spread, slope), divisor, h);
                 if (!math::isfinite(value)) return std::unexpected(error::non_finite); // the quotient overflowed
                 return Level<T>{ value, detail::saturating_sum(rounding, points) };
             }

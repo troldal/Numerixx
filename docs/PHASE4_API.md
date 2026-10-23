@@ -396,6 +396,19 @@ From the implementation review (numerics-reviewer), each reproduced first:
   precision under `Central<10>`) is a `static_assert`, not a silently inexact rule (or, beyond the range, undefined
   behaviour).
 - **An integer order is compared in its own type**, so `0x1'0000'0001ULL` is rejected rather than wrapped into 1.
+From an independent review by another model (OpenAI Codex), each reproduced first:
+- **The term check is exact** (`product_fits`): `|f_k| >= max / |c|` also rejected |f| = max under a weight of 1, where
+  the product cannot overflow; Phase 3 returned max / 12 for a `Central<4>` case that the check turned into
+  `non_finite`. Now a value below fl(max / |c|) fits, above it does not, and the tie is decided by the scaled product,
+  exact like `sum_fits`. The comparison of 180,000 first-derivative results with the Phase 3 header, with values up to
+  max, is identical except for Ridders on subnormal values (next point).
+- **The rounding of a value is at least denorm_min** for a nonzero subnormal value, where rounding is absolute: with
+  `eps |f|` alone, Ridders on a fn with subnormal values reported a result 192 denorm_min off with an estimate of 0.
+  For normal values nothing changes.
+- **The divisions are ordered to avoid a spurious underflow**: with `denominator * h > 1 > h`, dividing by
+  `denominator * h` first shrank a subnormal sum to 0 (`Central<10>` for f'''' returned 0 for a normal 2.6e-308); the
+  divisions by h now come first there, and only a result within that factor of max can overflow spuriously, which is
+  `non_finite` rather than a silent 0.
 - **Breaking, for an unusual call:** T given explicitly as the second template argument, `derivative<Ridders,
   double>(...)`, no longer compiles, since that argument is now the order. T is deduced from x as before; no call in
   the repository or the documentation spelled it.

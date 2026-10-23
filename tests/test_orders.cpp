@@ -280,6 +280,39 @@ static_assert(derivative<Central<2>, 4>(sixth, 0.0, 1.0) == non_finite);
 static_assert(derivative<Ridders, 4>(sixth, 0.0, 1.0) == non_finite);
 static_assert(derivative<Ridders, 2>(jump, 0.0, 1e-10) == non_finite);
 
+// Regressions from an independent review (Codex), each reproduced first.
+namespace {
+    constexpr double denorm = std::numeric_limits<double>::denorm_min();
+    // The values are {max, 0, 0, 0} at -2h, -h, h, 2h with h = 1: every term and sum fits, and f' = max / 12. The
+    // first Phase 4 term check, |f| >= max / |c|, rejected |f| = max under a weight of 1; Phase 3 returned max / 12.
+    constexpr auto top = [](double t) { return dmax * (((t + 1) * (t - 1) * (t - 2)) / -12); };
+    // Central<10> for f'''' (nodes -6 ... 6, denominator 453600) with h = 19 * 2^-22: values -5809 and -339 denorm_min
+    // at -6h and -5h, whose weights 479 and -8208 make the sum exactly denorm_min. Dividing it by 453600 h = 2.05
+    // first underflowed to 0; the f'''' it gives, denorm_min / (453600 h^4) = 2.6e-308, is normal. Now the divisions
+    // by h come first, but the first quotient, denorm_min / h = 220753 denorm_min, is still subnormal and is rounded
+    // to a multiple of denorm_min: up to 0.5 / 220753 = 2.3e-6 relative, which no order can avoid (fn's values carry
+    // that absolute error themselves); the second, 4.9e10 denorm_min, adds at most 1e-11, and the others are normal.
+    // So 3e-6. The reference is computed with the
+    // dividend scaled by 2^1000 (exact), so it does not underflow.
+    constexpr double h_sparse = 19 * 0x1p-22;
+    constexpr auto sparse = [](double t) {
+        return t == -6 * h_sparse ? -5809 * denorm : (t == -5 * h_sparse ? -339 * denorm : 0.0);
+    };
+    constexpr double sparse_exact =
+        denorm * 0x1p1000 / (453600 * h_sparse * h_sparse * h_sparse * h_sparse) * 0x1p-1000;
+    // a t^4 with a just above 2^-1020: every value is subnormal, so eps |f| underflowed to 0 and Ridders reported
+    // 24 * 2^-1020, 192 denorm_min below the exact 24 a, with an estimate of 0. The rounding of a subnormal value is
+    // absolute (denorm_min), and the estimate must cover the error.
+    constexpr double a_tiny = 0x1.0000000000002p-1020;
+    constexpr auto tiny4 = [](double t) { return (((a_tiny * t) * t) * t) * t; };
+} // namespace
+static_assert(derivative<Central<4>>(top, 0.0, 1.0)->value == dmax / 12);
+static_assert(
+    nxx::math::abs(derivative<Central<10>, 4>(sparse, 0.0, h_sparse)->value - sparse_exact) <= 3e-6 * sparse_exact);
+static_assert(nxx::math::abs(derivative<Ridders, 4>(tiny4, 0.0)->value - 24 * a_tiny)
+              <= *derivative<Ridders, 4>(tiny4, 0.0)->abs_error);
+static_assert(*derivative<Ridders, 4>(tiny4, 0.0)->abs_error > 0.0);
+
 // Ridders on polynomials, x = 2 and h = 1/8, every value dyadic: x^(N+1) is exact at level 1, where the base is exact
 // (5, 8 and 9 evaluations); x^(N+2) needs column 1 of the extrapolation (7, 12 and 13 evaluations).
 static_assert(derivative<Ridders, 2>(power<3>, 2.0, 0.125)->value == 12.0);
@@ -400,6 +433,13 @@ TEST_CASE("orders: the compile-time cases at run time")
     CHECK(derivative<Ridders, 2>(jump, 0.0, 1e-10) == non_finite);
     CHECK(derivative<Central<2>, 4>(sixth, 0.0, 1.0) == non_finite);
     CHECK(derivative<Ridders, 4>(sixth, 0.0, 1.0) == non_finite);
+    CHECK(derivative<Central<4>>(top, 0.0, 1.0)->value == dmax / 12);
+    CHECK(
+        nxx::math::abs(derivative<Central<10>, 4>(sparse, 0.0, h_sparse)->value - sparse_exact) <= 3e-6 * sparse_exact);
+    auto const tiny = derivative<Ridders, 4>(tiny4, 0.0);
+    REQUIRE(tiny.has_value());
+    CHECK(nxx::math::abs(tiny->value - 24 * a_tiny) <= *tiny->abs_error);
+    CHECK(*tiny->abs_error > 0.0);
     CHECK(derivative<Ridders, 2>(power<3>, 2.0, 0.125)->value == 12.0);
     CHECK(derivative<Ridders, 3>(power<4>, 2.0, 0.125)->value == 48.0);
     CHECK(derivative<Ridders, 4>(power<5>, 2.0, 0.125)->value == 240.0);
