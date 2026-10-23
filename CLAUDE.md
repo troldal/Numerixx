@@ -49,6 +49,13 @@ Presets: `clang-cl`, `cl`, `gcc`, `clang`, `emscripten`; each builds Debug into 
   `master` is opened only when the user asks. One small step at a time, and the user decides the next one. Since the
   library is header-only, every step changes the public API: propose its API before writing it. Before pushing, build
   and test on all five toolchains; after pushing, check CI (`gh run list --workflow ci.yml --branch dev`).
+- **Independent review at the end of each phase.** After the phase's implementation is committed and CI passes, run a
+  second-opinion review by another model with the OpenAI Codex CLI, read-only, on the phase's commit:
+  `codex exec -s read-only --ephemeral --color never -o <scratchpad>/codex_review.md "<prompt>"` from the project
+  root, with a prompt that names the commit, the spec (`docs/PHASE<n>_API.md`), `docs/design.md` and the rules here,
+  and asks for ranked findings, each with a file, line, counterexample or derivation, plus what was found correct.
+  Reproduce every finding before acting on it, propose the fixes to `include/` to the user before making them, and
+  record the adopted ones in the phase's API document. (Phase 4: three edge cases our own reviews had missed.)
 - **Licensing.** Code may come only from Numerixx 1.x and Boost.Math (BSL-1.0; keep its notice). Never use GSL or
   other GPL, LGPL or AGPL code, Numerical Recipes listings, or code without a licence. Implement algorithms from the
   papers and textbooks, and do not read GSL source.
