@@ -1,0 +1,20 @@
+% F2 fig:fd-slopes (Chapter 2, text width): relative error of the forward difference (Forward<1>) and the central
+% difference (Central<2>) against the step on the thread, H(T) at T0 = 1000 K, for the large steps 1e2 to 1e-2 K
+% (DS1, data/step-error-cp.csv). On log axes the errors fall on lines of slope 1 and 2 while truncation dominates.
+% The range stops at 1e-2 K, where the central difference stops improving (rounding, Chapter 3): the caption points
+% ahead (editor, stage 2, decision S2-14). A domain restriction on a log axis is in natural logarithms:
+% ln(1e-2) = -4.61, ln(1e2) = 4.61.
+\begin{tikzpicture}
+\begin{axis}[eqtufte, width=95mm, height=45mm, xmode=log, ymode=log,
+    xlabel={step $h$ (K)}, ylabel={relative error},
+    xmin=1e-2, xmax=1e2, ymin=1e-12, ymax=1e-1,
+    xtickten={-2,-1,0,1,2}, ytickten={-12,-10,-8,-6,-4,-2},
+    restrict x to domain=-4.62:4.62]
+  \addplot[muted, mark=*] table[col sep=comma, x=h, y=forward1, comment chars={\#}] {data/step-error-cp.csv};
+  \addplot[accent, mark=*] table[col sep=comma, x=h, y=central2, comment chars={\#}] {data/step-error-cp.csv};
+  \node[muted, font=\sffamily\scriptsize, anchor=south east, align=right] at (axis cs:3, 1e-3)
+    {forward difference: slope 1,\\ halving $h$ halves the error};
+  \node[accent, font=\sffamily\scriptsize, anchor=north west, align=left] at (axis cs:0.3, 1e-9)
+    {central difference: slope 2,\\ halving $h$ quarters the error};
+\end{axis}
+\end{tikzpicture}

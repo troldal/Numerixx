@@ -1,0 +1,21 @@
+% F7 fig:one-sided (Chapter 4, margin). Forward<2> against Central<2> and Forward<4> against Central<4>, exp(x) at
+% x = 1 (DS2): the same truncation slopes, higher rounding floors for the one-sided rules (larger S). One-sided rules
+% in accent, central rules muted.
+\begin{tikzpicture}
+\begin{axis}[eqtufte, width=35mm, height=34mm,
+  xmode=log, ymode=log, log basis x=10, log basis y=10,
+  xmin=1e-13, xmax=1, ymin=1e-16, ymax=10,
+  xtick={1e-12,1e-8,1e-4,1}, ytick={1e-16,1e-12,1e-8,1e-4,1},
+  xlabel={step $h$}, ylabel={relative error}, unbounded coords=jump]
+  \addplot[muted] table[col sep=comma, comment chars={\#}, x=h, y=central2] {data/step-error-exp.csv};
+  \addplot[muted] table[col sep=comma, comment chars={\#}, x=h, y=central4] {data/step-error-exp.csv};
+  \addplot[accent] table[col sep=comma, comment chars={\#}, x=h, y=forward2] {data/step-error-exp.csv};
+  \addplot[accent] table[col sep=comma, comment chars={\#}, x=h, y=forward4] {data/step-error-exp.csv};
+  % In the margin width the two rules of one order lie on top of each other along the truncation branch, so each
+  % pair carries one order label, and the family is given by the colour (the key in the free top-left corner).
+  \node[accent, font=\tiny, anchor=north west, inner sep=1pt] at (axis cs:1.5e-13, 5) {\code{Forward<P>}};
+  \node[muted, font=\tiny, anchor=north west, inner sep=1pt] at (axis cs:1.5e-13, 0.15) {\code{Central<P>}};
+  \node[font=\tiny, anchor=east, inner sep=1pt] at (axis cs:0.004, 1e-5) {$\aorder = 2$};
+  \node[font=\tiny, anchor=east, inner sep=1pt] at (axis cs:0.004, 3e-10) {$\aorder = 4$};
+\end{axis}
+\end{tikzpicture}

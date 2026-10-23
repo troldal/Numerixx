@@ -1,0 +1,326 @@
+% FIGURE AND LISTING GALLERY -- temporary, stage 2 only (editor-owned). Every figure F1 to F18 in its planned float
+% type with its planned caption and label (PLAN.md section 4.2), grouped by chapter, and every snippet of every
+% example in code/ (PLAN.md section 5), so that the author sees all the evidence at once before the prose is written.
+% Removed from main.tex and deleted at stage 4, when the chapters carry the floats themselves. The labels here are
+% the chapters' labels, so this file and a chapter must never be built together.
+\chapter{Figure and listing gallery (stage 2, temporary)}\label{ch:gallery}
+
+Every plot below reads a file in \code{data/} that \code{tools/generate_data.cpp} wrote by running the library;
+every listing is quoted from a compiled example in \code{code/} that runs as a test. The captions are the planned
+ones of \code{PLAN.md}; the chapters will carry the floats, and this gallery goes. Numbers in the captions are
+\code{\val} macros from \code{data/values.tex}.
+
+\section{Chapter 1: Why numerical derivatives}
+
+\begin{marginfigure}
+\centering
+\input{figures/01-why-secant}
+\caption{F1. A smooth curve with the tangent at $x$ and the secants through $(x, x+h)$ and $(x-h, x+h)$: the
+central secant is nearly parallel to the tangent. A diagram without data.\label{fig:secant}}
+\end{marginfigure}
+
+The thread example of the book, nitrogen's enthalpy $\enth(T)$ in the Shomate form, is defined once in
+\code{code/shomate.hpp} and quoted from there. Its heat capacity at $T_0 = \SI{1000}{K}$ is
+$\cp = \SI{\valCpExact}{\joule\per\mole\per\kelvin}$ (the closed form, the answer key); \code{Central<2>} with the
+default step of \SI{\valCpDefaultStep}{K} is \num{\valCpDefaultRelError} off relative, Ridders
+\num{\valCpRiddersRelError} with an estimate of \SI{\valCpRiddersEstimate}{\joule\per\mole\per\kelvin} after
+\valCpRiddersEvals{} evaluations.
+
+\clearpage
+\section{Chapter 2: Finite differences from Taylor's theorem}
+
+\begin{figure}
+\sidecaption{F2. Relative error of \code{Forward<1>} and \code{Central<2>} against the step $h$ on the thread,
+$\enth(T)$ at $T_0$, for large steps: on logarithmic axes the errors fall on lines of slope 1 and 2, so halving the
+step halves one error and quarters the other. Below \SI{0.01}{K} the central difference stops improving; why is the
+subject of Chapter 3. Data \code{data/step-error-cp.csv}.\label{fig:fd-slopes}}
+\centering
+\input{figures/02-taylor-fd-slopes}
+\end{figure}
+
+\clearpage
+\section{Chapter 3: Rounding and the choice of step}
+
+\begin{figure}
+\sidecaption{F3. The V: the relative error of \code{Central<2>} against $h$ over the whole range of steps, the model
+$E(h)$ dashed and the default step marked. The two branches, and the default step near the bottom. Data
+\code{data/step-error-cp.csv}.\label{fig:v-curve}}
+\centering
+\input{figures/03-rounding-v-curve}
+\end{figure}
+
+\begin{marginfigure}
+\centering
+\input{figures/03-rounding-float-double}
+\caption{F5. The V of \code{Central<2>} for float and double on $\mathrm{e}^x$ at 1: the floor sits at about
+$\epsmach^{2/3}$ of each type. Data \code{data/step-error-float.csv}.\label{fig:float-double}}
+\end{marginfigure}
+
+The margin figures of this chapter (F5 here; F4b and F17 on the next page) are placed by the layout engine where
+the margin has room; in the chapter each sits beside the paragraph that discusses it.
+
+\clearpage
+
+\begin{figure}
+\sidecaption{F4. The V for a narrow feature at a large $\abs{x}$: the default step $\epsmach^{1/3} \scale$ sits far
+to the right of the minimum, and the step $\epsmach^{1/3} w$ built from the feature's width $w$ lands at it. The
+default step assumes that $f$ varies on the scale $\max(\abs{x}, 1)$; replace $\scale$ by the scale on which $f$
+varies. Data \code{data/step-scale.csv}.\label{fig:step-scale}}
+\centering
+\input{figures/03-rounding-step-scale}
+\end{figure}
+
+\begin{marginfigure}
+\centering
+\input{figures/03-rounding-step-scale-small}
+\caption{F4b. The same at a small $\abs{x}$ in the user's units ($y \ln y$ at $y = 10^{-6}$): the default step
+exceeds $x$ and crosses zero, so the central rule fails, while $\epsmach^{1/3} y$ gives the expected accuracy. The 1 in
+$\max(\abs{x}, 1)$ is in your units. Data \code{data/step-scale-small.csv}.\label{fig:step-scale-small}}
+\end{marginfigure}
+
+\begin{marginfigure}
+\centering
+\input{figures/03-rounding-noise}
+\caption{F17. The V of \code{Central<2>} on $\mathrm{e}^x$ at 1 with the function's values perturbed by a relative
+noise $\noise = 10^{-10}$ and $10^{-8}$, against the clean curve: the rounding branch lifts to $\noise \abs{f} / h$ and
+the minimum moves right and up. A solver converged to $10^{-8}$ gives about five digits, at a step a thousand times
+the default. Data \code{data/step-error-noise.csv}.\label{fig:noise}}
+\end{marginfigure}
+
+\clearpage
+\section{Chapter 4: Higher-order and one-sided stencils}
+
+\begin{figure}
+\sidecaption{F6. Relative error against $h$ for \code{Central<2>} to \code{Central<10>}, $\mathrm{e}^x$ at 1: steeper
+truncation slopes, rounding branches that nearly coincide, and minima that slide up the common rounding line as the
+best step grows. A higher order buys accuracy by letting the step grow; the minimum falls from about
+$\epsmach^{2/3}$ to about $\epsmach^{10/11}$, three and a half decades. Data
+\code{data/step-error-exp.csv}.\label{fig:order-ladder}}
+\centering
+\input{figures/04-stencils-order-ladder}
+\end{figure}
+
+\begin{marginfigure}
+\centering
+\input{figures/04-stencils-one-sided}
+\caption{F7. \code{Forward<2>} against \code{Central<2>} and \code{Forward<4>} against \code{Central<4>}: the same
+slopes, higher floors (a larger $\ampl$). Data \code{data/step-error-exp.csv}.\label{fig:one-sided}}
+\end{marginfigure}
+
+\begin{marginfigure}
+\centering
+\input{figures/04-stencils-default-step-accuracy}
+\caption{F8. Relative error at the default step against $\aorder$ for \code{Central<P>} and \code{Forward<P>},
+$\mathrm{e}^x$: the median over eleven points in $[0.5, 1]$, the whiskers the smallest and largest value.
+Diminishing returns beyond 4 or 6 for double. Data
+\code{data/default-step-accuracy.csv}.\label{fig:default-step-accuracy}}
+\end{marginfigure}
+
+\begin{figure}
+\sidecaption{F9. The nodes of \code{Central<4>}, \code{Forward<2>} and \code{Backward<2>} for $\dorder = 1$ and
+$\dorder = 2$ on a line: node 0 filled where the rule uses it. A diagram without data.\label{fig:stencil-nodes}}
+\centering
+\input{figures/04-stencils-stencil-nodes}
+\end{figure}
+
+\clearpage
+\section{Chapter 5: Second to fourth derivatives}
+
+\begin{figure}
+\sidecaption{F10. The V of \code{Central<2>} for $\dorder = 1$ to 4, $\mathrm{e}^x$ at 1: the rounding branch
+steepens as $1/h^{\dorder}$ and the minimum rises. Why the fourth derivative gives four digits where the first gives
+eleven. Data \code{data/step-error-orders.csv}.\label{fig:v-curve-orders}}
+\centering
+\input{figures/05-orders-v-curve-orders}
+\end{figure}
+
+\begin{figure}
+\sidecaption{F11. Relative error at the default step against $\dorder$ for \code{Central<2>}, \code{Central<4>} and
+Ridders, double and float, $\mathrm{e}^x$ (medians over eleven points); the model $\epsmach^{\aorder/(\aorder+\dorder)}$
+as a guide line; the float $f''''$ point marked as the warning case. Data
+\code{data/order-accuracy.csv}.\label{fig:order-accuracy}}
+\centering
+\input{figures/05-orders-order-accuracy}
+\end{figure}
+
+\clearpage
+\section{Chapter 6: Ridders' extrapolation}
+
+\begin{table*}
+\caption{F12. Ridders' tableau for $\cp$ at $T_0$ from $h_0 = T_0 / 32$: the \valTableauLevelsUsed{} levels the
+method used, the entries $\Aij{i}{j}$ above and their relative errors with the rounding floor $r_i$ below; the entry
+Ridders returned (level \valTableauBestLevel, column \valTableauBestColumn) in the accent colour. Generated bodies
+\code{data/table-ridders-tableau.tex} and \code{data/table-ridders-tableau-errors.tex}.\label{tab:ridders-tableau}}
+\centering
+\input{figures/06-ridders-tableau}
+\end{table*}
+
+\begin{figure}
+\sidecaption{F12, companion diagram. The shape of the tableau: column 0 holds the base differences $D_i$ at the
+halved steps; every other entry is built from its left neighbour and that neighbour's parent one level up. A diagram
+without data.\label{fig:ridders-tableau-diagram}}
+\centering
+\input{figures/06-ridders-tableau-diagram}
+\end{figure}
+
+\begin{figure}
+\sidecaption{F13. Relative error of $\Aij{i}{j}$ against the level $i$ over 16 levels, one curve per column $j$, the
+rounding floor $r_i$ dashed: column 0 descends slowly while each higher column reaches the floor within a few levels;
+the floor doubles per level, so the entries then drift up. Ridders' stop and its returned entry are marked. The
+extrapolation reaches in a few levels what the base difference would need a dozen for; after that, more levels only
+add rounding. Data \code{data/ridders-tableau.csv}.\label{fig:ridders-convergence}}
+\centering
+\input{figures/06-ridders-convergence}
+\end{figure}
+
+\clearpage
+
+\begin{figure*}
+\centering
+\input{figures/06-ridders-coverage}
+\caption{F14. Ridders' error estimate against the actual error over the random study ($\dorder = 1$ dark,
+$\dorder = 2$ muted; nine smooth functions on $[0.2, 3]$, \valRiddersPointsPerFunction{} points each, no noise, no
+singularity within $h_0$), the diagonal drawn: points above it are covered, \SI{\valRiddersCoverageFirst}{\percent} of
+the \valRiddersCases{} cases for $\dorder = 1$ and \SI{\valRiddersCoverageSecond}{\percent} for $\dorder = 2$. Every
+third case is drawn (\valRiddersPlotCases{} per order; all enter the statistics). An actual error of exactly 0 (an
+exact stop; \valRiddersExactCasesFirst{} and \valRiddersExactCasesSecond{} cases) is clipped to
+$\epsmach \abs{f^{(\dorder)}}$. Data \code{data/ridders-coverage-plot-N1.csv},
+\code{-N2.csv}.\label{fig:ridders-coverage}}
+\end{figure*}
+
+\clearpage
+
+\begin{marginfigure}
+\centering
+\input{figures/06-ridders-cost}
+\caption{F14b. Evaluations of \code{fn} per call over the random study: $\dorder = 1$ dark, $\dorder = 2$ muted; the
+tail of $\dorder = 2$ are the restarts of $\log$ and $\sqrt{\cdot}$ below $x = 0.25$. Data
+\code{data/ridders-coverage-N1.csv}, \code{-N2.csv}.\label{fig:ridders-cost}}
+\end{marginfigure}
+
+\begin{marginfigure}
+\centering
+\input{figures/06-ridders-edge}
+\caption{F15. Evaluations and relative error of Ridders for $\log x$ at $x = 2^{-k}$ against $k$: restarts cost
+about two evaluations per halving; the budget is exhausted from $k = \valRiddersEdgeCapExponent$, ten correct digits
+hold to $k = \valRiddersEdgeTenDigitsExponent$, a value is returned to $k = \valRiddersEdgeLimitExponent$ and the
+result is non-finite beyond. Data \code{data/ridders-edge.csv}.\label{fig:ridders-edge}}
+\end{marginfigure}
+
+The margin figures F14b and F15 stand on a page of their own here because a margin float cannot sit beside the
+full-width F12 or F14; the chapter keeps them a page apart from those.
+
+\clearpage
+\section{Chapter 7: Using the library}
+
+\begin{marginfigure}
+\centering
+\input{figures/07-using-newton}
+\caption{F16. Newton's residual against the iteration for $T$ with $\enth(T) = H^\ast$ and a \code{Central<2>}
+slope: quadratic convergence until rounding, \valNewtonIterations{} iterations from \SI{\valNewtonStart}{K}. Data
+\code{data/newton.csv}.\label{fig:newton}}
+\end{marginfigure}
+
+\begin{marginfigure}
+\centering
+\input{figures/07-using-kink}
+\caption{F18. Relative error of \code{Central<2>}, \code{Central<4>} and Ridders (value and estimate) against the
+distance of $x$ from the range break at \SI{\valKinkJunction}{K}, where the two published Shomate fits of nitrogen
+do not meet and $\enth$ jumps by \SI{\valKinkJumpEnthalpy}{\joule\per\mole}. Inside a method's span the error of a
+straddling stencil grows as $1/h$ whatever $\aorder$ (for a kink it would be $\order(1)$ or $\order(h)$), the rule
+returns it without failing, and only Ridders' estimate shows it. Evaluable is not smooth: the estimate flags it, the
+stencil does not. Data \code{data/kink.csv}.\label{fig:kink}}
+\end{marginfigure}
+
+\clearpage
+\section{Listings: every snippet of every example}
+
+Each heading names the example of \code{PLAN.md} section 5 and its file; each listing is the snippet between the
+markers named in the run-in heading.
+
+\subsection*{Shared headers: \code{code/shomate.hpp}, \code{code/noise.hpp}}
+\paragraph{shomate.} \snippetheader{shomate}{shomate}
+\paragraph{shomate-H.} \snippetheader{shomate}{shomate-H}
+\paragraph{shomate-cp.} \snippetheader{shomate}{shomate-cp}
+\paragraph{noise.} \snippetheader{noise}{noise}
+
+\subsection*{E1: \code{code/01-why-first.cpp}}
+\paragraph{first.} \snippet{01-why-first}{first}
+\paragraph{first-ridders.} \snippet{01-why-first}{first-ridders}
+
+\subsection*{E2: \code{code/02-taylor-steps.cpp}}
+\paragraph{forward-vs-central.} \snippet{02-taylor-steps}{forward-vs-central}
+
+\subsection*{E3: \code{code/03-rounding-step.cpp}}
+\paragraph{explicit-step.} \snippet{03-rounding-step}{explicit-step}
+\paragraph{too-small.} \snippet{03-rounding-step}{too-small}
+
+\subsection*{E4: \code{code/03-rounding-scale.cpp}}
+\paragraph{narrow-feature.} \snippet{03-rounding-scale}{narrow-feature}
+\paragraph{small-x.} \snippet{03-rounding-scale}{small-x}
+
+\subsection*{E17: \code{code/03-rounding-noise.cpp}}
+\paragraph{noisy-function.} \snippet{03-rounding-noise}{noisy-function}
+\paragraph{noisy-coverage.} \snippet{03-rounding-noise}{noisy-coverage}
+
+\subsection*{E5: \code{code/04-stencils-orders.cpp}}
+\paragraph{higher-order.} \snippet{04-stencils-orders}{higher-order}
+
+\subsection*{E6: \code{code/04-stencils-edge.cpp}}
+\paragraph{validity-edge.} \snippet{04-stencils-edge}{validity-edge}
+
+\subsection*{E7: \code{code/05-orders-second.cpp}}
+\paragraph{second-derivative.} \snippet{05-orders-second}{second-derivative}
+\paragraph{order-enum.} \snippet{05-orders-second}{order-enum}
+
+\subsection*{E8: \code{code/05-orders-float.cpp}}
+\paragraph{float-fourth.} \snippet{05-orders-float}{float-fourth}
+
+\subsection*{E9: \code{code/06-ridders-basic.cpp}}
+\paragraph{ridders-cp.} \snippet{06-ridders-basic}{ridders-cp}
+
+\subsection*{E10: \code{code/06-ridders-edge.cpp}}
+\paragraph{edge-restart.} \snippet{06-ridders-edge}{edge-restart}
+
+\subsection*{E11: \code{code/07-using-expected.cpp}}
+\paragraph{names.} \snippet{07-using-expected}{names}
+\paragraph{expected-basics.} \snippet{07-using-expected}{expected-basics}
+\paragraph{expected-chain.} \snippet{07-using-expected}{expected-chain}
+\paragraph{estimate-pitfalls.} \snippet{07-using-expected}{estimate-pitfalls}
+
+\subsection*{E12: \code{code/07-using-newton.cpp}}
+\paragraph{newton.} \snippet{07-using-newton}{newton}
+\paragraph{newton-call.} \snippet{07-using-newton}{newton-call}
+
+\subsection*{E13: \code{code/07-using-sensitivity.cpp}}
+\paragraph{rate.} \snippet{07-using-sensitivity}{rate}
+\paragraph{sensitivity.} \snippet{07-using-sensitivity}{sensitivity}
+\paragraph{scaled.} \snippet{07-using-sensitivity}{scaled}
+\paragraph{jacobian.} \snippet{07-using-sensitivity}{jacobian}
+
+\subsection*{E14: \code{code/07-using-multiprecision.cpp}}
+\paragraph{multiprecision.} \snippet{07-using-multiprecision}{multiprecision}
+
+\subsection*{E15: \code{code/07-using-constexpr.cpp}}
+\paragraph{constexpr.} \snippet{07-using-constexpr}{constexpr}
+\paragraph{constexpr-failure.} \snippet{07-using-constexpr}{constexpr-failure}
+\paragraph{constexpr-value.} \snippet{07-using-constexpr}{constexpr-value}
+
+\subsection*{E16: \code{code/08-api-usage.cpp}}
+\paragraph{api-overloads.} \snippet{08-api-usage}{api-overloads}
+\paragraph{api-rejected.} \snippet{08-api-usage}{api-rejected}
+
+\subsection*{E18: \code{code/07-using-check.cpp}}
+\paragraph{check-digits.} \snippet{07-using-check}{check-digits}
+\paragraph{check-by-steps.} \snippet{07-using-check}{check-by-steps}
+\paragraph{check-by-order.} \snippet{07-using-check}{check-by-order}
+\paragraph{check-by-ridders.} \snippet{07-using-check}{check-by-ridders}
+\paragraph{check-absolute.} \snippet{07-using-check}{check-absolute}
+
+\subsection*{E19: \code{code/07-using-kink.cpp}}
+\paragraph{kink.} \snippet{07-using-kink}{kink}
+\paragraph{kink-outside.} \snippet{07-using-kink}{kink-outside}
+
+\subsection*{E20: \code{code/07-using-solver.cpp}}
+\paragraph{implicit-function.} \snippet{07-using-solver}{implicit-function}
+\paragraph{implicit-derivative.} \snippet{07-using-solver}{implicit-derivative}

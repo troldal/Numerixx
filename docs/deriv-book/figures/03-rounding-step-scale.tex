@@ -1,0 +1,22 @@
+% F4 fig:step-scale (Chapter 3, text width): the V of the central difference (Central<2>) for a narrow feature at a
+% large |x|, tanh((x - x0) / w) with x0 = 1000 and w = 0.5 at x = x0 + 0.2 (DS4, data/step-scale.csv). The default
+% step eps^(1/3) s lies far to the right of the minimum; the step eps^(1/3) w from the feature's width lands at it.
+% Both steps and their errors come from \valScale{Default,Fit}{Step,RelError}.
+\begin{tikzpicture}
+\begin{axis}[eqtufte, width=95mm, height=45mm, xmode=log, ymode=log,
+    xlabel={step $h$}, ylabel={relative error},
+    xmin=1e-12, xmax=10, ymin=1e-12, ymax=1,
+    xtickten={-12,-10,-8,-6,-4,-2,0}, ytickten={-12,-9,-6,-3,0}]
+  \addplot[black!75, mark=*] table[col sep=comma, x=h, y=error, comment chars={\#}] {data/step-scale.csv};
+  % the default step eps^(1/3) max(|x|, 1)
+  \draw[muted, thin] ({axis cs:\valScaleDefaultStep,1}|-{rel axis cs:0,0})
+    -- ({axis cs:\valScaleDefaultStep,1}|-{rel axis cs:0,1})
+    node[above, font=\sffamily\scriptsize, inner sep=1.5pt] {default step $\varepsilon^{1/3} s$};
+  \fill[muted] (axis cs:\valScaleDefaultStep,\valScaleDefaultRelError) circle (1.4pt);
+  % the step from the scale w on which f varies
+  \draw[accent, thin] ({axis cs:\valScaleFitStep,1}|-{rel axis cs:0,0})
+    -- ({axis cs:\valScaleFitStep,1}|-{rel axis cs:0,1})
+    node[above, font=\sffamily\scriptsize, inner sep=1.5pt] {$\varepsilon^{1/3} w$};
+  \fill[accent] (axis cs:\valScaleFitStep,\valScaleFitRelError) circle (1.4pt);
+\end{axis}
+\end{tikzpicture}

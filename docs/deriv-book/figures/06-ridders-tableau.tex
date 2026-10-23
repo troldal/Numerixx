@@ -1,0 +1,27 @@
+% F12 tab:ridders-tableau (Chapter 6). Ridders' tableau for cp at T0 from h_0 = T0 / 32: the levels the method
+% used, the entries A_{i,j} (first table) and their relative errors with the rounding floor r_i (second table).
+% Both bodies are generated (DS8, data/table-ridders-tableau.tex and data/table-ridders-tableau-errors.tex, seven
+% columns: \valTableauLevelsUsed); the entry Ridders returned is flagged in accent by the generator. Needs the full
+% width (table*): nine and ten columns of twelve-digit numbers do not fit the 114 mm text block.
+% The bodies are read with the editor's \tablebody (macros.tex), the TeX primitive \input: LaTeX's \input{...} runs
+% file hooks after the file, whose tokens start a new table row before \bottomrule and give "Misplaced \noalign".
+\footnotesize\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{@{}rr*{7}{r}@{}}
+\toprule
+ & & \multicolumn{7}{c}{entry $\Aij{i}{j}$ in J/(mol K)} \\
+\cmidrule(lr){3-9}
+level $i$ & $h_i$ (K) & $j = 0$ & $j = 1$ & $j = 2$ & $j = 3$ & $j = 4$ & $j = 5$ & $j = 6$ \\
+\midrule
+\tablebody{ridders-tableau}
+\bottomrule
+\end{tabular}
+\par\medskip
+\begin{tabular}{@{}rr*{7}{r}r@{}}
+\toprule
+ & & \multicolumn{7}{c}{relative error $\abs{\Aij{i}{j} - \cp} / \cp$} & floor \\
+\cmidrule(lr){3-9}
+level $i$ & $h_i$ (K) & $j = 0$ & $j = 1$ & $j = 2$ & $j = 3$ & $j = 4$ & $j = 5$ & $j = 6$ & $r_i / \cp$ \\
+\midrule
+\tablebody{ridders-tableau-errors}
+\bottomrule
+\end{tabular}

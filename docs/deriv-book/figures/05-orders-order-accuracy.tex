@@ -1,0 +1,30 @@
+% F11 fig:order-accuracy (Chapter 5, text width). Relative error at the default step against the derivative order N
+% for Central<2>, Central<4> and Ridders, in double (solid) and float (dashed), exp(x), medians over eleven points
+% in [0.5, 1] (DS6, data/order-accuracy.csv). The dotted guides are the model eps^(2/(2+N)) of Central<2> for each
+% type (2^-52 and 2^-23: exact constants). The float fourth derivatives are boxed in accent: the warning case.
+\begin{tikzpicture}
+\begin{axis}[eqtufte, width=76mm, height=48mm,
+  ymode=log, log basis y=10, xmin=0.7, xmax=4.3, ymin=1e-15, ymax=1,
+  xtick={1,2,3,4}, ytick={1e-15,1e-12,1e-9,1e-6,1e-3,1},
+  xlabel={derivative order $\dorder$}, ylabel={relative error at the default step}]
+  % the model of Central<2>: eps^(P/(P+N)) with P = 2, for double and float (dotted; named in the caption)
+  \addplot[muted, dotted, domain=1:4, samples=25] {(2^(-52))^(2/(2+x))};
+  \addplot[muted, dotted, domain=1:4, samples=25] {(2^(-23))^(2/(2+x))};
+  % double, solid
+  \addplot[black!80, mark=*, mark size=1.2pt] table[col sep=comma, comment chars={\#}, x=N, y=c2_double] {data/order-accuracy.csv};
+  \addplot[black!80, mark=square*, mark size=1.2pt] table[col sep=comma, comment chars={\#}, x=N, y=c4_double] {data/order-accuracy.csv};
+  \addplot[black!80, mark=triangle*, mark size=1.5pt] table[col sep=comma, comment chars={\#}, x=N, y=rid_double] {data/order-accuracy.csv};
+  % float, dashed, the same marks
+  \addplot[black!60, dashed, mark=*, mark size=1.2pt, mark options={solid}] table[col sep=comma, comment chars={\#}, x=N, y=c2_float] {data/order-accuracy.csv};
+  \addplot[black!60, dashed, mark=square*, mark size=1.2pt, mark options={solid}] table[col sep=comma, comment chars={\#}, x=N, y=c4_float] {data/order-accuracy.csv};
+  \addplot[black!60, dashed, mark=triangle*, mark size=1.5pt, mark options={solid}] table[col sep=comma, comment chars={\#}, x=N, y=rid_float] {data/order-accuracy.csv};
+  % labels at the right end of the double curves; the float curves carry the same marks
+  \node[font=\scriptsize, anchor=west, inner sep=1pt] at (axis cs:4.07, 1.2e-5) {\code{Central<2>}, double};
+  \node[font=\scriptsize, anchor=west, inner sep=1pt] at (axis cs:4.07, 4.9e-8) {\code{Central<4>}, double};
+  \node[font=\scriptsize, anchor=west, inner sep=1pt] at (axis cs:4.07, 6.8e-10) {\code{Ridders}, double};
+  \node[font=\scriptsize, anchor=south, inner sep=1pt] at (axis cs:2.5, 4e-3) {float, dashed (same marks)};
+  % the warning case: every fourth derivative in float
+  \draw[accent, thin] (axis cs:3.85, 3e-4) rectangle (axis cs:4.15, 4e-2);
+  \node[accent, font=\scriptsize, anchor=south] at (axis cs:4, 4.5e-2) {float $f''''$: warning};
+\end{axis}
+\end{tikzpicture}

@@ -1,0 +1,21 @@
+% F10 fig:v-curve-orders (Chapter 5, text width). The V of Central<2> for N = 1 to 4, exp(x) at x = 1 (DS5,
+% data/step-error-orders.csv). The truncation branches coincide (every derivative of exp is exp, and the constants
+% 1/6, 1/12, 1/4, 1/6 differ little); the rounding branch steepens as 1/h^N and the minimum rises with N: the fourth
+% derivative (accent) gives about four digits where the first gives eleven. Errors above 1 are cut off.
+\begin{tikzpicture}
+\begin{axis}[eqtufte, width=95mm, height=45mm,
+  xmode=log, ymode=log, log basis x=10, log basis y=10,
+  xmin=1e-13, xmax=1, ymin=1e-13, ymax=1,
+  xtick={1e-12,1e-10,1e-8,1e-6,1e-4,1e-2,1}, ytick={1e-12,1e-9,1e-6,1e-3,1},
+  xlabel={step $h$}, ylabel={relative error}, restrict y to domain=-14:-0.05, unbounded coords=jump]
+  \addplot[black!80] table[col sep=comma, comment chars={\#}, x=h, y=n1] {data/step-error-orders.csv};
+  \addplot[black!65] table[col sep=comma, comment chars={\#}, x=h, y=n2] {data/step-error-orders.csv};
+  \addplot[black!50] table[col sep=comma, comment chars={\#}, x=h, y=n3] {data/step-error-orders.csv};
+  \addplot[accent] table[col sep=comma, comment chars={\#}, x=h, y=n4] {data/step-error-orders.csv};
+  % labels below and to the right of the rounding branches, where nothing else is drawn
+  \node[font=\scriptsize, anchor=north west, inner sep=1pt] at (axis cs:3e-10, 1e-9) {$\dorder = 1$};
+  \node[font=\scriptsize, anchor=north west, inner sep=1pt] at (axis cs:3e-7, 1e-5) {$\dorder = 2$};
+  \node[font=\scriptsize, anchor=east, inner sep=1pt] at (axis cs:1.2e-5, 3e-2) {$\dorder = 3$};
+  \node[accent, font=\scriptsize, anchor=south west, inner sep=1pt] at (axis cs:3e-4, 8e-2) {$\dorder = 4$};
+\end{axis}
+\end{tikzpicture}

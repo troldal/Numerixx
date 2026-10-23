@@ -1,0 +1,21 @@
+% F4b fig:step-scale-small (Chapter 3, margin): the V of the central difference (Central<2>) for y ln y at
+% y = 1e-6 (DS4b, data/step-scale-small.csv). Steps above y sample below zero, where the function is not finite, so
+% the curve stops there (nan in the CSV) and the default step eps^(1/3) gets no value; the step eps^(1/3) y lands
+% near the minimum. Steps, status and error from \valSmall{DefaultStep,DefaultStatus,FitStep,FitRelError}.
+\begin{tikzpicture}
+\begin{axis}[eqtufte, width=36mm, height=32mm, xmode=log, ymode=log,
+    xlabel={step $h$}, ylabel={relative error},
+    xmin=1e-20, xmax=1e-5, ymin=1e-12, ymax=1e-2,
+    xtickten={-20,-15,-10,-5}, ytickten={-12,-8,-4},
+    unbounded coords=jump]
+  \addplot[black!75, mark=*] table[col sep=comma, x=h, y=error, comment chars={\#}] {data/step-scale-small.csv};
+  \draw[muted, thin] ({axis cs:\valSmallDefaultStep,1}|-{rel axis cs:0,0})
+    -- ({axis cs:\valSmallDefaultStep,1}|-{rel axis cs:0,1})
+    node[anchor=south east, font=\sffamily\scriptsize, inner sep=1pt, align=right] {default step:\\ \valSmallDefaultStatus};
+  \draw[accent, thin] ({axis cs:\valSmallFitStep,1}|-{rel axis cs:0,0})
+    -- ({axis cs:\valSmallFitStep,1}|-{rel axis cs:0,1});
+  \node[accent, font=\sffamily\scriptsize, anchor=east, inner sep=1.5pt]
+    at ({axis cs:\valSmallFitStep,1}|-{rel axis cs:0,0.72}) {$\varepsilon^{1/3} y$};
+  \fill[accent] (axis cs:\valSmallFitStep,\valSmallFitRelError) circle (1.2pt);
+\end{axis}
+\end{tikzpicture}

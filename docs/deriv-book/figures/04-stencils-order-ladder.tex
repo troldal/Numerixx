@@ -1,0 +1,26 @@
+% F6 fig:order-ladder (Chapter 4, text width). Relative error against the step for Central<2> to Central<10>,
+% exp(x) at x = 1 (DS2, data/step-error-exp.csv). The truncation branches steepen with P; the rounding branches
+% nearly coincide (S from 1 to 2.3), and the minima slide up the common rounding line eps / h (accent), because a
+% higher order lets the step grow. The float and caption stay in the chapter.
+\begin{tikzpicture}
+\begin{axis}[eqtufte, width=95mm, height=45mm,
+  xmode=log, ymode=log, log basis x=10, log basis y=10,
+  xmin=1e-13, xmax=1, ymin=1e-16, ymax=1,
+  xtick={1e-12,1e-10,1e-8,1e-6,1e-4,1e-2,1}, ytick={1e-16,1e-12,1e-8,1e-4,1},
+  xlabel={step $h$}, ylabel={relative error}, unbounded coords=jump]
+  % the common rounding line eps / h (relative, since f = f' for exp): a guide, not data
+  \addplot[accent, dashed, thin, domain=1e-13:1e-3, samples=2] {2^(-52) / x};
+  \node[accent, font=\scriptsize, anchor=south west, inner sep=1pt] at (axis cs:3e-9, 1.5e-7) {$\epsmach / h$};
+  \addplot[black!85] table[col sep=comma, comment chars={\#}, x=h, y=central2] {data/step-error-exp.csv};
+  \addplot[black!70] table[col sep=comma, comment chars={\#}, x=h, y=central4] {data/step-error-exp.csv};
+  \addplot[black!60] table[col sep=comma, comment chars={\#}, x=h, y=central6] {data/step-error-exp.csv};
+  \addplot[black!50] table[col sep=comma, comment chars={\#}, x=h, y=central8] {data/step-error-exp.csv};
+  \addplot[black!40] table[col sep=comma, comment chars={\#}, x=h, y=central10] {data/step-error-exp.csv};
+  % labels on the truncation branches, left of the curve (the curve is lower to the left)
+  \node[font=\scriptsize, anchor=east, inner sep=1pt] at (axis cs:0.17, 5e-3) {\code{Central<2>}};
+  \node[font=\scriptsize, anchor=east, inner sep=1pt] at (axis cs:0.17, 3e-5) {\code{Central<4>}};
+  \node[font=\scriptsize, anchor=east, inner sep=1pt] at (axis cs:0.17, 2e-7) {\code{Central<6>}};
+  \node[font=\scriptsize, anchor=east, inner sep=1pt] at (axis cs:0.17, 1.6e-9) {\code{Central<8>}};
+  \node[font=\scriptsize, anchor=east, inner sep=1pt] at (axis cs:0.17, 1.2e-11) {\code{Central<10>}};
+\end{axis}
+\end{tikzpicture}

@@ -1,0 +1,22 @@
+% F8 fig:default-step-accuracy (Chapter 4, margin). Relative error at the default step against the accuracy order P
+% for Central<2..10> and Forward<1..6>, exp(x), N = 1 (DS7, data/default-step-accuracy.csv): the median over eleven
+% points in [0.5, 1], the whiskers the smallest and largest value. Diminishing returns beyond P = 4 or 6 in double.
+% The rows with nan (a P the family lacks) are discarded, so the lines join the existing orders.
+\begin{tikzpicture}
+\begin{axis}[eqtufte, width=38mm, height=34mm,
+  ymode=log, log basis y=10, xmin=0.5, xmax=10.5, ymin=1e-16, ymax=1e-7,
+  xtick={1,2,...,10}, ytick={1e-16,1e-14,1e-12,1e-10,1e-8},
+  xlabel={accuracy order $\aorder$}, ylabel={relative error}, unbounded coords=discard,
+  error bars/y dir=both, error bars/y explicit, error bars/error bar style={thin}, error bars/error mark options={rotate=90, mark size=1pt}]
+  \addplot[accent, mark=*, mark size=1pt, error bars/error bar style={accent!60}]
+    table[col sep=comma, comment chars={\#}, x=P, y=central,
+      y error plus expr=\thisrow{central_max}-\thisrow{central}, y error minus expr=\thisrow{central}-\thisrow{central_min}]
+    {data/default-step-accuracy.csv};
+  \addplot[muted, mark=square*, mark size=1pt, error bars/error bar style={black!35}]
+    table[col sep=comma, comment chars={\#}, x=P, y=forward,
+      y error plus expr=\thisrow{forward_max}-\thisrow{forward}, y error minus expr=\thisrow{forward}-\thisrow{forward_min}]
+    {data/default-step-accuracy.csv};
+  \node[accent, font=\tiny, anchor=north, inner sep=1pt] at (axis cs:8, 1e-15) {\code{Central<P>}};
+  \node[muted, font=\tiny, anchor=south west, inner sep=1pt] at (axis cs:3.3, 3e-12) {\code{Forward<P>}};
+\end{axis}
+\end{tikzpicture}

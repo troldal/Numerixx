@@ -1,0 +1,37 @@
+% F13 fig:ridders-convergence (Chapter 6, text width). Relative error of the tableau entries A_{i,j} against the
+% level i over 16 levels for cp at T0 (DS8, data/ridders-tableau.csv, long form: one row per (i, j); each curve
+% selects its column j with a y expression and discards the other rows). Column 0 (the base difference) descends
+% slowly; each higher column reaches the rounding floor r_i (dashed) within a few levels; the floor doubles per
+% level, so the entries then drift up. Ridders' stop and its returned entry come from \valTableauStopLevel,
+% \valTableauBestLevel and \valTableauBestRelError (the entry matched bit for bit by the generator).
+\begin{tikzpicture}
+\begin{axis}[eqtufte, width=95mm, height=48mm,
+  ymode=log, log basis y=10, xmin=0, xmax=15.5, ymin=1e-16, ymax=1e-4,
+  xtick={0,2,...,14}, ytick={1e-16,1e-14,1e-12,1e-10,1e-8,1e-6,1e-4},
+  xlabel={level $i$ (step $h_0 / 2^i$, $h_0 = T_0/32$)}, ylabel={relative error of $\Aij{i}{j}$},
+  unbounded coords=discard]
+  % the rounding floor r_i (one value per level, taken from the j = 0 rows)
+  \addplot[muted, dashed] table[col sep=comma, comment chars={\#}, x=i,
+    y expr={\thisrow{j} == 0 ? \thisrow{floor} : nan}] {data/ridders-tableau.csv};
+  \node[muted, font=\scriptsize, anchor=south, inner sep=1pt] at (axis cs:12.5, 3.5e-11) {floor $r_i$};
+  % columns 0 to 4
+  \addplot[black!85, mark=*, mark size=1pt] table[col sep=comma, comment chars={\#}, x=i,
+    y expr={\thisrow{j} == 0 ? \thisrow{error} : nan}] {data/ridders-tableau.csv};
+  \addplot[black!70, mark=square*, mark size=1pt] table[col sep=comma, comment chars={\#}, x=i,
+    y expr={\thisrow{j} == 1 ? \thisrow{error} : nan}] {data/ridders-tableau.csv};
+  \addplot[black!55, mark=triangle*, mark size=1.2pt] table[col sep=comma, comment chars={\#}, x=i,
+    y expr={\thisrow{j} == 2 ? \thisrow{error} : nan}] {data/ridders-tableau.csv};
+  \addplot[black!45, mark=diamond*, mark size=1.2pt] table[col sep=comma, comment chars={\#}, x=i,
+    y expr={\thisrow{j} == 3 ? \thisrow{error} : nan}] {data/ridders-tableau.csv};
+  \addplot[black!35, mark=pentagon*, mark size=1.2pt] table[col sep=comma, comment chars={\#}, x=i,
+    y expr={\thisrow{j} == 4 ? \thisrow{error} : nan}] {data/ridders-tableau.csv};
+  \node[font=\scriptsize, anchor=south west, inner sep=1pt] at (axis cs:7.3, 6e-9) {$j = 0$: the base difference $D_i$};
+  \node[font=\scriptsize, anchor=south west, inner sep=1pt] at (axis cs:3.2, 3e-11) {$j = 1$};
+  \node[font=\scriptsize, anchor=north west, inner sep=1pt] at (axis cs:6.3, 7e-16) {$j = 2, 3, 4$ (they coincide)};
+  % Ridders' stop and the entry it returned
+  \draw[accent, thin, dashed] (axis cs:\valTableauStopLevel, 1e-16) -- (axis cs:\valTableauStopLevel, 1e-4);
+  \node[accent, font=\scriptsize, anchor=south west, inner sep=1pt] at (axis cs:\valTableauStopLevel, 3e-5) {Ridders stops};
+  \node[accent, draw, circle, thin, inner sep=0pt, minimum size=6pt] at (axis cs:\valTableauBestLevel, \valTableauBestRelError) {};
+  \node[accent, font=\scriptsize, anchor=south east, inner sep=1pt] at (axis cs:3.85, 1.1e-13) {returned};
+\end{axis}
+\end{tikzpicture}

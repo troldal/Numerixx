@@ -1,0 +1,26 @@
+% F3 fig:v-curve (Chapter 3, text width): the V of the central difference (Central<2>) on the thread, H(T) at
+% T0 = 1000 K: the measured relative error over the whole range of steps and the model
+% E(h) = (h^2 |H'''| / 6 + eps |H| / h) / cp, dashed (DS1, data/step-error-cp.csv); the default step marked from
+% \valCpDefaultStep and \valCpDefaultRelError (DS1b). The model exceeds 1 at the smallest steps, cut at the top.
+\begin{tikzpicture}
+\begin{axis}[eqtufte, width=95mm, height=45mm, xmode=log, ymode=log,
+    xlabel={step $h$ (K)}, ylabel={relative error},
+    xmin=1e-13, xmax=1e2, ymin=1e-12, ymax=1,
+    xtickten={-12,-10,-8,-6,-4,-2,0,2}, ytickten={-12,-9,-6,-3,0},
+    restrict y to domain=-30:0.01, unbounded coords=jump]
+  \addplot[muted, densely dashed, line width=0.6pt] table[col sep=comma, x=h, y=model_central2,
+    comment chars={\#}] {data/step-error-cp.csv};
+  \addplot[accent, mark=*] table[col sep=comma, x=h, y=central2, comment chars={\#}] {data/step-error-cp.csv};
+  % the default step: a thin muted line over the height of the axis, labelled at the top
+  \draw[muted, thin] ({axis cs:\valCpDefaultStep,1}|-{rel axis cs:0,0})
+    -- ({axis cs:\valCpDefaultStep,1}|-{rel axis cs:0,1})
+    node[above, font=\sffamily\scriptsize, inner sep=1.5pt] {default step};
+  \fill[accent] (axis cs:\valCpDefaultStep,\valCpDefaultRelError) circle (1.4pt);
+  % the two branches and the model
+  \node[font=\sffamily\scriptsize, black!70, anchor=south west, align=left] at (axis cs:3e-13, 1e-10)
+    {rounding:\\ error ${}\propto 1/h$};
+  \node[font=\sffamily\scriptsize, black!70, anchor=north west, align=left] at (axis cs:0.3, 1e-9)
+    {truncation:\\ error ${}\propto h^2$};
+  \node[font=\sffamily\scriptsize, muted, anchor=south west] at (axis cs:1e-9, 1e-3) {model $E(h)$, dashed};
+\end{axis}
+\end{tikzpicture}

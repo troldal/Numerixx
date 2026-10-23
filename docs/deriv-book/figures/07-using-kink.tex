@@ -1,0 +1,24 @@
+% F18 fig:kink (Chapter 7, section 7.8): the published enthalpy of nitrogen across the range break at 500 K, where
+% the two Shomate fits do not meet (H jumps by 0.77 J/mol). Relative error of cp at x = 500 K + delta against delta,
+% default steps: Central<2>, Central<4>, Ridders' value and Ridders' relative error estimate (dashed). While the break
+% lies inside a method's span the error is large and no method fails; only Ridders' estimate shows it. Data: DS20,
+% data/kink.csv (E19). Labels sit on their curves (pos is a fraction of the drawn length), right of the drop of Central<2>.
+\begin{tikzpicture}
+\begin{axis}[eqtufte, width=38mm, height=56mm, xmode=log, ymode=log,
+  xlabel={distance $\delta$ from the break (K)}, ylabel={relative error},
+  xtick={1e-4,1e-2,1,1e2}, ytick={1e-14,1e-10,1e-6,1e-2,1e2},
+  ymin=1e-15, ymax=1e2, xmin=4e-5, xmax=600, unbounded coords=jump]
+  \addplot[muted]
+    table[col sep=comma, x=delta, y=central2, comment chars={\#}] {data/kink.csv}
+    node[pos=0, anchor=south west, font=\scriptsize] {\code{Central<2>}};
+  \addplot[muted, densely dotted]
+    table[col sep=comma, x=delta, y=central4, comment chars={\#}] {data/kink.csv}
+    node[pos=0.15, anchor=south west, font=\scriptsize] {\code{Central<4>}};
+  \addplot[black!80]
+    table[col sep=comma, x=delta, y=ridders, comment chars={\#}] {data/kink.csv}
+    node[pos=0.11, anchor=north west, font=\scriptsize] {Ridders};
+  \addplot[accent, dashed]
+    table[col sep=comma, x=delta, y=ridders_estimate, comment chars={\#}] {data/kink.csv}
+    node[pos=0.11, anchor=south west, inner ysep=1pt, font=\scriptsize] {its estimate};
+\end{axis}
+\end{tikzpicture}

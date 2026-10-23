@@ -1,0 +1,22 @@
+% F5 fig:float-double (Chapter 3, margin): the V of the central difference (Central<2>) on exp(x) at x = 1 in float
+% and in double (DS3, data/step-error-float.csv). Each floor sits at about eps^(2/3) of its type, drawn as a dashed
+% guide from \valModelCentralTwoFirst{Float,Double}. Steps 1 to 1e-8 (on a log axis the domain restriction is in
+% natural logarithms: ln(1e-8) = -18.42).
+\begin{tikzpicture}
+\begin{axis}[eqtufte, width=36mm, height=32mm, xmode=log, ymode=log,
+    xlabel={step $h$}, ylabel={relative error},
+    xmin=1e-8, xmax=1, ymin=1e-12, ymax=1,
+    xtickten={-8,-4,0}, ytickten={-12,-8,-4,0},
+    unbounded coords=jump, restrict x to domain=-18.43:0.01]
+  \draw[accent, densely dashed, line width=0.5pt] ({rel axis cs:0,0}|-{axis cs:1,\valModelCentralTwoFirstFloat})
+    -- ({rel axis cs:1,0}|-{axis cs:1,\valModelCentralTwoFirstFloat})
+    node[below left, font=\sffamily\scriptsize, inner sep=1pt] {$\varepsilon_{\mathrm{float}}^{2/3}$};
+  \draw[accent, densely dashed, line width=0.5pt] ({rel axis cs:0,0}|-{axis cs:1,\valModelCentralTwoFirstDouble})
+    -- ({rel axis cs:1,0}|-{axis cs:1,\valModelCentralTwoFirstDouble})
+    node[above left, font=\sffamily\scriptsize, inner sep=1pt] {$\varepsilon_{\mathrm{double}}^{2/3}$};
+  \addplot[muted, mark=*] table[col sep=comma, x=h, y=error_float, comment chars={\#}] {data/step-error-float.csv};
+  \addplot[black!75, mark=*] table[col sep=comma, x=h, y=error_double, comment chars={\#}] {data/step-error-float.csv};
+  \node[muted, font=\sffamily\scriptsize, anchor=south west] at (axis cs:5e-7, 0.12) {float};
+  \node[black!75, font=\sffamily\scriptsize, anchor=south west] at (axis cs:1.2e-8, 1e-8) {double};
+\end{axis}
+\end{tikzpicture}

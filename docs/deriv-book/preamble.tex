@@ -165,7 +165,9 @@
 % \snippet{<file>}{<name>}: the lines of code/<file>.cpp between the comment lines "// <name>" and "// </name>",
 % without the markers. Markers and snippet start in column 0 (\lstinputlisting cannot gobble indentation, and an
 % indented end marker is not recognised); code/quickstart.cpp shows the convention.
-\newcommand{\snippet}[2]{\lstinputlisting[rangeprefix=//\ <, rangesuffix=>, linerange={#2-/#2},
+% The range ends are braced: without the braces, linerange splits a hyphenated name such as first-ridders at its
+% first hyphen and quotes the wrong lines, or nothing, without a warning (tools/check.py checks the markers).
+\newcommand{\snippet}[2]{\lstinputlisting[rangeprefix=//\ <, rangesuffix=>, linerange={{#2}-{/#2}},
   includerangemarker=false]{code/#1.cpp}}
 % ---------------------------------------------------------------- float placement
 \renewcommand{\topfraction}{0.85}

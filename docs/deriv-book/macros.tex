@@ -15,10 +15,34 @@
 \newcommand{\ampl}{S}                                         % rounding amplification: sum |w_k| / den
 \newcommand{\errc}{C}                                         % truncation error constant of a rule
 \newcommand{\scale}{s}                                        % max(|x|, 1), the scale of the default steps
+% --- added at stage 2 (PLAN.md section 2.3) ---
+\newcommand{\abs}[1]{\lvert #1 \rvert}                       % absolute value
+\newcommand{\hbest}{h^{\ast}}                                % the best step of the error model
+\newcommand{\etrunc}{E_{\mathrm{t}}}                         % truncation error, written \etrunc(h)
+\newcommand{\eround}{E_{\mathrm{r}}}                         % rounding error, written \eround(h); E(h) is their sum
+\newcommand{\Dc}[1]{D(#1)}                                   % the base difference (Central<2> of order N) at step #1
+\newcommand{\Aij}[2]{A_{#1,#2}}                              % Ridders' tableau entry: level #1, column #2
+\newcommand{\errest}{\hat{e}}                                % the error estimate abs_error
+\newcommand{\mom}[1]{M_{#1}}                                 % the #1-th moment sum_k w_k n_k^#1 of a rule
+\newcommand{\den}{d}                                         % the common denominator of the integer numerators
+\newcommand{\noise}{\eta}                                    % relative accuracy of f when worse than epsmach
+\newcommand{\fmax}{\Omega}                                   % the largest finite value of the type
+\newcommand{\nevals}{n_{\mathrm{f}}}                         % number of evaluations of fn
+\newcommand{\enth}{H}                                        % molar enthalpy of the thread, written \enth(T), J/mol
+\newcommand{\cp}{c_p}                                        % molar heat capacity, J/(mol K)
+\newcommand{\Rgas}{R}                                        % the gas constant
 % --- software identifiers (typeset in monospace) ---
 \newcommand{\code}[1]{\texttt{\detokenize{#1}}}
 \newcommand{\nxx}{Numerixx}
 % --- editorial ---
 \newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+% \snippetheader{<file>}{<name>}: as \snippet (preamble.tex), for the shared headers code/<file>.hpp that the
+% generator and the examples include (the thread's enthalpy in code/shomate.hpp is quoted from there, once).
+\newcommand{\snippetheader}[2]{\lstinputlisting[rangeprefix=//\ <, rangesuffix=>, linerange={{#2}-{/#2}},
+  includerangemarker=false]{code/#1.hpp}}
+% \tablebody{<name>}: the body rows of data/table-<name>.tex inside a tabular. LaTeX's \input{...} runs file hooks
+% after the file, whose tokens open a new row before \bottomrule ("Misplaced \noalign"); the TeX primitive does not.
+% Usage, on a line of its own between \midrule and \bottomrule:  \tablebody{ridders-tableau}
+\newcommand{\tablebody}[1]{\csname @@input\endcsname data/table-#1.tex }
 % --- generated values: data/values.tex defines one macro per number quoted in the text (\val...) ---
 \InputIfFileExists{data/values}{}{}

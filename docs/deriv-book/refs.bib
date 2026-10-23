@@ -1,7 +1,9 @@
 % References of the book. Every entry must be a real work, checked against the work itself (or a library
 % catalogue) by the evidence reviewer: author names, title, year, publisher or journal, volume, pages, DOI.
 % Never add an entry from memory without checking it; mark an unchecked entry with a note field "UNVERIFIED"
-% until it is checked. Candidates to verify are listed in BRIEF.md, "Literature".
+% until it is checked. The entries below are those of PLAN.md section 6, entered by the editor at stage 2 from
+% the plan's data and memory: every one carries note = {UNVERIFIED} until the evidence reviewer has checked it
+% (review round 1), and none may be cited before then. Accented names use LaTeX accents (ASCII file).
 
 % The layout test's citation; remove it with chapters/zz-layout-test.tex.
 @book{layout-test,
@@ -10,4 +12,268 @@
   publisher = {None},
   address   = {Nowhere},
   year      = {2026}
+}
+
+% ---------------------------------------------------------------- numerical differentiation, extrapolation
+@book{burden2016,
+  author    = {Burden, Richard L. and Faires, J. Douglas and Burden, Annette M.},
+  title     = {Numerical Analysis},
+  edition   = {10},
+  publisher = {Cengage Learning},
+  address   = {Boston},
+  year      = {2016},
+  note      = {UNVERIFIED}
+}
+
+@book{chapra2015,
+  author    = {Chapra, Steven C. and Canale, Raymond P.},
+  title     = {Numerical Methods for Engineers},
+  edition   = {7},
+  publisher = {McGraw-Hill Education},
+  address   = {New York},
+  year      = {2015},
+  note      = {UNVERIFIED}
+}
+
+@article{ridders1982,
+  author  = {Ridders, C. J. F.},
+  title   = {Accurate computation of {F}'(x) and {F}'(x){F}''(x)},
+  journal = {Advances in Engineering Software},
+  volume  = {4},
+  number  = {2},
+  pages   = {75--76},
+  year    = {1982},
+  doi     = {10.1016/S0141-1195(82)80057-0},
+  note    = {UNVERIFIED}
+}
+
+@article{fornberg1988,
+  author  = {Fornberg, Bengt},
+  title   = {Generation of finite difference formulas on arbitrarily spaced grids},
+  journal = {Mathematics of Computation},
+  volume  = {51},
+  number  = {184},
+  pages   = {699--706},
+  year    = {1988},
+  doi     = {10.1090/S0025-5718-1988-0935077-0},
+  note    = {UNVERIFIED}
+}
+
+@article{richardson1911,
+  author  = {Richardson, Lewis Fry},
+  title   = {The approximate arithmetical solution by finite differences of physical problems involving
+             differential equations, with an application to the stresses in a masonry dam},
+  journal = {Philosophical Transactions of the Royal Society of London. Series A},
+  volume  = {210},
+  pages   = {307--357},
+  year    = {1911},
+  doi     = {10.1098/rsta.1911.0009},
+  note    = {UNVERIFIED}
+}
+
+@article{richardson1927,
+  author  = {Richardson, Lewis Fry and Gaunt, J. Arthur},
+  title   = {The deferred approach to the limit},
+  journal = {Philosophical Transactions of the Royal Society of London. Series A},
+  volume  = {226},
+  pages   = {299--361},
+  year    = {1927},
+  doi     = {10.1098/rsta.1927.0008},
+  note    = {UNVERIFIED}
+}
+
+@book{sidi2003,
+  author    = {Sidi, Avram},
+  title     = {Practical Extrapolation Methods: Theory and Applications},
+  series    = {Cambridge Monographs on Applied and Computational Mathematics},
+  number    = {10},
+  publisher = {Cambridge University Press},
+  address   = {Cambridge},
+  year      = {2003},
+  doi       = {10.1017/CBO9780511546815},
+  note      = {UNVERIFIED}
+}
+
+% ---------------------------------------------------------------- floating-point arithmetic
+@book{higham2002,
+  author    = {Higham, Nicholas J.},
+  title     = {Accuracy and Stability of Numerical Algorithms},
+  edition   = {2},
+  publisher = {Society for Industrial and Applied Mathematics},
+  address   = {Philadelphia},
+  year      = {2002},
+  doi       = {10.1137/1.9780898718027},
+  note      = {UNVERIFIED}
+}
+
+@article{goldberg1991,
+  author  = {Goldberg, David},
+  title   = {What every computer scientist should know about floating-point arithmetic},
+  journal = {ACM Computing Surveys},
+  volume  = {23},
+  number  = {1},
+  pages   = {5--48},
+  year    = {1991},
+  doi     = {10.1145/103162.103163},
+  note    = {UNVERIFIED}
+}
+
+@book{sterbenz1974,
+  author    = {Sterbenz, Pat H.},
+  title     = {Floating-Point Computation},
+  publisher = {Prentice-Hall},
+  address   = {Englewood Cliffs},
+  year      = {1974},
+  note      = {UNVERIFIED}
+}
+
+@misc{ieee754-2019,
+  author       = {{IEEE}},
+  title        = {{IEEE} Standard for Floating-Point Arithmetic},
+  howpublished = {IEEE Std 754-2019},
+  publisher    = {Institute of Electrical and Electronics Engineers},
+  address      = {New York},
+  year         = {2019},
+  doi          = {10.1109/IEEESTD.2019.8766229},
+  note         = {UNVERIFIED}
+}
+
+% ---------------------------------------------------------------- the alternatives (Chapter 1, S1)
+@article{lyness1967,
+  author  = {Lyness, J. N. and Moler, C. B.},
+  title   = {Numerical differentiation of analytic functions},
+  journal = {SIAM Journal on Numerical Analysis},
+  volume  = {4},
+  number  = {2},
+  pages   = {202--210},
+  year    = {1967},
+  doi     = {10.1137/0704019},
+  note    = {UNVERIFIED}
+}
+
+@article{squire1998,
+  author  = {Squire, William and Trapp, George},
+  title   = {Using complex variables to estimate derivatives of real functions},
+  journal = {SIAM Review},
+  volume  = {40},
+  number  = {1},
+  pages   = {110--112},
+  year    = {1998},
+  doi     = {10.1137/S003614459631241X},
+  note    = {UNVERIFIED}
+}
+
+@book{griewank2008,
+  author    = {Griewank, Andreas and Walther, Andrea},
+  title     = {Evaluating Derivatives: Principles and Techniques of Algorithmic Differentiation},
+  edition   = {2},
+  publisher = {Society for Industrial and Applied Mathematics},
+  address   = {Philadelphia},
+  year      = {2008},
+  doi       = {10.1137/1.9780898717761},
+  note      = {UNVERIFIED}
+}
+
+% ---------------------------------------------------------------- the step, noise, optimisation texts
+@article{more2012,
+  author  = {Mor{\'e}, Jorge J. and Wild, Stefan M.},
+  title   = {Estimating derivatives of noisy simulations},
+  journal = {ACM Transactions on Mathematical Software},
+  volume  = {38},
+  number  = {3},
+  pages   = {19:1--19:21},
+  year    = {2012},
+  doi     = {10.1145/2168773.2168777},
+  note    = {UNVERIFIED}
+}
+
+@book{dennis1996,
+  author    = {Dennis, Jr., J. E. and Schnabel, Robert B.},
+  title     = {Numerical Methods for Unconstrained Optimization and Nonlinear Equations},
+  series    = {Classics in Applied Mathematics},
+  number    = {16},
+  publisher = {Society for Industrial and Applied Mathematics},
+  address   = {Philadelphia},
+  year      = {1996},
+  doi       = {10.1137/1.9781611971200},
+  note      = {UNVERIFIED (first published by Prentice-Hall, 1983; sections 5.4 and 5.6)}
+}
+
+@book{nocedal2006,
+  author    = {Nocedal, Jorge and Wright, Stephen J.},
+  title     = {Numerical Optimization},
+  edition   = {2},
+  series    = {Springer Series in Operations Research and Financial Engineering},
+  publisher = {Springer},
+  address   = {New York},
+  year      = {2006},
+  doi       = {10.1007/978-0-387-40065-5},
+  note      = {UNVERIFIED (section 8.1)}
+}
+
+@article{gill1983,
+  author  = {Gill, Philip E. and Murray, Walter and Saunders, Michael A. and Wright, Margaret H.},
+  title   = {Computing forward-difference intervals for numerical optimization},
+  journal = {SIAM Journal on Scientific and Statistical Computing},
+  volume  = {4},
+  number  = {2},
+  pages   = {310--321},
+  year    = {1983},
+  doi     = {10.1137/0904025},
+  note    = {UNVERIFIED}
+}
+
+% ---------------------------------------------------------------- the thread's data (decision A1)
+% Both verified by the evidence reviewer on 2026-10-23 (scratchpad record thread-data-nitrogen.md): Chase 1998
+% against the title page and verso of Part II, the NAIST and EPA HERO catalogue records and NIST's monograph list;
+% the WebBook against its main page, its Citation Guide and the DOI resolver. Cite the WebBook for the Shomate
+% equations and the coefficients (its own fit of January 2009), Chase 1998 for the tabulated data the fit represents.
+@book{chase1998,
+  author    = {Chase, Jr., Malcolm W.},
+  title     = {{NIST-JANAF} Thermochemical Tables},
+  edition   = {Fourth},
+  series    = {Journal of Physical and Chemical Reference Data, Monograph},
+  number    = {9},
+  publisher = {American Chemical Society and American Institute of Physics for the National Institute of Standards and Technology},
+  address   = {Woodbury, NY},
+  year      = {1998},
+  pages     = {1--1951},
+  isbn      = {1-56396-831-2},
+  note      = {Two parts: Part~I, Al--Co; Part~II, Cr--Zr. Nitrogen (N$_2$): Part~II, p.~1621}
+}
+
+@book{nist-webbook,
+  editor    = {Linstrom, P. J. and Mallard, W. G.},
+  title     = {{NIST} Chemistry {WebBook}},
+  series    = {NIST Standard Reference Database Number 69},
+  publisher = {National Institute of Standards and Technology},
+  address   = {Gaithersburg, MD},
+  doi       = {10.18434/T4D303},
+  note      = {Nitrogen, gas phase thermochemistry data, Shomate equation (new parameter fit January 2009, data from
+               Chase 1998), \url{https://webbook.nist.gov/cgi/cbook.cgi?ID=C7727379&Mask=1}, retrieved 23~October~2026}
+}
+
+% Optional, if the text names the equation's origin. Metadata verified in Crossref by the evidence reviewer; the
+% paper itself was not seen, so whether it contains the WebBook's five-term form is unverified.
+@article{shomate1954,
+  author  = {Shomate, C. Howard},
+  title   = {A method for evaluating and correlating thermodynamic data},
+  journal = {The Journal of Physical Chemistry},
+  volume  = {58},
+  number  = {4},
+  pages   = {368--372},
+  year    = {1954},
+  doi     = {10.1021/j150514a018},
+  note    = {UNVERIFIED (content not seen; metadata checked)}
+}
+
+% ---------------------------------------------------------------- the language (optional, Chapters 7 and 8)
+@misc{iso14882-2024,
+  author       = {{ISO/IEC}},
+  title        = {Programming languages -- {C++}},
+  howpublished = {ISO/IEC 14882:2024},
+  publisher    = {International Organization for Standardization},
+  address      = {Geneva},
+  year         = {2024},
+  note         = {UNVERIFIED}
 }

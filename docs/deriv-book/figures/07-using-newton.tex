@@ -1,0 +1,14 @@
+% F16 fig:newton (Chapter 7, section 7.4): Newton's method for T with H(T) = H(1000 K) from 800 K, the slope by
+% Central<2> with the default step (E12). The residual |H(T) - H*| in J/mol against the iteration: the number of
+% correct digits doubles per step until the residual reaches the rounding of H. Data: DS11, data/newton.csv.
+\begin{tikzpicture}
+\begin{axis}[eqtufte, width=38mm, height=34mm, ymode=log,
+  xlabel={iteration}, ylabel={residual $|H(T) - H^\ast|$ (J/mol)},
+  xtick distance=1, ytick={1e-12,1e-8,1e-4,1,1e4},
+  ymin=1e-13, ymax=1e5, xmin=-0.2, xmax=4.4]
+  \addplot[accent, mark=*, mark size=1pt]
+    table[col sep=comma, x=iteration, y expr={abs(\thisrow{residual})}, comment chars={\#}] {data/newton.csv}
+    node[pos=0.5, anchor=south west, font=\scriptsize, accent, align=left] {quadratic:\protect\\digits double}
+    node[pos=1, left=1pt, font=\scriptsize, muted] {rounding of $H$};
+\end{axis}
+\end{tikzpicture}
