@@ -89,6 +89,15 @@ static_assert(
     derivative<nxx::deriv::Ridders>([](NoDefault const &x) { return x * x; }, NoDefault(3), NoDefault(0.5))->value.v
     == 6.0);
 
+// Higher orders on the user types: x^2 has f'' = 2, and the second difference is exact for it whatever the step (2 at
+// every Ridders level, so the tableau stops on exact agreement); f''' and f'''' of x^2 are 0.
+static_assert(derivative<Central<2>, 2>(&Real::square, Real(3), Real(0.5))->value.v == 2.0);
+static_assert(derivative<nxx::deriv::Ridders, 2>(&Real::square, Real(3), Real(0.5))->value.v == 2.0);
+static_assert(derivative<Central<4>, 3>(&Real::square, Real(3), Real(0.5))->value.v == 0.0);
+static_assert(
+    derivative<nxx::deriv::Ridders, 4>([](NoDefault const &x) { return x * x; }, NoDefault(3), NoDefault(0.5))->value.v
+    == 0.0);
+
 static_assert(std::invocable<LvalueOnly &, double const &> && !std::invocable<LvalueOnly &, double>);
 static_assert(nxx::real<Real> && std::invocable<decltype(&Real::square) &, Real const &>);
 
@@ -114,15 +123,23 @@ TEST_CASE("deriv: callables are invoked with a T const lvalue through std::invok
     CHECK(derivative<Central<4>>(&Real::square, Real(3), Real(0.5))->value.v == 6.0);
     CHECK(derivative<Forward<2>>(&Real::square, Real(3), Real(0.5))->value.v == 6.0);
 
-    // The default step on the user type: x^2 is exact for the central difference, so only rounding remains. At x = 3,
-    // h = 3 eps^(1/3); fn's values give S eps |f| / h = 3 eps^(2/3) (S = 1, f = 9) and the points
-    // S/2 eps |x f'| / h = 3 eps^(2/3) (x f' = 18), so about 6 eps^(2/3) = 2.2e-10, or 4e-11 relative to 6.
     // Ridders on the user types, as in the static_asserts above.
     CHECK(derivative<nxx::deriv::Ridders>(&Real::square, Real(3), Real(0.5))->value.v == 6.0);
     CHECK(
         derivative<nxx::deriv::Ridders>([](NoDefault const &x) { return x * x; }, NoDefault(3), NoDefault(0.5))->value.v
         == 6.0);
 
+    // The higher orders above.
+    CHECK(derivative<Central<2>, 2>(&Real::square, Real(3), Real(0.5))->value.v == 2.0);
+    CHECK(derivative<nxx::deriv::Ridders, 2>(&Real::square, Real(3), Real(0.5))->value.v == 2.0);
+    CHECK(derivative<Central<4>, 3>(&Real::square, Real(3), Real(0.5))->value.v == 0.0);
+    CHECK(derivative<nxx::deriv::Ridders, 4>([](NoDefault const &x) { return x * x; }, NoDefault(3), NoDefault(0.5))
+              ->value.v
+          == 0.0);
+
+    // The default step on the user type: x^2 is exact for the central difference, so only rounding remains. At x = 3,
+    // h = 3 eps^(1/3); fn's values give S eps |f| / h = 3 eps^(2/3) (S = 1, f = 9) and the points
+    // S/2 eps |x f'| / h = 3 eps^(2/3) (x f' = 18), so about 6 eps^(2/3) = 2.2e-10, or 4e-11 relative to 6.
     auto const d = derivative(&Real::square, Real(3));
     REQUIRE(d.has_value());
     CHECK(d->value.v == doctest::Approx(6.0).epsilon(2e-10));

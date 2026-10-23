@@ -31,9 +31,16 @@ API approved: `docs/PHASE3_API.md`.
 - [x] One return type for every method, `std::expected<Estimate<T>, error>`, implicitly convertible to T (1023248)
 - [x] CI passes on all five toolchains (run 39605999468)
 
-### Phase 4: second derivatives
+### Phase 4: derivatives of order 1 to 4
 
-- [ ] Second derivatives of a scalar function
+API approved: `docs/PHASE4_API.md`.
+
+- [ ] `derivative<M, N>` for N = 1 to 4, as an integer or an `enum class order`, with every method
+- [ ] One Lagrange-formula generator for every table; Phase 2 tables reproduced bit for bit
+- [ ] Ridders for N = 1 to 4 on the `Central<2>` rule of each order
+- [ ] No overflow before the final quotient (fixes a constant-evaluation failure of `Central<4>` on a constant 1e308)
+- [ ] A compile-time warning for a float 4th derivative, silenceable at the call or by `NUMERIXX_NO_PRECISION_WARNING`
+- [ ] CI passes on all five toolchains
 
 ## Deferred
 

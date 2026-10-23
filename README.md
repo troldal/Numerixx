@@ -6,8 +6,8 @@ failures are returned as `std::expected`, and an exception thrown by your callba
 unchanged.
 
 Numerixx 2 is in development on the `dev` branch and currently provides numerical derivatives: central and one-sided
-finite differences of orders up to 10, and Ridders' extrapolation with an error estimate. Numerixx 1.x is at the tag
-`v1.1.0-legacy`.
+finite differences of orders up to 10, and Ridders' extrapolation with an error estimate, for the first to the fourth
+derivative. Numerixx 1.x is at the tag `v1.1.0-legacy`.
 
 ```cpp
 #include <numerixx/deriv.hpp>
@@ -21,6 +21,8 @@ auto d4 = nxx::deriv::derivative<Central<4>>([](double x) { return std::sin(x); 
 auto df = nxx::deriv::derivative<Forward<2>>([](double x) { return std::sqrt(x); }, 0.5); // never evaluates below x
 auto dr = nxx::deriv::derivative<Ridders>([](double x) { return std::sin(x); }, 1.0);     // adapts its step
 if (dr) { /* dr->value is cos(1) to about 1e-14, *dr->abs_error estimates its error */ }
+auto d2 = nxx::deriv::derivative<Ridders, 2>([](double x) { return std::sin(x); }, 1.0);  // f'', about 1e-12
+auto d3 = nxx::deriv::derivative<Central<2>, nxx::deriv::order::third>([](double x) { return std::sin(x); }, 1.0);
 
 static_assert(*nxx::deriv::derivative([](double x) { return x * x; }, 3.0, 0.5) == 6.0);
 ```

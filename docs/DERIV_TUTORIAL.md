@@ -4,7 +4,8 @@ This tutorial walks through the current implementation of numerical derivatives 
 `include/numerixx/math.hpp` and `include/numerixx/deriv.hpp`. It starts with how to call the library, then explains the
 mathematics behind the central difference and its default step, goes through the code line by line, including the C++
 details that let the same code run on `double`, on Boost.Multiprecision types and at compile time, and ends with the
-higher-order and one-sided stencils (section 8) and Ridders' extrapolation (section 9).
+higher-order and one-sided stencils (section 8), Ridders' extrapolation (section 9) and derivatives of order 2 to 4
+(section 10).
 
 ## 1. Using it
 
@@ -22,10 +23,15 @@ using nxx::deriv::Central, nxx::deriv::Forward, nxx::deriv::Ridders;
 auto const g = nxx::deriv::derivative<Central<4>>(f, 1.0);   // higher order: 4 evaluations
 auto const k = nxx::deriv::derivative<Forward<2>>(f, 1.0);   // one-sided: never evaluates f below x
 auto const r = nxx::deriv::derivative<Ridders>(f, 1.0);      // adapts its step; r->abs_error estimates the error
+
+using nxx::deriv::order;
+auto const d2 = nxx::deriv::derivative<Central<2>, 2>(f, 1.0);          // f'': (f(x+h) - 2f(x) + f(x-h)) / h^2
+auto const d4 = nxx::deriv::derivative<Ridders, order::fourth>(f, 1.0); // f'''', with an error estimate
 ```
 
-There are two overloads, with and without a step. The optional template argument chooses the method: a stencil
-(section 8) or Ridders (section 9); by default it is `Central<2>`, the central difference of sections 2 to 7. Every
+There are two overloads, with and without a step. The first optional template argument chooses the method: a stencil
+(section 8) or Ridders (section 9); by default it is `Central<2>`, the central difference of sections 2 to 7. The
+second chooses the derivative order, 1 (the default) to 4, as an integer or an `order` (section 10). Every
 method returns `std::expected<Estimate<T>, nxx::deriv::error>`: either an `Estimate`, or `error::non_finite` if no
 finite estimate exists (section 5 lists the cases). An `Estimate` holds `value` and `abs_error`, an
 `std::optional<T>` that only Ridders fills in, and converts implicitly to T, so `double slope = *d;` works. Numerixx
@@ -211,15 +217,15 @@ For `double` the result is `cbrt(0.5) / 2^17 = 0.7937 / 131072 = 6.055e-6`, whic
 
 ## 5. The derivative (`deriv.hpp`)
 
-`derivative` handles every method (sections 8 and 9 cover the others): one `if constexpr` sends Ridders to
-`detail::ridders` and the stencils to `detail::stencil_derivative`, whose result is wrapped as
-`Estimate{d, std::nullopt}`. For the default `Central<2>`, the compile-time checks and branches reduce to this (shown
-as one function returning the value; in the code the two-point part is the helper `detail::difference`, which
-Ridders shares):
+`derivative` handles every method and order (sections 8 to 10 cover the others): it forwards to one detail
+function, where one `if constexpr` sends Ridders to `detail::ridders` and the stencils to
+`detail::stencil_derivative`, whose result is wrapped as `Estimate{d, std::nullopt}`. For the default `Central<2>` and
+the first derivative, the compile-time checks and branches reduce to this (shown as one function returning the value;
+in the code the two-point part is the helper `detail::difference`, which Ridders shares):
 
 ```cpp
-template<typename M = Central<2>, real T, typename F>
-requires detail::method<M> && detail::callable<F, T>
+template<typename M = Central<2>, auto N = 1, real T, typename F>
+requires detail::method<M> && detail::valid_order<N> && detail::callable<F, T>
 [[nodiscard]] constexpr std::expected<T, error> derivative_value(F &&fn, T const &x, std::type_identity_t<T> const &h)
 {
     assert(h > T(0) && math::isfinite(h));
@@ -233,8 +239,9 @@ requires detail::method<M> && detail::callable<F, T>
     T const fm = static_cast<T>(std::invoke(fn, xm));
     T const fp = static_cast<T>(std::invoke(fn, xp));
     if (!math::isfinite(fm) || !math::isfinite(fp)) return std::unexpected(error::non_finite);
+    if (!detail::sum_fits(fp, T(T(0) - fm))) return std::unexpected(error::non_finite); // fp - fm would overflow
     T const d = (fp - fm) / dx;
-    if (!math::isfinite(d)) return std::unexpected(error::non_finite); // the difference or the quotient overflowed
+    if (!math::isfinite(d)) return std::unexpected(error::non_finite); // the quotient overflowed
     return d;
 }
 ```
@@ -243,10 +250,13 @@ Each line has a reason.
 
 ### The signature
 
-- **`typename S = Central<2>`** and **`detail::stencil<S>`**: the stencil is a type, the first template argument, so
+- **`typename M = Central<2>`** and **`detail::method<M>`**: the method is a type, the first template argument, so
   `derivative(f, x)` keeps working while `derivative<Central<4>>(f, x)` picks another rule. The concept accepts only
-  `Central`, `Forward` and `Backward` in their allowed orders; anything else is rejected by the constraint, not by a
-  hard error.
+  `Central`, `Forward` and `Backward` in their allowed orders, and `Ridders`; anything else is rejected by the
+  constraint, not by a hard error.
+- **`auto N = 1`**: the derivative order, second (section 10). It is `auto` so that both an integer and the scoped
+  enum `order` are accepted. Since the second template argument is the order, T can no longer be given explicitly
+  as `derivative<M, double>(...)`; it is always deduced from x.
 - **`requires std::invocable<F &, T const &>`**: fn must be callable with a `T`. The `F &` is there because the body
   calls `fn(...)` on a named reference, which is an lvalue. The result must convert to T, so fn may return an
   expression template or another type that converts.
@@ -292,14 +302,17 @@ Every failure becomes `error::non_finite`, and each one is checked *before* the 
    at x = 1). Dividing by it would give 0/0.
 3. **fn's values** are checked before they are subtracted: if fn returned NaN (for example `log` at a negative point)
    or an infinity, `inf - inf` is never formed.
-4. **The result** is checked last: both values can be finite while their difference overflows (`max - (-max)`), or the
-   quotient can overflow when the distance is tiny.
+4. **The difference** is checked before it is formed: both values can be finite while their difference overflows
+   (`max - (-max)`). `detail::sum_fits(a, b)` decides whether a + b is finite without forming it: dividing by the
+   radix is exact, so a + b exceeds max exactly when a / radix + b / radix exceeds max / radix, and that sum cannot
+   overflow.
+5. **The result** is checked last: the quotient can overflow when the distance is tiny.
 
 Checking first rather than last matters for two reasons. fn is only ever called at finite points. And in a constant
 expression, compilers reject arithmetic that produces an infinity or a NaN: GCC rejects floating-point overflow and NaN,
 Clang rejects NaN and division by zero. Because the checks come first, those failures are ordinary error values even in
-a `static_assert`. The one exception is check 4: an overflow of the final difference or quotient is detected after the
-fact, so in constant evaluation on GCC it is a compile error rather than an error value.
+a `static_assert`. The one exception is check 5: an overflow of the final quotient is detected after the fact, so in
+constant evaluation on GCC it is a compile error rather than an error value.
 
 ### Exceptions
 
@@ -310,27 +323,28 @@ Emscripten's default.
 ### The default-step overload
 
 ```cpp
-template<int Order, real T>
+template<int Exponent, real T>
 constexpr T default_step(T const &x)                     // in nxx::deriv::detail
-{
-    T const scale = math::abs(x) < T(1) ? T(1) : math::abs(x);
-    return math::root_epsilon<Order + 1, T>() * scale;
-}
+{ return math::root_epsilon<Exponent, T>() * detail::scale(x); }      // scale(x) = max(|x|, 1)
 
-template<typename M = Central<2>, real T, typename F>
-requires detail::method<M> && detail::callable<F, T>
-[[nodiscard]] constexpr std::expected<Estimate<T>, error> derivative(F &&fn, T const &x)
+template<typename M, int N, real T, typename F>          // in nxx::deriv::detail, behind the public overload
+constexpr std::expected<Estimate<T>, error> derivative_default(F &fn, T const &x)
 {
     if (!math::isfinite(x)) return std::unexpected(error::non_finite);
-    if constexpr (std::same_as<M, Ridders>) return nxx::deriv::derivative<M>(fn, x, T(detail::scale(x) / T(32)));
-    else return nxx::deriv::derivative<M>(fn, x, detail::default_step<detail::make_table(M{}).order>(x));
+    if constexpr (std::same_as<M, Ridders>) {
+        constexpr int divisor = ridders_divisors[N - 1];  // 32 for f', 4 for f'' to f''''
+        return detail::derivative_with_step<M, N>(fn, x, T(detail::scale(x) / T(divisor)));
+    } else {
+        constexpr int exponent = detail::make_table<N>(M{}).order + N;
+        return detail::derivative_with_step<M, N>(fn, x, detail::default_step<exponent>(x));
+    }
 }
 ```
 
-For `Central<2>` (order 2) this is section 2's `eps^(1/3) * max(|x|, 1)`; for Ridders the initial step is
-`max(|x|, 1) / 32` (section 9). The call is written `nxx::deriv::derivative`, fully qualified: an
-unqualified call would also look in the namespaces of T and F (argument-dependent lookup), where a user type could
-provide its own `derivative` and silently take over.
+For `Central<2>` (order 2) and f' this is section 2's `eps^(1/3) * max(|x|, 1)`; for Ridders the initial step is
+`max(|x|, 1) / 32` (section 9). Every internal call is written `detail::...`, qualified: an unqualified call would
+also look in the namespaces of T and F (argument-dependent lookup), where a user type could provide its own function
+of the same name and silently take over.
 
 ## 6. At compile time
 
@@ -491,24 +505,28 @@ The stencils are three class templates, `Central<P>` (even P from 2 to 10), `For
 to 6). They are empty: the type only names the rule. The caps are numerical: beyond `Central<10>` the gain is under
 half a digit even for 50-digit types, and the one-sided rounding factor S is already 27.7 at P = 6.
 
-**The tables** are computed at compile time by `detail::make_table`, from closed forms in exact integer arithmetic
-(`long long`, `std::gcd`, `std::lcm`), and put over one common denominator:
+**The tables** are computed at compile time by `detail::make_table<N>`, for the N-th derivative (section 10). Each
+family only supplies its nodes, and one generator turns nodes into weights by the Lagrange formula: the weight of node
+k is `N! [t^N] prod_{j != k} (t - n_j) / (n_k - n_j)`, the N-th derivative at 0 of the polynomial through the
+nodes, which is the solution of the moment conditions above. For `Central<4>` and node -1: `(t + 2)(t - 1)(t - 2) =
+t^3 - t^2 - 4t + 4` has the t coefficient -4, and `(-1 + 2)(-1 - 1)(-1 - 2) = 6`, so the weight is -4/6 = -2/3, the
+-8/12 derived above. The arithmetic is exact (`long long`, `std::gcd`, `std::lcm`), and the weights are put over one
+common denominator. (Phase 2 used a closed form per family; the generator reproduces those tables bit for bit, and
+also covers the higher orders, whose one-sided rules have no short closed form.)
 
-- Central, P = 2m: the coefficient of `f(x + k h) - f(x - k h)` is `(-1)^(k+1) (m!)^2 / (k (m-k)! (m+k)!)`. For m = 2
-  this gives 2/3 and -1/12, the {1, -8, 8, -1}/12 derived above.
-- Forward, P: `w_0 = -(1 + 1/2 + ... + 1/P)` and `w_k = (-1)^(k+1) C(P, k) / k`. For P = 2: -3/2, 2, -1/2.
-- Backward: Forward mirrored.
-
-The largest numerator is 2100 (`Central<10>`), exact in every real type, even `float`.
+Every value must fit 24 bits, so that it is exact in every real type, even `float`; the largest numerator is 2100 for
+f' (`Central<10>`) and 6,222,216 for f''''.
 
 **The evaluator** has two branches, chosen at compile time:
 
 - Two nodes (`Central<2>`, `Forward<1>`, `Backward<1>`): `(f_hi - f_lo) / (x_hi - x_lo)`, dividing by the distance
   between the points actually evaluated, as in section 5. `Central<2>` is the Phase 1 code, bit for bit.
-- More nodes: `sum_k numerator_k * f(x + n_k h)`, divided once by `denominator * h`. Dividing by the outer-node distance
-  would correct the rounding of the outer points only, and with more than two weights it makes the error larger (4x
-  for `Central<4>`). One division keeps the results exact for polynomials when x and h are short binary fractions,
-  which the tests use.
+- More nodes: `sum_k numerator_k * f(x + n_k h)`, divided once by `denominator * h` (and N - 1 more times by h for the
+  N-th derivative). Dividing by the outer-node distance would correct the rounding of the outer points only, and with
+  more than two weights it makes the error larger (4x for `Central<4>`). One division keeps the results exact for
+  polynomials when x and h are short binary fractions, which the tests use. Before each term is formed, `|f_k| <= max
+  / |numerator_k|` is checked, and the partial sum with `sum_fits`: a constant 1e308 under `Central<4>` used to form
+  -8e308 and then inf - inf, a compile error in a constant expression.
 
 **The input check** of section 5 generalises with `K = max |node|` and `Q = max(2K, denominator)`: `h <= max / (2Q)`
 and `|x| <= max - Q h`. Every point lies within K h of x, so at least about K h below max, and the divisor is at most
@@ -518,9 +536,9 @@ nodes, the zero distance becomes "h does not move x on one of its sides" (`x + h
 are needed because at a power of the radix the spacing differs on the two sides of x. Each value of fn is checked
 before it is added to the sum.
 
-**The default step** is `root_epsilon<P + 1>() * max(|x|, 1)`, as derived above, without the stencil's constant
-`(S / (p C))^(1/(p+1))`. Those constants lie between 1.4 and 2.0, and leaving one out costs at most a factor 1.64 in
-error.
+**The default step** is `root_epsilon<P + 1>() * max(|x|, 1)` for f', as derived above, without the stencil's
+constant `(S / (p C))^(1/(p+1))`. Those constants lie between 1.4 and 2.0, and leaving one out costs at most a factor
+1.64 in error. For the N-th derivative it is `root_epsilon<P + N>()` (section 10).
 
 ## 9. Ridders' extrapolation
 
@@ -574,10 +592,76 @@ actual error in 99% of the prototype's 2,700 random cases and was about 7 times 
 `Central<6>`: 6 evaluations, about 1e-14, no estimate. The estimate assumes fn is accurate to about eps; a noisier fn
 makes it optimistic.
 
-## 10. Limits, and what comes next
+## 10. Higher derivatives
+
+`derivative<M, N>` estimates the N-th derivative, for N from 1 to 4, with every method. N is an integer or an
+`order`, a scoped enum (`order::second` is 2):
+
+```cpp
+auto const a = derivative<Central<2>, 2>(f, x);              // (f(x+h) - 2f(x) + f(x-h)) / h^2
+auto const b = derivative<Central<2>, order::third>(f, x);   // (f(x+2h) - 2f(x+h) + 2f(x-h) - f(x-2h)) / 2h^3
+auto const c = derivative<Backward<2>, 4>(f, x);             // Chapra's (3f(x) - 14f(x-h) + ... - 2f(x-5h)) / h^4
+auto const d = derivative<Ridders, 4>(f, x);                 // f'''' with an error estimate
+```
+
+### The rules
+
+The weights come from the same generator as for f' (section 8), with N! [t^N] instead of the t coefficient, and the
+moment conditions become M_N = N! denominator, M_j = 0 for every other j up to N + P - 1. P stays the accuracy order,
+the O(h^P) of the error, so it is not the number of points: `Central<P>` uses the P + N - 1 integers around 0 (without
+0 for odd N, since an odd derivative gives the centre no weight), the one-sided rules P + N. For the third derivative,
+`Central<2>` is Chapra's four-point O(h^2) formula and `Central<4>` his six-point O(h^4) one.
+
+### The step, and why accuracy falls with the order
+
+The rounding error of fn's values is divided by h^N, so the error model becomes `C h^P |f^(P+N)| + S eps |f| / h^N`,
+smallest near `h = eps^(1/(P+N))`, with an error of about `eps^(P/(P+N))`. So the default step is
+`root_epsilon<P + N>() * max(|x|, 1)`, and the accuracy falls quickly with N: for `Central<2>` in double about 4e-11
+for f', 6e-8 for f'', 2e-6 for f''' and 1e-4 for f''''. In float, f'''' is mostly rounding noise, which is why it
+warns at compile time (below). The step's sensitivity grows with N too: for f'''', misjudging fn's scale by a factor 2
+costs up to 16 in error.
+
+The code divides by h N times instead of once by h^N: h^4 underflows for h below 1.2e-77 in double, and the repeated
+divisions cannot overflow spuriously (for h >= 1 each quotient is at most the one before, otherwise the last is the
+largest).
+
+### f'' from the actual offsets
+
+As the two-node f' rules divide by the distance between the points actually evaluated, `Central<2>` for f'' uses the
+actual offsets `h+ = (x + h) - x` and `h- = x - (x - h)`:
+
+```
+f'' ~= ((f(x+h) - f(x)) / h+ - (f(x) - f(x-h)) / h-) / ((h+ + h-) / 2)
+```
+
+This is exact for quadratics whatever the rounding of the points; the plain formula picks up an error of about
+eps |x f'| / h^2 from that rounding, as much as its own error at the default step. In Ridders' prototype, the plain
+formula let the estimate fall 8.7 times below the actual error for float, against 1.4.
+
+### Ridders
+
+Ridders' method extends unchanged: its base is the `Central<2>` rule of order N, whose error expansion has even powers
+of h for every N, so the same tableau applies. The rounding floor of a level is the same sum `eps sum |w_k| |f_k|`
+over `denominator * h^N`, saturated at every division. fn(x), part of the base for even N, is evaluated once. The
+default initial step is larger, `max(|x|, 1) / 4` instead of `/ 32`, since the rounding grows as 1/h^N: for f'' it is
+7 times as accurate as `/ 32`. For double the method typically reaches 4e-13, 3e-11 and 7e-10 relative for f'' to
+f'''', in 13 to 45 evaluations, at most 129.
+
+### The low-precision warning
+
+A 4th derivative in a type whose epsilon is above 1e-7 (float) gives a compiler warning. Standard C++ cannot
+emit a warning from a template instantiation (`#warning` acts at preprocessing), so the warning comes from
+`[[deprecated]]`: each public overload has a twin with the extra
+constraint `detail::noisy<N, T>`, which overload resolution prefers for such calls because it is more constrained. The
+warning is reported at the caller's line, so a pragma there silences it, and `NUMERIXX_NO_PRECISION_WARNING` turns it
+off everywhere.
+
+## 11. Limits, and what comes next
 
 - **Fixed rules only.** The methods are the three stencil families and Ridders; a user cannot supply their own
   weights, and a method cannot be chosen at run time except by a `switch` over `derivative<M>` calls.
+- **Orders up to 4, one at a time.** Several orders from shared evaluations (for Halley's method, say) and mixed
+  partial derivatives are deferred.
 - **Only Ridders estimates its error.** The stencils leave `abs_error` empty.
 - **The step assumes f varies on the scale `max(|x|, 1)`.** For a stencil and a faster-varying function, pass a step,
   or use Ridders.

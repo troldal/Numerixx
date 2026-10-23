@@ -23,7 +23,7 @@ using nxx::deriv::Forward;
 namespace {
 
     template<typename S>
-    constexpr auto table = nxx::deriv::detail::make_table(S{});
+    constexpr auto table = nxx::deriv::detail::make_table<1>(S{});
 
     // The moment M_j = sum_k w_k n_k^j of a table, computed here, independently of the closed forms in the library.
     template<std::size_t N>

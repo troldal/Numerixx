@@ -1,6 +1,6 @@
 # Phase 4 API proposal: derivatives of order 1 to 4
 
-Status: proposed, not yet approved.
+Status: approved by the user on 2026-10-23 and implemented.
 
 The user has decided:
 - the derivative order is a template argument after the method, written as an integer or as a scoped enum `order`;
@@ -375,6 +375,30 @@ For every N, as in Phase 3, plus:
     objection.
   - `second_derivative`, the reduced method set, a `default_step<M, N>` accessor, an "estimate below |value|"
     helper.
+
+## Changes during implementation
+
+From the implementation review (numerics-reviewer), each reproduced first:
+- **The term check is `|f_k| >= max / |c|`, not `>`.** fl(max / 6) rounds up, and 6 times it ties to infinity, so a
+  constant max / 6 under `Central<2>` for f'''' still overflowed in a constant expression. The same applies to the new
+  `saturating_product`.
+- **The one-sided quotients of the second difference** are pre-checked (`|a| / max < b / 2`, conservative), since an
+  overflow there is not the final quotient. A step function of +-1e300 with h = 1e-10 is now `non_finite` in a constant
+  expression too.
+- **Ridders' floor for N = 3 and 4 includes the rounding of the points**, `eps/2 (|x| + 2h) |f'| sum |w_k| /
+  (den h^N)`, with f' from the values at x +- h, which the nominal step leaves in. Without it, f''' of exp(a x),
+  a = 10 to 50, at x in [1, 3] was covered in 96.3 to 96.7% of the cases; with it in 99.0 to 99.3%, and f'''' in
+  100%. The random study stays at 100%, and float's worst case for f''' drops from 5.3 to 2.0 times the estimate, so
+  float f''' needs no bound of its own.
+- **Neighbouring points of a multi-node stencil must differ**: at h near 0.6 ulp(x), x + h and x + 2h round to the same
+  value, and `Central<2>` for f'''' returned a finite wrong value. Ridders had the check already.
+- **A stencil whose integer weights T cannot hold exactly** (radix^digits not above the largest table value, half
+  precision under `Central<10>`) is a `static_assert`, not a silently inexact rule (or, beyond the range, undefined
+  behaviour).
+- **An integer order is compared in its own type**, so `0x1'0000'0001ULL` is rejected rather than wrapped into 1.
+- **Breaking, for an unusual call:** T given explicitly as the second template argument, `derivative<Ridders,
+  double>(...)`, no longer compiles, since that argument is now the order. T is deduced from x as before; no call in
+  the repository or the documentation spelled it.
 
 ## Deferred
 

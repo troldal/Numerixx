@@ -10,6 +10,7 @@
 
 namespace {
 
+    using nxx::deriv::Backward;
     using nxx::deriv::Central;
     using nxx::deriv::derivative;
     using nxx::deriv::Forward;
@@ -141,7 +142,7 @@ namespace {
         stencil_error<Central<2>>("Central<2>");
         stencil_error<Central<4>>("Central<4>");
         stencil_error<Central<6>>("Central<6>");
-        stencil_error<Central<8> >("Central<8>");
+        stencil_error<Central<8>>("Central<8>");
         stencil_error<Central<10>>("Central<10>");
 
         // One-sided rules never evaluate fn on the other side of x, so they work at the edge of fn's domain.
@@ -149,7 +150,7 @@ namespace {
         auto const right = [](double x) { return x < 0.0 ? std::numeric_limits<double>::quiet_NaN() : std::exp(x); };
         show("Central<2>", derivative<Central<2>>(right, 0.0));
         show("Forward<2>", derivative<Forward<2>>(right, 0.0));
-        show("Forward<3>", derivative<Forward<3> >(right, 0.0));
+        show("Forward<3>", derivative<Forward<3>>(right, 0.0));
         show("Forward<4>", derivative<Forward<4>>(right, 0.0));
     }
 
@@ -194,6 +195,46 @@ namespace {
         show("d/dx x on x >= 0, at 0", derivative<Ridders>(half_line, 0.0));
     }
 
+    template<auto N>
+    void higher_order(std::string_view label)
+    {
+        auto const exp = [](double x) { return std::exp(x); };
+        auto const report = [](std::string_view name, auto const &d) {
+            if (d)
+                std::println("   {:<28} relative error {:.1e}{}",
+                    name,
+                    std::abs(d->value - std::exp(1.0)) / std::exp(1.0),
+                    d->abs_error ? std::format(", estimate {:.1e}", *d->abs_error / std::exp(1.0)) : "");
+        };
+        std::println("   {}", label);
+        report("Central<2>", derivative<Central<2>, N>(exp, 1.0));
+        report("Central<6>", derivative<Central<6>, N>(exp, 1.0));
+        report("Forward<2>", derivative<Forward<2>, N>(exp, 1.0));
+        report("Ridders", derivative<Ridders, N>(exp, 1.0));
+    }
+
+    void higher_orders()
+    {
+        // The order is the second template argument, an integer or an order. Every exp derivative is e at 1. The
+        // stencils reach about eps^(P/(P+N)) with their default steps, so accuracy falls with the order; Ridders
+        // adapts its step and reports its error.
+        std::println("\n11. Higher derivatives: d^N/dx^N exp(x) at x = 1");
+        higher_order<2>("f''");
+        higher_order<nxx::deriv::order::third>("f'''");
+        higher_order<4>("f''''");
+
+        // Chapra's backward f'''' of O(h^2): (3f(x) - 14f(x-h) + 26f(x-2h) - 24f(x-3h) + 11f(x-4h) - 2f(x-5h)) / h^4,
+        // the same as Backward<2> for the 4th derivative. For x^5 the error is h^2 f^(6) terms only, which vanish, so
+        // at x = 1 with h = 1/4 it is exact: 120 x = 120. At compile time too.
+        constexpr auto quintic = [](double x) { return x * x * x * x * x; };
+        constexpr auto chapra = derivative<Backward<2>, 4>(quintic, 1.0, 0.25);
+        static_assert(chapra.has_value() && chapra->value == 120.0);
+        show("Backward<2>, N = 4, x^5 at 1", chapra);
+        constexpr auto second = derivative<Ridders, nxx::deriv::order::second>(quintic, 1.0, 0.25);
+        static_assert(second.has_value() && nxx::math::abs(second->value - 20.0) <= *second->abs_error);
+        show("Ridders, N = 2, x^5 at 1", second);
+    }
+
 } // namespace
 
 int main()
@@ -207,4 +248,5 @@ int main()
     stencils();
     ridders();
     ridders_compile_time();
+    higher_orders();
 }
