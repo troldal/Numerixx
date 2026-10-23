@@ -35,12 +35,14 @@ API approved: `docs/PHASE3_API.md`.
 
 API approved: `docs/PHASE4_API.md`.
 
-- [ ] `derivative<M, N>` for N = 1 to 4, as an integer or an `enum class order`, with every method
-- [ ] One Lagrange-formula generator for every table; Phase 2 tables reproduced bit for bit
-- [ ] Ridders for N = 1 to 4 on the `Central<2>` rule of each order
-- [ ] No overflow before the final quotient (fixes a constant-evaluation failure of `Central<4>` on a constant 1e308)
-- [ ] A compile-time warning for a float 4th derivative, silenceable at the call or by `NUMERIXX_NO_PRECISION_WARNING`
-- [ ] CI passes on all five toolchains
+- [x] `derivative<M, N>` for N = 1 to 4, as an integer or an `enum class order`, with every method (d39e31b)
+- [x] One Lagrange-formula generator for every table; Phase 2 tables reproduced bit for bit (d39e31b)
+- [x] Ridders for N = 1 to 4 on the `Central<2>` rule of each order (d39e31b)
+- [x] No overflow before the final quotient (fixes a constant-evaluation failure of `Central<4>` on a constant 1e308)
+  (d39e31b)
+- [x] A compile-time warning for a float 4th derivative, silenceable at the call or by `NUMERIXX_NO_PRECISION_WARNING`
+  (d39e31b)
+- [x] CI passes on all five toolchains (run 39910979076)
 
 ## Deferred
 
