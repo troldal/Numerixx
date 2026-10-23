@@ -24,13 +24,24 @@
 
 % INPUTS-BEGIN (the editor maintains this list)
 \part{Fundamentals}
-\input{chapters/zz-layout-test}  % remove when the first real chapter exists
-\input{chapters/zz-figure-gallery}  % stage 2 only: every figure and listing; the editor removes it at stage 4
+\input{chapters/01-why}
+\input{chapters/02-taylor}
+\input{chapters/03-rounding}
+\input{chapters/04-stencils}
+\input{chapters/05-orders}
+\input{chapters/06-ridders}
+\input{chapters/07-using}
 \part{Reference}
+\input{chapters/08-api}
+\input{chapters/09-tables}
+\setcounter{topnumber}{3}  % Chapter 9 raises it to 4 for its stacked weight tables
+\input{chapters/10-guarantees}
 % INPUTS-END
 
 \appendix
 % APPENDIX-INPUTS-BEGIN
+\input{chapters/a1-floating-point}
+\input{chapters/a2-derivations}
 % APPENDIX-INPUTS-END
 
 \input{chapters/99-backmatter}
@@ -38,5 +49,9 @@
 \begin{fullbib}
 \bibliography{refs}
 \end{fullbib}
+
+% The quick reference is the book's last page, after the references (PLAN.md section 10.1). It is a \chapter* with
+% \phantomsection\label{ch:quick-reference}: refer to it with \hyperref[ch:quick-reference]{...} or \pageref.
+\input{chapters/qr-quick-reference}
 
 \end{document}

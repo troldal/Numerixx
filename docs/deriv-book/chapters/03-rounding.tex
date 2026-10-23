@@ -14,7 +14,7 @@ do then.
 
 \section{Floating-point numbers in brief}\label{sec:rounding-fp}
 
-A \code{double} stores a number with \valDigitsDouble{} binary digits, about 16 significant decimal digits. Numbers
+A \code{double} stores a number with \num{\valDigitsDouble} binary digits, about 16 significant decimal digits. Numbers
 are therefore spaced: just above 1 the next \code{double} is $1 + \epsmach$, where
 \begin{equation*}
   \epsmach = 2^{-52} \approx \num{\valEpsDouble}
@@ -51,22 +51,19 @@ which they differ, and those include the rounding errors of both values. The rou
 $f$; they are not tiny compared with the difference. This loss of digits is called \emph{cancellation}.
 
 A pocket calculator that keeps six significant digits shows the whole V in four lines. Differentiate $\mathrm{e}^x$ at
-$x = 1$, where $f'(1) = \mathrm{e} = 2.71828\ldots$, rounding each value of $f$ to six digits:
+$x = 1$, where $f'(1) = \mathrm{e} = \num{\valHandCalcExact}\ldots$, rounding each value of $f$ to six digits:
 \begin{center}\small
 \begin{tabular}{@{}lllll@{}}
 \toprule
 $h$ & $f(1 + h)$ & $f(1 - h)$ & estimate & error\\
 \midrule
-$0.1$ & $3.00417$ & $2.45960$ & $2.72285$ & $+0.0046$\\
-$0.01$ & $2.74560$ & $2.69123$ & $2.71850$ & $+0.00022$\\
-$0.001$ & $2.72100$ & $2.71556$ & $2.72000$ & $+0.0017$\\
-$0.0001$ & $2.71855$ & $2.71801$ & $2.70000$ & $-0.018$\\
+\tablebody{hand-calculator}
 \bottomrule
 \end{tabular}
 \end{center}
-From $h = 0.1$ to $0.01$ the error falls by the factor 20, close to the 100 of the truncation error alone. Below
-that it rises. At $h = 0.0001$ the two values share their first three digits; their difference, $0.00054$, has only
-two digits left, and the last of them is rounding. A \code{double} keeps about 16 digits instead of six, so the same
+From $h = 0.1$ to $0.01$ the error falls by a factor of \num{\valHandCalcErrorRatio}, close to the 100 of the
+truncation error alone. Below that it rises. At $h = 10^{-4}$ the two values share their first three digits; their
+difference, \num{\valHandCalcLastDiff}, has only two digits left, and the last of them is rounding. A \code{double} keeps about 16 digits instead of six, so the same
 happens at smaller steps, but it happens.
 
 Both errors can be written down. If each value of $f$ is off by up to about $\epsmach \abs{f}$, the difference
@@ -160,7 +157,7 @@ step is \SI{\valCpDefaultStep}{\kelvin}; the relative error is \num{\valCpDefaul
 bottom of the V (\cref{fig:v-curve}). Every stencil of the library has a default step of the same form,
 $\epsmach^{1/(\aorder + \dorder)} \scale$ (\cref{ch:stencils,ch:orders}).
 
-Dropping the constant $3^{1/3} \approx \valStepConstantCentralTwoFirst$ makes the default step smaller than the model's
+Dropping the constant $3^{1/3} \approx \num{\valStepConstantCentralTwoFirst}$ makes the default step smaller than the model's
 best step, by that factor when $f$ varies on the scale $\scale$. It costs little, and the scale itself is only a
 guess (\cref{sb:step-constant}).
 
@@ -179,12 +176,12 @@ $\hbest / k$. With $h = \hbest / k$ the model error grows by the factor
 \begin{equation*}
   \frac{E(\hbest / k)}{E(\hbest)} = \frac{\dorder k^{-\aorder} + \aorder k^{\dorder}}{\aorder + \dorder}.
 \end{equation*}
-For the central difference, $k = 3^{1/3} \approx \valStepConstantCentralTwoFirst$, and the factor is
-$7 \cdot 3^{1/3} / 9 \approx 1.12$: the default step loses about a tenth of the best accuracy. The library's
-documentation gives the range for all its first-derivative rules: $k$ between 1.4 and 2.0, at a cost of at most a
-factor 1.64. For higher derivatives $k$ is larger
-(\valStepConstantCentralTwoSecond{} for \code{Central<2>} and $f''$, \valStepConstantCentralTwoFourth{} for $f^{(4)}$)
-and so is the cost (\cref{ch:orders}).
+For the central difference, $k = 3^{1/3} \approx \num{\valStepConstantCentralTwoFirst}$, and the factor is
+$7 \cdot 3^{1/3} / 9 \approx \num{\valStepCostCentralTwoFirst}$: the default step loses about a tenth of the best
+accuracy. For the other first-derivative rules $k$ lies between that and 2 (\code{Forward<1>}), and the cost reaches
+\num{\valStepCostCentralTenFirst} for \code{Central<10>}. For higher derivatives $k$ is larger
+(\num{\valStepConstantCentralTwoSecond} for \code{Central<2>} and $f''$, \num{\valStepConstantCentralTwoFourth} for
+$f^{(4)}$) and so is the cost (\cref{ch:orders}, \cref{sec:derivations-model}).
 
 Why leave $k$ out at all? Because it only matters when the scale assumption holds, and that assumption is the weaker
 link: a function that varies faster than $\scale$ wants a smaller step anyway, and on the library's test functions
@@ -328,10 +325,10 @@ their spread estimates $\noise \abs{f}$. Mor\'e and Wild turn this idea into a r
 library does not do it for you: a noise-aware step is one of its deferred features (\cref{ch:using}).
 
 Ridders' method does not help here as much as elsewhere. Its error estimate assumes that $f$ is accurate to about
-$\epsmach$, so for a noisy $f$ it can be optimistic. Over \valRiddersPointsPerFunction{} points in $[0.2, 3]$ the
+$\epsmach$, so for a noisy $f$ it can be optimistic. Over \num{\valNoiseRiddersCases} points in $[0.2, 3]$ the
 estimate covered the actual error in \SI{\valNoiseCleanRiddersCoverage}{\percent} of the cases for the clean
 $\mathrm{e}^x$, but only in \SI{\valNoiseEightRiddersCoverage}{\percent} for $\noise = 10^{-8}$, where the worst
-error was \valNoiseEightRiddersWorstRatio{} times its estimate. \Cref{ch:using} differentiates a friction factor that
+error was \num{\valNoiseEightRiddersWorstRatio} times its estimate. \Cref{ch:using} differentiates a friction factor that
 comes from a solver, with this rule.
 
 \section{Float, double and more digits}\label{sec:rounding-types}

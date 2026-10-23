@@ -91,7 +91,7 @@
   {\fontsize{11}{13}\selectfont\color{muted}Part \thepart}{0.8ex}{\fontsize{22}{27}\selectfont}
 % Chapters: a new page, the chapter number muted above a large bold title.
 \titleformat{\chapter}[display]{\normalfont\bfseries}
-  {\fontsize{11}{13}\selectfont\color{muted}Chapter \thechapter}{0.6ex}{\fontsize{18}{22}\selectfont}
+  {\fontsize{11}{13}\selectfont\color{muted}\csname @chapapp\endcsname\ \thechapter}{0.6ex}{\fontsize{18}{22}\selectfont}
 \titlespacing*{\chapter}{0pt}{0pt}{4ex}
 \titleformat{\section}{\normalfont\fontsize{13}{16}\selectfont\bfseries}{\thesection}{0.6em}{}
 \titleformat{\subsection}{\normalfont\fontsize{11}{14}\selectfont\bfseries}{\thesubsection}{0.6em}{}
@@ -164,7 +164,7 @@
 \lstset{style=bkcode}
 % \snippet{<file>}{<name>}: the lines of code/<file>.cpp between the comment lines "// <name>" and "// </name>",
 % without the markers. Markers and snippet start in column 0 (\lstinputlisting cannot gobble indentation, and an
-% indented end marker is not recognised); code/quickstart.cpp shows the convention.
+% indented end marker is not recognised); every file in code/ follows the convention (code/README.md).
 % The range ends are braced: without the braces, linerange splits a hyphenated name such as first-ridders at its
 % first hyphen and quotes the wrong lines, or nothing, without a warning (tools/check.py checks the markers).
 \newcommand{\snippet}[2]{\lstinputlisting[rangeprefix=//\ <, rangesuffix=>, linerange={{#2}-{/#2}},

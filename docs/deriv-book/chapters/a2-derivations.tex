@@ -156,11 +156,14 @@ $E(\hbest)$,
   \label{eq:derivations-cost}
 \end{equation}
 For the first derivative $\kappa$ lies between \num{\valStepConstantCentralTwoFirst} (\code{Central<2>}, where it
-is $3^{1/3}$) and 2 (\code{Forward<1>}, $(2 \cdot 2)^{1/2}$), and \cref{eq:derivations-cost} gives at most 1.64,
-reached by \code{Central<10>}; for \code{Central<2>} and $f'$ it is 1.12. For the higher orders $\kappa$ is
+is $3^{1/3}$) and 2 (\code{Forward<1>}, $(2 \cdot 2)^{1/2}$), and \cref{eq:derivations-cost} gives at most
+\num{\valStepCostCentralTenFirst}, reached by \code{Central<10>} with $\kappa = \num{\valStepConstantCentralTenFirst}$;
+for \code{Central<2>} and $f'$ it is \num{\valStepCostCentralTwoFirst}. For the higher orders $\kappa$ is
 \num{\valStepConstantCentralTwoSecond} for $f''$ and \num{\valStepConstantCentralTwoFourth} for $f''''$ with
-\code{Central<2>}, and the cost by \cref{eq:derivations-cost} is about 3.5 and 11, the figures the header
-states. They are model figures for a function that varies on the scale $\scale$ exactly. The design record
+\code{Central<2>}, and the cost by \cref{eq:derivations-cost} is \num{\valStepCostCentralTwoSecond} and
+\num{\valStepCostCentralTwoFourth}; for \code{Central<4>} and $f''''$ it is \num{\valStepCostCentralFourFourth}, the
+largest of the library's rules. These are the figures the header and the design record state, rounded, and they are
+model figures for a function that varies on the scale $\scale$ exactly. The design record
 reports the opposite experience on nine test functions that vary faster than $\scale$: half the default step was
 better for every order, by a factor 1.2 to 1.8 for \code{Central<2>}, which is why the library keeps the plain
 convention of \cref{eq:orders-step} for every order and states its sensitivity instead

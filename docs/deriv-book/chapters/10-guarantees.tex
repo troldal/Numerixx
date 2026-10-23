@@ -95,7 +95,7 @@ floor; and it attempts at most \num{\valRiddersLevelCap} levels in all (\cref{ta
 and whose estimate is within twice that of an independent prototype for the same case.
 
 The estimate assumes that $f$ is accurate to about $\epsmach$. With a relative noise of $10^{-10}$ and $10^{-8}$ on
-$\mathrm{e}^x$, the coverage over \num{\valRiddersPointsPerFunction} points fell to
+$\mathrm{e}^x$, the coverage over \num{\valNoiseRiddersCases} points fell to
 \SI{\valNoiseTenRiddersCoverage}{\percent} and \SI{\valNoiseEightRiddersCoverage}{\percent}, with worst ratios of
 \num{\valNoiseTenRiddersWorstRatio} and \num{\valNoiseEightRiddersWorstRatio} (measured, \cref{sec:rounding-noise}).
 It does not see a kink or a jump inside its span either, except as a large estimate (\cref{fig:kink}).
@@ -125,7 +125,8 @@ Method & $N = 1$ & 2 & 3 & 4\\
 
 \paragraph{Orders.} The derivative order is 1 to 4. \code{Central<P>} stops at $P = 10$: beyond it the gain is under
 half a digit even for 50-digit types. The one-sided rules stop at $P = 6$, where the rounding amplification $\ampl$ is
-already \num{\valAmplForwardSix} for $f'$ and 4019 for $f''''$ (\cref{tab:weights-forward-first,tab:weights-forward-fourth}).
+already \num{\valAmplForwardSix} for $f'$ and \num{\valAmplForwardSixFourth} for $f''''$
+(\cref{tab:weights-forward-first,tab:weights-forward-fourth}).
 
 \paragraph{Types.} The integer weights must be exact in \code{T}, which every type with 24 significant bits or more
 satisfies; a narrower type fails a \code{static_assert}. A fourth derivative in a type with an epsilon above $10^{-7}$

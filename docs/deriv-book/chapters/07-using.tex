@@ -37,6 +37,7 @@ Ridders' method costs two or four per level, with a median of \num{\valRiddersEv
 estimate or the reason there is none. An \code{Estimate<T>} has two members, \code{value} and \code{abs_error}; the second is a
 \code{std::optional<T>}, filled by Ridders' method and empty for the stencils. The one reason so far is
 \code{error::non_finite}. The usual pattern is to test the result, then read it:
+\needspace{18\baselineskip}%
 \snippet{07-using-expected}{expected-basics}
 The central rule at $x = 0$ samples $\log(-h)$, which is NaN, so the first call fails. \code{error::non_finite}
 covers every case in which no finite estimate exists: \code{x} is not finite; \code{fn} returned an infinite or NaN
@@ -49,6 +50,7 @@ value and passes a failure through; \code{and_then} chains a second call that ca
 \snippet{07-using-expected}{expected-chain}
 Both lambdas take a \code{double}: an \code{Estimate<double>} converts to its value where a \code{double} is
 expected. The conversion is convenient and has three traps, shown in the last snippet:
+\needspace{13\baselineskip}%
 \snippet{07-using-expected}{estimate-pitfalls}
 First, \code{auto} deduces \code{Estimate<double>}, and \code{std::println} does not apply the conversion: print
 \code{e.value}. Second, \code{if (*r)} tests the value against zero, not whether \code{r} holds a result: the
@@ -88,7 +90,7 @@ $f$ defined on one side of $x$ only (an edge of its domain or its validity range
 $f$ varies on a scale $w$ much smaller than $\abs{x}$, or $\abs{x} \ll 1$ in your units & \code{Central<2>}, or
   \code{Ridders} from $h = w/4$ & $\epsmach^{1/3} w$ & 2 & \num{\valScaleFitRelError}, against
   \num{\valScaleDefaultRelError} with the default step & \cref{fig:step-scale,fig:step-scale-small}\\
-$f$ is the output of an iterative solver or a fit, accurate to $\noise$ & \code{Central<2>} & $\noise^{1/3}
+$f$ is the output of an iterative solver, accurate to $\noise$ only (noisy) & \code{Central<2>} & $\noise^{1/3}
   \max(\abs{x}, 1)$ & 2 & $\noise^{2/3}$: \num{\valSolverFitRelError} for $\noise = 10^{-10}$,
   against \num{\valSolverDefaultRelError} with the default step; Ridders' estimate is optimistic &
   \cref{fig:noise}, \cref{sec:using-solver}\\
@@ -115,6 +117,7 @@ An energy balance often gives the enthalpy of a stream and asks for its temperat
 $T$. Newton's method needs the slope $\deriv{\enth}{T} = \cp$, which \code{derivative} supplies. This is the classic
 use of a derivative inside an iteration, so the method is the default \code{Central<2>}, applied to the thread's
 enthalpy \code{H(T)}:
+\needspace{23\baselineskip}%
 \snippet{07-using-newton}{newton}
 \begin{marginfigure}
 \centering
@@ -156,7 +159,7 @@ gradient of its own (\cref{sec:using-not}).
 \subsection{A function with no formula: a friction factor}\label{sec:using-solver}
 
 The thread's enthalpy has a closed-form derivative; most functions in practice do not. The Darcy friction factor
-$\lambda$ of turbulent flow in a rough pipe follows from the Colebrook equation\cite{KEY-REQUESTED}
+$\lambda$ of turbulent flow in a rough pipe follows from the Colebrook equation\cite{colebrook1939}
 \begin{equation}
   \frac{1}{\sqrt{\lambda}} = -2 \log_{10}\left(\frac{10^{-4}}{3.7} + \frac{2.51}{\mathit{Re}\,\sqrt{\lambda}}\right)
   \label{eq:using-colebrook}
@@ -168,6 +171,7 @@ The output of such a solver is accurate to about its tolerance, not to machine e
 $\mathit{Re} = 10^5$ with $\noise = 10^{-10}$ it is \num{\valSolverFrictionNoise}
 off, relative, and it changes in steps as $\mathit{Re}$ moves. That is the noisy function of \cref{sec:rounding-noise},
 and its cure applies: the step $\noise^{1/3} s$ instead of the default $\epsmach^{1/3} s$.
+\needspace{11\baselineskip}%
 \snippet{07-using-solver}{implicit-derivative}
 The answer key is the implicit-function derivative of \cref{eq:using-colebrook} at its root, found to machine
 precision by Newton's method. With the default step, \num{\valSolverDefaultStep} in units of $\mathit{Re}$, the
@@ -175,9 +179,9 @@ relative error is \num{\valSolverDefaultRelError}: the rounding branch, $\noise 
 small. With $h = \noise^{1/3}\,\mathit{Re}$, about \num{\valSolverFitStep}, it is \num{\valSolverFitRelError}, inside
 the model's $\noise^{2/3} = \num{\valSolverModelFitRelError}$ (measured). Ridders' method returned a relative error of
 \num{\valSolverDerivRelError} with a relative estimate of \num{\valSolverDerivRelEstimate}, so its estimate covered
-the error here; but the estimate assumes $f$ accurate to $\epsmach$, and over \num{\valRiddersPointsPerFunction} random points of a
-function with relative noise $10^{-8}$ it covered only \SI{\valNoiseEightRiddersCoverage}{\percent} of the cases
-(\cref{sec:rounding-noise}). Pass the step; do not rely on the estimate.
+the error here; but the estimate assumes $f$ accurate to $\epsmach$, and over \num{\valNoiseRiddersCases} random
+points of a function with relative noise $10^{-8}$ it covered only \SI{\valNoiseEightRiddersCoverage}{\percent} of
+the cases (\cref{sec:rounding-noise}). Pass the step; do not rely on the estimate.
 
 The solver matters. A fixed-point iteration stopped at the same tolerance is smooth between the values of
 $\mathit{Re}$ at which its iteration count changes, but off by up to its tolerance: Ridders' method on it was
@@ -301,6 +305,7 @@ temperature, a phase boundary, an \code{if}. The published enthalpy of nitrogen 
 \SI{\valKinkJunction}{K} and another above, and the two do not meet: $\enth$ jumps by
 \SI{\valKinkJumpEnthalpy}{\joule\per\mole} at \SI{\valKinkJunction}{K}.\cite{nist-webbook} Every method evaluates
 this function without complaint, \SI{1}{mK} above the break:
+\needspace{13\baselineskip}%
 \snippet{07-using-kink}{kink}
 \begin{marginfigure}
 \centering
@@ -321,11 +326,13 @@ break, outside every span, all three errors are below \num{\valKinkOutsideCentra
 that change with the step. \emph{Cure:} differentiate the branch you mean, with \code{Forward<P>} above a break or
 \code{Backward<P>} below it, or the branch's own function.
 
-\paragraph{Aliasing at a large $\abs{x}$.} A function that oscillates on a scale far below $\max(\abs{x}, 1)$ can lie
-about its slope at every sample: $\sin x$ near $x = 10^4 \pi$ from the default steps is the documented case
-(\cref{sb:aliasing}). \emph{Cure:} a step on the oscillation's scale.
+\paragraph{Aliasing.} A function that oscillates on a scale far below $\max(\abs{x}, 1)$ can lie about its slope
+at every sample: $\sin(64 \pi x)$ at $x = 0$, whose first levels sample only zeros, is the tested case
+(\cref{sb:aliasing}); $\sin x$ at a large $\abs{x}$, where the default step spans many periods, is the everyday
+form. \emph{Cure:} a step on the oscillation's scale.
 
-\paragraph{A noisy function.} A solver's output or a fitted table is accurate to $\noise$, not to $\epsmach$.
+\paragraph{A noisy function.} A solver's output, or any function whose error changes irregularly from one argument
+to the next, is accurate to $\noise$, not to $\epsmach$.
 \emph{Symptom:} the error with the default step is far above $\epsmach^{2/3}$, and Ridders' estimate is optimistic.
 \emph{Cure:} the step $\noise^{1/3} s$ (\cref{sec:using-solver}, \cref{sec:rounding-noise}).
 
@@ -341,7 +348,7 @@ that means nothing.
 (\cref{sec:api-warning}). \emph{Cure:} double.
 
 \paragraph{\code{auto} on the result.} \code{auto v = *d;} is an \code{Estimate}, and \code{std::format} and Boost's
-operators do not see its conversion (\cref{sec:using-result}). \emph{Cure:} \code{d->value}, or \code{double v = *d}.
+arithmetic operators do not see its conversion (\cref{sec:using-result}). \emph{Cure:} \code{d->value}, or \code{double v = *d}.
 
 \paragraph{One step for several orders.} The default step differs per method and order, from $\epsmach^{1/3} s$ for
 $f'$ to $\epsmach^{1/6} s$ for $f''''$ with \code{Central<2>} (\cref{tab:default-steps}), because the rounding error

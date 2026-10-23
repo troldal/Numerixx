@@ -69,7 +69,7 @@ $\epsmach^{1/3}$: \num{\valModelCentralTwoFirstDouble}, \num{\valModelCentralTwo
 five digits. The minima of \cref{fig:v-curve-orders} rise accordingly, and the measured medians at the default
 step, in \cref{fig:order-accuracy}, follow the model within its usual factor: \num{\valDoubleFourthCentralRelError}
 for the fourth derivative against \num{\valExpCentralTwoRelError} for the first. These are the
-\valHeadlineFourthDigits{} and \valHeadlineFirstDigits{} digits that \cref{ch:why} promised. What is lost to each
+\num{\valHeadlineFourthDigits} and \num{\valHeadlineFirstDigits} digits that \cref{ch:why} promised. What is lost to each
 order, and why float cannot afford a fourth derivative at all, is quantified in \cref{sb:fourth-sensitivity}.
 
 One caution about the word \emph{relative}. The model's rounding term is an absolute error,
@@ -79,8 +79,8 @@ $\abs{f} / (\scale^{\dorder} \abs{f^{(\dorder)}})$. For $\mathrm{e}^x$ at 1 that
 \cref{fig:order-accuracy} presuppose that $f$ varies on the scale $\scale$, so that $\abs{f^{(\dorder)}}$ is about
 $\abs{f} / \scale^{\dorder}$. For the thread's second derivative at $T_0$ the factor
 $\abs{\enth} / (\scale^2 \abs{\enth''})$ is \num{\valCpSecondRelativeFactor}, so the model's relative error is
-$\ampl = 4$ times that times $\epsmach^{1/2}$, about fifteen times \num{\valModelCentralTwoSecondDouble}, and the
-measured \num{\valCpSecondRelError} of \cref{sec:orders-thread} lies below it. Near a point where $f^{(\dorder)}$
+$\ampl = 4$ times that times $\epsmach^{1/2}$, which is \num{\valCpSecondModelRelError}, and the measured
+\num{\valCpSecondRelError} of \cref{sec:orders-thread} lies below it. Near a point where $f^{(\dorder)}$
 vanishes the relative error grows without bound while the absolute error stays what the model says; there,
 judge a result by its absolute error (\cref{sec:using-check}).
 
@@ -172,7 +172,7 @@ $\dorder \ge 2$ rather than $\scale / 32$, because the base's rounding error gro
 start pays. A level costs 2 evaluations for $f'$ and $f''$ and 4 for $f'''$ and $f''''$, plus $f(x)$ once per call
 for the even orders, which is kept across restarts. And the gain over a stencil grows with the order: for the fourth
 derivative in double, Ridders reaches a median of \num{\valDoubleFourthRiddersRelError} where \code{Central<2>}
-reaches \num{\valDoubleFourthCentralRelError}, four more digits for a median of \valRiddersEvalsMedianFourth{}
+reaches \num{\valDoubleFourthCentralRelError}, four more digits for a median of \num{\valRiddersEvalsMedianFourth}
 evaluations over the random study of \cref{ch:ridders}, against five. \Cref{fig:order-accuracy} shows the three methods side by side.
 
 \section{The thread: $\dd \cp / \dd T$}\label{sec:orders-thread}
@@ -181,10 +181,10 @@ The slope of the heat capacity at $T_0$ is $\enth''(T_0) = \SI{\valCpSecondExact
 by the closed form. The three-point rule with its default step of \SI{\valCpSecondStep}{\kelvin} and Ridders from
 $h_0 = T_0 / 4$ both compute it in one call each:
 \snippet{05-orders-second}{second-derivative}
-The stencil's relative error is \num{\valCpSecondRelError}, below the model's rounding term of
+The stencil's relative error is \num{\valCpSecondRelError}, below the model's \num{\valCpSecondModelRelError} of
 \cref{sec:orders-accuracy}; Ridders returns a value \num{\valCpRiddersSecondRelError} off with an estimate of
 \SI{\valCpRiddersSecondEstimate}{\joule\per\mole\per\kelvin\squared} against an actual error of
-\SI{\valCpRiddersSecondActual}{\joule\per\mole\per\kelvin\squared}, after \valCpRiddersSecondEvals{} evaluations.
+\SI{\valCpRiddersSecondActual}{\joule\per\mole\per\kelvin\squared}, after \num{\valCpRiddersSecondEvals} evaluations.
 The integer and the enumerator spell the same order:
 \snippet{05-orders-second}{order-enum}
 The example checks that the two results compare equal, value and estimate alike, which the defaulted \code{==} of

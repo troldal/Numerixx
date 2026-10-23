@@ -13,7 +13,7 @@ A binary floating-point number is
   x = \pm m \cdot 2^{e}, \qquad 1 \le m < 2,
 \end{equation*}
 where the \emph{significand} $m$ has $p$ binary digits and the \emph{exponent} $e$ is an integer in a fixed range.
-For \code{float} $p = \valDigitsFloat$, for \code{double} $p = \valDigitsDouble$ (\cref{tab:fp-constants}). Every
+For \code{float} $p = \num{\valDigitsFloat}$, for \code{double} $p = \num{\valDigitsDouble}$ (\cref{tab:fp-constants}). Every
 integer up to $2^{p}$ is exact, which is why the library's integer weights, all below $2^{24}$, are exact in every
 type with at least 24 significant bits. Between two powers of two the numbers are evenly spaced; at each power of two
 the spacing doubles.
@@ -21,16 +21,18 @@ the spacing doubles.
 \begin{table}
 \sidecaption{The constants of \code{float} and \code{double}, from \code{std::numeric_limits} on the build machine
 (IEEE~754 formats). $\epsmach = 2^{1-p}$; decimal digits is \code{digits10}, the number of decimal digits that
-survive a round trip.\label{tab:fp-constants}}
+survive a round trip; below the smallest normal number the subnormals continue to the smallest
+subnormal.\label{tab:fp-constants}}
 \centering\small
 \begin{tabular}{@{}lll@{}}
 \toprule
  & \code{float} & \code{double}\\
 \midrule
-significant bits $p$ (\code{digits}) & \valDigitsFloat & \valDigitsDouble\\
-decimal digits (\code{digits10}) & \valDigitsTenFloat & \valDigitsTenDouble\\
+significant bits $p$ (\code{digits}) & \num{\valDigitsFloat} & \num{\valDigitsDouble}\\
+decimal digits (\code{digits10}) & \num{\valDigitsTenFloat} & \num{\valDigitsTenDouble}\\
 machine epsilon $\epsmach$ & \num{\valEpsFloat} & \num{\valEpsDouble}\\
 largest finite $\fmax$ (\code{max}) & \num{\valMaxFloat} & \num{\valMaxDouble}\\
+smallest normal (\code{min}) & \num{\valMinFloat} & \num{\valMinDouble}\\
 smallest subnormal (\code{denorm_min}) & \num{\valDenormMinFloat} & \num{\valDenormMinDouble}\\
 \bottomrule
 \end{tabular}
@@ -93,6 +95,6 @@ $2h$ magnifies what is left (\cref{sec:rounding-v}).
 
 Nothing above is special to binary: decimal types round to decimal digits, with their own $\epsmach$, and
 multiprecision types such as \code{cpp_bin_float_50} of Boost.Multiprecision, with
-$p = \valDigitsMultiprecision$ bits and $\epsmach = \num{\valEpsMultiprecision}$, follow the same rules with more
+$p = \num{\valDigitsMultiprecision}$ bits and $\epsmach = \num{\valEpsMultiprecision}$, follow the same rules with more
 digits. The library needs from a type only what \code{std::numeric_limits} describes, its arithmetic and its comparisons
 (the concept \code{nxx::real}, \cref{ch:api}), and its error model needs only $\epsmach$.

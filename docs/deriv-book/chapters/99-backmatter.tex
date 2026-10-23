@@ -1,4 +1,101 @@
-% Back matter before the references: notation and glossary. Owner: the editor.
-\chapter*{Notation}
-\addcontentsline{toc}{chapter}{Notation}
-\todo{The notation table, from macros.tex and the notation guide in PLAN.md.}
+% Back matter before the references: notation and glossary. Owner: the editor. The notation follows the guide in
+% PLAN.md section 2 and the macros of macros.tex; the glossary holds the terms fixed by style decision 4.
+\chapter*{Notation and glossary}
+\addcontentsline{toc}{chapter}{Notation and glossary}\markboth{Notation and glossary}{}
+
+\section*{Notation}
+
+Mathematics is set in the sans-serif face; variables are italic and operators upright. Code names such as
+\code{Central<4>} and \code{abs_error} appear in monospace and never inside mathematics. Primes are used up to
+$f'''$; the fourth derivative is $f^{(4)}$ or, where the library's own wording is quoted, $f''''$.
+
+\begin{center}\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}>{\raggedright}p{27mm}>{\raggedright\arraybackslash}p{82mm}@{}}
+\toprule
+Symbol & Meaning\\
+\midrule
+$x$, $f$, $f(x)$ & the point and the function to differentiate; \code{x} and \code{fn} in code\\
+$h$ & the step; for Ridders' method the initial step $h_0$, with $h_i = h_0 / 2^i$ at level $i$\\
+$\dd f / \dd x$, $f^{(\dorder)}$ & the first and the $\dorder$-th derivative\\
+$\dorder$ & the derivative order, 1 to 4 (the template argument \code{N})\\
+$\aorder$ & the accuracy order of a rule, error $\order(h^{\aorder})$ (the template argument \code{P})\\
+$\order(h^{\aorder})$ & of the order of $h^{\aorder}$ as $h \to 0$\\
+$n_k$, $w_k$ & the nodes of a rule (integer offsets: the samples are at $x + n_k h$) and its rational weights,
+  $f^{(\dorder)} \approx \sum_k w_k f(x + n_k h) / h^{\dorder}$\\
+$c_k$, $\den$ & the integer numerators and their common denominator, $w_k = c_k / \den$, as the library stores
+  them and \cref{ch:tables} tabulates them\\
+$x_k$, $f_k$ & $x + n_k h$ and $f(x_k)$, the $k$-th point and sample\\
+$K$ & the largest $\abs{n_k}$ of a rule; the rule spans $K h$ on each side of $x$\\
+$\mom{j}$ & the $j$-th moment of a rule, $\sum_k w_k n_k^j$ (with $c_k$: $\sum_k c_k n_k^j$)\\
+$\errc$ & the error constant: leading truncation term $\errc\, h^{\aorder} f^{(\aorder + \dorder)}$\\
+$\ampl$ & the rounding amplification, $\sum_k \abs{w_k}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{center}\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}>{\raggedright}p{27mm}>{\raggedright\arraybackslash}p{82mm}@{}}
+\toprule
+Symbol & Meaning\\
+\midrule
+$\epsmach$ & machine epsilon of the type, \code{std::numeric_limits<T>::epsilon()}: $2^{-52}$ for \code{double};
+  the book uses $\epsmach$, not the unit roundoff $\epsmach / 2$\\
+$\ulp(x)$ & unit in the last place: the spacing of the floating-point numbers at $x$\\
+$\fl(\cdot)$ & the rounded result of an operation\\
+$\fmax$ & the largest finite value of the type, \code{std::numeric_limits<T>::max()}\\
+$\scale$ & $\max(\abs{x}, 1)$, the scale of the default steps\\
+$w$ & the scale on which $f$ varies, when it is not $\scale$\\
+$\noise$ & the noise level: the relative accuracy of $f$ when it is worse than $\epsmach$\\
+$E(h)$, $\etrunc(h)$, $\eround(h)$ & the error model and its truncation and rounding parts\\
+$\hbest$ & the best step of the error model\\
+$\Dc{h}$, $D_i$ & the base difference (the \code{Central<2>} rule of order $\dorder$) at step $h$; $D_i = \Dc{h_i}$\\
+$\Aij{i}{j}$ & Ridders' tableau entry at level $i$, column $j$; $\Aij{i}{0} = D_i$\\
+$r_i$ & the rounding floor of level $i$ of the tableau\\
+$e_{i,j}$, $\errest$ & the estimate of a tableau entry, and the returned error estimate \code{abs_error}\\
+$\nevals$ & the number of evaluations of \code{fn}\\
+$\xi$ & the intermediate point of Taylor's remainder\\
+$\enth(T)$, $\cp$, $T_0$ & the thread example: the molar enthalpy of nitrogen in \si{\joule\per\mole} relative to
+  \SI{298.15}{\kelvin}, its heat capacity $\dd \enth / \dd T$ in \si{\joule\per\mole\per\kelvin}, and the point
+  \SI{1000}{\kelvin}\\
+$\Rgas$ & the gas constant\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section*{Glossary}
+
+\begin{description}\setlength{\itemsep}{1pt}
+  \item[accuracy order $\aorder$] The power of $h$ in a rule's leading truncation error, $\order(h^{\aorder})$;
+    the number in \code{Central<P>}, \code{Forward<P>} and \code{Backward<P>}. Not the number of points.
+  \item[coverage] The fraction of cases in a study whose error estimate is at least the actual error.
+  \item[derivative order $\dorder$] Which derivative is computed, 1 to 4; the template argument \code{N} or a
+    value of \code{order}.
+  \item[error estimate] The \code{abs_error} of a result: an estimate of its absolute error, filled by Ridders'
+    method and empty for the stencils; an estimate, not a bound.
+  \item[estimate] A returned value of a derivative; the \code{value} of an \code{Estimate<T>}.
+  \item[evaluation] One call of \code{fn}; the unit of cost.
+  \item[kink] A point where $f$ or one of its derivatives jumps: a range break between two fits, a phase boundary,
+    an \code{if}. A rule whose span contains one returns a wrong value without failing.
+  \item[level, column, entry, tableau] Ridders' method halves the step once per level; the extrapolated values
+    form a triangular tableau whose column $j$ is free of the error terms up to $h^{2j}$; an entry is one value in it.
+  \item[machine epsilon $\epsmach$] The spacing of the floating-point numbers just above 1.
+  \item[node] An integer offset $n_k$ of a rule; the sample is taken at $x + n_k h$.
+  \item[noise level $\noise$] The relative accuracy of $f$ when it is worse than $\epsmach$ (a solver's tolerance,
+    for instance); it replaces $\epsmach$ in the rounding branch of the error model.
+  \item[non-finite] An infinite or NaN value; the one failure of \code{derivative}, \code{error::non_finite}.
+  \item[restart] Ridders' method discarding its tableau and starting again from a smaller step, after a non-finite
+    value or an untrusted result.
+  \item[rounding error] The part of the error that comes from the rounding of the values of $f$ (and of the points);
+    it grows as the step shrinks.
+  \item[rule] A formula for a derivative: a stencil with its weights, such as the central difference.
+  \item[sample] A value $f_k = f(x + n_k h)$ at a node.
+  \item[scale $\scale$] $\max(\abs{x}, 1)$, the length on which the default steps assume $f$ to vary.
+  \item[stencil] The pattern of nodes of a rule, and the family of rules that share it (\code{Central<P>}); a
+    stencil method, as against Ridders' method, samples a fixed pattern of points.
+  \item[step $h$] The distance between $x$ and the points at which $f$ is sampled, in the units of $x$; the default
+    step is the one the library chooses when none is passed.
+  \item[truncation error] The error of a rule in exact arithmetic, from truncating the Taylor series; it shrinks
+    with the step.
+\end{description}

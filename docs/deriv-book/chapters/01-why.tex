@@ -87,7 +87,9 @@ through one function, \code{derivative}, with these choices.
 \begin{itemize}
   \item \emph{Four methods.} \code{Central<P>}, the default, samples $f$ on both sides of $x$; \code{Forward<P>}
     and \code{Backward<P>} sample on one side only, for a function defined on one side; \code{Ridders} adapts its
-    step and also estimates its own error. \code{P} is the accuracy order of \cref{ch:taylor}.
+    step and also estimates its own error. The first three are \emph{stencils}:\mnote{A \emph{stencil} samples $f$
+    at a fixed pattern of points around $x$ and combines the samples with fixed weights. Ridders' method decides
+    its points as it goes.} \code{P} is the accuracy order of \cref{ch:taylor}.
   \item \emph{Derivatives of order 1 to 4}, $f'$ to $f^{(4)}$.
   \item \emph{Any real type}: \code{float}, \code{double}, or a user type with more digits such as those of
     Boost.Multiprecision.
@@ -108,6 +110,7 @@ $T_0 = \SI{1000}{\kelvin}$. The function returns $\enth(T)$, the enthalpy relati
 \si{\joule\per\mole\per\kelvin} directly. The coefficients and the function are defined once, in a header shared by
 every example of the book:
 \snippetheader{shomate}{shomate}
+\needspace{14\baselineskip}%
 \snippetheader{shomate}{shomate-H}
 
 The heat capacity is one call. Without a method or a step, \code{derivative} uses \code{Central<2>}, the central
@@ -126,7 +129,7 @@ significant figures, which is a matter for the property data, not for the deriva
 
 Ridders' method adapts its step and reports an estimate of its own error in \code{abs_error}:
 \snippet{01-why-first}{first-ridders}
-After \valCpRiddersEvals{} evaluations of $\enth$, against the stencil's two, it returns
+After \num{\valCpRiddersEvals} evaluations of $\enth$, against the stencil's two, it returns
 $\cp = \num{\valCpRiddersValue}$\,\si{\joule\per\mole\per\kelvin} with an error estimate of
 \SI{\valCpRiddersEstimate}{\joule\per\mole\per\kelvin}. The actual error is
 \SI{\valCpRiddersActual}{\joule\per\mole\per\kelvin}, or \num{\valCpRiddersRelError} relative, so the estimate is
@@ -146,9 +149,9 @@ $x$ (\cref{ch:rounding}).
 \begin{table}
 \sidecaption{The method in five situations. Each row is a call \code{derivative<M>(fn, x)}, or
 \code{derivative<M>(fn, x, h)} with the step given; $\epsmach$ is the machine epsilon of the type ($2^{-52}$ for
-\code{double}), $\scale = \max(\abs{x}, 1)$, $w$ the scale on which $f$ varies and $\noise$ the relative accuracy of
-$f$. Evaluations are those of \code{fn} for $f'$. The full table, with the evidence for each row, is
-\cref{tab:method-choice}.\label{tab:method-summary}}
+\code{double}), $w$ the scale on which $f$ varies and $\noise$ the relative accuracy of $f$. Evaluations are those
+of \code{fn} for $f'$. The full table, with the evidence for each row, is \cref{tab:method-choice}; the
+quick-reference page at the end of the book repeats this one.\label{tab:method-summary}}
 \centering\footnotesize
 \renewcommand{\arraystretch}{1.15}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{33mm}>{\raggedright\arraybackslash}p{36mm}%
@@ -156,26 +159,17 @@ $f$. Evaluations are those of \code{fn} for $f'$. The full table, with the evide
 \toprule
 Situation & Method \code{M} and step & Cost and accuracy\\
 \midrule
-Inside an iteration; $f$ smooth and cheap & \code{Central<2>}, the default step & 2 evaluations; about
-\valHeadlineFirstDigits{} digits in \code{double}\\ \addlinespace[3pt]
-A value to report, with an error estimate & \code{Ridders}, the default initial step & typically
-\valRiddersEvalsMedianFirst{}, at most \valRiddersMaxEvalsFirst{}; about \valHeadlineRiddersFirstDigits{} digits\\ \addlinespace[3pt]
-$f$ defined on one side of $x$ only & \code{Forward<2>} or \code{Backward<2>}, the default step & 3 evaluations;
-about \num{\valExpForwardTwoRelError} relative error on $\mathrm{e}^x$\\ \addlinespace[3pt]
-$f$ varies on a scale $w$ far from $\scale$ & \code{Central<2>}, $h = \epsmach^{1/3} w$ & 2 evaluations; accuracy
-as in the first row\\ \addlinespace[3pt]
-$f$ accurate to $\noise > \epsmach$ only (a solver output) & \code{Central<2>}, $h = \noise^{1/3} \scale$ & 2
-evaluations; about $\noise^{2/3}$ relative\\
+\tablerows{chapters/shared-method-summary}
 \bottomrule
 \end{tabular}
 \end{table}
 
 \paragraph{Accuracy.} At the default step a first derivative in \code{double} has about
-\valHeadlineFirstDigits{} correct digits, a fourth derivative about \valHeadlineFourthDigits{}: the medians of
+\num{\valHeadlineFirstDigits} correct digits, a fourth derivative about \num{\valHeadlineFourthDigits}: the medians of
 \cref{tab:accuracy-matrix}, measured on $\mathrm{e}^x$. Higher derivatives lose digits fast (\cref{ch:orders}).
 
 \paragraph{Cost.} A stencil costs a fixed number of evaluations, two for \code{Central<2>} and $f'$; Ridders' method
-typically \valRiddersEvalsMedianFirst{} for $f'$ and never more than \valRiddersMaxEvalsFirst{} (\cref{tab:cost}).
+typically \num{\valRiddersEvalsMedianFirst} for $f'$ and never more than \num{\valRiddersMaxEvalsFirst} (\cref{tab:cost}).
 
 \paragraph{The one check.} Test the result before you use it, as in the listings above: \code{if (d)}, then
 \code{d->value}. A stencil reports no error estimate; \cref{sec:using-check} shows how to check its result.

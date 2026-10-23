@@ -249,9 +249,12 @@ below the range and returns a derivative of the extrapolated formula, with no si
 remedy is to make the domain explicit. The wrapper below returns NaN outside the fit's range, so that any rule
 sampling there fails with \code{non_finite} instead of succeeding; the one-sided rules never sample there and
 succeed, \code{Forward<2>} with its three points and \code{Forward<4>} with five:
+\needspace{14\baselineskip}%
 \snippet{04-stencils-edge}{validity-edge}
 The example checks that the central rule fails and that both one-sided results are within $10^{-8}$ of the closed
-form; \cref{ch:ridders} shows what Ridders' method, which restarts below a failing step, does at the same edge.
+form; measured, \code{Forward<2>} is \num{\valEdgeForwardTwoRelError} off and \code{Forward<4>}
+\num{\valEdgeForwardFourRelError}. \Cref{ch:ridders} shows what Ridders' method, which restarts below a failing
+step, does at the same edge.
 Below \SI{500}{\kelvin} the published enthalpy of nitrogen is a different fit, and the two do not meet, which
 makes the junction the range break of \cref{sec:using-pitfalls}.
 

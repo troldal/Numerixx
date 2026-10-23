@@ -2,20 +2,10 @@
 % the library (data/table-*.tex, read with \tablebody) and checked there against the moment conditions.
 % Tables: T4 to T7 tab:weights-central-{first,second,third,fourth}, T8 to T11 tab:weights-forward-{...},
 % T12 tab:default-steps, T13 tab:ridders-constants.
-%% NEW-MACRO: \breakcommas lets a line break after every comma in mathematics, for the long lists of nodes and
-%% numerators in the weight tables; used inside a table only, where it stays local to the float.
-\makeatletter
-\newcommand{\breakcommas}{\mathchardef\bk@mathcomma=\mathcode`\,\relax\mathcode`\,="8000\relax}
-{\catcode`\,=\active\gdef,{\bk@mathcomma\penalty\z@}}
-\makeatother
-%% NEW-MACRO: the column layout and header of a weight table (T4 to T11), so that the eight tables agree.
-\newcommand{\weighttablestart}{\centering\footnotesize\breakcommas\setlength{\tabcolsep}{3pt}%
-  \begin{tabular}{@{}r>{\raggedright}p{36mm}>{\raggedright}p{60mm}rrcl@{}}
-  \toprule
-  $P$ & Nodes $n_k$ & Numerators $c_k$ & $\den$ & $\ampl$ & $\errc$ & Leading error term\\
-  \midrule}
-\newcommand{\weighttableend}{\bottomrule\end{tabular}}
+% The macros \breakcommas, \weighttablestart and \weighttableend are in macros.tex (merged at stage 4).
 \chapter{Tables}\label{ch:tables}
+% Four weight tables may stack at the top of a page (main.tex restores the default of 3 after this chapter).
+\setcounter{topnumber}{4}
 
 The tables of this chapter are the single source of the weights and constants that Part~I quotes. Every body was
 written by the book's data generator from the library itself, from the same internal tables that
@@ -91,7 +81,8 @@ float.\label{tab:weights-central-fourth}}
 \Cref{tab:weights-forward-first,tab:weights-forward-second,tab:weights-forward-third,tab:weights-forward-fourth}
 give \code{Forward<P>} for $\dorder = 1$ to 4 and $\aorder = 1$ to 6. A one-sided rule gains one order per node, and
 both its constants are larger than those of the central rule of the same order: $\ampl$ grows to
-\num{\valAmplForwardSix} for $f'$ with $\aorder = 6$ and to 4019 for $f''''$, which is why the one-sided rules stop at
+\num{\valAmplForwardSix} for $f'$ with $\aorder = 6$ and to \num{\valAmplForwardSixFourth} for $f''''$, which is why
+the one-sided rules stop at
 $\aorder = 6$.
 
 \begin{table*}

@@ -38,6 +38,7 @@
 #include <complex>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <limits>
@@ -384,17 +385,76 @@ namespace {
     constexpr auto exp_fn = [](double x) { return std::exp(x); };
     double const e_at_one = std::exp(1.0);
 
-    // ------------------------------------------------------------------------------------------------ layout test
+    // ------------------------------------------------------------------------------------------------ hand tables
 
-    // TEMPLATE data set, used by chapters/zz-layout-test.tex only: remove it with the layout test (stage 4).
-    void template_step_error(Output &o)
+    // The two pencil-and-paper tables of Chapters 2.3 and 3.2, generated so that no computed digit is typed.
+    // Chapter 2: x^3 at x = 1 with h = 0.1 and 0.05, exact in decimal arithmetic; the values are printed to seven
+    // significant digits, which a hand calculation gives exactly. Chapter 3: a six-digit calculator differentiating
+    // exp(x) at 1, simulated by rounding every value of f and the quotient to six significant digits.
+    double round_to_digits(double v, int digits)
     {
-        auto out = csv(o, "template-step-error", "h,error");
-        for (int k = 1; k <= 13; ++k) {
-            double const h = power_of_ten(-k);
-            if (auto const d = derivative(exp_fn, 1.0, h)) out << h << ',' << std::abs(d->value - e_at_one) << '\n';
+        char buf[64];
+        std::snprintf(buf, sizeof buf, "%.*g", digits, v);
+        return std::strtod(buf, nullptr);
+    }
+
+    std::string general(double v, int digits, bool keep_zeros = false)
+    {
+        char buf[64];
+        std::snprintf(buf, sizeof buf, keep_zeros ? "%#.*g" : "%.*g", digits, v);
+        return buf;
+    }
+
+    // A signed error to two significant digits in plain decimal notation, as a calculator shows it (+0.00022).
+    std::string signed_decimal(double v)
+    {
+        int const decimals = std::max(0, 1 - static_cast<int>(std::floor(std::log10(std::abs(v)))));
+        return (v < 0 ? "$-$" : "$+$") + fixed(std::abs(v), decimals);
+    }
+
+    void hand_tables(Output &o)
+    {
+        {
+            auto tab = table(o, "hand-cube",
+                "x^3 at x = 1 with h = 0.1 and 0.05: f(1+h), f(1-h), Forward<1> value and error, Central<2> value and error; "
+                "the library's values printed to 7 significant digits, which an exact hand calculation gives too");
+            auto const cube = [](double x) { return x * x * x; };
+            for (double const h : { 0.1, 0.05 }) {
+                auto const fwd = derivative<Forward<1>>(cube, 1.0, h);
+                auto const cen = derivative<Central<2>>(cube, 1.0, h);
+                if (!fwd || !cen) {
+                    o.fail("hand-cube: a rule failed");
+                    continue;
+                }
+                tab << "$h = " << general(h, 7) << "$ & $" << general(cube(1 + h), 7) << "$ & $" << general(cube(1 - h), 7)
+                    << "$ & $" << general(fwd->value, 7) << "$, \\enspace $" << general(fwd->value - 3, 7) << "$ & $"
+                    << general(cen->value, 7) << "$, \\enspace $" << general(cen->value - 3, 7) << "$ \\\\\n";
+            }
         }
-        value(o, "TemplateDefaultError", sig(*rel_error(derivative(exp_fn, 1.0), e_at_one)));
+        {
+            auto tab = table(o, "hand-calculator",
+                "a six-digit calculator: the central difference of exp(x) at x = 1 for h = 0.1 to 0.0001, every value of f "
+                "and the quotient rounded to 6 significant digits; error against e");
+            double first_error = 0;
+            double second_error = 0;
+            double last_diff = 0;
+            int row = 0;
+            for (double const h : { 0.1, 0.01, 0.001, 0.0001 }) {
+                double const fp = round_to_digits(std::exp(1 + h), 6);
+                double const fm = round_to_digits(std::exp(1 - h), 6);
+                double const estimate = round_to_digits((fp - fm) / (2 * h), 6);
+                double const error = estimate - e_at_one;
+                if (row == 0) first_error = error;
+                if (row == 1) second_error = error;
+                last_diff = fp - fm;
+                tab << "$" << general(h, 7) << "$ & $" << general(fp, 6, true) << "$ & $" << general(fm, 6, true) << "$ & $"
+                    << general(estimate, 6, true) << "$ & " << signed_decimal(error) << " \\\\\n";
+                ++row;
+            }
+            value(o, "HandCalcExact", sig(e_at_one, 6));
+            value(o, "HandCalcErrorRatio", sig(first_error / second_error));
+            value(o, "HandCalcLastDiff", fixed(last_diff, 5));
+        }
     }
 
     // ------------------------------------------------------------------------------------------------ DS1, DS1b
@@ -443,8 +503,12 @@ namespace {
         // The second derivative, d cp / dT (E7).
         double const cp2 = Hn(2);
         value(o, "CpSecondExact", sig(cp2, 4));
-        value(o, "CpSecondStep", sig(nxx::math::root_epsilon<4, double>() * T0));
+        double const h2 = nxx::math::root_epsilon<4, double>() * T0;
+        value(o, "CpSecondStep", sig(h2));
         value(o, "CpSecondRelError", sig(*rel_error(derivative<Central<2>, 2>(H, T0), cp2)));
+        // The model's rounding term for the three-point rule at its default step, relative: S eps |H| / (h^2 |H''|)
+        // with S = 4 (section 5.2).
+        value(o, "CpSecondModelRelError", sig(4 * dbl_eps * H0 / (h2 * h2 * std::abs(cp2))));
         calls = 0;
         auto const r2 = derivative<Ridders, 2>(Counted{ H, &calls }, T0);
         ridders_values(o, "CpRiddersSecond", r2, cp2, calls);
@@ -452,6 +516,28 @@ namespace {
         // The factors behind "relative accuracy" (section 3.2, 5.2): |H| / (s |H'|) and |H| / (s^2 |H''|) at T0.
         value(o, "CpRelativeFactor", sig(H0 / (T0 * cp)));
         value(o, "CpSecondRelativeFactor", sig(H0 / (T0 * T0 * std::abs(cp2))));
+    }
+
+    // E6 (section 4.4): the one-sided rules at the lower end of the fit's range, 500 K, with the wrapper that returns
+    // NaN outside the range, as code/04-stencils-edge.cpp has it; Central<2> must fail there.
+    void e6_validity_edge(Output &o)
+    {
+        auto const wrapped = [](double T) {
+            using book::nitrogen;
+            if (T < nitrogen.T_min || T > nitrogen.T_max) return not_a_number;
+            return book::shomate_H(nitrogen, T);
+        };
+        double const T_edge = book::nitrogen.T_min;
+        double const cp = book::shomate_cp(book::nitrogen, T_edge);
+        if (derivative<Central<2>>(wrapped, T_edge)) o.fail("E6: Central<2> did not fail at the edge");
+        auto const f2 = rel_error(derivative<Forward<2>>(wrapped, T_edge), cp);
+        auto const f4 = rel_error(derivative<Forward<4>>(wrapped, T_edge), cp);
+        if (!f2 || !f4) {
+            o.fail("E6: a one-sided rule failed at the edge");
+            return;
+        }
+        value(o, "EdgeForwardTwoRelError", sig(*f2));
+        value(o, "EdgeForwardFourRelError", sig(*f4));
     }
 
     // ------------------------------------------------------------------------------------------------ DS2, DS3, DS5
@@ -1174,6 +1260,23 @@ namespace {
             value(o, "Ampl" + family + words[P], sig(S_ampl, 3));
             value(o, "Errc" + family + words[P], sig(static_cast<double>(num) / static_cast<double>(den), 3));
         }
+        // The largest amplification of all the tables, Forward<6> for the fourth derivative (sections 9.3 and 10.4).
+        if constexpr (N == 4 && P == 6) {
+            if (family == "Forward") value(o, "AmplForwardSixFourth", sig(S_ampl, 4));
+        }
+    }
+
+    // The constants S and C of a rule, from its table, for the step-constant computations of DS13.
+    template<typename S, int N>
+    std::pair<double, double> rule_constants()
+    {
+        constexpr auto t = nxx::deriv::detail::make_table<N>(S{});
+        long long weights = 0;
+        for (int const c : t.numerators) weights += c < 0 ? -c : c;
+        long long const m_top = moment(t, N + t.order);
+        double const ampl = static_cast<double>(weights) / t.denominator;
+        double const errc = static_cast<double>(m_top < 0 ? -m_top : m_top) / (static_cast<double>(factorial(N + t.order)) * t.denominator);
+        return { ampl, errc };
     }
 
     void ds12_weight_tables(Output &o)
@@ -1250,6 +1353,22 @@ namespace {
         value(o, "StepConstantCentralTwoFirst", sig(std::cbrt(3.0)));
         value(o, "StepConstantCentralTwoSecond", sig(std::pow(2.0 * 4 / (2.0 / 12), 1.0 / 4)));
         value(o, "StepConstantCentralTwoFourth", sig(std::pow(4.0 * 16 / (2.0 / 6), 1.0 / 6)));
+        // What dropping the constant costs by the model (Appendix B.4, eq. derivations-cost): at h = h*/k the error
+        // is (N k^-P + P k^N) / (P + N) times the minimum, with k = (N S / (P C))^(1/(P+N)) from the rule's table.
+        auto const step_cost = [&]<typename Rule, int N>(std::string const &name) {
+            constexpr int P = nxx::deriv::detail::make_table<N>(Rule{}).order;
+            auto const [S_ampl, C_errc] = rule_constants<Rule, N>();
+            double const k = std::pow(N * S_ampl / (P * C_errc), 1.0 / (P + N));
+            double const cost = (N * std::pow(k, -P) + P * std::pow(k, N)) / (P + N);
+            value(o, "StepCost" + name, sig(cost, 3));
+            return k;
+        };
+        step_cost.template operator()<Central<2>, 1>("CentralTwoFirst");
+        step_cost.template operator()<Central<2>, 2>("CentralTwoSecond");
+        step_cost.template operator()<Central<2>, 4>("CentralTwoFourth");
+        step_cost.template operator()<Central<4>, 4>("CentralFourFourth");
+        double const k_ten = step_cost.template operator()<Central<10>, 1>("CentralTenFirst");
+        value(o, "StepConstantCentralTenFirst", sig(k_ten));
     }
 
     void ds14_ridders_constants(Output &o)
@@ -1406,6 +1525,7 @@ namespace {
         value(o, "DenormMinFloat", sig(static_cast<double>(std::numeric_limits<float>::denorm_min())));
         value(o, "DenormMinDouble", sig(std::numeric_limits<double>::denorm_min()));
         value(o, "MinDouble", sig(std::numeric_limits<double>::min()));
+        value(o, "MinFloat", sig(static_cast<double>(std::numeric_limits<float>::min())));
         value(o, "DigitsFloat", integer(std::numeric_limits<float>::digits));
         value(o, "DigitsDouble", integer(std::numeric_limits<double>::digits));
         value(o, "DigitsTenFloat", integer(std::numeric_limits<float>::digits10));
@@ -1541,6 +1661,7 @@ namespace {
                 ratios.push_back(actual / *rr->abs_error);
                 errors.push_back(actual / std::exp(x));
             }
+            if (cases != points_per_function) o.fail("DS19: Ridders failed at " + std::to_string(points_per_function - cases) + " of the points for " + prefix);
             value(o, prefix + "Coverage", percent(static_cast<double>(covered) / cases));
             value(o, prefix + "MedianRatio", sig(median(ratios)));
             value(o, prefix + "WorstRatio", sig(*std::max_element(ratios.begin(), ratios.end())));
@@ -1549,6 +1670,7 @@ namespace {
         study_coverage(exp_fn, "NoiseCleanRidders");
         study_coverage(ten, "NoiseTenRidders");
         study_coverage(eight, "NoiseEightRidders");
+        value(o, "NoiseRiddersCases", integer(points_per_function));
     }
 
     // ------------------------------------------------------------------------------------------------ DS20
@@ -1726,8 +1848,9 @@ int main(int argc, char **argv)
     o.tex << "% " << header << '\n';
 
     check_thread_function(o);
-    template_step_error(o);
+    hand_tables(o);
     ds1_step_error_cp(o);
+    e6_validity_edge(o);
     ds2_step_error_exp(o);
     ds3_step_error_float(o);
     ds4_step_scale(o);

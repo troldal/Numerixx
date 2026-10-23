@@ -34,6 +34,30 @@
 % --- software identifiers (typeset in monospace) ---
 \newcommand{\code}[1]{\texttt{\detokenize{#1}}}
 \newcommand{\nxx}{Numerixx}
+% --- merged at stage 4 from the chapters' %% NEW-MACRO blocks ---
+% signature (Chapter 8): a block of declarations set as \code lines (signatures are prose and \code, never a typed
+% listing); \sigindent indents a continued declaration line.
+\newenvironment{signature}{\par\smallskip\noindent\begin{minipage}{\linewidth}\raggedright\footnotesize
+  \setlength{\parskip}{0pt}}{\end{minipage}\par\smallskip}
+\newcommand{\sigindent}{\hspace*{1.5em}}
+% \breakcommas (Chapter 9): lets a line break after every comma in mathematics, for the long lists of nodes and
+% numerators in the weight tables. The active comma is defined once, here, and only prints the ordinary math comma
+% followed by a break point; \breakcommas itself only changes the comma's mathcode, an assignment local to the group
+% (the float) it is issued in, so mathematics elsewhere is untouched.
+\makeatletter
+\mathchardef\bk@mathcomma=\mathcode`\,\relax
+{\catcode`\,=\active \gdef,{\bk@mathcomma\penalty\z@}}
+\newcommand{\breakcommas}{\mathcode`\,="8000\relax}
+\makeatother
+% The column layout and header of a weight table (Chapter 9, T4 to T11), so that the eight tables agree.
+\newcommand{\weighttablestart}{\centering\footnotesize\breakcommas\setlength{\tabcolsep}{3pt}%
+  \begin{tabular}{@{}r>{\raggedright}p{36mm}>{\raggedright}p{60mm}rrcl@{}}
+  \toprule
+  $P$ & Nodes $n_k$ & Numerators $c_k$ & $\den$ & $\ampl$ & $\errc$ & Leading error term\\
+  \midrule}
+\newcommand{\weighttableend}{\bottomrule\end{tabular}}
+% \qrhead (quick reference): a run-in heading inside multicols, where a paragraph heading fails.
+\newcommand{\qrhead}[1]{\par\noindent\textbf{#1}\enspace}
 % --- editorial ---
 \newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
 % \snippetheader{<file>}{<name>}: as \snippet (preamble.tex), for the shared headers code/<file>.hpp that the
@@ -44,5 +68,8 @@
 % after the file, whose tokens open a new row before \bottomrule ("Misplaced \noalign"); the TeX primitive does not.
 % Usage, on a line of its own between \midrule and \bottomrule:  \tablebody{ridders-tableau}
 \newcommand{\tablebody}[1]{\csname @@input\endcsname data/table-#1.tex }
+% \tablerows{<path>}: the same for a hand-written row file of the chapters, used for the five rows of the method
+% choice T0 (chapters/shared-method-summary.tex), which 1.5 and the quick-reference page share.
+\newcommand{\tablerows}[1]{\csname @@input\endcsname #1.tex }
 % --- generated values: data/values.tex defines one macro per number quoted in the text (\val...) ---
 \InputIfFileExists{data/values}{}{}

@@ -1,7 +1,7 @@
 # code/
 
 Every code listing in the book is a file here: built as `numerixx_book_<file>` and run as a CTest test with the
-normal build, so a listing cannot stop compiling or drift from the library. `quickstart.cpp` shows the conventions:
+normal build, so a listing cannot stop compiling or drift from the library. every file here follows these conventions (`01-why-first.cpp` is the shortest example):
 
 - the snippet the book quotes lies between the comment lines `// <name>` and `// </name>` and is quoted with
   `\snippet{<file>}{<name>}`;

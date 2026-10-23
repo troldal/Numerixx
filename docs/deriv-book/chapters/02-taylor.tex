@@ -164,14 +164,13 @@ steps $0.1$ and $0.05$:
 \toprule
  & $f(1 + h)$ & $f(1 - h)$ & forward, error & central, error\\
 \midrule
-$h = 0.1$ & $1.331$ & $0.729$ & $3.31$, \enspace $0.31$ & $3.01$, \enspace $0.01$\\
-$h = 0.05$ & $1.157625$ & $0.857375$ & $3.1525$, \enspace $0.1525$ & $3.0025$, \enspace $0.0025$\\
+\tablebody{hand-cube}
 \bottomrule
 \end{tabular}
 \end{center}
 Halving the step divides the forward error by a little more than 2 and the central error by exactly 4. The error
 terms predict the sizes too: $h f''/2 = 3h$ gives $0.3$ and $0.15$ for the forward difference, the small rest being
-the next term, $h^2$; and $h^2 f'''/6 = h^2$ gives $0.01$ and $0.0025$ for the central difference, exactly, because
+the next term, $h^2$; and $h^2 f'''/6 = h^2$ gives $1/100$ and $1/400$ for the central difference, exactly, because
 the fourth and higher derivatives of a cubic vanish.
 
 How small must $h$ be for the leading term to dominate? Small compared with the distance over which $f$ changes its

@@ -1,11 +1,6 @@
 % Chapter 8: API reference (practice author). PLAN.md section 1.4. Every statement is checked against
 % include/numerixx/deriv.hpp and include/numerixx/math.hpp. Tables: T2 tab:api-names, T3 tab:api-methods.
 % Example: E16 (code/08-api-usage.cpp); E11's names snippet.
-%% NEW-MACRO: a block of declarations set as \code lines (signatures are prose and \code, never a typed listing).
-\newenvironment{signature}{\par\smallskip\noindent\begin{minipage}{\linewidth}\raggedright\footnotesize
-  \setlength{\parskip}{0pt}}{\end{minipage}\par\smallskip}
-%% NEW-MACRO: the indentation of a continued declaration line in a signature block.
-\newcommand{\sigindent}{\hspace*{1.5em}}
 \chapter{API reference}\label{ch:api}
 
 This chapter lists every public name of \code{nxx::deriv}, and those of the shared header
@@ -139,8 +134,8 @@ to the latest diagonal entry (\cref{sb:floor-coverage}).
 
 \code{Estimate} is an aggregate, so it takes designated initialisers and structured bindings,
 \code{auto const [value, abs_error] = *r}. It converts implicitly to \code{T}. Where a conversion is not considered,
-in \code{auto}, \code{std::format} and the operator templates of Boost.Multiprecision, write \code{e.value} or
-\code{T(e)}. The conversion also applies where it may surprise: \code{if (*r)} tests the value against 0, not whether
+in \code{auto}, \code{std::format} and the arithmetic operator templates of Boost.Multiprecision (its comparisons do
+accept it), write \code{e.value} or \code{T(e)}. The conversion also applies where it may surprise: \code{if (*r)} tests the value against 0, not whether
 there is a result, and \code{int n = *r} truncates the value (\cref{sec:using-result}). The defaulted \code{==}
 compares both members; without it, \code{==} would compare only the values, through the conversion.
 
@@ -197,7 +192,7 @@ The two-node rules, \code{Central<2>} for $f'$, \code{Forward<1>} and \code{Back
 between the points actually evaluated, and \code{Central<2>} for $f''$ uses the actual offsets of its points
 (\cref{sb:actual-distance,sb:actual-offsets}); rules with more nodes divide the weighted sum by $\den h$ and then by
 $h$, $N - 1$ more times, never by $h^N$. \code{Ridders} extrapolates the \code{Central<2>} rule of order N in
-Richardson's tableau until rounding stops the improvement; it restarts below a step at which \code{fn} is not finite,
+a Richardson tableau until rounding stops the improvement; it restarts below a step at which \code{fn} is not finite,
 or below one whose result has at most two correct bits by its own estimate while that estimate is far above rounding.
 Its constants are in \cref{tab:ridders-constants}.
 
