@@ -1,0 +1,13 @@
+# LaTeX output, in case the book is built in place (the build scripts write to the build directory instead).
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.sbr
+*.synctex.gz
+*.toc
+acs-*.bib
+main.pdf

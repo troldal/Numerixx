@@ -18,6 +18,8 @@ in CI.
 - `cmake/CPM.cmake` fetches the test dependencies; the library itself has none
 - `CMakePresets.json` one preset per toolchain, used locally and in CI (`.github/workflows/ci.yml`)
 - `docs/Doxyfile` the API documentation settings, used by the docs targets in `docs/CMakeLists.txt`
+- `docs/deriv-book/` the book on `nxx::deriv` (LaTeX): its own `CLAUDE.md` holds its rules, roles and process; its
+  examples build as tests (`NUMERIXX_BUILD_BOOK`), its PDF is the target `numerixx_book`
 - `docs/plan.md` current plan; `docs/design.md` design decisions; also a technique survey, a tutorial and API
   proposals (`docs/PHASE2_API.md`)
 

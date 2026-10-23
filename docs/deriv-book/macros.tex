@@ -1,0 +1,24 @@
+% Shared notation of the book. The editor owns this file; authors add new macros ONLY in their own chapter
+% file, marked %% NEW-MACRO, and the editor merges them here. The notation guide in PLAN.md explains each one.
+% --- calculus ---
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\deriv}[2]{\frac{\dd #1}{\dd #2}}                 % df/dx
+\newcommand{\nderiv}[3]{\frac{\dd^{#3} #1}{\dd #2^{#3}}}      % d^n f / dx^n
+\newcommand{\order}{\mathcal{O}}                              % big O
+% --- floating point ---
+\newcommand{\epsmach}{\varepsilon}                            % machine epsilon of the type (2^-52 for double)
+\newcommand{\ulp}{\operatorname{ulp}}                         % unit in the last place
+\newcommand{\fl}{\operatorname{fl}}                           % the rounded result of an operation
+% --- finite differences ---
+\newcommand{\dorder}{N}                                       % derivative order, 1 to 4
+\newcommand{\aorder}{P}                                       % accuracy order of a rule: error O(h^P)
+\newcommand{\ampl}{S}                                         % rounding amplification: sum |w_k| / den
+\newcommand{\errc}{C}                                         % truncation error constant of a rule
+\newcommand{\scale}{s}                                        % max(|x|, 1), the scale of the default steps
+% --- software identifiers (typeset in monospace) ---
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\nxx}{Numerixx}
+% --- editorial ---
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+% --- generated values: data/values.tex defines one macro per number quoted in the text (\val...) ---
+\InputIfFileExists{data/values}{}{}

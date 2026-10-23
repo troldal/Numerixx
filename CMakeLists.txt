@@ -17,6 +17,13 @@ if (NUMERIXX_BUILD_DEMOS)
     add_subdirectory(demo)
 endif ()
 
+# The book on nxx::deriv (docs/deriv-book): its code examples build and run as tests; its data and PDF are
+# on-demand targets (numerixx_book_data, numerixx_book).
+option(NUMERIXX_BUILD_BOOK "Build the book's examples and add its targets" ${PROJECT_IS_TOP_LEVEL})
+if (NUMERIXX_BUILD_BOOK)
+    add_subdirectory(docs/deriv-book)
+endif ()
+
 option(NUMERIXX_BUILD_DOCS "Add the Numerixx documentation targets (needs Doxygen)" ${PROJECT_IS_TOP_LEVEL})
 if (NUMERIXX_BUILD_DOCS)
     find_package(Doxygen 1.10)

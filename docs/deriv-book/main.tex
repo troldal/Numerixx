@@ -1,0 +1,41 @@
+% "Numerical Derivatives with Numerixx" -- main file.
+% Layout: preamble.tex (the EquiCore design paper's Tufte layout, extended for a book). Notation: macros.tex.
+% Rules, roles and process: CLAUDE.md in this folder. Build: cmake --build --preset <preset> --target numerixx_book
+% (or tools/build.sh). The editor maintains the chapter list between the INPUTS markers.
+\documentclass[10pt,a4paper,oneside]{report}
+\input{preamble}
+\input{macros}
+
+\title{Numerical Derivatives with Numerixx}
+\renewcommand{\bkSubtitle}{A textbook and reference for finite differences and Ridders' extrapolation in C++}
+\author{Kenneth Troldal Balslev}
+\date{Draft}
+
+\begin{document}
+\pagenumbering{Alph}  % letters on the title page, so that its page anchor differs from page 1
+\maketitle
+
+\pagenumbering{roman}
+\input{chapters/00-frontmatter}
+\tableofcontents
+\listofsidebars
+\cleardoublepage
+\pagenumbering{arabic}
+
+% INPUTS-BEGIN (the editor maintains this list)
+\part{Fundamentals}
+\input{chapters/zz-layout-test}  % remove when the first real chapter exists
+\part{Reference}
+% INPUTS-END
+
+\appendix
+% APPENDIX-INPUTS-BEGIN
+% APPENDIX-INPUTS-END
+
+\input{chapters/99-backmatter}
+
+\begin{fullbib}
+\bibliography{refs}
+\end{fullbib}
+
+\end{document}

@@ -1,0 +1,11 @@
+# latexmk settings for the book: pdflatex, and BibTeX always run. achemso writes acs-main.bib into the output
+# directory, where latexmk runs BibTeX, while refs.bib stays in this folder: MiKTeX's BibTeX is pointed at this
+# folder with --include-directory, TeX Live's through BIBINPUTS.
+use Cwd;
+my $here = getcwd();
+$pdf_mode = 1;
+$bibtex_use = 2;
+ensure_path('BIBINPUTS', $here);
+ensure_path('TEXINPUTS', $here);
+my $miktex = `bibtex --version 2>&1` =~ /MiKTeX/;
+$bibtex = $miktex ? "bibtex --include-directory=\"$here\" %O %S" : 'bibtex %O %S';
