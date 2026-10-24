@@ -68,7 +68,7 @@ Each has a twin with the additional constraint \code{detail::noisy<N, T>}, marke
   \item \code{N}, the derivative order: 1 (the default) to 4, as a value of any integer type except \code{bool}, or as
     an \code{order}. \code{detail::valid_order<N>} compares an integer in its own type, so a value beyond the range of
     \code{int} is not wrapped into 1 to 4.
-  \item \code{T}, the real type, deduced from \code{x} alone; it must satisfy \code{nxx::real} and provide the
+  \item \code{T}, the real type, deduced from \code{x} alone; it must satisfy \code{nxx::real}, which includes the
     \code{numeric_limits} members of \cref{sec:api-real}. The step's type, \code{std::type_identity_t<T>}, is
     non-deduced, so a \code{double} step converts to a multiprecision \code{T}; the conversion is implicit, so for a
     \code{float} \code{x} write \code{1e-3f}, since a \code{double} step is diagnosed under \code{-Wconversion} unless
@@ -239,14 +239,15 @@ relative estimate of \num{\valFloatFourthRiddersAtOneRelEstimate} that says the 
 \texttt{\}}
 \end{signature}
 \code{real<T>} holds when \code{std::numeric_limits<T>} is specialised with \code{is_integer} false,
-\code{is_bounded} true and \code{is_exact} false, so that \code{max()} is finite and \code{epsilon()} positive; when
-\code{T} is constructible from \code{int} and totally ordered; and when $a + b$, $a - b$, $a \times b$, $a / b$ and
-$-a$ convert to \code{T}, which admits expression templates (\cref{sb:expression-templates}). The tests check that
-\code{float}, \code{double}, \code{long double}, \code{cpp_bin_float_50} with and without expression templates and
-\code{cpp_dec_float_50} satisfy it, and that \code{int}, \code{unsigned} and \code{cpp_rational} do not. The
-algorithms also read \code{radix}, \code{digits}, \code{epsilon()}, \code{max()} and \code{denorm_min()}, which the
-concept does not check: a type
-without them passes the constraints and then fails to compile inside the header. A type of your own, here a wrapper
+\code{is_bounded} true and \code{is_exact} false, so that \code{max()} is finite and \code{epsilon()} positive, and
+with the members the algorithms read: \code{radix} (at least 2) and \code{digits} (at least 1) as constant
+expressions, \code{epsilon()} and \code{max()} convertible to \code{T}, and \code{denorm_min()} from which \code{T}
+can be constructed; when \code{T} is constructible from \code{int}, copyable and totally ordered; and when $a + b$,
+$a - b$, $a \times b$, $a / b$ and $-a$ convert to \code{T}, which admits expression templates
+(\cref{sb:expression-templates}). The tests check that \code{float}, \code{double}, \code{long double},
+\code{cpp_bin_float_50} with and without expression templates and \code{cpp_dec_float_50} satisfy it, and that
+\code{int}, \code{unsigned}, \code{cpp_rational}, a type missing any one of the five members, one with radix 1
+and one that cannot be copied do not. A type of your own, here a wrapper
 of \code{double} with the arithmetic, a total order and construction from \code{int} and no default constructor,
 needs exactly the members below (\code{code/07-using-usertype.cpp}, which differentiates $\mathrm{e}^x$ with it):
 \snippet{07-using-usertype}{usertype-limits}

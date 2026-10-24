@@ -12,8 +12,13 @@ Decisions in force. Each one says why; change it here before changing the code.
 ## Real types (`math.hpp`)
 
 - `nxx::real<T>` accepts a type that specialises `std::numeric_limits` as non-integer, is constructible from `int`, is
-  totally ordered, and has `+ - * /` and unary minus whose results convert to `T`. This admits the built-in floating
-  types and Boost.Multiprecision types, with or without expression templates.
+  copyable and totally ordered, and has `+ - * /` and unary minus whose results convert to `T`. This admits the
+  built-in floating types and Boost.Multiprecision types, with or without expression templates. It also requires the
+  `numeric_limits` members the code reads: `radix` (at least 2) and `digits` (at least 1) as constant expressions,
+  `epsilon()` and `max()` convertible to `T`, and `denorm_min()` from which `T` can be constructed, so that a type
+  lacking one fails at the concept instead of inside the header. `denorm_min()` need only construct `T` because the
+  code reads it as `T(denorm_min())`; a type that inherits `numeric_limits<double>` and constructs from `double`
+  only explicitly is accepted.
 - The type must also be bounded and inexact (`numeric_limits` `is_bounded`, `!is_exact`): `isfinite` needs a finite
   `max()` and `root_epsilon` a positive `epsilon()`. This rejects rationals such as `cpp_rational`, whose epsilon is 0
   (the scaling loop never ended). The concept is not split into arithmetic and default-step parts: exact types have no

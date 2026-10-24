@@ -20,6 +20,132 @@ static_assert(!nxx::real<int> && !nxx::real<unsigned>);
 // Exact and unbounded: epsilon is 0 and max is not a bound, so root_epsilon and isfinite would be meaningless.
 static_assert(!nxx::real<mp::cpp_rational>);
 
+// nxx::real requires every numeric_limits member the headers read (U-5). Own wraps a double; its numeric_limits is
+// written member by member, not inherited from numeric_limits<double>, so that a missing member is not hidden. Variant
+// 0 is complete; 1 to 5 each lack one member (radix, digits, denorm_min, epsilon, max); 6 has radix 1, under which
+// root_epsilon's scaling would never end.
+namespace {
+
+    template<int V>
+    struct Own
+    {
+        double v = 0;
+
+        constexpr Own(int i) : v(i) {}
+        constexpr explicit Own(double d) : v(d) {}
+
+        friend constexpr Own operator+(Own a, Own b) { return Own(a.v + b.v); }
+        friend constexpr Own operator-(Own a, Own b) { return Own(a.v - b.v); }
+        friend constexpr Own operator*(Own a, Own b) { return Own(a.v * b.v); }
+        friend constexpr Own operator/(Own a, Own b) { return Own(a.v / b.v); }
+        friend constexpr Own operator-(Own a) { return Own(-a.v); }
+        friend constexpr auto operator<=>(Own, Own) = default;
+    };
+
+    // Movable but not copyable, complete otherwise: its arithmetic results still convert to it (by moving), but
+    // math::abs returns a copy of a const reference, so the concept rejects it. A template, like Own, so that its
+    // operators, which only the concept inspects, are not reported as unused functions.
+    template<int = 0>
+    struct NoCopy
+    {
+        double v = 0;
+
+        constexpr NoCopy(int i) : v(i) {}
+        NoCopy(NoCopy const &) = delete;
+        NoCopy(NoCopy &&) = default;
+        NoCopy &operator=(NoCopy const &) = delete;
+        NoCopy &operator=(NoCopy &&) = default;
+
+        friend NoCopy operator+(NoCopy const &a, NoCopy const &b) { return NoCopy(int(a.v + b.v)); }
+        friend NoCopy operator-(NoCopy const &a, NoCopy const &b) { return NoCopy(int(a.v - b.v)); }
+        friend NoCopy operator*(NoCopy const &a, NoCopy const &b) { return NoCopy(int(a.v * b.v)); }
+        friend NoCopy operator/(NoCopy const &a, NoCopy const &b) { return NoCopy(int(a.v / b.v)); }
+        friend NoCopy operator-(NoCopy const &a) { return NoCopy(int(-a.v)); }
+        friend auto operator<=>(NoCopy const &, NoCopy const &) = default;
+    };
+
+} // namespace
+
+template<int V>
+struct std::numeric_limits<Own<V>>
+{
+    static constexpr bool is_specialized = true;
+    static constexpr bool is_integer = false;
+    static constexpr bool is_bounded = true;
+    static constexpr bool is_exact = false;
+    static constexpr int radix = V == 6 ? 1 : 2;
+    static constexpr int digits = 53;
+    static constexpr Own<V> epsilon() { return Own<V>(std::numeric_limits<double>::epsilon()); }
+    static constexpr Own<V> max() { return Own<V>((std::numeric_limits<double>::max)()); }
+    static constexpr Own<V> denorm_min() { return Own<V>(std::numeric_limits<double>::denorm_min()); }
+};
+
+template<>
+struct std::numeric_limits<Own<1>>
+{
+    static constexpr bool is_specialized = true, is_integer = false, is_bounded = true, is_exact = false;
+    [[maybe_unused]] static constexpr int digits = 53; // the concept stops at the missing radix, before digits
+    static constexpr Own<1> epsilon() { return Own<1>(std::numeric_limits<double>::epsilon()); }
+    static constexpr Own<1> max() { return Own<1>((std::numeric_limits<double>::max)()); }
+    static constexpr Own<1> denorm_min() { return Own<1>(std::numeric_limits<double>::denorm_min()); }
+};
+
+template<>
+struct std::numeric_limits<Own<2>>
+{
+    static constexpr bool is_specialized = true, is_integer = false, is_bounded = true, is_exact = false;
+    static constexpr int radix = 2;
+    static constexpr Own<2> epsilon() { return Own<2>(std::numeric_limits<double>::epsilon()); }
+    static constexpr Own<2> max() { return Own<2>((std::numeric_limits<double>::max)()); }
+    static constexpr Own<2> denorm_min() { return Own<2>(std::numeric_limits<double>::denorm_min()); }
+};
+
+template<>
+struct std::numeric_limits<Own<3>>
+{
+    static constexpr bool is_specialized = true, is_integer = false, is_bounded = true, is_exact = false;
+    static constexpr int radix = 2;
+    static constexpr int digits = 53;
+    static constexpr Own<3> epsilon() { return Own<3>(std::numeric_limits<double>::epsilon()); }
+    static constexpr Own<3> max() { return Own<3>((std::numeric_limits<double>::max)()); }
+};
+
+template<>
+struct std::numeric_limits<Own<4>>
+{
+    static constexpr bool is_specialized = true, is_integer = false, is_bounded = true, is_exact = false;
+    static constexpr int radix = 2;
+    static constexpr int digits = 53;
+    static constexpr Own<4> max() { return Own<4>((std::numeric_limits<double>::max)()); }
+    static constexpr Own<4> denorm_min() { return Own<4>(std::numeric_limits<double>::denorm_min()); }
+};
+
+template<>
+struct std::numeric_limits<Own<5>>
+{
+    static constexpr bool is_specialized = true, is_integer = false, is_bounded = true, is_exact = false;
+    static constexpr int radix = 2;
+    static constexpr int digits = 53;
+    static constexpr Own<5> epsilon() { return Own<5>(std::numeric_limits<double>::epsilon()); }
+    static constexpr Own<5> denorm_min() { return Own<5>(std::numeric_limits<double>::denorm_min()); }
+};
+
+template<>
+struct std::numeric_limits<NoCopy<>> : std::numeric_limits<double>
+{
+    static NoCopy<> epsilon() { return NoCopy<>(0); }
+    static NoCopy<> max() { return NoCopy<>(1); }
+};
+
+static_assert(nxx::real<Own<0>>);
+static_assert(!nxx::real<Own<1>>, "no radix");
+static_assert(!nxx::real<Own<2>>, "no digits");
+static_assert(!nxx::real<Own<3>>, "no denorm_min");
+static_assert(!nxx::real<Own<4>>, "no epsilon");
+static_assert(!nxx::real<Own<5>>, "no max");
+static_assert(!nxx::real<Own<6>>, "radix 1");
+static_assert(!nxx::real<NoCopy<>>, "not copyable");
+
 static_assert(nxx::math::abs(-2.5) == 2.5 && nxx::math::abs(2.5) == 2.5 && nxx::math::abs(0.0) == 0.0);
 static_assert(nxx::math::isfinite(0.0) && nxx::math::isfinite(std::numeric_limits<double>::max()));
 static_assert(nxx::math::isfinite(std::numeric_limits<double>::denorm_min()));

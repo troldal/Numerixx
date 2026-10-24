@@ -17,20 +17,30 @@ namespace nxx {
     /**
      * @brief A real-number type: a built-in floating-point type, or a user type such as a Boost.Multiprecision number.
      *
-     * The type specialises std::numeric_limits as bounded, inexact and non-integer, so it has a finite max() and a
-     * positive epsilon(). It is constructible from int and totally ordered, and its + - * / and unary minus return
-     * something convertible to the type, so expression templates are allowed. Exact types such as rationals are
-     * rejected.
+     * The type specialises std::numeric_limits as bounded, inexact and non-integer, with the members the library
+     * reads: radix (at least 2) and digits (at least 1) as constant expressions, epsilon() and max() convertible to
+     * the type, and denorm_min() from which the type can be constructed. It is constructible from int, copyable and
+     * totally ordered, and its + - * / and unary minus return something convertible to the type, so expression
+     * templates are allowed. Exact types such as rationals are rejected.
      *
      * @tparam T The candidate type.
      */
     // Constructible from int, because constants are written T(1), T(2): a double literal would silently lose
     // precision in a wider type. The operators' results need only convert to T, because Boost.Multiprecision with
-    // expression templates returns an expression object from a + b, not a T.
+    // expression templates returns an expression object from a + b, not a T. The numeric_limits members are those the
+    // headers read: radix and digits in constant expressions (a static_assert and the float-warning constraint), radix
+    // at least 2 because root_epsilon and the overflow guards scale by it; epsilon() and max() are copy-initialised
+    // into T, while denorm_min() is read as T(denorm_min()), so a type that inherits numeric_limits<double> and
+    // constructs from double only explicitly is accepted.
     template<typename T>
     concept real = std::numeric_limits<T>::is_specialized && !std::numeric_limits<T>::is_integer
                    && std::numeric_limits<T>::is_bounded && !std::numeric_limits<T>::is_exact
-                   && std::constructible_from<T, int> && std::totally_ordered<T> && requires(T const a, T const b) {
+                   && std::constructible_from<T, int> && std::copyable<T> && std::totally_ordered<T>
+                   && requires(T const a, T const b) {
+                          requires std::numeric_limits<T>::radix >= 2 && std::numeric_limits<T>::digits >= 1;
+                          { std::numeric_limits<T>::epsilon() } -> std::convertible_to<T>;
+                          { (std::numeric_limits<T>::max)() } -> std::convertible_to<T>;
+                          requires std::constructible_from<T, decltype(std::numeric_limits<T>::denorm_min())>;
                           { a + b } -> std::convertible_to<T>;
                           { a - b } -> std::convertible_to<T>;
                           { a * b } -> std::convertible_to<T>;
