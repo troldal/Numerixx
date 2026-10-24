@@ -11,3 +11,5 @@
 *.toc
 acs-*.bib
 main.pdf
+# Python's cache from tools/check.py
+tools/__pycache__/
