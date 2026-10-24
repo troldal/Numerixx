@@ -501,9 +501,10 @@ type and evaluator.
 
 ### In the code
 
-The stencils are three class templates, `Central<P>` (even P from 2 to 10), `Forward<P>` and `Backward<P>` (P from 1
-to 6). They are empty: the type only names the rule. The caps are numerical: beyond `Central<10>` the gain is under
-half a digit even for 50-digit types, and the one-sided rounding factor S is already 27.7 at P = 6.
+The stencils are three class templates, `Central<P>` (even P from 2 to 10), `Forward<P>` and `Backward<P>` (P from 1 to
+6). They are empty: the type only names the rule. The caps are design decisions: beyond `Central<10>` the model's gain
+is about 0.2 digit for f' in double and 0.7 in a 50-digit type, and the one-sided rounding factor S is already
+27.7 at P = 6.
 
 **The tables** are computed at compile time by `detail::make_table<N>`, for the N-th derivative (section 10). Each
 family only supplies its nodes, and one generator turns nodes into weights by the Lagrange formula: the weight of node
@@ -538,7 +539,7 @@ before it is added to the sum.
 
 **The default step** is `root_epsilon<P + 1>() * max(|x|, 1)` for f', as derived above, without the stencil's
 constant `(S / (p C))^(1/(p+1))`. Those constants lie between 1.4 and 2.0, and leaving one out costs at most a factor
-1.64 in error. For the N-th derivative it is `root_epsilon<P + N>()` (section 10).
+of about 1.6 in error (1.63 for `Central<10>`). For the N-th derivative it is `root_epsilon<P + N>()` (section 10).
 
 ## 9. Ridders' extrapolation
 

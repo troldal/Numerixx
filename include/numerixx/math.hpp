@@ -80,38 +80,38 @@ namespace nxx {
             static_assert(N >= 2);
             T const radix = static_cast<T>(std::numeric_limits<T>::radix);
 
-            // Multiplying by a power of the radix changes only the exponent, so a and scale stay exact, and
-            // eps = a / scale^N gives eps^(1/N) = a^(1/N) / scale. For double and N = 3, 2^-52 becomes a = 0.5 with
-            // scale = 2^17. Each step tries a * radix^N one factor of radix at a time and stops as soon as the value
-            // passes 1, so no intermediate exceeds radix: forming radix^N itself would overflow for large N (2^128 for
-            // float), which constant evaluation rejects. For such N no step is taken, and a stays eps.
-            T a = std::numeric_limits<T>::epsilon();
+            // Multiplying by a power of the radix changes only the exponent, so scaled and scale stay exact, and eps =
+            // scaled / scale^N gives eps^(1/N) = scaled^(1/N) / scale. For double and N = 3, 2^-52 becomes scaled = 0.5
+            // with scale = 2^17. Each step tries scaled * radix^N one factor of radix at a time and stops as soon as
+            // the value passes 1, so no intermediate exceeds radix: forming radix^N itself would overflow for large N
+            // (2^128 for float), which constant evaluation rejects. For such N no step is taken, and scaled stays eps.
+            T scaled = std::numeric_limits<T>::epsilon();
             T scale = T(1);
             while (true) {
-                T b = a;
-                for (int i = 0; i < N && b <= T(1); ++i) b = b * radix;
-                if (!(b <= T(1))) break;
-                a = b;
+                T trial = scaled;
+                for (int i = 0; i < N && trial <= T(1); ++i) trial = trial * radix;
+                if (!(trial <= T(1))) break;
+                scaled = trial;
                 scale = scale * radix;
             }
 
-            // Newton's iteration for y^N = a: y <- y + (a / y^(N-1) - y) / N. From y = 1, at or above the root
-            // since a <= 1, every iterate stays above the root (by the inequality of arithmetic and geometric means)
-            // and decreases; in floating point it stops decreasing once it reaches the root to within rounding. The
-            // scaling put the root in (1/radix, 1], so this takes a few steps; started from 1 against eps itself, it
-            // would take dozens. y^(N-1) cannot underflow: if a was scaled, then radix^N <= 1/eps and y > 1/radix, so
-            // y^(N-1) > radix^(1-N) >= radix eps; otherwise a = eps and y^(N-1) >= eps^((N-1)/N) >= eps.
+            // Newton's iteration for y^N = scaled: y <- y + (scaled / y^(N-1) - y) / N. From y = 1, at or above the
+            // root since scaled <= 1, every iterate stays above the root (by the inequality of arithmetic and geometric
+            // means) and decreases; in floating point it stops decreasing once it reaches the root to within rounding.
+            // The scaling put the root in (1/radix, 1], so this takes a few steps; started from 1 against eps itself,
+            // it would take dozens. y^(N-1) cannot underflow: if eps was scaled, then radix^N <= 1/eps and y > 1/radix,
+            // so y^(N-1) > radix^(1-N) >= radix eps; otherwise scaled = eps and y^(N-1) >= eps^((N-1)/N) >= eps.
             //
-            // The update is written as a correction to y. Near the root a / y^(N-1) - y is exact (the operands are
-            // within a factor 2), and the rounding errors of a / y^(N-1), up to about N/2 ulps from the N - 1
-            // products, are divided by N, so the result is within an ulp: at most 0.58 ulps for float and double,
-            // N = 2 ... 5000, against 60-digit roots. The textbook form ((N - 1) y + a / y^(N-1)) / N rounds a sum
-            // of size N y, worth up to an ulp of y, so its stopping test could fire 1.8 ulps above the root.
+            // The update is written as a correction to y. Near the root scaled / y^(N-1) - y is exact (the operands are
+            // within a factor 2), and the rounding errors of scaled / y^(N-1), up to about N/2 ulps from the N - 1
+            // products, are divided by N, so the result is within an ulp: at most 0.58 ulps for float and double, N = 2
+            // ... 5000, against 60-digit roots. The textbook form ((N - 1) y + scaled / y^(N-1)) / N rounds a sum of
+            // size N y, worth up to an ulp of y, so its stopping test could fire 1.8 ulps above the root.
             T y = T(1);
             while (true) {
                 T y_n1 = T(1);
                 for (int i = 1; i < N; ++i) y_n1 = y_n1 * y;
-                T const next = T(y + T(a / y_n1 - y) / T(N));
+                T const next = T(y + T(scaled / y_n1 - y) / T(N));
                 if (!(next < y)) break;
                 y = next;
             }

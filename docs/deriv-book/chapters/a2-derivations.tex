@@ -181,8 +181,8 @@ for \code{Central<2>} and $f'$ it is \num{\valStepCostCentralTwoFirst}. For the 
 \code{Central<2>}, and the cost by \cref{eq:derivations-cost} is \num{\valStepCostCentralTwoSecond} and
 \num{\valStepCostCentralTwoFourth}; for \code{Central<4>} and $f''''$ it is \num{\valStepCostCentralFourFourth}, the
 largest of the four rules the design record quotes. These agree with the design record's figures of 3.5, 11 and 15
-(\code{docs/PHASE4_API.md}); the ``at most a factor 1.64'' of the library's documentation for $f'$ is the cost at
-$\kappa$ rounded to 1.8 (\code{Central<10>}, where the unrounded $\kappa$ gives \num{\valStepCostCentralTenFirst}).
+(\code{docs/PHASE4_API.md}); the library's documentation gives the bound for $f'$ as about 1.6, and \num{\valStepCostCentralTenFirst} for
+\code{Central<10>}.
 They are model figures for a function that varies on the scale $\scale$ exactly. The design record's prototype
 (\code{docs/PHASE4_API.md}) reports the opposite experience on nine test functions that vary faster than $\scale$:
 half the default step was better for every order, by a factor 1.2 to 1.8 for \code{Central<2>}, which is why the

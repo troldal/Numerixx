@@ -5,7 +5,8 @@
  * derivative<M, N>() estimates the N-th derivative of fn at x from values of fn near x, by a method M: a stencil,
  * `Central<P>`, or `Forward<P>` and `Backward<P>` where fn is defined on one side of x only; or `Ridders`, which adapts
  * the step and also estimates the error. N is 1 by default, an integer or an `order`. Every method returns a
- * std::expected<Estimate<T>, error>; Numerixx itself never throws.
+ * std::expected<Estimate<T>, error>; Numerixx itself never throws, but the result's own value() throws
+ * std::bad_expected_access on a failure, so test the result and read it with `->` or `*`.
  *
  * @code
  * auto const d = nxx::deriv::derivative<nxx::deriv::Ridders>([](double x) { return std::exp(x); }, 1.0);
@@ -41,7 +42,9 @@ namespace nxx::deriv {
     enum class error {
         /**
          * No finite estimate: x is not finite, fn returned an infinite or NaN value, a difference, term, sum or
-         * quotient would overflow, a point x + k h would overflow, or h is below the resolution of x.
+         * quotient would overflow, a point x + k h would overflow, or h is below the resolution of x: for the two-node
+         * rules of f' (`Central<2>`, `Forward<1>`, `Backward<1>`) when their two points coincide, for every other rule
+         * when x + h or x - h rounds to x.
          */
         non_finite
     };
@@ -49,9 +52,10 @@ namespace nxx::deriv {
     /**
      * @brief A derivative estimate: the value, and an estimate of its absolute error when the method provides one.
      *
-     * Converts implicitly to T. Where a conversion is not considered (auto, std::format, and the operator templates of
-     * Boost.Multiprecision), write `e.value` or `T(e)`. The conversion also applies where it may surprise: `if (*r)`
-     * tests the value against 0, not whether there is a result, and `int n = *r` truncates the value.
+     * Converts implicitly to T. Where a conversion is not considered (auto, std::format, and the arithmetic operator
+     * templates of Boost.Multiprecision, whose comparisons do accept it), write `e.value` or `T(e)`. The conversion
+     * also applies where it may surprise: `if (*r)` tests the value against 0, not whether there is a result (and Clang
+     * rejects it under -Wfloat-conversion with -Werror; write `r->value != 0`), and `int n = *r` truncates the value.
      *
      * @code
      * auto const r = nxx::deriv::derivative<nxx::deriv::Ridders>(fn, 1.0);
@@ -102,7 +106,8 @@ namespace nxx::deriv {
         /**
          * @brief Whether `Central<p>` exists: p even, 2 <= p <= 10.
          *
-         * Beyond the cap the gain is under half a digit even for 50-digit types.
+         * The cap is a design decision, not a measured limit: by the model's exponent alone, `Central<12>` would gain
+         * about 0.2 digit for f' in double and 0.7 in a 50-digit type.
          *
          * @param p The accuracy order.
          * @return true if the order is accepted.
@@ -112,8 +117,9 @@ namespace nxx::deriv {
         /**
          * @brief Whether `Forward<p>` and `Backward<p>` exist: 1 <= p <= 6.
          *
-         * Beyond the cap the rounding amplification, the sum of the absolute weights, is too large (27.7 for p = 6
-         * and the first derivative, 4019 for the fourth).
+         * The cap is a design decision: the rounding amplification, the sum of the absolute weights, is already 27.7
+         * for p = 6 and the first derivative (4019 for the fourth) and grows about as fast as the order pays; by the
+         * model, `Forward<7>` would lower the best error for f' by about 14 % and `Forward<8>` not at all.
          *
          * @param p The accuracy order.
          * @return true if the order is accepted.
@@ -379,11 +385,11 @@ namespace nxx::deriv {
          *     w_k = n! [t^n] prod_{j != k} (t - n_j) / (n_k - n_j),
          *
          * the n-th derivative at 0 of the polynomial that interpolates fn at the nodes. Equivalently, they solve the
-         * moment conditions M_j = sum_k w_k n_k^j = 0 for j != n up to n + p - 1, and M_n = n!; Chapra derives the
-         * same rules from Taylor series. Each weight is computed in exact rational arithmetic (long long, reduced
-         * with gcd), then all are put over their lcm, so that the table holds integers only. The largest
-         * intermediate is 12! times 4! (`Central<10>`, n = 4), far inside long long, and every value must fit 24
-         * bits, which keeps it exact in float (the largest numerator is 6,222,216).
+         * moment conditions M_j = sum_k w_k n_k^j = 0 for j != n up to n + p - 1, and M_n = n!; Chapra derives the same
+         * rules from Taylor series. Each weight is computed in exact rational arithmetic (long long, reduced with gcd),
+         * then all are put over their lcm, so that the table holds integers only. The largest intermediate is 12!
+         * (`Central<10>`, n = 4; 12! times 4! bounds it), far inside long long, and every value must fit 24 bits, which
+         * keeps it exact in float (the largest numerator is 6,222,216).
          *
          * Worked example, `Central<4>` for f' on the nodes -2, -1, 1, 2: for the node -1, prod_{j != k} (t - n_j) =
          * (t + 2)(t - 1)(t - 2) = t^3 - t^2 - 4t + 4, whose t^1 coefficient is -4, and prod (n_k - n_j) =
@@ -514,14 +520,14 @@ namespace nxx::deriv {
          * A rule of order p has truncation error O(h^p) and rounding error O(eps / h^N), and this step balances the
          * two, scaled so that the step is relative for large |x|.
          *
-         * In detail, the error is about C h^p |f^(p+N)| + S eps |f| / h^N, where C is the stencil's error constant
-         * and S the sum of its absolute weights. It is smallest at h = (N S eps |f| / (p C |f^(p+N)|))^(1/(p+N)),
-         * with an error of order eps^(p/(p+N)). f and its derivatives are unknown, so the step assumes that f varies
-         * on the scale max(|x|, 1) and drops the constant (N S / (p C))^(1/(p+N)). For f' that constant lies between
-         * 1.4 and 2.0 and costs at most a factor 1.64 in error; for higher N it costs more by the model (3.5 for
-         * `Central<2>` and f'', 11 for f''''), but test functions that vary faster than max(|x|, 1) did better with
-         * smaller steps for every order, so the convention is kept. For `Central<2>`: h = eps^(1/3) * max(|x|, 1)
-         * for f', eps^(1/4) * max(|x|, 1) for f''.
+         * In detail, the error is about C h^p |f^(p+N)| + S eps |f| / h^N, where C is the stencil's error constant and
+         * S the sum of its absolute weights. It is smallest at h = (N S eps |f| / (p C |f^(p+N)|))^(1/(p+N)), with an
+         * error of order eps^(p/(p+N)). f and its derivatives are unknown, so the step assumes that f varies on the
+         * scale max(|x|, 1) and drops the constant (N S / (p C))^(1/(p+N)). For f' that constant lies between 1.4 and
+         * 2.0 and costs at most a factor of about 1.6 in error (1.63 for `Central<10>`); for higher N it costs more by
+         * the model (3.5 for `Central<2>` and f'', 11 for f''''), but test functions that vary faster than max(|x|, 1)
+         * did better with smaller steps for every order, so the convention is kept. For `Central<2>`: h = eps^(1/3) *
+         * max(|x|, 1) for f', eps^(1/4) * max(|x|, 1) for f''.
          *
          * @tparam Exponent p + N.
          * @tparam T The real type.
@@ -1377,7 +1383,11 @@ namespace nxx::deriv {
      * fn is called once per node of a stencil, and only at finite points; Ridders calls it 2 or 4 times per level, at
      * most 64 to 129 times. Failures are detected before the arithmetic that would produce them, so they are error
      * values in constant expressions too, except an overflow of a final quotient, which GCC rejects at compile time.
-     * Exceptions thrown by fn or by T pass through unchanged.
+     * Exceptions thrown by fn or by T pass through unchanged, and the result's value() throws on a failure.
+     *
+     * fn is assumed smooth on the points the method samples: a kink or a jump among them gives a wrong value without
+     * an error. A kink at x itself is invisible even to Ridders' estimate: a central rule returns the mean of the two
+     * one-sided slopes there, and Ridders converges to it.
      *
      * @code
      * auto const d3 = derivative<Central<2>, order::third>(fn, x, h); // f''' on x +- h, x +- 2h: Chapra's O(h^2)

@@ -53,12 +53,13 @@ Decisions in force. Each one says why; change it here before changing the code.
   done. The defaulted `==` compares both members; without it, `==` would compare only the values, through the
   conversion.
 - Stencils are the class templates `Central<P>` (even P, 2 to 10), `Forward<P>` and `Backward<P>` (1 to 6), the first
-  template argument of `derivative`, defaulting to `Central<2>` (`PHASE2_API.md`). P is the accuracy order, the
-  O(h^P) of the error, not the number of points: for the N-th derivative `Central<P>` has P + N - 1 nodes (without 0
-  for odd N), the one-sided rules P + N. They are empty tags; their tables are internal (`detail::make_table<N>`),
-  because no current use needs user-written stencils. The caps are numerical and the same for every N: beyond
-  `Central<10>` the gain is under half a digit even for 50-digit types, and the one-sided rounding factor
-  `S = sum |w| / den` is 27.7 at P = 6 for f' (4019 for f'''').
+  template argument of `derivative`, defaulting to `Central<2>` (`PHASE2_API.md`). P is the accuracy order, the O(h^P)
+  of the error, not the number of points: for the N-th derivative `Central<P>` has P + N - 1 nodes (without 0 for odd
+  N), the one-sided rules P + N. They are empty tags; their tables are internal (`detail::make_table<N>`), because no
+  current use needs user-written stencils. The caps are the same for every N and are design decisions, not measured
+  limits: by the model's exponent alone, `Central<12>` would gain about 0.2 digit for f' in double and 0.7 in a 50-digit
+  type, and the one-sided rounding factor `S = sum |w| / den`, 27.7 at P = 6 for f' (4019 for f''''), grows about as
+  fast as the order pays (`Forward<7>` would lower the best error for f' by about 14 %, `Forward<8>` not at all).
 - The weights of every rule come from one consteval generator, the Lagrange formula
   `w_k = N! [t^N] prod_{j != k} (t - n_j) / (n_k - n_j)` (Burden et al.), in exact long long arithmetic over one common
   denominator; each family only supplies its nodes. It replaced the Phase 2 closed forms, which it reproduces bit for
@@ -109,11 +110,11 @@ Decisions in force. Each one says why; change it here before changing the code.
   is a `static_assert`.
 - The default step is `eps^(1/(p+N)) * max(|x|, 1)` for a rule of order p and the N-th derivative. It balances
   truncation error (O(h^p)) against rounding error (O(eps / h^N)) when fn varies on a scale of `max(|x|, 1)`, giving an
-  error of about `eps^(p/(p+N))`. The constant `(N S / (p C))^(1/(p+N))` is left out. For f' it lies between 1.4 and
-  2.0 and costs at most a factor 1.64; for higher orders it costs more by the model (3.5 for `Central<2>` and f'', 11
-  for f''''), but on test functions that vary faster than `max(|x|, 1)` half the default step was better for every
-  order, f' included, so one convention is kept for all N. Callers pass a step when fn varies faster; the sensitivity
-  grows with N.
+  error of about `eps^(p/(p+N))`. The constant `(N S / (p C))^(1/(p+N))` is left out. For f' it lies between 1.4 and 2.0
+  and costs at most a factor of about 1.6 (1.63 for `Central<10>`); for higher orders it costs more by the model (3.5
+  for `Central<2>` and f'', 11 for f''''), but on test functions that vary faster than `max(|x|, 1)` half the default
+  step was better for every order, f' included, so one convention is kept for all N. Callers pass a step when fn varies
+  faster; the sensitivity grows with N.
 - The two-point difference is one helper, `detail::difference`, returning the value and the values and spacing for the
   rounding floor `(eps |f_lo| + eps |f_hi|) / (x_hi - x_lo)`; the two-node stencils and every f' Ridders level use it,
   as `detail::second_difference` serves `Central<2>` for f'' and the f'' Ridders levels.

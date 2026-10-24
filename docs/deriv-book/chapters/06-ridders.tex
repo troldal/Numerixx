@@ -213,7 +213,7 @@ relative estimate is \num{\valKinkInsideRiddersRelEstimate}, ten orders of magni
 \num{\valKinkOutsideRiddersRelEstimate} it reports \SI{\valKinkOutsideDelta}{\kelvin} from the break
 (\cref{sec:using-pitfalls}, \cref{fig:kink}). The estimate flags a jump; the stencil does not. A kink, a jump in
 $f'$ with $f$ continuous, at $x$ itself shows no symptom at all: the central difference of $c \abs{t}$ is exactly
-zero at every step, so every rule returns the mean of the two one-sided slopes plus the smooth part's own error,
+zero at every step, so every central rule returns the mean of the two one-sided slopes plus the smooth part's own error,
 Ridders' tableau converges to that mean with its estimate at the floor, and nothing in the samples can show it;
 know the branch boundaries and differentiate the branch you mean (\cref{sec:using-pitfalls}).
 

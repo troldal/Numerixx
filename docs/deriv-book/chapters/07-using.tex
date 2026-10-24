@@ -382,8 +382,8 @@ value, is far above its usual size (\num{\valKinkOutsideRiddersRelEstimate} of t
 extrapolation assumes an error expansion in even powers of $h$, which the break destroys, so the tableau's entries
 disagree. At \SI{\valKinkOutsideDelta}{K} from the break, outside every span, all three errors are at most
 \num{\valKinkOutsideCentralRelError} (measured, \cref{fig:kink}). Evaluable is not smooth. \emph{Symptom:} a large
-estimate from Ridders' method, or stencil values that change with the step; a kink at $x$ itself shows no symptom at
-all, since every rule returns the mean of the two slopes (\cref{sec:ridders-trust}). \emph{Cure:} know the branch
+estimate from Ridders' method, or stencil values that change with the step; a kink at $x$ shows no symptom at all:
+central rules return the mean of the two slopes (\cref{sec:ridders-trust}). \emph{Cure:} know the branch
 boundaries, and differentiate the branch you mean, with \code{Forward<P>} above a break or \code{Backward<P>} below
 it, or the branch's own function.
 
