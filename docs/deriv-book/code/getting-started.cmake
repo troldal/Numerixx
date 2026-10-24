@@ -6,7 +6,7 @@ include(FetchContent)
 # a tag or a full commit hash; CMake 3.25 or later
 FetchContent_Declare(numerixx
     GIT_REPOSITORY https://github.com/troldal/Numerixx.git
-    GIT_TAG        aeec7e6f9367591d1a3eadde3d79a3a59ed78648)
+    GIT_TAG        e155191a63a967f8b5a8466711c6cd1802c29a8e)
 FetchContent_MakeAvailable(numerixx)
 
 add_executable(app main.cpp)
