@@ -75,7 +75,7 @@ $x + h$ crosses a power of two (the two-sided spacing of \cref{sb:ulp}). Two con
 \cref{ch:rounding}. A step below $\ulp(x) / 2$ does not move $x$. If neither $x + h$ nor $x - h$ moves, the library
 reports \code{error::non_finite}. If only one moves, as can happen near a power of two, a two-node rule for $f'$
 returns a finite value that is mostly rounding, and every other rule reports \code{non_finite}
-(\cref{sb:ulp,sec:api-derivative}). Hence the precondition: a step well above $\ulp(x)$. And for any step the distance
+(\cref{sb:ulp,sec:api-derivative}). Hence the requirement: a step well above $\ulp(x)$. And for any step the distance
 between the two points of the central difference is not exactly $2h$, which is why the two-node rules divide by the
 distance actually evaluated (\cref{sb:actual-distance}).
 

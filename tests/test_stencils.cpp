@@ -153,8 +153,8 @@ static_assert(derivative<Backward<1>>(saturating, -(dmax - 0x1p+971), 0x1.8p+971
 static_assert(derivative<Backward<2>>(power<1>, -1.0, 0x1.8p-54) == non_finite);
 static_assert(derivative<Central<4>>(power<1>, -1.0, 0x1.8p-54) == non_finite);
 
-// Regression: a non-finite x with the default step gave a NaN or infinite step, and a NaN step tripped the h > 0
-// precondition (an abort in debug builds, a compile error in constant expressions) instead of returning non_finite.
+// Regression: a non-finite x with the default step gave a NaN or infinite step, which aborted in debug builds and was
+// a compile error in constant expressions; the x check comes first, so these are error values.
 namespace {
     constexpr double qnan = std::numeric_limits<double>::quiet_NaN();
     constexpr double inf = std::numeric_limits<double>::infinity();

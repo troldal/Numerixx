@@ -71,9 +71,14 @@ Decisions in force. Each one says why; change it here before changing the code.
   bit (checked once when it was introduced): the one-sided rules of higher orders have no short closed form, so one
   generator builds every family and order. Every value must fit 24 bits, exact in float (the largest numerator is
   6,222,216), or constant evaluation fails.
-- The one error so far is `non_finite`: x is not finite, fn returned an infinite or NaN value, a difference, term,
-  sum or quotient would overflow, a point `x + k h` would overflow, or h is below the resolution of x. Its
-  documentation reserves more values. A non-positive or non-finite step is a precondition violation (`assert`).
+- The one error so far is `non_finite`: x is not finite, the step is not positive and finite, fn returned an
+  infinite or NaN value, a difference, term, sum or quotient would overflow, a point `x + k h` would overflow, or h
+  is below the resolution of x. Its documentation reserves more values, and says that a listed cause may move to a
+  new one. A step that is not positive and finite was first a precondition (`assert`); it is now validated, because
+  `derivative` is the public boundary and a step is often computed from data: under `NDEBUG` the assert vanished,
+  and then `Forward<1>` with a negative step returned a backward difference (`Backward<1>` a forward one), a step
+  of -inf made the two-node rules call fn at infinite points, and in a constant expression a bad step was a
+  compile error, not a value. One comparison per call.
 - Failures are detected before the arithmetic that would produce them: with `K = max |node|` and `Q = max(2K, den)`,
   the input check `h <= max / 2Q` and `|x| <= max - Q h` keeps every point at least about `K h` below max and the
   divisor finite (for `Central<2>`, Q = 2: `h <= max/4`, `|x| <= max - 2h`). The margin matters: with Q = K, rounding
@@ -98,8 +103,9 @@ Decisions in force. Each one says why; change it here before changing the code.
   `static_cast<T>` before any arithmetic, so expression templates do not escape. Every call is
   `std::invoke(fn, point)` with `point` a `T const` lvalue, exactly what the constraint promises: member-function
   pointers work, and so do callables that reject rvalues.
-- The default-step overload rejects a non-finite x before computing the step: a NaN x would give a NaN step and trip
-  the `h > 0` precondition, which stays an `assert` for caller-supplied steps.
+- The default-step overload rejects a non-finite x before computing the step, so that it is an error value in
+  constant expressions too: the step would be NaN or infinite, and Clang rejects arithmetic that produces a NaN at
+  compile time.
 - The step parameter is `std::type_identity_t<T>`, so `T` is deduced from `x` alone and a `double` step converts to a
   multiprecision `T`.
 - Two-node rules (`Central<2>`, `Forward<1>`, `Backward<1>`, f' only) divide by the distance between the points
@@ -123,8 +129,8 @@ Decisions in force. Each one says why; change it here before changing the code.
   faster; the sensitivity grows with N.
 - `default_step<M, N>(x)` returns the step that `derivative<M, N>(fn, x)` uses (for Ridders, the initial step), so a
   caller can repeat a rule at 2h and h/2 or apply it by hand without rebuilding the formula. The overload without a
-  step calls it, so the two calls give the same result for every finite x; a non-finite x is a precondition
-  violation (an `assert`), as a bad step is.
+  step calls it, so the two calls give the same result for every x: a non-finite x gives a non-finite step, and both
+  return `non_finite`.
 - The two-point difference is one helper, `detail::difference`, returning the value and the values and spacing for the
   rounding floor `(eps |f_lo| + eps |f_hi|) / (x_hi - x_lo)`; the two-node stencils and every f' Ridders level use it,
   as `detail::second_difference` serves `Central<2>` for f'' and the f'' Ridders levels.

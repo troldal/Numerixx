@@ -222,7 +222,7 @@ difference can be formed, and the library reports \code{error::non_finite}. Near
 differs on the two sides: below $2^e$ the numbers are twice as dense as above it, so a step can move $x$ downwards
 and not upwards. The central difference then divides by the half-spacing that remains and returns a finite value
 that is mostly rounding, without failing. The rules with more than two nodes check both $x + h$ and $x - h$ and fail
-instead (\cref{sec:api-derivative}). Hence the documented precondition: a step well above $\ulp(x)$.
+instead (\cref{sec:api-derivative}). Hence the documented requirement: a step well above $\ulp(x)$.
 \end{sidebar}
 
 \section{When the default step is wrong: the scale of $f$}\label{sec:rounding-scale}

@@ -211,3 +211,57 @@ TEST_CASE("deriv: default_step is the step of the default-step call")
     CHECK(agrees_for_methods<4>(bin50(-3)));
     CHECK(agrees_for_methods<4>(bin50_et(1000)));
 }
+
+
+// A step that is not positive and finite is an error value, before fn is called, in constant expressions and at run
+// time alike (U-6): zero, -0.0, a negative step, NaN and both infinities, for the two-node and multi-node rules, the
+// one-sided rules, and Ridders, including the f'' paths that evaluate fn(x) first.
+namespace {
+
+    constexpr double inf_step = std::numeric_limits<double>::infinity();
+    constexpr double nan_step = std::numeric_limits<double>::quiet_NaN();
+
+    template<typename M, int N, typename F>
+    constexpr bool rejects_bad_steps(F const &fn)
+    {
+        auto const rejected = [&fn](double h) {
+            return derivative<M, N>(fn, 1.0, h) == std::unexpected(nxx::deriv::error::non_finite);
+        };
+        return rejected(0.0) && rejected(-0.0) && rejected(-0.25) && rejected(nan_step) && rejected(inf_step)
+               && rejected(-inf_step);
+    }
+
+} // namespace
+
+static_assert(rejects_bad_steps<nxx::deriv::Central<2>, 1>(cube) && rejects_bad_steps<nxx::deriv::Central<2>, 2>(cube));
+static_assert(rejects_bad_steps<nxx::deriv::Central<4>, 1>(cube) && rejects_bad_steps<nxx::deriv::Forward<1>, 1>(cube));
+static_assert(rejects_bad_steps<nxx::deriv::Backward<1>, 1>(cube) && rejects_bad_steps<nxx::deriv::Ridders, 1>(cube));
+static_assert(rejects_bad_steps<nxx::deriv::Ridders, 2>(cube));
+
+// default_step agrees with the default-step call at a non-finite x too: an infinite x gives an infinite step, and both
+// calls return non_finite. (A NaN x gives a NaN step, which Clang does not compute in a constant expression: below.)
+static_assert(derivative(cube, inf_step) == derivative(cube, inf_step, default_step(inf_step)));
+static_assert(derivative<nxx::deriv::Ridders>(cube, -inf_step)
+              == derivative<nxx::deriv::Ridders>(cube, -inf_step, default_step<nxx::deriv::Ridders>(-inf_step)));
+
+TEST_CASE("deriv: a step that is not positive and finite is an error, and fn is not called")
+{
+    int calls = 0;
+    auto const counted = [&calls](double x) {
+        ++calls;
+        return x * x * x;
+    };
+    CHECK(rejects_bad_steps<nxx::deriv::Central<2>, 1>(counted));
+    CHECK(rejects_bad_steps<nxx::deriv::Central<2>, 2>(counted));
+    CHECK(rejects_bad_steps<nxx::deriv::Central<4>, 1>(counted));
+    CHECK(rejects_bad_steps<nxx::deriv::Forward<1>, 1>(counted));
+    CHECK(rejects_bad_steps<nxx::deriv::Backward<1>, 1>(counted));
+    CHECK(rejects_bad_steps<nxx::deriv::Ridders, 1>(counted));
+    CHECK(rejects_bad_steps<nxx::deriv::Ridders, 2>(counted));
+    CHECK(calls == 0);
+
+    // default_step at a NaN x: a NaN step, and non_finite from both calls.
+    CHECK(derivative(cube, nan_step) == derivative(cube, nan_step, default_step(nan_step)));
+    CHECK(derivative<nxx::deriv::Ridders, 2>(cube, nan_step)
+          == derivative<nxx::deriv::Ridders, 2>(cube, nan_step, default_step<nxx::deriv::Ridders, 2>(nan_step)));
+}

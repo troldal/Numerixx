@@ -20,7 +20,6 @@
 #include <numerixx/math.hpp>
 
 #include <array>
-#include <cassert>
 #include <concepts>
 #include <cstddef>
 #include <expected>
@@ -37,14 +36,15 @@ namespace nxx::deriv {
     /**
      * @brief Why derivative() returned no estimate.
      *
-     * More values may be added; a switch on it should have a default.
+     * More values may be added, and a listed cause may move to a new value: a switch on it should have a default,
+     * and a caller should test for success rather than for a particular error.
      */
     enum class error {
         /**
-         * No finite estimate: x is not finite, fn returned an infinite or NaN value, a difference, term, sum or
-         * quotient would overflow, a point x + k h would overflow, or h is below the resolution of x: for the two-node
-         * rules of f' (`Central<2>`, `Forward<1>`, `Backward<1>`) when their two points coincide, for every other rule
-         * when x + h or x - h rounds to x.
+         * No finite estimate: x is not finite, the step is not positive and finite, fn returned an infinite or NaN
+         * value, a difference, term, sum or quotient would overflow, a point x + k h would overflow, or h is below the
+         * resolution of x: for the two-node rules of f' (`Central<2>`, `Forward<1>`, `Backward<1>`) when their two
+         * points coincide, for every other rule when x + h or x - h rounds to x.
          */
         non_finite
     };
@@ -1362,13 +1362,15 @@ namespace nxx::deriv {
          * @tparam F The callable type.
          * @param fn The function.
          * @param x The point.
-         * @param h The step, > 0 and finite.
+         * @param h The step.
          * @return The estimate, or error::non_finite.
          */
         template<typename M, int N, real T, typename F>
         constexpr std::expected<Estimate<T>, error> derivative_with_step(F &fn, T const &x, T const &h)
         {
-            assert(h > T(0) && math::isfinite(h)); // a bad step is a bug in the caller, not a run-time failure
+            // The step is the caller's input, often computed: validated here, before fn is called, the same way in
+            // debug and release builds and in constant expressions (comparisons only, so a NaN is no arithmetic).
+            if (!(h > T(0)) || !math::isfinite(h)) return std::unexpected(error::non_finite);
             if constexpr (std::same_as<M, Ridders>) {
                 if (!math::isfinite(x)) return std::unexpected(error::non_finite);
                 return detail::ridders<N>(fn, x, h);
@@ -1384,8 +1386,9 @@ namespace nxx::deriv {
      * @brief The step that `derivative<M, N>(fn, x)` uses when no step is passed.
      *
      * For a stencil of accuracy order P it is eps^(1/(P+N)) * max(|x|, 1); for Ridders it is the initial step,
-     * max(|x|, 1) / 32 for f' and max(|x|, 1) / 4 for f'' to f''''. For every finite x, `derivative<M, N>(fn, x)` and
-     * `derivative<M, N>(fn, x, default_step<M, N>(x))` give the same result, so a caller can repeat a rule at twice or
+     * max(|x|, 1) / 32 for f' and max(|x|, 1) / 4 for f'' to f''''. For every x, `derivative<M, N>(fn, x)` and
+     * `derivative<M, N>(fn, x, default_step<M, N>(x))` give the same result (for a non-finite x a non-finite step,
+     * and error::non_finite from both), so a caller can repeat a rule at twice or
      * half the default step, or apply it by hand, without rebuilding the formula.
      *
      * @code
@@ -1397,14 +1400,12 @@ namespace nxx::deriv {
      * @tparam N The derivative order: 1 (the default) to 4, an integer or an `order`.
      * @tparam T The real type, deduced from @p x.
      * @param x The point.
-     * @pre x finite.
-     * @return The step, positive and finite.
+     * @return The step: positive and finite for a finite x, otherwise not finite.
      */
     template<typename M = Central<2>, auto N = 1, real T>
     requires detail::method<M> && detail::valid_order<N>
     [[nodiscard]] constexpr T default_step(T const &x)
     {
-        assert(math::isfinite(x)); // a non-finite point is a bug in the caller, as a bad step is for derivative()
         constexpr int n = static_cast<int>(N);
         if constexpr (std::same_as<M, Ridders>) {
             constexpr int divisor = detail::ridders_divisors[static_cast<std::size_t>(n - 1)];
@@ -1431,7 +1432,8 @@ namespace nxx::deriv {
         template<typename M, int N, real T, typename F>
         constexpr std::expected<Estimate<T>, error> derivative_default(F &fn, T const &x)
         {
-            // Checked first: a NaN x would give a NaN step and trip the precondition.
+            // Checked first, so that a non-finite x is an error value in constant expressions too: its step would be
+            // NaN or infinite, and Clang rejects arithmetic that produces a NaN at compile time.
             if (!math::isfinite(x)) return std::unexpected(error::non_finite);
             // The public default_step, so that derivative(fn, x) and derivative(fn, x, default_step(x)) agree.
             return detail::derivative_with_step<M, N>(fn, x, nxx::deriv::default_step<M, N>(x));
@@ -1463,8 +1465,8 @@ namespace nxx::deriv {
      * @param fn The function to differentiate.
      * @param x The point.
      * @param h The step of a stencil, or the initial step of Ridders; it converts to T, so a double step works for a
-     *          multiprecision T.
-     * @pre h > 0 and h finite; for a stencil, h well above ulp(x).
+     *          multiprecision T. A step that is not positive and finite gives error::non_finite before fn is
+     *          called; a stencil needs h well above ulp(x).
      * @return The estimate of the derivative, with an error estimate for Ridders, or error::non_finite.
      */
     // h is a non-deduced context (type_identity_t), so T comes from x alone and a double step converts to a

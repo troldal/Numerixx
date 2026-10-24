@@ -33,7 +33,7 @@ $= 10^{-n}$ for $n$ figures, \code{atol} in the derivative's units decides near 
 test. Inside an iteration no check is needed.
 
 \qrhead{Failures.} \code{non_finite}: \code{x} not finite; \code{fn} infinite or NaN at a sample; an overflow; a step
-below the resolution of \code{x}. A step $\le 0$ is a bug (an \code{assert}, gone under \code{NDEBUG}). A float
+below the resolution of \code{x}; a step that is not positive and finite. A float
 fourth derivative warns at compile time.
 
 \qrhead{Methods} (relative accuracy in double at the default step).

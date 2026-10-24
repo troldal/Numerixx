@@ -88,10 +88,9 @@ Each has a twin with the additional constraint \code{detail::noisy<N, T>}, marke
 \paragraph{Parameters.} \code{fn}, the function to differentiate. \code{x}, the point. \code{h}, the step of a
 stencil, or the initial step of Ridders' method.
 
-\paragraph{Preconditions.} \code{h > 0} and \code{h} finite, checked by an \code{assert}: a bad step is a bug in the
-caller. Under \code{NDEBUG} the check is compiled out and the behaviour unspecified (\code{Forward<1>} with a
-negative step evaluates below $x$); validate a computed step, or use the overload without a step, which has no
-precondition. For a stencil, \code{h} well above $\ulp(x)$: a two-node rule fails only when its two points coincide,
+\paragraph{The step.} A step that is not positive and finite (zero, negative, NaN or infinite) returns
+\code{non_finite} before \code{fn} is called, in every build and in constant expressions. For a stencil, \code{h}
+well above $\ulp(x)$: a two-node rule fails only when its two points coincide,
 and near a power of two a step can move $x$ on one side only, so that \code{Central<2>} divides by a half-ulp distance
 and returns a finite value that is mostly rounding.
 
@@ -99,7 +98,7 @@ and returns a finite value that is mostly rounding.
 \code{root_epsilon<P + N, T>()} times the scale. For Ridders' method the initial step is
 $\max(\abs{x}, 1)/32$ for $f'$ and $\max(\abs{x}, 1)/4$ for $f''$ to $f''''$. \code{default_step} returns the step,
 so that \code{derivative<M, N>(fn, x)} and \code{derivative<M, N>(fn, x, default_step<M, N>(x))} give the same
-result; \code{x} must be finite (an \code{assert}):
+result for every \code{x} (for a non-finite \code{x}, \code{non_finite} from both):
 \begin{signature}
 \code{template<typename M = Central<2>, auto N = 1, real T>}\\
 \sigindent\code{requires detail::method<M> && detail::valid_order<N>}\\

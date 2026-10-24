@@ -176,8 +176,8 @@ Each guarantee below is stated with the hypothesis it rests on and with how it i
     values. An exception thrown by \code{fn} or by the operations of \code{T} passes through unchanged. Verified by
     inspection: the headers contain no \code{throw} and no \code{try}.
   \item \emph{Where \code{fn} is called.} Only at finite points: the overflow checks come before any point is formed.
-    A stencil calls \code{fn} once per node, and, for a step $h > 0$ (the precondition, an \code{assert} that
-    \code{NDEBUG} removes), \code{Forward<P>} never below $x$ and \code{Backward<P>} never above. Ridders' method
+    A stencil calls \code{fn} once per node, \code{Forward<P>} never below $x$ and \code{Backward<P>} never
+    above; a step that is not positive and finite returns \code{non_finite} before any call. Ridders' method
     calls it at most \num{\valRiddersMaxEvalsFirst}, \num{\valRiddersMaxEvalsSecond}, \num{\valRiddersMaxEvalsThird}
     and \num{\valRiddersMaxEvalsFourth} times for $f'$ to $f''''$. Verified by tests that count and log the calls.
   \item \emph{No shared state.} The headers hold no global, static or thread-local variable other than compile-time
