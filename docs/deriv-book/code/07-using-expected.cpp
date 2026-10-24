@@ -41,7 +41,7 @@ auto const d = derivative(ln, 0.0); // samples log(-h): NaN
 if (d) {
     std::println("slope {}", d->value);
 } else if (d.error() == error::non_finite) {
-    std::println("no finite estimate at x = 0");
+    std::println("no estimate at x = 0: {}", d.error());
 }
 
 auto const g = derivative(ln, 2.0); // succeeds

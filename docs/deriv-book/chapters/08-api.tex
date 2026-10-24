@@ -22,7 +22,7 @@ Name & Kind & Section\\
 \code{derivative} & function template: two overloads, each with a deprecated twin & \ref{sec:api-derivative}\\
 \code{default_step} & function template & \ref{sec:api-derivative}\\
 \code{Estimate<T>} & class template, an aggregate & \ref{sec:api-estimate}\\
-\code{error} & scoped enumeration: \code{non_finite} & \ref{sec:api-error-order}\\
+\code{error} & scoped enumeration: \code{non_finite}, formattable & \ref{sec:api-error-order}\\
 \code{order} & scoped enumeration over \code{int}: \code{first} to \code{fourth} & \ref{sec:api-error-order}\\
 \code{Central<P>}, \code{Forward<P>}, \code{Backward<P>} & class templates, empty method tags &
   \ref{sec:api-methods}\\
@@ -173,6 +173,8 @@ terminates without exceptions); read \code{r->value} after testing \code{r}.
 \end{signature}
 \code{error} says why \code{derivative} returned no estimate; its one value is described in
 \cref{sec:api-derivative}. More values may be added, so a \code{switch} on it should have a \code{default}.
+\code{deriv.hpp} specialises \code{std::formatter<error>}: a value formats as its enumerator's name, with the format
+specification of a string, so \code{std::format("{:>12}", e)} gives \code{"  non_finite"}.
 \code{order} names the derivative orders for readability: \code{derivative<Ridders, order::second>} is
 \code{derivative<Ridders, 2>}. It is scoped, so its names stay out of \code{nxx::deriv} and it does not convert to
 \code{int} elsewhere.

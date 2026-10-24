@@ -16,22 +16,13 @@ namespace {
     using nxx::deriv::Forward;
     using nxx::deriv::Ridders;
 
-    std::string_view to_string(nxx::deriv::error e)
-    {
-        switch (e) {
-        case nxx::deriv::error::non_finite:
-            return "non_finite";
-        }
-        return "unknown";
-    }
-
     template<typename T>
     void show(std::string_view label, std::expected<T, nxx::deriv::error> const &d)
     {
         if (d)
             std::println("   {:<28} {:.17g}", label, *d);
         else
-            std::println("   {:<28} error: {}", label, to_string(d.error()));
+            std::println("   {:<28} error: {}", label, d.error());
     }
 
     // A derivative estimate, with its error estimate when the method provides one (Ridders). std::format does not
@@ -40,7 +31,7 @@ namespace {
     void show(std::string_view label, std::expected<nxx::deriv::Estimate<T>, nxx::deriv::error> const &d)
     {
         if (!d)
-            std::println("   {:<28} error: {}", label, to_string(d.error()));
+            std::println("   {:<28} error: {}", label, d.error());
         else if (d->abs_error)
             std::println("   {:<28} {:.17g} +- {:.1e}", label, d->value, *d->abs_error);
         else

@@ -74,7 +74,10 @@ Decisions in force. Each one says why; change it here before changing the code.
 - The one error so far is `non_finite`: x is not finite, the step is not positive and finite, fn returned an
   infinite or NaN value, a difference, term, sum or quotient would overflow, a point `x + k h` would overflow, or h
   is below the resolution of x. Its documentation reserves more values, and says that a listed cause may move to a
-  new one. A step that is not positive and finite was first a precondition (`assert`); it is now validated, because
+  new one. `std::formatter<error>` writes the enumerator's name; it is in `deriv.hpp`, which therefore includes
+  `<format>` (measured on a minimal file: 0.22 to 0.56 s on GCC 16, 0.32 to 0.61 s on MSVC; free where the caller
+  prints anyway). Splitting `non_finite` by cause is deferred until a use needs to tell them apart. A step that is not
+  positive and finite was first a precondition (`assert`); it is now validated, because
   `derivative` is the public boundary and a step is often computed from data: under `NDEBUG` the assert vanished,
   and then `Forward<1>` with a negative step returned a backward difference (`Backward<1>` a forward one), a step
   of -inf made the two-node rules call fn at infinite points, and in a constant expression a bad step was a

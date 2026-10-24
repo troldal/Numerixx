@@ -23,10 +23,12 @@
 #include <concepts>
 #include <cstddef>
 #include <expected>
+#include <format>
 #include <functional>
 #include <limits>
 #include <numeric>
 #include <optional>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -36,8 +38,9 @@ namespace nxx::deriv {
     /**
      * @brief Why derivative() returned no estimate.
      *
-     * More values may be added, and a listed cause may move to a new value: a switch on it should have a default,
-     * and a caller should test for success rather than for a particular error.
+     * More values may be added, and a listed cause may move to a new value: a switch on it should have a default, and a
+     * caller should test for success rather than for a particular error. It is formattable: std::format("{}", e) writes
+     * the enumerator's name, such as `non_finite`.
      */
     enum class error {
         /**
@@ -1554,3 +1557,41 @@ namespace nxx::deriv {
     { return detail::derivative_default<M, static_cast<int>(N)>(fn, x); }
 
 } // namespace nxx::deriv
+
+/** @brief The standard library's formatter, specialised for nxx::deriv::error. */
+namespace std {
+
+    /**
+     * @brief Formats an nxx::deriv::error as the name of its enumerator, such as `non_finite`, with the format
+     * specification of a string.
+     *
+     * @code
+     * if (!d) std::println("no estimate: {}", d.error());   // no estimate: non_finite
+     * @endcode
+     */
+    template<>
+    struct formatter<nxx::deriv::error> : formatter<string_view>
+    {
+        /**
+         * @brief Writes the name of @p e.
+         *
+         * @tparam FormatContext The format context.
+         * @param e The error.
+         * @param ctx The format context.
+         * @return The end of the output.
+         */
+        template<typename FormatContext>
+        auto format(nxx::deriv::error e, FormatContext &ctx) const
+        {
+            // No default: a new enumerator makes the compilers warn here (-Wswitch) until its name is added.
+            string_view name = "unknown";
+            switch (e) {
+            case nxx::deriv::error::non_finite:
+                name = "non_finite";
+                break;
+            }
+            return formatter<string_view>::format(name, ctx);
+        }
+    };
+
+} // namespace std

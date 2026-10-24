@@ -5,6 +5,7 @@
 #include <doctest/doctest.h>
 
 #include <cmath>
+#include <format>
 #include <limits>
 
 namespace mp = boost::multiprecision;
@@ -264,4 +265,17 @@ TEST_CASE("deriv: a step that is not positive and finite is an error, and fn is 
     CHECK(derivative(cube, nan_step) == derivative(cube, nan_step, default_step(nan_step)));
     CHECK(derivative<nxx::deriv::Ridders, 2>(cube, nan_step)
           == derivative<nxx::deriv::Ridders, 2>(cube, nan_step, default_step<nxx::deriv::Ridders, 2>(nan_step)));
+}
+
+
+// error is formattable: the enumerator's name, with the format specification of a string (U-11).
+static_assert(std::formattable<nxx::deriv::error, char>);
+
+TEST_CASE("deriv: error formats as its name")
+{
+    CHECK(std::format("{}", nxx::deriv::error::non_finite) == "non_finite");
+    CHECK(std::format("[{:>12}]", nxx::deriv::error::non_finite) == "[  non_finite]");
+    auto const d = derivative(cube, std::numeric_limits<double>::infinity());
+    REQUIRE(!d);
+    CHECK(std::format("no estimate: {}", d.error()) == "no estimate: non_finite");
 }

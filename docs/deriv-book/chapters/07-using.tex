@@ -53,7 +53,7 @@ The central rule at $x = 0$ samples $\log(-h)$, which is NaN, so the first call 
 covers every case in which no finite estimate exists: \code{x} is not finite; \code{fn} returned an infinite or NaN
 value; a difference, term, sum or quotient would overflow; a point $x + k h$ would overflow; or $h$ is below the
 resolution of $x$ (\cref{sb:ulp}). \code{error} may gain values, so a \code{switch} on it needs a \code{default}. It
-has no \code{std::formatter}: print \code{static_cast<int>(d.error())}, or a word chosen in that \code{switch}. To find
+is formattable: \code{std::println("{}", d.error())} writes the enumerator's name, \code{non_finite}. To find
 the cause, evaluate \code{fn} at $x \pm h$ yourself and compare $h$ with the spacing of the numbers at $x$.
 
 The member functions \code{transform} and \code{and_then} of \code{std::expected} apply a function only when there is
