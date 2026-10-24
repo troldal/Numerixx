@@ -5,6 +5,8 @@
 
 #include <numerixx/deriv.hpp>
 
+#include "silence.hpp"
+
 #include <boost/multiprecision/cpp_bin_float.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
 #include <doctest/doctest.h>
@@ -13,6 +15,7 @@
 #include <cmath>
 #include <complex>
 #include <cstddef>
+#include <expected>
 #include <limits>
 #include <numbers>
 #include <numeric>
@@ -197,9 +200,11 @@ static_assert(accepted<Forward<6>, 4u> && accepted<Backward<1>, std::size_t{ 2 }
 static_assert(!accepted<Central<2>, 0> && !accepted<Central<2>, 5> && !accepted<Ridders, -1>);
 static_assert(!accepted<Central<2>, true> && !accepted<Central<2>, 2.0>);
 static_assert(!accepted<Central<2>, 0x1'0000'0001ULL>); // not wrapped into order 1
-// The low-precision warning: a 4th derivative in float only.
-static_assert(nxx::deriv::detail::noisy<4, float> && nxx::deriv::detail::noisy<order::fourth, float>);
-static_assert(!nxx::deriv::detail::noisy<4, double> && !nxx::deriv::detail::noisy<3, float>);
+// The low-precision warning: a derivative above the first in float, for every method (Phase 5; f'''' only before).
+static_assert(nxx::deriv::detail::noisy<2, float> && nxx::deriv::detail::noisy<3, float>);
+static_assert(nxx::deriv::detail::noisy<4, float> && nxx::deriv::detail::noisy<order::second, float>);
+static_assert(!nxx::deriv::detail::noisy<1, float> && !nxx::deriv::detail::noisy<order::first, float>);
+static_assert(!nxx::deriv::detail::noisy<2, double> && !nxx::deriv::detail::noisy<4, double>);
 static_assert(!nxx::deriv::detail::noisy<4, long double> && !nxx::deriv::detail::noisy<4, bin50>);
 static_assert(static_cast<int>(order::first) == 1 && static_cast<int>(order::fourth) == 4);
 static_assert(!std::is_convertible_v<order, int>); // scoped: no implicit conversion elsewhere
@@ -231,9 +236,11 @@ static_assert(has_weights<Backward<2>, 4, 6>({ -5, -4, -3, -2, -1, 0 }, { -2, 11
 // Exactness on polynomials of the highest degree a rule integrates, x^(N + p - 1), for every rule and order.
 static_assert(all_exact<1>() && all_exact<2>() && all_exact<3>() && all_exact<4>());
 // float, for the low orders, whose values fit 24 bits: x^3 under Central<2> for f'' and x^2 under Forward<1> for f''
-// at 1 with h = 1/4 (at most 5^3 = 125 in units of 4^-3).
+// at 1 with h = 1/4 (at most 5^3 = 125 in units of 4^-3). Deliberate: the low-precision warning is silenced.
+NUMERIXX_SILENCE_BEGIN
 static_assert(derivative<Central<2>, 2>([](float x) { return x * x * x; }, 1.0f, 0.25f)->value == 6.0f);
 static_assert(derivative<Forward<1>, 2>([](float x) { return x * x; }, 1.0f, 0.25f)->value == 2.0f);
+NUMERIXX_SILENCE_END
 
 // The actual offsets of Central<2> for f'': at x = 1 with h = 0x1.4p-53 the points round to 1 + 2^-52 and 1 - 2^-53,
 // unequal offsets. For fn(t) = t, f+ - f0 and f0 - f- are exactly the offsets, so f'' = 0 exactly; a formula with the
@@ -373,26 +380,30 @@ namespace {
     // of 3.6 over 5,400 random cases for f'; for f'' to f'''' the worst was 2.0), within 4 times the prototype's
     // error, the estimate within twice the prototype's, and the evaluations within the prototype's plus 4: libm
     // implementations round fn's values differently, which can move a stall by a level.
+    // The checks on a result, apart from the call, so that a deliberate float call can be silenced where it is made.
+    template<typename T>
+    bool judged(std::expected<Estimate<T>, nxx::deriv::error> const &r, int calls, T exact, Reference ref, T cover)
+    {
+        if (!r || !r->abs_error) return false;
+        T const actual = std::abs(r->value - exact);
+        bool const ok = actual <= cover * *r->abs_error && actual <= T(4) * T(ref.error) * std::abs(exact)
+                        && *r->abs_error <= T(2) * T(ref.estimate) * std::abs(exact) && calls <= ref.evaluations + 4;
+        if (!ok) MESSAGE("actual ", actual, ", estimate ", *r->abs_error, ", calls ", calls);
+        return ok;
+    }
+
     template<int N, typename T, typename F>
     bool accurate(F fn, T x, T exact, Reference ref, T cover = T(6))
     {
         int calls = 0;
         auto const r = derivative<Ridders, N>(Counted{ fn, &calls }, x);
-        if (!r || !r->abs_error) return false;
-        T const actual = std::abs(r->value - exact);
-        bool const ok = actual <= cover * *r->abs_error && actual <= T(4) * T(ref.error) * std::abs(exact)
-                        && *r->abs_error <= T(2) * T(ref.estimate) * std::abs(exact) && calls <= ref.evaluations + 4;
-        if (!ok) MESSAGE("N ", N, ": actual ", actual, ", estimate ", *r->abs_error, ", calls ", calls);
-        return ok;
+        return judged(r, calls, exact, ref, cover);
     }
 
     // Only coverage, for float cases whose value depends on the libm's rounding of fn.
-    template<int N, typename T, typename F>
-    bool covered(F fn, T x, T exact, T cover)
-    {
-        auto const r = derivative<Ridders, N>(fn, x);
-        return r && r->abs_error && std::abs(r->value - exact) <= cover * *r->abs_error;
-    }
+    template<typename T>
+    bool covered(std::expected<Estimate<T>, nxx::deriv::error> const &r, T exact, T cover)
+    { return r && r->abs_error && std::abs(r->value - exact) <= cover * *r->abs_error; }
 
     // Closed forms of the N-th derivative.
     double sin_n(int n, double x) { return std::sin(x + n * std::numbers::pi / 2); }
@@ -416,8 +427,10 @@ TEST_CASE("orders: the compile-time cases at run time")
     CHECK(all_exact<2>());
     CHECK(all_exact<3>());
     CHECK(all_exact<4>());
+    NUMERIXX_SILENCE_BEGIN
     CHECK(derivative<Central<2>, 2>([](float x) { return x * x * x; }, 1.0f, 0.25f)->value == 6.0f);
     CHECK(derivative<Forward<1>, 2>([](float x) { return x * x; }, 1.0f, 0.25f)->value == 2.0f);
+    NUMERIXX_SILENCE_END
     CHECK(derivative<Central<2>, 2>(power<1>, 1.0, 0x1.4p-53) == 0.0);
     CHECK(derivative<Central<2>, 2>(wide2, 0.0, 0x1p-600) == 0x1p601);
     CHECK(derivative<Central<2>, 2>(narrow2, 0.0, 0x1p600) == 0x1p-599);
@@ -538,47 +551,57 @@ TEST_CASE("orders: Ridders' accuracy against closed forms, double and float")
     auto const pole = [](double t) { return 1.0 / (t - 0.01); };
     double const e = std::numbers::e;
 
-    // Prototype references {relative error, relative estimate, evaluations}, from the default initial step s/4.
+    // Prototype references {relative error, relative estimate, evaluations}, from the default initial step s/4. The
+    // pole between the samples restarts after untrusted results, below the smallest step tried since Phase 5: the
+    // same values as before, with fewer evaluations (55, 108 and 109 before), from .scratch/onesided/ridders5.py.
     CHECK(accurate<2>(exp, 1.0, e, { 4.0e-13, 3.6e-12, 15 }));
     CHECK(accurate<2>(sin, 0.5, sin_n(2, 0.5), { 4.1e-13, 3.6e-12, 15 }));
     CHECK(accurate<2>(runge, 0.3, runge_n(2, 0.3), { 2.4e-13, 3.6e-12, 19 }));
     CHECK(accurate<2>(log, 0.2, log_n(2, 0.2), { 5.5e-13, 3.4e-11, 21 }));
     CHECK(accurate<2>(log, 0.01, log_n(2, 0.01), { 9.1e-12, 6.3e-11, 29 })); // domain edge, restarts
-    CHECK(accurate<2>(pole, 0.0, pole_n(2, 0.01), { 1.3e-12, 1.2e-11, 55 })); // pole between samples
+    CHECK(accurate<2>(pole, 0.0, pole_n(2, 0.01), { 1.3e-12, 1.2e-11, 31 })); // pole between samples
     CHECK(accurate<3>(exp, 1.0, e, { 3.4e-11, 7.2e-10, 28 }));
     CHECK(accurate<3>(sin, 0.5, sin_n(3, 0.5), { 1.4e-11, 1.4e-9, 28 }));
     CHECK(accurate<3>(runge, 0.3, runge_n(3, 0.3), { 6.9e-12, 6.4e-9, 40 }));
     CHECK(accurate<3>(log, 0.2, log_n(3, 0.2), { 6.0e-11, 4.6e-9, 34 }));
     CHECK(accurate<3>(log, 0.01, log_n(3, 0.01), { 9.9e-10, 6.7e-8, 42 }));
-    CHECK(accurate<3>(pole, 0.0, pole_n(3, 0.01), { 2.2e-11, 7.5e-9, 108 }));
+    CHECK(accurate<3>(pole, 0.0, pole_n(3, 0.01), { 2.2e-11, 7.5e-9, 60 }));
     CHECK(accurate<4>(exp, 1.0, e, { 5.4e-10, 2.1e-7, 25 }));
     CHECK(accurate<4>(sin, 0.5, sin_n(4, 0.5), { 3.5e-10, 1.3e-7, 25 }));
     CHECK(accurate<4>(runge, 0.3, runge_n(4, 0.3), { 3.6e-9, 9.9e-7, 37 }));
     CHECK(accurate<4>(log, 0.2, log_n(4, 0.2), { 2.0e-8, 6.0e-6, 35 }));
     CHECK(accurate<4>(log, 0.01, log_n(4, 0.01), { 1.7e-8, 1.8e-6, 39 }));
-    CHECK(accurate<4>(pole, 0.0, pole_n(4, 0.01), { 2.3e-8, 3.3e-6, 109 }));
+    CHECK(accurate<4>(pole, 0.0, pole_n(4, 0.01), { 2.3e-8, 3.3e-6, 61 }));
+
+    // Poles 1e-3 and 1e-4 from x: before Phase 5 the restarts after untrusted results started at half the previous
+    // initial step and ran out of levels, and f'' to f'''' were off by 1 to 11 times the value, uncovered.
+    auto const near = [](double t) { return 1.0 / (t - 1e-3); };
+    auto const behind = [](double t) { return 1.0 / (t + 1e-4); };
+    CHECK(accurate<2>(near, 0.0, pole_n(2, 1e-3), { 5.2e-13, 1.2e-11, 37 }));
+    CHECK(accurate<2>(behind, 0.0, pole_n(2, -1e-4), { 1.1e-12, 7.7e-12, 43 }));
+    CHECK(accurate<3>(near, 0.0, pole_n(3, 1e-3), { 1.6e-11, 1.8e-9, 72 }));
+    CHECK(accurate<3>(behind, 0.0, pole_n(3, -1e-4), { 7.8e-11, 1.0e-9, 88 }));
+    CHECK(accurate<4>(near, 0.0, pole_n(4, 1e-3), { 2.2e-9, 8.1e-7, 73 }));
+    CHECK(accurate<4>(behind, 0.0, pole_n(4, -1e-4), { 3.8e-9, 4.9e-7, 85 }));
 
     // float: sin rounds alike in numpy and the C++ libraries, exp does not, so exp is checked for coverage only.
+    // Derivatives above the first in float are the low-precision case: deliberate here, so the warning is silenced
+    // at the calls.
     auto const sinf = [](float t) { return std::sin(t); };
     auto const expf = [](float t) { return std::exp(t); };
-    CHECK(accurate<2>(sinf, 0.5f, float(sin_n(2, 0.5)), { 2.5e-5, 1.9e-4, 11 }));
-    CHECK(accurate<3>(sinf, 0.5f, float(sin_n(3, 0.5)), { 1.8e-4, 4.7e-3, 20 }));
-    CHECK(covered<2>(expf, 1.0f, float(e), 6.0f));
-    CHECK(covered<3>(expf, 1.0f, float(e), 6.0f));
-    // f'''' in float is the low-precision case: deliberate here, so the warning is silenced at the call.
-#if defined(_MSC_VER) && !defined(__clang__)
-#pragma warning(push)
-#pragma warning(disable : 4996)
-#else
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
+    int calls2 = 0;
+    int calls3 = 0;
+    NUMERIXX_SILENCE_BEGIN
+    auto const sin2 = derivative<Ridders, 2>(Counted{ sinf, &calls2 }, 0.5f);
+    auto const sin3 = derivative<Ridders, 3>(Counted{ sinf, &calls3 }, 0.5f);
+    auto const exp2 = derivative<Ridders, 2>(expf, 1.0f);
+    auto const exp3 = derivative<Ridders, 3>(expf, 1.0f);
     auto const noisy = derivative<Ridders, 4>(sinf, 0.5f);
-#if defined(_MSC_VER) && !defined(__clang__)
-#pragma warning(pop)
-#else
-#pragma GCC diagnostic pop
-#endif
+    NUMERIXX_SILENCE_END
+    CHECK(judged(sin2, calls2, float(sin_n(2, 0.5)), { 2.5e-5, 1.9e-4, 11 }, 6.0f));
+    CHECK(judged(sin3, calls3, float(sin_n(3, 0.5)), { 1.8e-4, 4.7e-3, 20 }, 6.0f));
+    CHECK(covered(exp2, float(e), 6.0f));
+    CHECK(covered(exp3, float(e), 6.0f));
     // The prototype: 1.6e-3 relative off, with an estimate of 5.2e-2 relative; the estimate shows the noise (at least
     // half the prototype's).
     REQUIRE(noisy.has_value());

@@ -151,6 +151,8 @@ static_assert(default_step(0.5) == nxx::math::root_epsilon<3, double>());
 static_assert(default_step<nxx::deriv::Central<4>, 2>(-3.0) == nxx::math::root_epsilon<6, double>() * 3.0);
 static_assert(default_step<nxx::deriv::Ridders>(1000.0) == 31.25);
 static_assert(default_step<nxx::deriv::Ridders, nxx::deriv::order::second>(-8.0) == 2.0);
+static_assert(default_step<nxx::deriv::ForwardRidders, 4>(-8.0) == 0.25); // max(|x|, 1) / 32 for every order
+static_assert(default_step<nxx::deriv::BackwardRidders>(0.5) == 1.0 / 32);
 
 namespace {
 
@@ -174,20 +176,21 @@ namespace {
         else return agrees<M, Last>(x) && agrees_up_to<M, Last - 1>(x);
     }
 
-    // Six methods, orders 1 to Last (4, or 3 for a type whose fourth derivative is deprecated as noise).
+    // Eight methods, orders 1 to Last (4, or 1 for a type whose higher derivatives are deprecated as noisy).
     template<int Last, typename T>
     constexpr bool agrees_for_methods(T const &x)
     {
         using namespace nxx::deriv;
         return agrees_up_to<Central<2>, Last>(x) && agrees_up_to<Central<10>, Last>(x)
                && agrees_up_to<Forward<1>, Last>(x) && agrees_up_to<Forward<6>, Last>(x)
-               && agrees_up_to<Backward<3>, Last>(x) && agrees_up_to<Ridders, Last>(x);
+               && agrees_up_to<Backward<3>, Last>(x) && agrees_up_to<Ridders, Last>(x)
+               && agrees_up_to<ForwardRidders, Last>(x) && agrees_up_to<BackwardRidders, Last>(x);
     }
 
 } // namespace
 
 // |x| below 1, a negative x and a large x, where the scale max(|x|, 1) differs. One assertion per method: MSVC limits a
-// constant evaluation to about a million steps (/constexpr:steps), which all six methods together exceed.
+// constant evaluation to about a million steps (/constexpr:steps), which all eight methods together exceed.
 template<typename M>
 constexpr bool agrees_at_three_points()
 { return agrees_up_to<M, 4>(0.5) && agrees_up_to<M, 4>(-3.0) && agrees_up_to<M, 4>(1000.0); }
@@ -198,6 +201,8 @@ static_assert(agrees_at_three_points<nxx::deriv::Forward<1>>());
 static_assert(agrees_at_three_points<nxx::deriv::Forward<6>>());
 static_assert(agrees_at_three_points<nxx::deriv::Backward<3>>());
 static_assert(agrees_at_three_points<nxx::deriv::Ridders>());
+static_assert(agrees_at_three_points<nxx::deriv::ForwardRidders>());
+static_assert(agrees_at_three_points<nxx::deriv::BackwardRidders>());
 
 TEST_CASE("deriv: default_step is the step of the default-step call")
 {
@@ -206,8 +211,8 @@ TEST_CASE("deriv: default_step is the step of the default-step call")
     CHECK(agrees_for_methods<4>(0.5));
     CHECK(agrees_for_methods<4>(-3.0));
     CHECK(agrees_for_methods<4>(1000.0));
-    CHECK(agrees_for_methods<3>(0.5f));
-    CHECK(agrees_for_methods<3>(-3.0f));
+    CHECK(agrees_for_methods<1>(0.5f));
+    CHECK(agrees_for_methods<1>(-3.0f));
     CHECK(agrees_for_methods<4>(bin50(0.5)));
     CHECK(agrees_for_methods<4>(bin50(-3)));
     CHECK(agrees_for_methods<4>(bin50_et(1000)));
@@ -216,7 +221,7 @@ TEST_CASE("deriv: default_step is the step of the default-step call")
 
 // A step that is not positive and finite is an error value, before fn is called, in constant expressions and at run
 // time alike (U-6): zero, -0.0, a negative step, NaN and both infinities, for the two-node and multi-node rules, the
-// one-sided rules, and Ridders, including the f'' paths that evaluate fn(x) first.
+// one-sided rules, and the extrapolation methods, including the paths that evaluate fn(x) first.
 namespace {
 
     constexpr double inf_step = std::numeric_limits<double>::infinity();
@@ -238,6 +243,8 @@ static_assert(rejects_bad_steps<nxx::deriv::Central<2>, 1>(cube) && rejects_bad_
 static_assert(rejects_bad_steps<nxx::deriv::Central<4>, 1>(cube) && rejects_bad_steps<nxx::deriv::Forward<1>, 1>(cube));
 static_assert(rejects_bad_steps<nxx::deriv::Backward<1>, 1>(cube) && rejects_bad_steps<nxx::deriv::Ridders, 1>(cube));
 static_assert(rejects_bad_steps<nxx::deriv::Ridders, 2>(cube));
+static_assert(
+    rejects_bad_steps<nxx::deriv::ForwardRidders, 1>(cube) && rejects_bad_steps<nxx::deriv::BackwardRidders, 3>(cube));
 
 // default_step agrees with the default-step call at a non-finite x too: an infinite x gives an infinite step, and both
 // calls return non_finite. (A NaN x gives a NaN step, which Clang does not compute in a constant expression: below.)
@@ -259,6 +266,8 @@ TEST_CASE("deriv: a step that is not positive and finite is an error, and fn is 
     CHECK(rejects_bad_steps<nxx::deriv::Backward<1>, 1>(counted));
     CHECK(rejects_bad_steps<nxx::deriv::Ridders, 1>(counted));
     CHECK(rejects_bad_steps<nxx::deriv::Ridders, 2>(counted));
+    CHECK(rejects_bad_steps<nxx::deriv::ForwardRidders, 1>(counted));
+    CHECK(rejects_bad_steps<nxx::deriv::BackwardRidders, 2>(counted));
     CHECK(calls == 0);
 
     // default_step at a NaN x: a NaN step, and non_finite from both calls.

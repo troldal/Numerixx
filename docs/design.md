@@ -36,17 +36,21 @@ Decisions in force. Each one says why; change it here before changing the code.
 
 ## Derivatives (`deriv.hpp`)
 
-- One entry point, `derivative<M, N>(fn, x[, h])`, for every method M (the stencils and `Ridders`, `PHASE3_API.md`)
-  and every derivative order N from 1 to 4 (`PHASE4_API.md`); N defaults to 1, so `derivative<M>` is unchanged. The
-  method concept `detail::method` is closed (`stencil<M> || same_as<M, Ridders>`), not a trait users could
-  specialise. Each public overload forwards to one detail function, which dispatches once with `if constexpr`.
+- One entry point, `derivative<M, N>(fn, x[, h])`, for every method M (the stencils, `Ridders`, `PHASE3_API.md`, and
+  its one-sided forms `ForwardRidders` and `BackwardRidders`, `PHASE5_API.md`) and every derivative order N from 1 to
+  4 (`PHASE4_API.md`); N defaults to 1, so `derivative<M>` is unchanged. The method concept `detail::method` is closed
+  (`stencil<M> || extrapolation<M>`), not a trait users could specialise. Each public overload forwards to one detail
+  function, which dispatches once with `if constexpr`.
 - The order is an integer or the scoped enum `order` (`order::second`, user decision), so the parameter is `auto N`:
   a scoped enum does not convert to `int`. `detail::valid_order<N>` accepts any integer type except `bool`, and
   `order`, from 1 to 4; it is converted to `int` once, below the public overloads. The cap is 4 (user decision): the
   textbook tables stop there, and the accuracy is already about 1e-4 for f'''' with `Central<2>` in double.
-- A 4th derivative in a type whose epsilon is above 1e-7 (float; tested with integers, `radix^(digits-1) < 10^7`)
-  warns at compile time (user decision): its result is mostly rounding noise. The mechanism is a twin of each public
-  overload, additionally constrained by `detail::noisy` and marked `[[deprecated]]`, which subsumption selects; a
+- A derivative above the first in a type whose epsilon is above 1e-7 (float; tested with integers,
+  `radix^(digits-1) < 10^7`) warns at compile time, for every method (user decisions: f'''' in Phase 4, f'' and f'''
+  added in Phase 5, since float is not a good type for derivatives above the first). The median relative errors in
+  float are 4e-4 to 2e-2 for f'' to f'''' with `Central<2>`, and 1e-5 to 1e-3 with `Ridders`. The mechanism is a twin
+  of each public overload, additionally constrained by `detail::noisy` and marked `[[deprecated]]`, which subsumption
+  selects; a
   deprecated helper inside the body was rejected, because its warning is reported inside the header, so a pragma at
   the call cannot silence it, and GCC and MSVC suppress it for a system-header include. `NUMERIXX_NO_PRECISION_WARNING`
   turns it off; it must be defined alike in every translation unit.
@@ -121,8 +125,8 @@ Decisions in force. Each one says why; change it here before changing the code.
   more than two weights enlarges the error (4x for `Central<4>`); the divisions keep polynomial results exact for
   dyadic x and h, and cannot overflow spuriously. Neighbouring points must differ (at h near 0.6 ulp(x), x + h and
   x + 2h coincide), and a rule whose integer weights T cannot hold exactly (radix^digits not above the largest value)
-  is rejected by the constraint `detail::exact_weights` of `derivative`, so that a requires-expression sees it;
-  Ridders is checked against the `Central<2>` table it uses.
+  is rejected by the constraint `detail::exact_weights` of `derivative`, so that a requires-expression sees it; an
+  extrapolation method is checked against the table of its base stencil (`detail::base<M>`).
 - The default step is `eps^(1/(p+N)) * max(|x|, 1)` for a rule of order p and the N-th derivative. It balances
   truncation error (O(h^p)) against rounding error (O(eps / h^N)) when fn varies on a scale of `max(|x|, 1)`, giving an
   error of about `eps^(p/(p+N))`. The constant `(N S / (p C))^(1/(p+N))` is left out. For f' it lies between 1.4 and 2.0
@@ -130,19 +134,22 @@ Decisions in force. Each one says why; change it here before changing the code.
   for `Central<2>` and f'', 11 for f''''), but on test functions that vary faster than `max(|x|, 1)` half the default
   step was better for every order, f' included, so one convention is kept for all N. Callers pass a step when fn varies
   faster; the sensitivity grows with N.
-- `default_step<M, N>(x)` returns the step that `derivative<M, N>(fn, x)` uses (for Ridders, the initial step), so a
+- `default_step<M, N>(x)` returns the step that `derivative<M, N>(fn, x)` uses (for an extrapolation method, the
+  initial step), so a
   caller can repeat a rule at 2h and h/2 or apply it by hand without rebuilding the formula. The overload without a
   step calls it, so the two calls give the same result for every x: a non-finite x gives a non-finite step, and both
   return `non_finite`.
 - The two-point difference is one helper, `detail::difference`, returning the value and the values and spacing for the
   rounding floor `(eps |f_lo| + eps |f_hi|) / (x_hi - x_lo)`; the two-node stencils and every f' Ridders level use it,
-  as `detail::second_difference` serves `Central<2>` for f'' and the f'' Ridders levels.
+  as `detail::second_difference` serves `Central<2>` for f'' and the f'' Ridders levels. Their arithmetic is split from
+  the evaluation (`difference_of`, `second_difference_of`), so that the forward levels, which have fn(x) already, use
+  the same checks.
 
-## Ridders (`derivative<Ridders>`)
+## Ridders (`derivative<Ridders>`, `ForwardRidders`, `BackwardRidders`)
 
 The specification, with the evidence for each rule and constant, is `PHASE3_API.md` ("Algorithm" and "The
 constants"); the code is implemented from Ridders (1982) and Richardson extrapolation, not from Numerical Recipes.
-In short (for every order N, `PHASE4_API.md`):
+In short (for every order N, `PHASE4_API.md`; the one-sided forms and the restart rule, `PHASE5_API.md`):
 - The base is the `Central<2>` rule of order N (an even error expansion for every N): the difference and the second
   difference above for N = 1 and 2, the nominal-step rules for N = 3 and 4, whose floor is
   `eps sum |w_k| |f_k| / (den h^N)` plus the rounding of the points, `eps/2 (|x| + 2h) |f'| sum |w_k| / (den h^N)`
@@ -158,25 +165,64 @@ In short (for every order N, `PHASE4_API.md`):
   (checked after the overflow check, with q = 2 for N <= 2 and 4 for N >= 3, so x +- h and x +- 2h are only formed when
   finite; for N >= 3 the inner and outer points must also differ), or after 32 attempted levels (at most 64, 65, 128
   and 129 evaluations for N = 1 to 4).
-- Restarts below the failing step when a level fails (fn not finite, a non-finite entry, the overflow check), and
-  below the starting step when the result is untrusted (`4 abs_error >= |value|` and `abs_error > 64 floor`); the
-  restart discards the tableau, the best entry and the stall counter.
+- Restarts below the failing step when a level fails (fn not finite, a non-finite entry, the overflow check), and,
+  when the result is untrusted (`4 abs_error >= |value|` and `abs_error > 64 floor`), below the smallest step the
+  tableau tried; the restart discards the tableau, the best entry and the stall counter. Until Phase 5 the untrusted
+  restart started at half the previous initial step: it re-evaluated the same large steps, and the levels ran out
+  before the step reached fn's scale, so poles 1e-3 and 1e-4 from x (finite on both sides) left f'' to f'''' off by
+  1 to 11 times with an estimate that did not cover it. No step is skipped (the steps are still `h0 / 2^k`); a case
+  the slower descent handled can lose up to 8 times in accuracy, and restarts overlapping one or two levels did worse
+  on every measure.
 - The default initial step is `max(|x|, 1) / 32` for f' and `max(|x|, 1) / 4` for N >= 2: the base's rounding grows
   as 1/h^N, so a larger start pays (for f'' 1.6 times as accurate as s/8 and 7 times as s/32).
+- The nearest point where fn is not finite must be at least about `2^-34 max(|x|, 1)` from x for f' and `2^-31` for
+  f'' to f'''' (the 32 levels, less those a result needs); with the restart rule above this holds for poles too.
+
+One driver, `detail::ridders<S, N>`, serves all three methods, on the base stencil S = `detail::base<M>`: `Central<2>`
+for `Ridders`, `Forward<1>` for the one-sided methods (user decision, from the study in `PHASE5_API.md`). The reach
+for the overflow check (`detail::reach`, shared with the stencils), whether fn(x) is needed, and the points that must
+differ follow from S's table. Two things are chosen by S:
+- The column factor: 4^j for the even central expansion, 2^j for the forward rule, whose error has every power of h.
+- The floor of an entry: centrally the newest level's, as tuned in Phase 3; one-sided it is carried through the
+  tableau, `(r floor(i, j-1) + floor(i-1, j-1)) / (r - 1)`, saturating (`detail::propagated_floor`), exactly
+  `sum |c_k| floor_k` since the coefficients alternate. Columns divided by 2^j - 1 amplify the newest level's rounding
+  about 3.5 times rather than 1.4: with the level's floor the prototype's forward f' was covered in 97.5% of the cases
+  (worst 8.9 times the estimate), with the propagated one in 99.4% (worst 2.6). For `Ridders` it would change nearly
+  every estimate for a small gain, so it was not adopted there.
+
+The one-sided methods:
+- The forward levels follow the central conventions: the actual distance for f', the second difference on the actual
+  offsets of x, x + h, x + 2h for f'', and the nominal step with the node-rounding term, `eps/2 (|x| + N h) |f'|`, for
+  f''' and f''''. fn(x) is evaluated once per call. Cost: at most 33, 65, 97 and 129 evaluations.
+- `BackwardRidders` runs the forward driver on `fn(-t)` at `-x` and negates odd orders: negation is exact, so fn
+  receives exactly `x - k h`, and the mirror holds by construction. A `Backward<1>` table would sum from `x - N h` and
+  round differently.
+- The initial step is `max(|x|, 1) / 32` for every N (`detail::one_sided_divisor`): the rules reach N h, and s/32 was
+  the more accurate of the two starts without gross errors for f' to f''', and the best for f''''.
+- Their reach from the default step: fn must vary on a scale of at least about `2^-30 max(|x|, 1)` (sqrt or log at
+  1e-9 from 0). Closer, the levels run out and the result is wrong, but flagged by an estimate of at least |value| / 4.
+- They are less accurate than `Ridders` (medians 2e-13, 1e-10, 4e-8 and 2e-6 for f' to f'''' in double, against 1e-14
+  to 7e-10), and for fn defined on one side only: where both sides exist, `Ridders` is better, also near a NaN edge,
+  whose NaN guides its restarts.
 
 ## Tests
 
 - doctest. Every constexpr function has `static_assert` tests next to run-time tests of the same cases.
 - Ridders: the actual error must be within 6 times the estimate, and the estimate within twice the independent
   Python prototype's value for the case (for the multiprecision types, which the prototype does not model, twice the
-  first C++ run's: a regression baseline, as the test rule in CLAUDE.md allows, labelled with its commit). Polynomials with dyadic x and h are exact, with the rounding floor of the predicted level as the
+  first C++ run's: a regression baseline, as the test rule in CLAUDE.md allows, labelled with its commit). The Phase 5
+  prototype (`.scratch/onesided/ridders5.py`) reproduces the C++ results of both bases for double bit for bit
+  (28,000 cases). The one-sided methods' multiprecision tests check coverage and a trusted result, without a
+  baseline. Polynomials with dyadic x and h are exact, with the rounding floor of the predicted level as the
   estimate (binary types only).
 - Stencil tables are checked by `static_assert` against the moment conditions of their order and a reduced
   denominator, with a moment function in the test file, independent of the generator (a Taylor check against the
   interpolation formula), and against published rows (Fornberg 1988, Chapra ch. 23). Run-time tolerances are `(C + 2S) eps^(p/(p+1))`:
   truncation plus rounding of fn's values and of the points, a bound that the measured errors stay 4 to 16 times
   below for double; `(C + 2S) eps^(p/(p+N))` for the N-th derivative.
-- The low-precision warning is tested by CTest cases that build a float f'''' with warnings as errors: without
-  silencing it must fail with the warning's text, and silenced at the call or by the macro it must build.
+- The low-precision warning is tested by CTest cases that build a float f'' with warnings as errors, one per overload:
+  without silencing each must fail with the warning's text, and silenced at the call or by the macro it must build.
+  Tests that make deliberate float calls above f' silence them at the call (`tests/silence.hpp`), never inside a
+  template, where GCC and MSVC report the warning.
 - Multiprecision cases use standalone Boost.Multiprecision 1.92 with Boost.Config (header-only): the full Boost CMake
   tarball builds Boost.Container, which fails on em++. Standalone mode has no `cbrt`, so references use `pow`.

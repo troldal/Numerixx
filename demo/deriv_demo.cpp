@@ -11,9 +11,11 @@
 namespace {
 
     using nxx::deriv::Backward;
+    using nxx::deriv::BackwardRidders;
     using nxx::deriv::Central;
     using nxx::deriv::derivative;
     using nxx::deriv::Forward;
+    using nxx::deriv::ForwardRidders;
     using nxx::deriv::Ridders;
 
     template<typename T>
@@ -202,6 +204,7 @@ namespace {
         report("Central<6>", derivative<Central<6>, N>(exp, 1.0));
         report("Forward<2>", derivative<Forward<2>, N>(exp, 1.0));
         report("Ridders", derivative<Ridders, N>(exp, 1.0));
+        report("ForwardRidders", derivative<ForwardRidders, N>(exp, 1.0));
     }
 
     void higher_orders()
@@ -226,6 +229,37 @@ namespace {
         show("Ridders, N = 2, x^5 at 1", second);
     }
 
+    void one_sided_ridders()
+    {
+        // At the edge of fn's domain Ridders' samples reach the other side, and it fails; the one-sided forms sample
+        // one side only, and still estimate their error. They gain one order per level instead of two, so they are
+        // less accurate than Ridders where both sides exist.
+        std::println("\n12. One-sided Ridders at the edge of fn's domain");
+        auto const right = [](double x) { return x < 0.0 ? std::numeric_limits<double>::quiet_NaN() : std::exp(x); };
+        auto const left = [](double x) { return x > 0.0 ? std::numeric_limits<double>::quiet_NaN() : std::exp(x); };
+        show("Ridders, exp on x >= 0, at 0", derivative<Ridders>(right, 0.0));
+        auto const f = derivative<ForwardRidders>(right, 0.0);
+        show("ForwardRidders, at 0", f);
+        if (f) std::println("   {:<28} {:.1e}", "actual error", std::abs(f->value - 1.0));
+        show("BackwardRidders, x <= 0", derivative<BackwardRidders>(left, 0.0));
+        show("ForwardRidders, f'' at 0", derivative<ForwardRidders, 2>(right, 0.0));
+
+        // sqrt near 0: fn varies on the scale x, far below the default step; the method restarts below the smallest
+        // step it tried until it reaches that scale. d/dx sqrt(x) = 1 / (2 sqrt(x)) = 50 at 1e-4.
+        auto const s = derivative<ForwardRidders>([](double x) { return std::sqrt(x); }, 1e-4);
+        show("d/dx sqrt(x) at 1e-4", s);
+        if (s) std::println("   {:<28} {:.1e}", "actual error", std::abs(s->value - 50.0));
+
+        // A kink at x: the central methods return the mean of the two slopes, the one-sided ones each slope, exactly
+        // here (a line above 1, a parabola below). At compile time too.
+        constexpr auto kink = [](double x) { return x < 1.0 ? x * x : 3.0 * x - 2.0; };
+        static_assert(derivative<ForwardRidders>(kink, 1.0)->value == 3.0);
+        static_assert(derivative<BackwardRidders>(kink, 1.0)->value == 2.0);
+        show("kink at 1: Ridders", derivative<Ridders>(kink, 1.0));
+        show("kink at 1: ForwardRidders", derivative<ForwardRidders>(kink, 1.0));
+        show("kink at 1: BackwardRidders", derivative<BackwardRidders>(kink, 1.0));
+    }
+
 } // namespace
 
 int main()
@@ -240,4 +274,5 @@ int main()
     ridders();
     ridders_compile_time();
     higher_orders();
+    one_sided_ridders();
 }

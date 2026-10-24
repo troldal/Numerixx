@@ -245,14 +245,21 @@ TEST_CASE("ridders: restarts below a failing or untrusted step")
     CHECK(accurate(log, 0.01, 100.0, { 5.0e-14, 1.8e-13, 24 }));
     CHECK(accurate(log, 1e-4, 1e4, { 1.6e-14, 2.8e-13, 36 }));
 
-    // A pole on a sample (x + h = 1/128 at level 2) and one between the samples (non-dyadic, no infinite value).
+    // A pole on a sample (x + h = 1/128 at level 2) and one between the samples (non-dyadic, no infinite value). The
+    // second restarts after untrusted results, below the smallest step tried since Phase 5 (the references of these
+    // restarts are from the Phase 5 prototype, .scratch/onesided/ridders5.py; before, 3.8e-15, 3.9e-14 and 30).
     CHECK(accurate([](double x) { return 1 / (x - 1.0 / 128); }, 0.0, -16384.0, { 5.3e-15, 5.7e-14, 26 }));
-    CHECK(accurate([](double x) { return 1 / (x - 0.01); }, 0.0, -1e4, { 3.8e-15, 3.9e-14, 30 }));
+    CHECK(accurate([](double x) { return 1 / (x - 0.01); }, 0.0, -1e4, { 2.1e-14, 7.3e-14, 26 }));
 
     // Aliasing: sin(64 pi x) vanishes at every sample of the first tableau (h = 1/32, 1/64), which looks like a
-    // derivative of 0; the untrusted-result test restarts below it.
+    // derivative of 0; the untrusted-result test restarts below it (24 evaluations before Phase 5).
     double const omega = 64 * std::numbers::pi;
-    CHECK(accurate([omega](double x) { return std::sin(omega * x); }, 0.0, omega, { 0.0, 2.2e-16, 24 }));
+    CHECK(accurate([omega](double x) { return std::sin(omega * x); }, 0.0, omega, { 0.0, 2.2e-16, 20 }));
+
+    // Poles 1e-3 and 1e-4 from x, where fn is finite on both sides: before Phase 5 the restarts after untrusted results
+    // started at half the previous initial step and ran out of levels (f' at 1e-4 was 6% off).
+    CHECK(accurate([](double x) { return 1 / (x - 1e-3); }, 0.0, -1e6, { 2.0e-15, 5.8e-14, 32 }));
+    CHECK(accurate([](double x) { return 1 / (x + 1e-4); }, 0.0, -1e8, { 1.6e-15, 4.7e-14, 38 }));
 
     // Finite values whose difference overflows: at x = 1e300 the first steps give D_i = inf, and the tableau restarts.
     // fn is linear, so it has no truncation error and the estimate is the rounding floor, eps |f'| (the prototype was
@@ -300,7 +307,8 @@ TEST_CASE("ridders: failures, untrusted results and the level cap")
     CHECK(calls == 4);
 
     // The level cap with untrusted results: the Heaviside step at 0 is untrusted at every restart (each D_i doubles),
-    // so the cap ends it after 32 levels, and the last result is returned with an estimate above |value| / 4.
+    // so the cap ends it after 32 levels, and the last result is returned with an estimate above |value| / 4. Each
+    // restart starts below the smallest step tried, so the steps never repeat.
     auto const step_at_0 = [](double x) { return x < 0.0 ? 0.0 : 1.0; };
     auto const capped = derivative<Ridders>(counted(step_at_0), 0.0);
     REQUIRE(capped.has_value());

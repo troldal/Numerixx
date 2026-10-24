@@ -310,6 +310,33 @@ From numerics-reviewer:
 - **A harness reference had the wrong sign** (central f'', 1/(x - 0.01)). Corrected, the row's error is 1.3e-12, as
   the existing test's reference.
 
+## Changes during implementation
+
+- **Central bit identity, measured.** The study's 28,000 central cases (nine functions at 300 points and 800 poles,
+  N = 1 to 4, double and float) were dumped from the old and the new header. 5,233 changed: every one of the 800 poles
+  for N = 2 to 4 and 110 for N = 1, in both types, and 213 float f'''' cases, all of them after an untrusted result.
+  No double result on the nine functions changed. The C++ prototype with only the restart changed reproduces the new
+  header on all 28,000 cases, so the restart is the only change.
+- **The Python prototype** (`.scratch/onesided/ridders5.py`, numpy, from the textbook rules) reproduces the new
+  header for double bit for bit on 28,000 cases, both bases: values, estimates and evaluations. Its first run differed
+  only for x^7 - x, where it used `t ** 7` and the C++ repeated multiplication; numpy's exp, sin, log, atan and sqrt
+  round as the C++ libraries here. Every new test reference comes from it.
+- **fn finite at x only** costs 33, 65, 33 and 33 evaluations, not 33 to 129: a level stops at its first non-finite
+  value, except the f'' level, which evaluates both of its points first. The cap of 1 + 32 N is reached with every
+  evaluation made, and is tested on log at 1e-12, beyond the reach.
+- **The float polynomial case** is x^4 at 1 with h = 1/8, not at 3 with h = 1/32 as in the review: there the node
+  3 + 1/32 gives 97^4 / 2^20, which needs 27 bits.
+- **The warning's tests** silence deliberate float calls at the call (`tests/silence.hpp`); a call inside a test
+  template cannot be silenced from the line that instantiates it. The float f'' and f''' accuracy tests of `Ridders`
+  call the method directly in a silenced block, and share only the checks.
+- **The mirror is a struct, not a lambda** (`detail::Mirrored`, holding a pointer to fn): MSVC 19.51 rejects, in
+  constant evaluation, a lambda that captures a function reference by reference ("a read of an uninitialized
+  symbol"), which a static_assert of `BackwardRidders` on a plain function hit; GCC, Clang and clang-cl accept it.
+  Reproduced in isolation (`.scratch/onesided/msvc/repro.cpp`).
+- **Callables:** both methods are tested with a member-function pointer, a callable that rejects rvalues, a type
+  without a default constructor and one whose `numeric_limits` is written member by member, and with the
+  `exact_weights` constraint on a 2-digit type (f''' accepted, f'''' rejected, as for `Ridders`).
+
 ## Not adopted
 
 - **The propagated floor for `Ridders`:** it raised coverage slightly (f' from 99.0% to 99.3%; the worst f'' case

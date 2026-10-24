@@ -187,6 +187,10 @@ static_assert(!accepted<Backward<6>, 2, Narrow<11>>);
 static_assert(accepted<nxx::deriv::Ridders, 1, Narrow<2>> && accepted<nxx::deriv::Ridders, 3, Narrow<2>>);
 static_assert(!accepted<nxx::deriv::Ridders, 4, Narrow<2>> && !accepted<Central<2>, 4, Narrow<2>>);
 static_assert(accepted<Central<2>, 3, Narrow<2>>);
+// The one-sided extrapolations use Forward<1>'s table: 1, 2, 3 and 6 for f' to f''''.
+static_assert(accepted<nxx::deriv::ForwardRidders, 3, Narrow<2>>);
+static_assert(!accepted<nxx::deriv::ForwardRidders, 4, Narrow<2>>);
+static_assert(accepted<nxx::deriv::BackwardRidders, 4, Narrow<11>>);
 // The built-in types hold every table: Central<10> f'''' needs 6,222,216, below float's 2^24.
 static_assert(accepted<Central<10>, 4, double> && accepted<Forward<6>, 4, double>);
 static_assert(accepted_with_step<Central<10>, 3, float> && accepted_with_step<Backward<6>, 3, float>);
@@ -207,6 +211,19 @@ static_assert(derivative<Central<4>, 3>(&Real::square, Real(3), Real(0.5))->valu
 static_assert(
     derivative<nxx::deriv::Ridders, 4>([](NoDefault const &x) { return x * x; }, NoDefault(3), NoDefault(0.5))->value.v
     == 0.0);
+
+// The one-sided extrapolations on the user types, and BackwardRidders through its mirrored callable, which passes fn
+// a T const lvalue too. x^2 at 3 with h = 1/2: the forward rule's error is linear in h for a quadratic, so the first
+// column is exact, 6; f'' is exact at every level, 2.
+static_assert(derivative<nxx::deriv::ForwardRidders>(&Real::square, Real(3), Real(0.5))->value.v == 6.0);
+static_assert(derivative<nxx::deriv::BackwardRidders>(&Real::square, Real(3), Real(0.5))->value.v == 6.0);
+static_assert(derivative<nxx::deriv::BackwardRidders, 2>(&Real::square, Real(3), Real(0.5))->value.v == 2.0);
+static_assert(
+    derivative<nxx::deriv::ForwardRidders>([](NoDefault const &x) { return x * x; }, NoDefault(3), NoDefault(0.5))
+        ->value.v
+    == 6.0);
+static_assert(derivative<nxx::deriv::BackwardRidders>(plain_square, Plain(3), Plain(0.5))->value.v == 6.0);
+static_assert(derivative<nxx::deriv::BackwardRidders>(LvalueOnly{}, 1.0, 0.5) == 2.0);
 
 static_assert(std::invocable<LvalueOnly &, double const &> && !std::invocable<LvalueOnly &, double>);
 static_assert(nxx::real<Real> && std::invocable<decltype(&Real::square) &, Real const &>);
@@ -238,6 +255,13 @@ TEST_CASE("deriv: callables are invoked with a T const lvalue through std::invok
     CHECK(
         derivative<nxx::deriv::Ridders>([](NoDefault const &x) { return x * x; }, NoDefault(3), NoDefault(0.5))->value.v
         == 6.0);
+
+    // The one-sided extrapolations above.
+    CHECK(derivative<nxx::deriv::ForwardRidders>(&Real::square, Real(3), Real(0.5))->value.v == 6.0);
+    CHECK(derivative<nxx::deriv::BackwardRidders>(&Real::square, Real(3), Real(0.5))->value.v == 6.0);
+    CHECK(derivative<nxx::deriv::BackwardRidders, 2>(&Real::square, Real(3), Real(0.5))->value.v == 2.0);
+    CHECK(derivative<nxx::deriv::BackwardRidders>(LvalueOnly{}, 1.0, 0.5) == 2.0);
+    CHECK(derivative<nxx::deriv::BackwardRidders>(plain_square, Plain(3), Plain(0.5))->value.v == 6.0);
 
     // The higher orders above.
     CHECK(derivative<Central<2>, 2>(&Real::square, Real(3), Real(0.5))->value.v == 2.0);

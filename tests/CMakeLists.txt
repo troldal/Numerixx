@@ -27,7 +27,7 @@ target_include_directories(boost_multiprecision SYSTEM INTERFACE
 target_compile_definitions(boost_multiprecision INTERFACE BOOST_MP_STANDALONE)
 
 add_executable(numerixx_tests test_math.cpp test_deriv.cpp test_stencils.cpp test_callables.cpp test_ridders.cpp
-        test_orders.cpp)
+        test_orders.cpp test_onesided.cpp)
 target_link_libraries(numerixx_tests PRIVATE numerixx::numerixx doctest::doctest_with_main boost_multiprecision)
 if (MSVC)
     target_compile_options(numerixx_tests PRIVATE /W4 /WX /permissive-)
@@ -38,10 +38,11 @@ endif ()
 
 add_test(NAME numerixx_tests COMMAND numerixx_tests)
 
-# The low-precision warning of a 4th derivative in float. Each case is an object library outside the normal build,
-# built by its test, since one of them must fail: with warnings as errors, "warns" fails with the warning's text in the
-# output, while "silenced" (a pragma at the call) and "macro" (NUMERIXX_NO_PRECISION_WARNING) build.
-foreach (case IN ITEMS warns silenced macro)
+# The low-precision warning of a derivative above the first in float. Each case is an object library outside the normal
+# build, built by its test, since two of them must fail: with warnings as errors, "warns_step" and "warns_default" (one
+# per overload of derivative()) fail with the warning's text in the output, while "silenced" (a pragma at the calls)
+# and "macro" (NUMERIXX_NO_PRECISION_WARNING) build.
+foreach (case IN ITEMS warns_step warns_default silenced macro)
     set(target numerixx_precision_warning_${case})
     add_library(${target} OBJECT EXCLUDE_FROM_ALL precision_warning.cpp)
     target_link_libraries(${target} PRIVATE numerixx::numerixx)
@@ -52,9 +53,13 @@ foreach (case IN ITEMS warns silenced macro)
     endif ()
     add_test(NAME ${target} COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target ${target} --config $<CONFIG>)
 endforeach ()
+target_compile_definitions(numerixx_precision_warning_warns_step PRIVATE NUMERIXX_WARNING_STEP_ONLY)
+target_compile_definitions(numerixx_precision_warning_warns_default PRIVATE NUMERIXX_WARNING_DEFAULT_ONLY)
 target_compile_definitions(numerixx_precision_warning_silenced PRIVATE NUMERIXX_WARNING_SILENCED)
 target_compile_definitions(numerixx_precision_warning_macro PRIVATE NUMERIXX_NO_PRECISION_WARNING)
-set_tests_properties(numerixx_precision_warning_warns PROPERTIES PASS_REGULAR_EXPRESSION "mostly rounding noise")
-# The three build the same tree, so they must not run concurrently under ctest -j.
-set_tests_properties(numerixx_precision_warning_warns numerixx_precision_warning_silenced
-        numerixx_precision_warning_macro PROPERTIES RESOURCE_LOCK numerixx_build_tree)
+set_tests_properties(numerixx_precision_warning_warns_step numerixx_precision_warning_warns_default
+        PROPERTIES PASS_REGULAR_EXPRESSION "keep few correct digits")
+# The four build the same tree, so they must not run concurrently under ctest -j.
+set_tests_properties(numerixx_precision_warning_warns_step numerixx_precision_warning_warns_default
+        numerixx_precision_warning_silenced numerixx_precision_warning_macro
+        PROPERTIES RESOURCE_LOCK numerixx_build_tree)

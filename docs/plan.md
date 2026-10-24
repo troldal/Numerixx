@@ -44,6 +44,20 @@ API approved: `docs/PHASE4_API.md`.
   (d39e31b)
 - [x] CI passes on all five toolchains (run 39910979076)
 
+### Phase 5: one-sided Ridders, and the float warning from f''
+
+API approved: `docs/PHASE5_API.md`.
+
+- [ ] `derivative<ForwardRidders, N>` and `derivative<BackwardRidders, N>` for N = 1 to 4, on a `Forward<1>` base with
+  the rounding floor carried through the tableau, and `BackwardRidders` as the forward method on the mirrored function
+- [ ] One extrapolation driver on the base stencil; `Ridders` unchanged bit for bit except after untrusted results
+- [ ] After an untrusted result every Ridders method restarts below the smallest step tried (fixes poles 1e-3 and 1e-4
+  from x)
+- [ ] The low-precision warning for every derivative above the first in float, every method
+- [ ] An independent Python prototype that reproduces the C++ results for double bit for bit, as the source of the
+  test references
+- [ ] CI passes on all five toolchains
+
 ## Deferred
 
 - Gradients and Jacobians, until a module needs them.

@@ -584,7 +584,9 @@ Two things make a step bad. If fn is not finite at x +- h (a domain edge, a pole
 interval contained the bad point, so the tableau is discarded and restarted at h/2. And if the result has at most two
 correct bits while its estimate is far above the rounding floor, fn misbehaves within the step without producing an
 infinity (a pole between the samples, or aliasing: sin(64 pi x) vanishes at every sample of h = 1/32 and 1/64), so
-the method restarts below its starting step. At most 32 levels are attempted in all, 64 evaluations of fn.
+the method restarts below the smallest step it tried. (Until Phase 5 it restarted at half its starting step, which
+re-evaluated the same large steps: with a pole 1e-4 from x the levels ran out first.) At most 32 levels are attempted
+in all, 64 evaluations of fn.
 
 ### What it costs and gives
 
@@ -648,9 +650,38 @@ default initial step is larger, `max(|x|, 1) / 4` instead of `/ 32`, since the r
 7 times as accurate as `/ 32`. For double the method typically reaches 4e-13, 3e-11 and 7e-10 relative for f'' to
 f'''', in 13 to 45 evaluations, at most 129.
 
+### One side only: `ForwardRidders` and `BackwardRidders`
+
+Ridders' method samples both sides of x, so it fails where fn is undefined on one side: at a domain edge, or at the
+end of a correlation's range. `ForwardRidders` extrapolates the `Forward<1>` rule of order N instead, which samples x
+and above only, and gives an error estimate as `Ridders` does; `BackwardRidders` samples x and below.
+
+```cpp
+auto const f = [](double x) { return x < 1.0 ? std::nan("") : std::log(x); }; // undefined below 1
+auto const a = derivative<Ridders>(f, 1.0);           // non_finite: its samples reach below 1
+auto const b = derivative<ForwardRidders>(f, 1.0);    // 1 to about 1e-13, with an error estimate
+auto const c = derivative<BackwardRidders>(g, 2.0);   // g defined up to 2 only
+```
+
+The forward rule's error has every power of h, `D(h) = f^(N) + c_1 h + c_2 h^2 + ...`, so column j of the tableau
+divides by `2^j - 1` and gains one order per level instead of two. That makes it less accurate than `Ridders`: about
+2e-13, 1e-10, 4e-8 and 2e-6 relative for f' to f'''' in double, against 1e-14 to 7e-10, still 10 to 25 times better
+than the best one-sided stencil. Those columns also amplify the newest level's rounding about 3.5 times, against 1.4
+for the central ones, so the rounding floor of each entry is carried through the tableau rather than taken from the
+newest level; with it the estimate covered the error in 99.4% of the prototype's random cases for f'.
+
+A one-sided method never sees the NaN beyond an edge, so near one it learns only from untrusted results, and
+restarting below the smallest step tried is what lets it reach the scale of fn. From the default step
+`max(|x|, 1) / 32` it handles sqrt or log down to about 1e-9 from 0; closer, its result is wrong but flagged (an
+estimate of at least |value| / 4): pass a step on fn's own scale, such as `x / 8`. `BackwardRidders` is
+`ForwardRidders` applied to fn(-t) at -x, which gives exactly the points x - k h. Where fn is defined on both sides,
+use `Ridders`, also near an edge.
+
 ### The low-precision warning
 
-A 4th derivative in a type whose epsilon is above 1e-7 (float) gives a compiler warning. Standard C++ cannot
+A derivative above the first in a type whose epsilon is above 1e-7 (float) gives a compiler warning, by every method:
+the median relative error of f'' in float is 4e-4 with `Central<2>` and 1e-5 with `Ridders`, and f'''' is 2e-2 and
+1e-3. (Phase 4 warned for f'''' only.) Standard C++ cannot
 emit a warning from a template instantiation (`#warning` acts at preprocessing), so the warning comes from
 `[[deprecated]]`: each public overload has a twin with the extra
 constraint `detail::noisy<N, T>`, which overload resolution prefers for such calls because it is more constrained. The
@@ -659,11 +690,12 @@ off everywhere.
 
 ## 11. Limits, and what comes next
 
-- **Fixed rules only.** The methods are the three stencil families and Ridders; a user cannot supply their own
+- **Fixed rules only.** The methods are the three stencil families and the three Ridders methods; a user cannot
+  supply their own
   weights, and a method cannot be chosen at run time except by a `switch` over `derivative<M>` calls.
 - **Orders up to 4, one at a time.** Several orders from shared evaluations (for Halley's method, say) and mixed
   partial derivatives are deferred.
-- **Only Ridders estimates its error.** The stencils leave `abs_error` empty.
+- **Only the Ridders methods estimate their error.** The stencils leave `abs_error` empty.
 - **The step assumes f varies on the scale `max(|x|, 1)`.** For a stencil and a faster-varying function, pass a step,
   or use Ridders.
 
