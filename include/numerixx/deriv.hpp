@@ -535,7 +535,7 @@ namespace nxx::deriv {
          * @return The step.
          */
         template<int Exponent, real T>
-        constexpr T default_step(T const &x)
+        constexpr T stencil_step(T const &x)
         { return math::root_epsilon<Exponent, T>() * detail::scale(x); }
 
         /**
@@ -1350,6 +1350,45 @@ namespace nxx::deriv {
             }
         }
 
+    } // namespace detail
+
+    /**
+     * @brief The step that `derivative<M, N>(fn, x)` uses when no step is passed.
+     *
+     * For a stencil of accuracy order P it is eps^(1/(P+N)) * max(|x|, 1); for Ridders it is the initial step,
+     * max(|x|, 1) / 32 for f' and max(|x|, 1) / 4 for f'' to f''''. For every finite x, `derivative<M, N>(fn, x)` and
+     * `derivative<M, N>(fn, x, default_step<M, N>(x))` give the same result, so a caller can repeat a rule at twice or
+     * half the default step, or apply it by hand, without rebuilding the formula.
+     *
+     * @code
+     * double const h = default_step<Central<2>>(x);            // what derivative(fn, x) uses
+     * auto const coarse = derivative<Central<2>>(fn, x, 2 * h); // the same rule at twice the step
+     * @endcode
+     *
+     * @tparam M The method: `Central<P>` (by default `Central<2>`), `Forward<P>`, `Backward<P>` or `Ridders`.
+     * @tparam N The derivative order: 1 (the default) to 4, an integer or an `order`.
+     * @tparam T The real type, deduced from @p x.
+     * @param x The point.
+     * @pre x finite.
+     * @return The step, positive and finite.
+     */
+    template<typename M = Central<2>, auto N = 1, real T>
+    requires detail::method<M> && detail::valid_order<N>
+    [[nodiscard]] constexpr T default_step(T const &x)
+    {
+        assert(math::isfinite(x)); // a non-finite point is a bug in the caller, as a bad step is for derivative()
+        constexpr int n = static_cast<int>(N);
+        if constexpr (std::same_as<M, Ridders>) {
+            constexpr int divisor = detail::ridders_divisors[static_cast<std::size_t>(n - 1)];
+            return T(detail::scale(x) / T(divisor));
+        } else {
+            constexpr int exponent = detail::make_table<n>(M{}).order + n;
+            return detail::stencil_step<exponent>(x);
+        }
+    }
+
+    namespace detail {
+
         /**
          * @brief The N-th derivative of fn at x by method M with its default step, behind the public overloads.
          *
@@ -1366,13 +1405,8 @@ namespace nxx::deriv {
         {
             // Checked first: a NaN x would give a NaN step and trip the precondition.
             if (!math::isfinite(x)) return std::unexpected(error::non_finite);
-            if constexpr (std::same_as<M, Ridders>) {
-                constexpr int divisor = ridders_divisors[static_cast<std::size_t>(N - 1)];
-                return detail::derivative_with_step<M, N>(fn, x, T(detail::scale(x) / T(divisor)));
-            } else {
-                constexpr int exponent = detail::make_table<N>(M{}).order + N;
-                return detail::derivative_with_step<M, N>(fn, x, detail::default_step<exponent>(x));
-            }
+            // The public default_step, so that derivative(fn, x) and derivative(fn, x, default_step(x)) agree.
+            return detail::derivative_with_step<M, N>(fn, x, nxx::deriv::default_step<M, N>(x));
         }
 
     } // namespace detail
@@ -1419,12 +1453,13 @@ namespace nxx::deriv {
     /**
      * @brief The @p N-th derivative of @p fn at @p x by method @p M with its default step.
      *
-     * For a stencil of order P the step is eps^(1/(P+N)) * max(|x|, 1). It balances truncation against rounding when
-     * fn varies on the scale max(|x|, 1), and the error is then about eps^(P/(P+N)); pass a step when fn varies
-     * faster, or when the derivative is much smaller than that error. The sensitivity grows with N: for f'''',
-     * misjudging fn's scale by a factor 2 costs up to 16 in error. For Ridders the initial step is max(|x|, 1) / 32
-     * for f' and max(|x|, 1) / 4 for f'' to f'''', and the method adapts it. The default steps differ between methods
-     * and orders, so generic code that varies N should use this overload rather than pass one h for every order.
+     * For a stencil of order P the step is eps^(1/(P+N)) * max(|x|, 1). It balances truncation against rounding when fn
+     * varies on the scale max(|x|, 1), and the error is then about eps^(P/(P+N)); pass a step when fn varies faster, or
+     * when the derivative is much smaller than that error. The sensitivity grows with N: for f'''', misjudging fn's
+     * scale by a factor 2 costs up to 16 in error. For Ridders the initial step is max(|x|, 1) / 32 for f' and
+     * max(|x|, 1) / 4 for f'' to f'''', and the method adapts it; default_step<M, N>(x) returns the step. The default
+     * steps differ between methods and orders, so generic code that varies N should use this overload rather than pass
+     * one h for every order.
      *
      * @tparam M The method: `Central<P>` (by default `Central<2>`), `Forward<P>`, `Backward<P>` or `Ridders`.
      * @tparam N The derivative order: 1 (the default) to 4, an integer or an `order`.

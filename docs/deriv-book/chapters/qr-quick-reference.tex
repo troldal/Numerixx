@@ -61,7 +61,8 @@ Situation & Method and step & Cost and accuracy\\
 \bottomrule
 \end{tabular}}
 
-\qrhead{Your own step.} \code{h = nxx::math::root_epsilon<3, double>() * w;} for $\epsmach^{1/3} w$
+\qrhead{Your own step.} \code{default_step<M, N>(x)} is the one \code{derivative} uses;
+\code{h = nxx::math::root_epsilon<3, double>() * w;} for $\epsmach^{1/3} w$
 (\code{Central<2>}, $f'$; in general \code{root_epsilon<P + N, T>()}), and
 \code{h = std::cbrt(eta) * std::max(std::abs(x), 1.0);} for a noisy $f$.
 

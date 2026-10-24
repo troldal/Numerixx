@@ -249,8 +249,8 @@ $-\log_{10}(\abs{a - b} / \abs{b})$, with a helper \code{digits(a, b)}.
 
 \paragraph{Repeat with $2h$ and $h/2$.} While truncation dominates, halving the step quarters the error of
 \code{Central<2>}; while rounding dominates, it doubles it. Values that agree to many digits at $h$, $2h$ and $h/2$ are
-accurate to about that many. The library has no accessor for its default step, so the check rebuilds it,
-\code{root_epsilon<P + N, T>() * max(|x|, 1)}:
+accurate to about that many. \code{default_step<M, N>(x)} returns the step that the call without one uses
+(\cref{sec:api-derivative}):
 \needspace{16\baselineskip}% the listing in one piece (stage-6 layout)
 \snippet{07-using-check}{check-by-steps}
 Here they agree to \num{\valCheckStepsDigits} digits, and the value agrees with the closed form to

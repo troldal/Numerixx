@@ -128,8 +128,8 @@ numerators.\label{tab:weights-forward-fourth}}
 \Cref{tab:default-steps} gives, for every stencil and order, the exponent of the default step
 $h = \epsmach^{1/(\aorder+\dorder)} \max(\abs{x}, 1)$, the step itself for \code{double} at $\abs{x} \le 1$ (for a
 larger $\abs{x}$, multiply by $\abs{x}$), the model's relative error $\epsmach^{\aorder/(\aorder+\dorder)}$ at that
-step, and the number of evaluations. The steps are \code{nxx::math::root_epsilon<P + N, double>()}, computed by the
-library. The model error drops the constants $\errc$ and $\ampl$ and assumes that $f$ varies on the scale
+step, and the number of evaluations. The steps are \code{nxx::math::root_epsilon<P + N, double>()};
+\code{default_step<M, N>(x)} returns them times the scale. The model error drops the constants $\errc$ and $\ampl$ and assumes that $f$ varies on the scale
 $\max(\abs{x}, 1)$, $\abs{f} \sim s^{\dorder} \abs{f^{(\dorder)}}$; it is a rule of thumb, and the measured
 accuracies are in \cref{tab:accuracy-matrix}.
 

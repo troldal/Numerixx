@@ -11,14 +11,11 @@
 #include <numerixx/deriv.hpp>
 #include <numerixx/math.hpp>
 
-#include <algorithm>
 #include <cmath>
 #include <print>
 
 int main()
 {
-    using nxx::math::root_epsilon;
-
     // clang-format off
 // <noise-estimate-use>
 // f(Re) from a solver converged to the tolerance 1e-10
@@ -26,8 +23,7 @@ auto const f = [](double re) {
     return book::friction(re, 1e-10);
 };
 double const Re = 1e5;
-double const h = root_epsilon<3, double>()
-                 * std::max(std::abs(Re), 1.0);
+double const h = nxx::deriv::default_step(Re);
 auto const e = book::estimate_noise(f, Re, h); // 8 values
 double eta = 1e-10; // the solver's tolerance, as fallback
 if (e.k > 0) {      // the estimate settled
@@ -50,7 +46,7 @@ double const h_eta = std::cbrt(eta) * Re; // the step
     double const eta_g = 1e-8;
     auto const g = [eta_g](double x) { return book::noisy(std::exp(x), x, eta_g); };
     double const x = 1.0;
-    double const hx = root_epsilon<3, double>() * std::max(std::abs(x), 1.0);
+    double const hx = nxx::deriv::default_step(x);
     auto const n = book::estimate_noise(g, x, hx);
     if (e.k == 0 || n.k == 0) return 1;
     double const rel_f = e.sigma / std::abs(f(Re));

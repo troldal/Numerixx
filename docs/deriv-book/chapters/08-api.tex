@@ -20,6 +20,7 @@ numbers.
 Name & Kind & Section\\
 \midrule
 \code{derivative} & function template: two overloads, each with a deprecated twin & \ref{sec:api-derivative}\\
+\code{default_step} & function template & \ref{sec:api-derivative}\\
 \code{Estimate<T>} & class template, an aggregate & \ref{sec:api-estimate}\\
 \code{error} & scoped enumeration: \code{non_finite} & \ref{sec:api-error-order}\\
 \code{order} & scoped enumeration over \code{int}: \code{first} to \code{fourth} & \ref{sec:api-error-order}\\
@@ -92,8 +93,16 @@ and near a power of two a step can move $x$ on one side only, so that \code{Cent
 and returns a finite value that is mostly rounding.
 
 \paragraph{Default steps.} For a stencil of accuracy order P, $h = \epsmach^{1/(P+N)} \max(\abs{x}, 1)$, computed as
-\code{root_epsilon<P + N, T>()} times the scale; there is no accessor for it. For Ridders' method the initial step is
-$\max(\abs{x}, 1)/32$ for $f'$ and $\max(\abs{x}, 1)/4$ for $f''$ to $f''''$. Pass a step when \code{fn} varies faster
+\code{root_epsilon<P + N, T>()} times the scale. For Ridders' method the initial step is
+$\max(\abs{x}, 1)/32$ for $f'$ and $\max(\abs{x}, 1)/4$ for $f''$ to $f''''$. \code{default_step} returns the step,
+so that \code{derivative<M, N>(fn, x)} and \code{derivative<M, N>(fn, x, default_step<M, N>(x))} give the same
+result; \code{x} must be finite (an \code{assert}):
+\begin{signature}
+\code{template<typename M = Central<2>, auto N = 1, real T>}\\
+\sigindent\code{requires detail::method<M> && detail::valid_order<N>}\\
+\code{[[nodiscard]] constexpr T default_step(T const &x);}
+\end{signature}
+Pass a step when \code{fn} varies faster
 than $\max(\abs{x}, 1)$, or when the derivative is much smaller than the error $\epsmach^{P/(P+N)}$; use the overload
 without a step in generic code that varies N (\cref{tab:default-steps}).
 

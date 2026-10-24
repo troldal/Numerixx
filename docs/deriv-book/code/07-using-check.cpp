@@ -42,9 +42,7 @@ int main()
     // clang-format off
 // <check-by-steps>
 // Central<2> at its default step h, and at 2h and h/2
-// the default step: root_epsilon<P + N, T>() * max(|x|, 1)
-double const s_T = std::max(std::abs(T0), 1.0);
-double const h = nxx::math::root_epsilon<3, double>() * s_T;
+double const h = nxx::deriv::default_step(T0);
 auto const d = derivative(H, T0, h);
 auto const d2 = derivative(H, T0, 2 * h);
 auto const d0 = derivative(H, T0, h / 2);
@@ -108,7 +106,7 @@ if (r) {
 // but the spread is tiny against |f| / max(|x|, 1).
 auto const sine = [](double x) { return std::sin(x); };
 double const x = 1.5708; // just above pi/2
-double const hs = nxx::math::root_epsilon<3, double>() * x;
+double const hs = nxx::deriv::default_step(x);
 auto const s = derivative(sine, x, hs);
 auto const s2 = derivative(sine, x, 2 * hs);
 auto const s0 = derivative(sine, x, hs / 2);

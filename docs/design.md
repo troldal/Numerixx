@@ -120,6 +120,10 @@ Decisions in force. Each one says why; change it here before changing the code.
   for `Central<2>` and f'', 11 for f''''), but on test functions that vary faster than `max(|x|, 1)` half the default
   step was better for every order, f' included, so one convention is kept for all N. Callers pass a step when fn varies
   faster; the sensitivity grows with N.
+- `default_step<M, N>(x)` returns the step that `derivative<M, N>(fn, x)` uses (for Ridders, the initial step), so a
+  caller can repeat a rule at 2h and h/2 or apply it by hand without rebuilding the formula. The overload without a
+  step calls it, so the two calls give the same result for every finite x; a non-finite x is a precondition
+  violation (an `assert`), as a bad step is.
 - The two-point difference is one helper, `detail::difference`, returning the value and the values and spacing for the
   rounding floor `(eps |f_lo| + eps |f_hi|) / (x_hi - x_lo)`; the two-node stencils and every f' Ridders level use it,
   as `detail::second_difference` serves `Central<2>` for f'' and the f'' Ridders levels.

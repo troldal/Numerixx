@@ -140,3 +140,74 @@ TEST_CASE("deriv: a non-finite estimate is an error")
     CHECK(derivative(counted, 1.0, 1e-300) == std::unexpected(nxx::deriv::error::non_finite));
     CHECK(calls == 0);
 }
+
+
+// default_step<M, N>(x) is the step derivative<M, N>(fn, x) uses (U-12). Closed forms: eps^(1/(P+N)) max(|x|, 1) for a
+// stencil, max(|x|, 1) / 32 (f') or / 4 (f'' to f'''') for Ridders' initial step.
+using nxx::deriv::default_step;
+
+static_assert(default_step(0.5) == nxx::math::root_epsilon<3, double>());
+static_assert(default_step<nxx::deriv::Central<4>, 2>(-3.0) == nxx::math::root_epsilon<6, double>() * 3.0);
+static_assert(default_step<nxx::deriv::Ridders>(1000.0) == 31.25);
+static_assert(default_step<nxx::deriv::Ridders, nxx::deriv::order::second>(-8.0) == 2.0);
+
+namespace {
+
+    // A smooth function of + - * / only, so that it works for every real type and in constant expressions.
+    template<typename T>
+    constexpr T smooth(T const &t)
+    { return T(T(t * t * t + T(2)) / T(t * t + T(1))); }
+
+    // The default-step call and the call with default_step's step give the same result, value and estimate.
+    template<typename M, int N, typename T>
+    constexpr bool agrees(T const &x)
+    {
+        auto const fn = [](T const &t) { return smooth(t); };
+        return derivative<M, N>(fn, x) == derivative<M, N>(fn, x, default_step<M, N>(x));
+    }
+
+    template<typename M, int Last, typename T>
+    constexpr bool agrees_up_to(T const &x)
+    {
+        if constexpr (Last == 1) return agrees<M, 1>(x);
+        else return agrees<M, Last>(x) && agrees_up_to<M, Last - 1>(x);
+    }
+
+    // Six methods, orders 1 to Last (4, or 3 for a type whose fourth derivative is deprecated as noise).
+    template<int Last, typename T>
+    constexpr bool agrees_for_methods(T const &x)
+    {
+        using namespace nxx::deriv;
+        return agrees_up_to<Central<2>, Last>(x) && agrees_up_to<Central<10>, Last>(x)
+               && agrees_up_to<Forward<1>, Last>(x) && agrees_up_to<Forward<6>, Last>(x)
+               && agrees_up_to<Backward<3>, Last>(x) && agrees_up_to<Ridders, Last>(x);
+    }
+
+} // namespace
+
+// |x| below 1, a negative x and a large x, where the scale max(|x|, 1) differs. One assertion per method: MSVC limits a
+// constant evaluation to about a million steps (/constexpr:steps), which all six methods together exceed.
+template<typename M>
+constexpr bool agrees_at_three_points()
+{ return agrees_up_to<M, 4>(0.5) && agrees_up_to<M, 4>(-3.0) && agrees_up_to<M, 4>(1000.0); }
+
+static_assert(agrees_at_three_points<nxx::deriv::Central<2>>());
+static_assert(agrees_at_three_points<nxx::deriv::Central<10>>());
+static_assert(agrees_at_three_points<nxx::deriv::Forward<1>>());
+static_assert(agrees_at_three_points<nxx::deriv::Forward<6>>());
+static_assert(agrees_at_three_points<nxx::deriv::Backward<3>>());
+static_assert(agrees_at_three_points<nxx::deriv::Ridders>());
+
+TEST_CASE("deriv: default_step is the step of the default-step call")
+{
+    CHECK(default_step(0.5) == nxx::math::root_epsilon<3, double>());
+    CHECK(default_step<nxx::deriv::Ridders>(1000.0) == 31.25);
+    CHECK(agrees_for_methods<4>(0.5));
+    CHECK(agrees_for_methods<4>(-3.0));
+    CHECK(agrees_for_methods<4>(1000.0));
+    CHECK(agrees_for_methods<3>(0.5f));
+    CHECK(agrees_for_methods<3>(-3.0f));
+    CHECK(agrees_for_methods<4>(bin50(0.5)));
+    CHECK(agrees_for_methods<4>(bin50(-3)));
+    CHECK(agrees_for_methods<4>(bin50_et(1000)));
+}
