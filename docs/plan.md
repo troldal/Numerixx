@@ -48,15 +48,17 @@ API approved: `docs/PHASE4_API.md`.
 
 API approved: `docs/PHASE5_API.md`.
 
-- [ ] `derivative<ForwardRidders, N>` and `derivative<BackwardRidders, N>` for N = 1 to 4, on a `Forward<1>` base with
+- [x] `derivative<ForwardRidders, N>` and `derivative<BackwardRidders, N>` for N = 1 to 4, on a `Forward<1>` base with
   the rounding floor carried through the tableau, and `BackwardRidders` as the forward method on the mirrored function
-- [ ] One extrapolation driver on the base stencil; `Ridders` unchanged bit for bit except after untrusted results
-- [ ] After an untrusted result every Ridders method restarts below the smallest step tried (fixes poles 1e-3 and 1e-4
-  from x)
-- [ ] The low-precision warning for every derivative above the first in float, every method
-- [ ] An independent Python prototype that reproduces the C++ results for double bit for bit, as the source of the
-  test references
-- [ ] CI passes on all five toolchains
+  (f20696f)
+- [x] One extrapolation driver on the base stencil; `Ridders` unchanged bit for bit except after untrusted results
+  (f20696f; 28,000 cases compared with the previous header)
+- [x] After an untrusted result every Ridders method restarts below the smallest step tried (fixes poles 1e-3 and 1e-4
+  from x) (f20696f)
+- [x] The low-precision warning for every derivative above the first in float, every method (f20696f)
+- [x] An independent Python prototype that reproduces the C++ results for double bit for bit, as the source of the
+  test references (`.scratch/onesided/ridders5.py`, 28,000 cases)
+- [x] CI passes on all five toolchains (run 40138064893)
 
 ## Deferred
 
