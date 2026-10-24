@@ -49,11 +49,13 @@ later version. The examples of the book name the function, the method tags, \cod
 \code{template<typename M = Central<2>, auto N = 1, real T, typename F>}\\
 \sigindent\code{requires detail::method<M> && detail::valid_order<N>}\\
 \sigindent\sigindent\code{&& detail::callable<F, T>}\\
+\sigindent\sigindent\code{&& detail::exact_weights<M, N, T>}\\
 \code{[[nodiscard]] constexpr std::expected<Estimate<T>, error>}\\
 \sigindent\code{derivative(F &&fn, T const &x, std::type_identity_t<T> const &h);}\\[1ex]
 \code{template<typename M = Central<2>, auto N = 1, real T, typename F>}\\
 \sigindent\code{requires detail::method<M> && detail::valid_order<N>}\\
 \sigindent\sigindent\code{&& detail::callable<F, T>}\\
+\sigindent\sigindent\code{&& detail::exact_weights<M, N, T>}\\
 \code{[[nodiscard]] constexpr std::expected<Estimate<T>, error>}\\
 \sigindent\code{derivative(F &&fn, T const &x);}
 \end{signature}
@@ -70,7 +72,8 @@ Each has a twin with the additional constraint \code{detail::noisy<N, T>}, marke
     an \code{order}. \code{detail::valid_order<N>} compares an integer in its own type, so a value beyond the range of
     \code{int} is not wrapped into 1 to 4.
   \item \code{T}, the real type, deduced from \code{x} alone; it must satisfy \code{nxx::real}, which includes the
-    \code{numeric_limits} members of \cref{sec:api-real}. The step's type, \code{std::type_identity_t<T>}, is
+    \code{numeric_limits} members of \cref{sec:api-real}, and hold the method's integer weights exactly,
+    \code{detail::exact_weights<M, N, T>} (\cref{sec:api-methods}). The step's type, \code{std::type_identity_t<T>}, is
     non-deduced, so a \code{double} step converts to a multiprecision \code{T}; the conversion is implicit, so for a
     \code{float} \code{x} write \code{1e-3f}, since a \code{double} step is diagnosed under \code{-Wconversion} unless
     \code{float} holds it exactly.
@@ -209,10 +212,10 @@ The methods are empty tags, passed as the first template argument of \code{deriv
 P is the accuracy order, the $\order(h^P)$ of the error, not the number of points. A tag with an order outside its
 range is rejected by the constraint of \code{derivative}; completing the type itself fails a \code{static_assert}
 (``\code{Central<P> needs an even order P from 2 to 10}'', ``\code{Forward<P> needs an order P from 1 to 6}''). A
-stencil whose integer weights the type \code{T} cannot hold exactly fails a \code{static_assert} too (``this rule's
-integer weights are not exact in T''); every type with 24 significant bits or more holds them all. That check is in
-the body of the evaluator, not in a constraint: a \code{requires}-expression reports such a call as valid (for
-\code{Central<10>} with \code{std::float16_t}, say), and the call then fails to compile inside the library.
+rule whose integer weights the type \code{T} cannot hold exactly is rejected by the constraint
+\code{detail::exact_weights<M, N, T>}, which a \code{requires}-expression sees; every type with 24 significant bits
+or more holds them all, and Ridders' method is checked against the weights of \code{Central<2>} it uses. A
+half-precision type accepts \code{Central<4>}, for one, but not \code{Central<10>}.
 \Cref{tab:api-methods} gives the nodes, the cost and the default step of each.
 
 The two-node rules divide by the distance between the points actually evaluated, \code{Central<2>} for $f''$ by its
@@ -271,9 +274,8 @@ The helpers use comparisons and $+ - \times /$ only, so they run in constant exp
 \section{Rejected calls}\label{sec:api-rejected}
 
 What the constraints reject does not compile: the error is reported at the call, not at run time. The example tests
-each case with a \code{requires}-expression. A type too narrow for a rule's integer weights is rejected by a
-\code{static_assert} inside the library instead (\cref{sec:api-methods}), which a \code{requires}-expression does not
-see.
+each case with a \code{requires}-expression. A type too narrow for a rule's integer weights is rejected the same
+way (\cref{sec:api-methods}).
 
 \snippet{08-api-usage}{api-rejected}
 A type given explicitly as the second template argument, as in

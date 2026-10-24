@@ -539,6 +539,41 @@ namespace nxx::deriv {
         { return math::root_epsilon<Exponent, T>() * detail::scale(x); }
 
         /**
+         * @brief The largest integer in the weight table that method M uses for the N-th derivative: the largest
+         * numerator in magnitude, or the denominator.
+         *
+         * Ridders uses the table of `Central<2>`, as ridders_level does for f''' and f'''' (its f' and f'' need 2,
+         * as that table does).
+         *
+         * @tparam M The method.
+         * @tparam N The derivative order, 1 to 4.
+         */
+        template<typename M, int N>
+        inline constexpr long long largest_weight_integer = [] {
+            using S = std::conditional_t<std::same_as<M, Ridders>, Central<2>, M>;
+            constexpr auto table = detail::make_table<N>(S{});
+            long long v = table.denominator;
+            for (int const c : table.numerators) v = c < -v ? -c : (c > v ? c : v);
+            return v;
+        }();
+
+        /**
+         * @brief Whether T holds every integer of the weight table of method M for the N-th derivative exactly, so
+         * that the rule keeps its order.
+         *
+         * Every type with 24 significant bits or more holds every table (the largest integer is 6,222,216, of
+         * `Central<10>` for f''''); a narrower type, such as half precision, needs a rule with smaller weights: a lower
+         * order, or Ridders. A constraint of derivative(), so that a requires-expression sees it; it must follow
+         * method<M> and valid_order<N> there, because it builds the table.
+         *
+         * @tparam M The method.
+         * @tparam N The derivative order, 1 to 4, an integer or an `order`.
+         * @tparam T The real type.
+         */
+        template<typename M, auto N, typename T>
+        concept exact_weights = detail::holds_integers<T>(detail::largest_weight_integer<M, static_cast<int>(N)>);
+
+        /**
          * @brief Whether every point x + k h and the divisor of a rule are finite: h <= max / 2q and |x| <= max - q h.
          *
          * With K = max(|lo|, |hi|) the largest node and q = max(2K, denominator), nothing overflows before fn is
@@ -1007,13 +1042,6 @@ namespace nxx::deriv {
             constexpr int hi = table.nodes[size - 1];
             constexpr int k_max = -lo > hi ? -lo : hi;
             constexpr int q = 2 * k_max > table.denominator ? 2 * k_max : table.denominator;
-            constexpr long long largest_value = [](auto const &t) {
-                long long v = t.denominator;
-                for (int const c : t.numerators) v = c < -v ? -c : (c > v ? c : v);
-                return v;
-            }(table);
-            static_assert(detail::holds_integers<T>(largest_value),
-                "this rule's integer weights are not exact in T: use a type with more significant digits");
             if (!detail::fits(x, h, q)) return std::unexpected(error::non_finite);
 
             if constexpr (size == 2) {
@@ -1443,6 +1471,7 @@ namespace nxx::deriv {
     // multiprecision T instead of making deduction fail. N is auto, because the scoped order does not convert to int.
     template<typename M = Central<2>, auto N = 1, real T, typename F>
     requires detail::method<M> && detail::valid_order<N> && detail::callable<F, T>
+             && detail::exact_weights<M, N, T>
     [[nodiscard]] constexpr std::expected<Estimate<T>, error>
         derivative(F &&fn, T const &x, std::type_identity_t<T> const &h)
     {
@@ -1471,6 +1500,7 @@ namespace nxx::deriv {
      */
     template<typename M = Central<2>, auto N = 1, real T, typename F>
     requires detail::method<M> && detail::valid_order<N> && detail::callable<F, T>
+             && detail::exact_weights<M, N, T>
     [[nodiscard]] constexpr std::expected<Estimate<T>, error> derivative(F &&fn, T const &x)
     { return detail::derivative_default<M, static_cast<int>(N)>(fn, x); }
 
@@ -1492,7 +1522,8 @@ namespace nxx::deriv {
      * @return As for the general overload.
      */
     template<typename M = Central<2>, auto N = 1, real T, typename F>
-    requires detail::method<M> && detail::valid_order<N> && detail::callable<F, T> && detail::noisy<N, T>
+    requires detail::method<M> && detail::valid_order<N> && detail::callable<F, T>
+             && detail::exact_weights<M, N, T> && detail::noisy<N, T>
     [[deprecated(
         "the 4th derivative in a type with 7 or fewer significant digits is mostly rounding noise: use "
         "double, or silence this warning at the call or with NUMERIXX_NO_PRECISION_WARNING")]] [[nodiscard]]
@@ -1512,7 +1543,8 @@ namespace nxx::deriv {
      * @return As for the general overload.
      */
     template<typename M = Central<2>, auto N = 1, real T, typename F>
-    requires detail::method<M> && detail::valid_order<N> && detail::callable<F, T> && detail::noisy<N, T>
+    requires detail::method<M> && detail::valid_order<N> && detail::callable<F, T>
+             && detail::exact_weights<M, N, T> && detail::noisy<N, T>
     [[deprecated(
         "the 4th derivative in a type with 7 or fewer significant digits is mostly rounding noise: use "
         "double, or silence this warning at the call or with NUMERIXX_NO_PRECISION_WARNING")]] [[nodiscard]]

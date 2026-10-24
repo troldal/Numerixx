@@ -25,13 +25,13 @@ namespace nxx {
      *
      * @tparam T The candidate type.
      */
-    // Constructible from int, because constants are written T(1), T(2): a double literal would silently lose
-    // precision in a wider type. The operators' results need only convert to T, because Boost.Multiprecision with
-    // expression templates returns an expression object from a + b, not a T. The numeric_limits members are those the
-    // headers read: radix and digits in constant expressions (a static_assert and the float-warning constraint), radix
-    // at least 2 because root_epsilon and the overflow guards scale by it; epsilon() and max() are copy-initialised
-    // into T, while denorm_min() is read as T(denorm_min()), so a type that inherits numeric_limits<double> and
-    // constructs from double only explicitly is accepted.
+    // Constructible from int, because constants are written T(1), T(2): a double literal would silently lose precision
+    // in a wider type. The operators' results need only convert to T, because Boost.Multiprecision with expression
+    // templates returns an expression object from a + b, not a T. The numeric_limits members are those the headers
+    // read: radix and digits in constant expressions (the exact-weights and float-warning constraints of derivative),
+    // radix at least 2 because root_epsilon and the overflow guards scale by it; epsilon() and max() are
+    // copy-initialised into T, while denorm_min() is read as T(denorm_min()), so a type that inherits
+    // numeric_limits<double> and constructs from double only explicitly is accepted.
     template<typename T>
     concept real = std::numeric_limits<T>::is_specialized && !std::numeric_limits<T>::is_integer
                    && std::numeric_limits<T>::is_bounded && !std::numeric_limits<T>::is_exact

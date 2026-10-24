@@ -122,12 +122,76 @@ struct std::numeric_limits<Plain>
 
 static_assert(nxx::real<Plain>);
 
-// x^2 at 3 with h = 1/2: exact for every rule of order >= 2 and for Ridders (6; the second derivative is 2, the third 0).
+// x^2 at 3 with h = 1/2: exact for every rule of order >= 2 and for Ridders (6; the second derivative is 2, the
+// third 0).
 static_assert(derivative(plain_square, Plain(3), Plain(0.5))->value.v == 6.0);
 static_assert(derivative<Forward<2>>(plain_square, Plain(3), Plain(0.5))->value.v == 6.0);
 static_assert(derivative<nxx::deriv::Ridders>(plain_square, Plain(3), Plain(0.5))->value.v == 6.0);
 static_assert(derivative<Central<2>, 2>(plain_square, Plain(3), Plain(0.5))->value.v == 2.0);
 static_assert(derivative<Central<4>, 3>(plain_square, Plain(3), Plain(0.5))->value.v == 0.0);
+
+namespace {
+
+    // Types that declare few significant binary digits, numeric_limits written member by member (U-10): D = 11 is half
+    // precision, D = 2 holds the integers 0 to 3. A template, so that its operators, which only the constraints
+    // inspect in most cases, are not reported as unused.
+    template<int D>
+    struct Narrow
+    {
+        double v = 0;
+
+        constexpr Narrow(int i) : v(i) {}
+        constexpr explicit Narrow(double d) : v(d) {}
+
+        friend constexpr Narrow operator+(Narrow a, Narrow b) { return Narrow(a.v + b.v); }
+        friend constexpr Narrow operator-(Narrow a, Narrow b) { return Narrow(a.v - b.v); }
+        friend constexpr Narrow operator*(Narrow a, Narrow b) { return Narrow(a.v * b.v); }
+        friend constexpr Narrow operator/(Narrow a, Narrow b) { return Narrow(a.v / b.v); }
+        friend constexpr Narrow operator-(Narrow a) { return Narrow(-a.v); }
+        friend constexpr auto operator<=>(Narrow, Narrow) = default;
+    };
+
+    template<typename T>
+    constexpr T narrow_square(T const &x) { return x * x; }
+
+    template<typename M, int N, typename T>
+    constexpr bool accepted = requires { derivative<M, N>(narrow_square<T>, T(1)); };
+
+    template<typename M, int N, typename T>
+    constexpr bool accepted_with_step = requires { derivative<M, N>(narrow_square<T>, T(1), T(1)); };
+
+} // namespace
+
+template<int D>
+struct std::numeric_limits<Narrow<D>>
+{
+    static constexpr bool is_specialized = true;
+    static constexpr bool is_integer = false;
+    static constexpr bool is_bounded = true;
+    static constexpr bool is_exact = false;
+    static constexpr int radix = 2;
+    static constexpr int digits = D;
+    static constexpr Narrow<D> epsilon() { return Narrow<D>(1e-3); }
+    static constexpr Narrow<D> max() { return Narrow<D>(65504.0); }
+    static constexpr Narrow<D> denorm_min() { return Narrow<D>(6e-8); }
+};
+
+// A rule whose integer weights T cannot hold exactly is rejected by the constraint detail::exact_weights, so that a
+// requires-expression sees it (U-10). Largest integers: Central<2> 2 (f' to f''') and 6 (f''''), Central<4> up to 56,
+// Central<10> 2520 for f', Forward<6> 450 for f' and 9490 for f''; Ridders uses Central<2>'s table.
+static_assert(accepted<Central<2>, 1, Narrow<11>> && accepted<Central<2>, 4, Narrow<11>>);
+static_assert(accepted<Central<4>, 4, Narrow<11>> && accepted<nxx::deriv::Ridders, 4, Narrow<11>>);
+static_assert(!accepted<Central<10>, 1, Narrow<11>> && !accepted_with_step<Central<10>, 1, Narrow<11>>);
+static_assert(accepted<Forward<6>, 1, Narrow<11>> && !accepted<Forward<6>, 2, Narrow<11>>);
+static_assert(!accepted<Backward<6>, 2, Narrow<11>>);
+static_assert(accepted<nxx::deriv::Ridders, 1, Narrow<2>> && accepted<nxx::deriv::Ridders, 3, Narrow<2>>);
+static_assert(!accepted<nxx::deriv::Ridders, 4, Narrow<2>> && !accepted<Central<2>, 4, Narrow<2>>);
+static_assert(accepted<Central<2>, 3, Narrow<2>>);
+// The built-in types hold every table: Central<10> f'''' needs 6,222,216, below float's 2^24.
+static_assert(accepted<Central<10>, 4, double> && accepted<Forward<6>, 4, double>);
+static_assert(accepted_with_step<Central<10>, 3, float> && accepted_with_step<Backward<6>, 3, float>);
+// A narrow type differentiates where its digits suffice: x^2 at 3 with h = 1/2 is exact.
+static_assert(derivative(narrow_square<Narrow<11>>, Narrow<11>(3), Narrow<11>(0.5))->value.v == 6.0);
 
 // Ridders on the user types: x^2 at 3 with h = 1/2 is exact at level 1 (A[1][1] equals its parent), so 6 exactly.
 static_assert(derivative<nxx::deriv::Ridders>(&Real::square, Real(3), Real(0.5))->value.v == 6.0);

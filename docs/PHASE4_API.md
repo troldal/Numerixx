@@ -394,7 +394,8 @@ From the implementation review (numerics-reviewer), each reproduced first:
   value, and `Central<2>` for f'''' returned a finite wrong value. Ridders had the check already.
 - **A stencil whose integer weights T cannot hold exactly** (radix^digits not above the largest table value, half
   precision under `Central<10>`) is a `static_assert`, not a silently inexact rule (or, beyond the range, undefined
-  behaviour).
+  behaviour). (Changed after Phase 4: a constraint of `derivative`, `detail::exact_weights`, so that a
+  requires-expression sees it; Ridders is checked against the `Central<2>` table it uses.)
 - **An integer order is compared in its own type**, so `0x1'0000'0001ULL` is rejected rather than wrapped into 1.
 From an independent review by another model (OpenAI Codex), each reproduced first:
 - **The term check is exact** (`product_fits`): `|f_k| >= max / |c|` also rejected |f| = max under a weight of 1, where

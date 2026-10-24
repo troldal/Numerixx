@@ -106,7 +106,7 @@ holds integers only. The largest intermediate it reaches is $12!$ (the end node'
 \code{long long}. Every numerator and denominator must fit in 24 bits, which keeps the weights exact in float as
 well as in double (the largest numerator is 6,222,216); the generator checks this before narrowing to \code{int},
 and a type too narrow to hold a rule's integers, such as half precision under \code{Central<10>}, is rejected by a
-\code{static_assert} rather than used with rounded weights. The tests check every table against the moment
+constraint of \code{derivative} rather than used with rounded weights. The tests check every table against the moment
 conditions with a moment function of their own, and against the published rows of Fornberg\cite{fornberg1988} and
 Chapra (Chapter 23);\cite{chapra2015} they also use the exactness on polynomials, with a point and a step that are short
 binary fractions so that no rounding occurs, and check that \code{Central<4>} on $x^4$ returns exactly 4 at compile

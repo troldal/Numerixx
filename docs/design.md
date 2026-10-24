@@ -112,7 +112,8 @@ Decisions in force. Each one says why; change it here before changing the code.
   more than two weights enlarges the error (4x for `Central<4>`); the divisions keep polynomial results exact for
   dyadic x and h, and cannot overflow spuriously. Neighbouring points must differ (at h near 0.6 ulp(x), x + h and
   x + 2h coincide), and a rule whose integer weights T cannot hold exactly (radix^digits not above the largest value)
-  is a `static_assert`.
+  is rejected by the constraint `detail::exact_weights` of `derivative`, so that a requires-expression sees it;
+  Ridders is checked against the `Central<2>` table it uses.
 - The default step is `eps^(1/(p+N)) * max(|x|, 1)` for a rule of order p and the N-th derivative. It balances
   truncation error (O(h^p)) against rounding error (O(eps / h^N)) when fn varies on a scale of `max(|x|, 1)`, giving an
   error of about `eps^(p/(p+N))`. The constant `(N S / (p C))^(1/(p+N))` is left out. For f' it lies between 1.4 and 2.0

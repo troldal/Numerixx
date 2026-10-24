@@ -142,7 +142,7 @@ is already \num{\valAmplForwardSix} for $f'$ and \num{\valAmplForwardSixFourth} 
 (\cref{tab:weights-forward-first,tab:weights-forward-fourth}) and grows about as fast as a higher order pays.
 
 \paragraph{Types.} The integer weights must be exact in \code{T}, which every type with 24 significant bits or more
-satisfies; a narrower type fails a \code{static_assert}. A fourth derivative in a type with an epsilon above $10^{-7}$
+satisfies; a narrower type is rejected at the call by a constraint. A fourth derivative in a type with an epsilon above $10^{-7}$
 is mostly rounding noise and warns (\cref{sec:api-warning}).
 
 \paragraph{The scale.} The default steps assume that $f$ varies on the scale $\max(\abs{x}, 1)$ in the units of $x$.
@@ -191,7 +191,7 @@ Each guarantee below is stated with the hypothesis it rests on and with how it i
     saturating cases.
   \item \emph{Exact weights.} The integer weights are exact in every type with 24 significant bits or more; the
     largest is 6,222,216, below $2^{24}$. A larger value would make the generator's constant evaluation fail, and a
-    narrower type fails a \code{static_assert}. Verified at every compilation.
+    narrower type is rejected by a constraint of \code{derivative}. Verified at every compilation.
   \item \emph{Exact on polynomials.} With dyadic $x$ and a power-of-two $h$, a stencil is exact for polynomials of degree
     up to $\dorder + \aorder - 1$, provided every intermediate is exact in the type. Verified by \code{static_assert}s
     that also check the bit budget of each case.
