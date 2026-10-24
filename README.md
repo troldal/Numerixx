@@ -41,4 +41,6 @@ the project root.
 
 ## License
 
-MIT
+MIT, except third-party data: the Shomate coefficients of nitrogen in `docs/deriv-book/code/shomate.hpp`
+are NIST Standard Reference Data (NIST Chemistry WebBook, SRD 69), (c) U.S. Secretary of Commerce, reproduced with
+attribution and not covered by the MIT licence.

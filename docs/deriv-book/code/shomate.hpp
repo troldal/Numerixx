@@ -11,6 +11,10 @@
 // p. 1621). The coefficients are the WebBook's fit to those tables; the tables themselves hold no coefficients.
 // Every value below was verified against the page source by the book's evidence reviewer on 2026-10-23.
 //
+// Licence: the coefficients in nitrogen_low, nitrogen and nitrogen_high are NIST Standard Reference Data,
+// (c) U.S. Secretary of Commerce, reproduced with attribution; they are not covered by the MIT licence of this
+// repository, which applies to the code around them.
+//
 // The WebBook's equations, with t = T / 1000 and T in kelvin:
 //     Cp                 = A + B t + C t^2 + D t^3 + E / t^2                      J/(mol K)
 //     H - H(298.15 K)    = A t + B t^2/2 + C t^3/3 + D t^4/4 - E/t + F - H       kJ/mol
