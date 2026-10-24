@@ -51,9 +51,12 @@ def normalised_code(text: str) -> str:
 
 
 def signature_problems() -> list:
-    """The \\code{...} lines of every `signature` block (Chapter 8) that do not occur in the library's headers: the
-    declarations are transcribed, and this keeps them true to the header. A line that is a comment, or empty once
-    its trailing semicolon is removed, is skipped; a "see below" placeholder comment is stripped like any comment."""
+    """The declarations of every `signature` block (Chapter 8) that do not occur in the library's headers: the
+    declarations are transcribed, and this keeps them true to the header. The \\code{...} lines of a block are joined
+    into one declaration up to the line that ends it (a semicolon or a brace), whitespace and comments removed, and
+    the whole must occur in the headers normalised the same way: a line-by-line check would pass a change confined to
+    one of two overloads that share their other lines (R2-library-03). A comment line, a namespace line (presentation:
+    the header nests its namespaces) and a "see below" placeholder comment are skipped or stripped."""
     headers = ''
     for name in ('deriv.hpp', 'math.hpp'):
         headers += (HERE.parent.parent / 'include' / 'numerixx' / name).read_text(encoding='utf-8', errors='replace')
@@ -63,13 +66,29 @@ def signature_problems() -> list:
     for path in sorted(HERE.glob('chapters/*.tex')):
         text = path.read_text(encoding='ascii', errors='replace')
         for block in re.finditer(r'\\begin\{signature\}(.*?)\\end\{signature\}', text, flags=re.S):
-            for piece in re.findall(r'\\code\{((?:[^{}]|\{[^{}]*\})*)\}', block.group(1)):
-                # A comment, or a namespace line (presentation: the header nests its namespaces), is not a declaration.
-                if piece.strip().startswith('//') or piece.strip().startswith('namespace'):
+            declaration, first = [], ''
+
+            def check() -> None:
+                whole = ''.join(declaration).rstrip(';')
+                if whole and whole not in normalised_headers:
+                    problems.append(f'{path.relative_to(HERE)}: declaration not in the headers: {first} ...')
+
+            # A brace that the chapter sets outside \code (\texttt{\{}, \texttt{\};}) is part of the declaration.
+            body = block.group(1).replace('\\texttt{\\{}', '\\code{ BRACEOPEN }').replace('\\texttt{\\};}', '\\code{ BRACECLOSE ;}')
+            for piece in re.findall(r'\\code\{((?:[^{}]|\{[^{}]*\})*)\}', body):
+                stripped = piece.strip().replace('BRACEOPEN', '{').replace('BRACECLOSE', '}')
+                if stripped.startswith('//') or stripped.startswith('namespace'):
                     continue
-                code = normalised_code(piece).rstrip(';')
-                if code and code not in normalised_headers:
-                    problems.append(f'{path.relative_to(HERE)}: signature line not in the headers: {piece.strip()}')
+                code = normalised_code(stripped)
+                if not code:
+                    continue
+                if not declaration:
+                    first = stripped
+                declaration.append(code)
+                if stripped.endswith((';', '{', '}')):
+                    check()
+                    declaration, first = [], ''
+            check()
     return problems
 
 

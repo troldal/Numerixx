@@ -44,18 +44,13 @@ inline double noisy(double f, double x, double eta)
 // </noise>
 
 // <noise-estimate>
-// The noise of fn near x (More and Wild): in a difference
-// table of its values at x, x + h, ..., x + m h, the k-th
-// differences of a smooth function shrink like h^k, those
-// of the noise do not. sigma_k, their root mean square
-// scaled by k!^2 / (2k)!, settles at the noise; accepted
-// once sigma_k, sigma_k+1 and sigma_k+2 agree within 4x.
+// The noise of fn near x from a difference table of its
+// values at x, x + h, ..., x + m h (More and Wild).
 struct NoiseEstimate
 {
     double sigma; // the absolute noise; NaN if none settled
     int k;        // the difference order used; 0 if none
 };
-
 template<typename F>
 NoiseEstimate estimate_noise(F fn, double x, double h,
                              std::size_t m = 7)

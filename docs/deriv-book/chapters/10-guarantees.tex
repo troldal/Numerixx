@@ -104,7 +104,8 @@ The estimate assumes that $f$ is accurate to about $\epsmach$. With a relative n
 $\mathrm{e}^x$, the coverage over \num{\valNoiseRiddersCases} points fell to
 \SI{\valNoiseTenRiddersCoverage}{\percent} and \SI{\valNoiseEightRiddersCoverage}{\percent}, with worst ratios of
 \num{\valNoiseTenRiddersWorstRatio} and \num{\valNoiseEightRiddersWorstRatio} (measured, \cref{sec:rounding-noise}).
-It does not see a kink or a jump inside its span either, except as a large estimate (\cref{fig:kink}).
+It does not see a jump inside its span either, except as a large estimate (\cref{fig:kink}), nor a kink at $x$ at
+all (\cref{sec:ridders-trust}).
 
 \section{Cost}\label{sec:guarantees-cost}
 
@@ -113,8 +114,8 @@ operations; the library's own work is one weighted sum per stencil and one table
 \Cref{tab:cost} gives the counts. For a stencil they are exact: one evaluation per node. For Ridders' method they
 depend on $f$ and $x$; the table gives the median and the range of the random study and the cap, which no call
 exceeds. For $f'$ in double, Ridders' \num{\valRiddersEvalsMedianFirst} evaluations (median) against a stencil's
-2 to 6 buy about \num{\valHeadlineRiddersFirstDigits} digits against \num{\valHeadlineFirstDigits} for
-\code{Central<2>}, as many as \code{Central<4>} gives and none over \code{Central<6>} (\cref{tab:accuracy-matrix}),
+2 to 6 buy about three more digits than \code{Central<2>} (\num{\valHeadlineRiddersFirstDigits} against
+\num{\valHeadlineFirstDigits}), as many as \code{Central<4>}, none over \code{Central<6>} (\cref{tab:accuracy-matrix}),
 and an estimate of the error.
 
 \begin{table}
@@ -211,9 +212,11 @@ estimate, which is an estimate (\cref{sec:guarantees-ridders}); and the default 
 \section{How it is verified}\label{sec:guarantees-verification}
 
 The library's tests are one doctest executable and three build tests, listed in \cref{tab:tests}. Their reference
-values come from closed forms, from the published tables of Fornberg\cite{fornberg1988} and
-Chapra\cite[ch.~23]{chapra2015} or from an independent
-prototype, never from \nxx{} itself, and each tolerance is justified by an error estimate in a comment. The stencils,
+values for the derivatives come from closed forms, from the published tables of Fornberg\cite{fornberg1988} and
+Chapra (Chapter 23)\cite{chapra2015} or from an independent
+prototype, never from \nxx{} itself; the ceilings on \code{abs_error} for the multiprecision types are twice the
+estimates of the first run, regression baselines that \code{docs/design.md} records as such, not independent
+references. Each tolerance is justified by an error estimate in a comment. The stencils,
 for example, are held to $(\errc + 2\ampl)\,\epsmach^{P/(P+N)}$ relative on $\mathrm{e}^x$, truncation plus the
 rounding of the samples and of the points, for a selection of rules and orders, two-node rules included; the tests'
 comment calls it an estimate, not a bound, and reports measured errors 4 to 16 times below it on its three points.
@@ -250,11 +253,10 @@ File & What it checks\\
 
 \section{Deferred features}\label{sec:guarantees-deferred}
 
-The library describes these as deferred, each until a use needs it; none is promised. From \code{docs/plan.md}:
-gradients and Jacobians, and a derivative as a callable. From the Phase documents: several orders from shared
-evaluations, orders above 4, a default-step constant or a scale parameter for $f$, mixed partials and Hessians, a
-tolerance at which Ridders' method stops early, variants of Ridders' method, error estimates for the stencils at the
-cost of extra evaluations, more \code{error} values, and a public stencil type for user-written rules. From the
-technique survey (\code{docs/DERIV_TECHNIQUES.md}): noise-aware steps,\cite{more2012} and the complex step, automatic
-differentiation and contour methods, which need a generic, analytic $f$ and complex or dual number types rather than
-a \code{fn(T)} callback (\cref{sb:alternatives}).
+Deferred until a use needs it, none promised. From \code{docs/plan.md}: gradients and Jacobians, a derivative as a
+callable. From the Phase documents: several orders from shared evaluations, orders above 4, a default-step constant
+or scale parameter, mixed partials and Hessians, a tolerance for Ridders' method, variants of it, error estimates for
+the stencils, more \code{error} values, user-written stencils. From \code{docs/DERIV_TECHNIQUES.md}: noise-aware
+steps,\cite{more2012} and the complex step, automatic differentiation and contour methods, which need a generic,
+analytic $f$ and complex or dual number types (\cref{sb:alternatives}).
+

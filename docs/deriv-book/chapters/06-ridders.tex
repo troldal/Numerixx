@@ -34,11 +34,10 @@ new; \cref{sb:richardson-disguise} showed that \cref{eq:ridders-richardson} is t
 \code{Central<4>} written differently. What makes it a method is repetition: the new estimate has the same form,
 an expansion in even powers with the leading term now $h^4$, so a second combination with the factor
 $4^2 = 16$ removes that term, a third with $4^3$ the next, and so on, each from values the previous stage already
-has. Burden et al.\cite[Sect.~4.2]{burden2016} present the tableau this builds and Sidi\cite{sidi2003} the general
-theory. Ridders' paper reduces the step by a factor 1.4 and stops when the error grows; the library uses the ratio
-2, a rounding floor, a two-level stall, a final check and restarts, chosen on a prototype
-(\cref{sb:floor-coverage}): the idea is Ridders', the rules are the library's, and every statistic in this chapter
-is of the latter.
+has. Burden et al.\cite{burden2016} (Section 4.2) present the tableau this builds and Sidi\cite{sidi2003} the general
+theory. Ridders' paper supplies the idea; the rules, the ratio 2, a rounding floor, a two-level stall, a final
+check and restarts, are the library's own, chosen on a prototype (\cref{sb:floor-coverage}), and every statistic
+in this chapter is of them.
 
 \section{The tableau in one picture}\label{sec:ridders-tableau}
 
@@ -155,7 +154,8 @@ error to estimate is \num{\valRiddersMedianRatioFirst} and \num{\valRiddersMedia
 estimate is an overestimate by a factor of ten or so. Two things the figure does not say must be said: the
 estimate is not a bound, and the study's scope is smooth functions, no noise, and for $f'$ no singularity within
 the initial step (for the higher orders the larger initial step does reach a singularity at small $x$, which the
-method survives by restarting, \cref{sb:floor-coverage}). Outside that scope is the next section.
+method survives by restarting, or, where the samples stay finite, by taking more levels,
+\cref{sb:floor-coverage}). Outside that scope is the next section.
 
 \section{When not to trust it}\label{sec:ridders-trust}
 
@@ -176,8 +176,8 @@ ten correct digits hold down to $x = \num{\valRiddersEdgeTenDigits}$; a value is
 $x = \num{\valRiddersEdgeLimit}$, with the estimate risen to \num{\valRiddersEdgeLimitRelEstimate} of the value; and below that the result is
 \code{non_finite}. As a rule, in its two readings: a value is returned as long as the nearest bad point of $f$ is
 about $2^{-34} \scale$ away for $f'$ and $2^{-31} \scale$ for the higher orders, whose initial step is $\scale / 4$
-(derived from the initial step and the level cap, and measured here, \cref{sec:guarantees-limits}); for ten
-digits keep it at least $2^{-30} \scale$ away (measured for $f'$). The stencil in the same example does not
+(derived from the initial step and the level cap; for $f'$ also measured here, \cref{sec:guarantees-limits}); for
+ten digits keep it at least $2^{-\num{\valRiddersEdgeTenDigitsExponent}} \scale$ away (measured for $f'$). The stencil in the same example does not
 fail, since its default step of $\epsmach^{1/3}$ never reaches zero, but its relative error is
 \num{\valEdgeCentralAtOneHundredthRelError}: the truncation $h^2 / 3x^2$ with a step scaled by $\scale = 1$ rather
 than by $x$, the small-$\abs{x}$ case of \cref{sec:rounding-scale}, which Ridders handles by adapting the step.
@@ -205,13 +205,17 @@ points of $\mathrm{e}^x$ with the values perturbed by $\noise = 10^{-8}$, the co
 \SI{\valNoiseEightRiddersCoverage}{\percent} with a worst ratio of \num{\valNoiseEightRiddersWorstRatio}
 (\cref{fig:noise}). Pass an initial step on the scale of the noise, and do not read the estimate as a bound.
 
-\paragraph{A kink inside the span.} A range break or a kink within $h_0$ of $x$ does not produce a non-finite
-value, and Ridders returns a value for the wrong function. What it also returns is a large estimate, since the
-base differences then converge like $\order(h)$ rather than $\order(h^2)$ and the entries keep changing: on the
-thread's own range break the stencils return errors of order one in silence, while Ridders' relative estimate is
-\num{\valKinkInsideRiddersRelEstimate}, ten orders of magnitude above the \num{\valKinkOutsideRiddersRelEstimate} it
-reports \SI{\valKinkOutsideDelta}{\kelvin} from the break (\cref{sec:using-pitfalls}, \cref{fig:kink}). The
-estimate flags it; the stencil does not.
+\paragraph{A jump or a kink inside the span.} A range break within $h_0$ of $x$ does not produce a non-finite
+value, and Ridders returns a value for the wrong function. Where $f$ itself jumps, it also returns a large
+estimate, since the base differences then converge like $\order(h)$ rather than $\order(h^2)$ and the entries keep
+changing: on the thread's own range break the stencils return errors of order one in silence, while Ridders'
+relative estimate is \num{\valKinkInsideRiddersRelEstimate}, ten orders of magnitude above the
+\num{\valKinkOutsideRiddersRelEstimate} it reports \SI{\valKinkOutsideDelta}{\kelvin} from the break
+(\cref{sec:using-pitfalls}, \cref{fig:kink}). The estimate flags a jump; the stencil does not. A kink, a jump in
+$f'$ with $f$ continuous, at $x$ itself shows no symptom at all: the central difference of $c \abs{t}$ is exactly
+zero at every step, so every rule returns the mean of the two one-sided slopes plus the smooth part's own error,
+Ridders' tableau converges to that mean with its estimate at the floor, and nothing in the samples can show it;
+know the branch boundaries and differentiate the branch you mean (\cref{sec:using-pitfalls}).
 
 \section{Cost}\label{sec:ridders-cost}
 
@@ -237,10 +241,10 @@ as many (\cref{tab:cost}). The caps are \num{\valRiddersLevelCap} levels in all,
 most \num{\valRiddersMaxEvalsFirst}, \num{\valRiddersMaxEvalsSecond}, \num{\valRiddersMaxEvalsThird} and
 \num{\valRiddersMaxEvalsFourth} evaluations for the four orders; \cref{sec:guarantees-ridders} collects the
 statistics for all four. Against a stencil's two to six evaluations, Ridders takes 2.3 to 7 times as many for
-$f'$, and for them returns about two more digits than \code{Central<2>} (a median of
-\num{\valExpCentralTwoRelError} on $\mathrm{e}^x$ against Ridders' \num{\valExpRiddersFirstRelError}, about
-\num{\valHeadlineRiddersFirstDigits} digits), as many as \code{Central<4>} (\num{\valExpCentralFourRelError}), none over \code{Central<6>}
-(\num{\valExpCentralSixRelError}, \cref{tab:accuracy-matrix}), and an estimate.
+$f'$, and for them returns about three more digits than \code{Central<2>} (medians \num{\valExpCentralTwoRelError}
+and \num{\valExpRiddersFirstRelError} on $\mathrm{e}^x$: \num{\valHeadlineFirstDigits} against
+\num{\valHeadlineRiddersFirstDigits} digits), as many as \code{Central<4>} (\num{\valExpCentralFourRelError}), none
+over \code{Central<6>} (\num{\valExpCentralSixRelError}, \cref{tab:accuracy-matrix}), and an estimate.
 
 \section{Stencil or Ridders}\label{sec:ridders-choice}
 
@@ -251,13 +255,14 @@ and a code that needs an estimate asks for Ridders. The choice follows from that
 derivative is recomputed many times and a Newton step tolerates an approximate slope, a stencil with the default
 step is the right tool: two or four evaluations, a relative error of about \num{\valExpCentralTwoRelError} or
 \num{\valExpCentralFourRelError}, no decisions. For a value that is reported, compared or published, Ridders:
-several times the evaluations, about two more digits than \code{Central<2>} and as many as \code{Central<4>}, and
+several times the evaluations, about three more digits than \code{Central<2>} (\num{\valHeadlineRiddersFirstDigits}
+against \num{\valHeadlineFirstDigits}) and as many as \code{Central<4>}, and
 a number that says how far to trust it. A stencil result can still be checked after the fact, by repeating it at
 another step or order, or by Ridders itself (\cref{sec:using-check}).
 
 \begin{sidebar}[label=sb:difference-form]{Burden's difference form of the tableau}
 \Cref{eq:ridders-richardson} generalises to the weighted combination
-$(4^j \Aij{i}{j-1} - \Aij{i-1}{j-1}) / (4^j - 1)$ for column $j$. Burden et al.\cite[Sect.~4.2]{burden2016} write
+$(4^j \Aij{i}{j-1} - \Aij{i-1}{j-1}) / (4^j - 1)$ for column $j$. Burden et al.\cite{burden2016} (Section 4.2) write
 the equal correction form,
 \[
   \Aij{i}{j} = \Aij{i}{j-1} + \frac{\Aij{i}{j-1} - \Aij{i-1}{j-1}}{4^j - 1},
@@ -322,11 +327,13 @@ common: for $f'$, \num{\valRiddersUncoveredMainCountFirst} of the \num{\valRidde
 \num{\valRiddersUncoveredMainMinXSecond} and \num{\valRiddersUncoveredMainMaxXSecond}, where the derivatives grow
 like $(2x)^k$ and the first levels are not yet in the asymptotic regime, so the change from the parent undershoots
 the entry's error; a function whose derivatives grow geometrically on the scale of $h_0$ is where the estimate is
-tightest, and a smaller initial step restores the margin. An actual error of exactly 0, which the figure clips,
-occurred in \num{\valRiddersZeroErrorFirst} cases for $f'$ (\num{\valRiddersZeroOnQuinticFirst} on $x^5$, the rest
-values that happen to equal the rounded closed form, spread over \num{\valRiddersZeroFunctionsFirst} functions) and
-in \num{\valRiddersZeroErrorSecond} for $f''$, all on $x^5$; the study records values, not the stop reason, so it
-does not count exact stops. There were no restarts for $f'$ and \num{\valRiddersRestartedSecond} for $f''$, the
+tightest, and a smaller initial step usually restores the margin: a quarter of the default initial step covers
+\num{\valRiddersMarginQuarterCovered} of the study's \num{\valRiddersMarginCases} uncovered cases (all four
+orders), a sixty-fourth \num{\valRiddersMarginSixtyFourthCovered}. An actual error of exactly 0,
+which the figure clips, occurred in \num{\valRiddersZeroErrorFirst} cases for $f'$, which lie on
+\num{\valRiddersZeroFunctionsFirst} functions, \num{\valRiddersZeroOnQuinticFirst} of them on $x^5$ and the rest
+values that happen to equal the rounded closed form, and in \num{\valRiddersZeroErrorSecond} for $f''$, all on
+$x^5$; the study records values, not the stop reason, so it does not count exact stops. There were no restarts for $f'$ and \num{\valRiddersRestartedSecond} for $f''$, the
 cases of $\log x$ and $\sqrt{x}$ below $x = 0.25$, where $h_0 = \scale / 4$ reaches below zero and the first levels
 are NaN. $1/x$ at the same points does not restart: its pole lies between finite samples, the first levels are
 simply wrong, and the tableau takes more levels and converges from the later ones, accurately. The tests hold
@@ -346,6 +353,6 @@ the second tableau converges to $64\pi$, and the tests check that it does so to 
 in about two dozen evaluations.
 The design record names the case that cannot be caught: samples that are exactly periodic \emph{and} lie on a
 polynomial, such as $\cos(64 \pi x)$ at 0 for $f''$, where every sample of the first levels is exactly 1, two
-entries agree exactly, and the method stops with the floor as its estimate. That fools every sampling method,
-not only this one; the remedy is an initial step on the function's own scale, which here is the period.
+entries agree exactly, and the method stops with the floor as its estimate. That fools every sampling method;
+the remedy is an initial step on the function's own scale, here the period.
 \end{sidebar}

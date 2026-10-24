@@ -19,61 +19,64 @@ order: where derivatives arise and what the library offers (\cref{ch:why}); the 
 and their errors (\cref{ch:taylor}); why a smaller step is not always better, and how the step is chosen
 (\cref{ch:rounding}); more points and one-sided rules (\cref{ch:stencils}); second to fourth derivatives
 (\cref{ch:orders}); Ridders' extrapolation, the one method that estimates its own error (\cref{ch:ridders}); and the
-library in use, with worked engineering examples and the pitfalls (\cref{ch:using}). One example runs through Part~I:
-the heat capacity of nitrogen from its enthalpy, a function whose derivative is known, so that every error the book
-quotes could be measured.
+library in use, with worked engineering examples and the pitfalls (\cref{ch:using}). One example runs through Part~I,
+the heat capacity of nitrogen from its enthalpy, whose derivative is known, so that every error quoted could be
+measured.
 
 Part~II is the reference: every public name (\cref{ch:api}), every weight and constant (\cref{ch:tables}), and what
 accuracy and cost to expect, where the methods stop working, and what the library guarantees (\cref{ch:guarantees}).
-The appendices hold the floating-point facts and the derivations the sidebars cite. The notation and a glossary
-precede the references.
+The appendices hold the floating-point facts and the derivations the sidebars cite; a notation table and a glossary
+follow them.
 
 A reader in a hurry has two shortcuts. \Cref{sec:why-summary}, ``If you read nothing else'', chooses a method for
 the five situations that cover most uses and gives the two checks every call needs. And the
-\hyperref[ch:quick-reference]{quick-reference page}, the last page of the book (page
-\pageref{ch:quick-reference}), is the whole interface on one sheet: the call in its forms, the result, the failures,
-the method choice, how to check a result that comes without an error estimate, and the pitfalls that matter most.
+\hyperref[ch:quick-reference]{quick-reference page} (page \pageref{ch:quick-reference}) is the interface on one
+sheet: the calls, the result, the failures, the method choice, the checks and the pitfalls that matter most.
 
 \section*{The evidence}
 
-Every number in this book that comes from a computation was produced by the library itself: a generator program in
-the book's sources runs \code{nxx::deriv} and writes the values, the data behind every plot and the bodies of the
-tables, and the text quotes them by name. The generator checks the weight tables against their defining equations
-and the thread example against an independent evaluation each time it runs. Every code listing is quoted from a
+Every number in this book that comes from a computation was produced by the library itself, apart from a few
+attributed figures of its design record and tests: a generator program in the book's sources runs \code{nxx::deriv} and writes the values, the data behind every plot and the
+bodies of the tables, and the text quotes them by name; at every run it also checks the weight tables and the
+thread example against independent evaluations. Every code listing is quoted from a
 compiled program that runs as a test of the library and checks what the text claims about it, with two exceptions:
 the declarations of \cref{ch:api} are transcribed from the library's header and checked against it at every build,
 and the CMake snippet of \cref{sec:using-call} is quoted from a file the book's build does not configure. The book
-describes the library as it is; a feature it does not have is named as deferred, never promised.
+describes the library as it is; a missing feature is named as deferred.
 
 \section*{The version}
 
 This document describes \code{nxx::deriv} as of commit \todo{the commit of \code{dev} at release} of the
-\nxx{} repository, branch \code{dev}. The library's public headers, the tests and the design record in the
-repository are the ground truth; where this book and the code disagree, the code is right and the book has a bug.
+\nxx{} repository, branch \code{dev}. The library's public headers, its tests and its design record are the ground
+truth: where this book and the code disagree, the book has the bug.
 
 \section*{How this document was prepared}
 
 This document was prepared with the use of AI, under the direction of its author, who defined its scope, approved
-its plan, its evidence and every stage, decided every contested point and is responsible for its content.
+its plan, its evidence and each stage through the first review round, decided every contested point of that round,
+directed that the second round be closed on the editor's recommendations, and is responsible for its content.
 
-The work ran as a staged process with AI models in named roles, coordinated by a main session (Anthropic's Claude,
-Fable 5.1) that set up the book's folder, its layout, its build and checks and the skeleton of its data generator,
-launched the other agents and reported to the author. An editor (Claude Fable 5.1) wrote the plan, the notation,
+The work ran as a staged process with AI models in named roles. The book's folder, its layout, its build and
+checks and the skeleton of its data generator were set up in a session on Anthropic's Claude Opus 5.5; from the
+plan on, a main session on Claude Fable 5.1 coordinated the other agents and reported to the author. An editor
+(Claude Fable 5.1) wrote the plan, the notation,
 the data generator, the front and back matter and the decision letters, and integrated the chapters. Three authors
 drafted the chapters in parallel and wrote the code examples: the fundamentals of Part~I (Claude Opus 5.5), the
 methods chapters and the derivations (Claude Fable 5.1), and the chapter on using the library together with Part~II
-(Claude Opus 5.5). Before any prose was written, the plan was reviewed by a reader in the role of a practising
-process engineer and by the numerics reviewer, and the thread example's data and the generator's first results
-were verified by the evidence reviewer. The integrated draft was then reviewed in one round by five reviewers: two
-readers in the role of the target audience, a practising process engineer and an engineering-software developer
-(Claude Opus 5.5), and three peer reviewers, of the numerical and mathematical claims (Claude Fable 5.1), of every
-statement and listing against the code (Claude Opus 5.5), and of the numbers, figures and citations (Claude
-Opus 5.5); the editor decided on every finding, the author approved the decisions, and the authors revised their
-chapters. Still to come, and to be recorded here at release, are a second, targeted round of review and two
-independent reviews by other models, OpenAI Codex and Cline with DeepSeek V4.1 Flash 1017.
+(Claude Opus 5.5). Before any prose was written, the plan was reviewed by the engineer reader and the numerics
+reviewer, and the thread example's data and the generator's first results by the evidence reviewer. The integrated
+draft was then reviewed by five reviewers: two readers in the role of the target audience, a process engineer and
+an engineering-software developer (Claude Opus 5.5), and three peer reviewers, of the numerical claims (Claude
+Fable 5.1), of every statement and listing against the code (Claude Opus 5.5), and of the numbers, figures and
+citations (Claude Opus 5.5); the editor decided on every finding, the author approved the decisions, and the
+authors revised their chapters. The revised book was reviewed in a second, targeted round by the same five
+reviewers, who confirmed the
+revisions and raised 30 new findings, and independently by two other models, OpenAI Codex (10 findings, with
+compiled counterexamples) and Cline with DeepSeek V4.1 Flash through ClinePass (21 findings); the editor decided
+on every finding, and the authors applied the decisions in a final round of fixes.
 
-The numbers, the plotted data and the bodies of the generated tables were computed by running the library through
-the book's data generator; no model typed them. The code listings are compiled and run as tests; the declarations
-of \cref{ch:api} are transcribed from the library's header and checked against it at every build. Every reference
-was checked by the evidence reviewer against the work or a library catalogue. The layout follows an earlier design
-document of the author's.
+The numbers, the plotted data and the generated tables were computed by running the library through the book's
+data generator; no model typed them, and the few figures quoted from the design record and the tests are
+attributed. The code listings are compiled and run as tests; the declarations of \cref{ch:api} are checked against
+the library's header at every build. Every reference was checked against the work or a library catalogue. The
+layout follows an earlier design document of the author's.

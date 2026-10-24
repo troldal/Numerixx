@@ -3,9 +3,10 @@
 # add it as a subdirectory. The target numerixx::numerixx
 # adds the include path and requires C++23.
 include(FetchContent)
+# a tag or a full commit hash; CMake 3.25 or later
 FetchContent_Declare(numerixx
     GIT_REPOSITORY https://github.com/troldal/Numerixx.git
-    GIT_TAG        aeec7e6)  # a pinned commit or tag
+    GIT_TAG        aeec7e6f9367591d1a3eadde3d79a3a59ed78648)
 FetchContent_MakeAvailable(numerixx)
 
 add_executable(app main.cpp)

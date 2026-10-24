@@ -12,7 +12,7 @@ written by the book's data generator from the library itself, from the same inte
 \code{derivative} uses (the few constants that are literals of the library's code are transcribed, as
 \cref{sec:tables-ridders} says), and the generator checks each rule against its moment conditions before writing it;
 the library's tests compare the rules with the published tables of Fornberg\cite{fornberg1988} and
-Chapra.\cite[ch.~23]{chapra2015}
+Chapra (Chapter 23).\cite{chapra2015}
 
 \section{How to read the tables}\label{sec:tables-reading}
 
@@ -75,8 +75,8 @@ the three-point second difference, the four-point rule for $f'''$ and the five-p
 
 \begin{table*}
 \caption{\code{Central<P>} for the fourth derivative, $f^{(4)}$. The largest numerator of all the tables,
-6,222,216, is the centre weight of \code{Central<10>}; every numerator fits in 24 bits, so every rule is exact in
-float.\label{tab:weights-central-fourth}}
+6,222,216, is the centre weight of \code{Central<10>}; every numerator fits in 24 bits, so every rule's integer weights are
+exact in \code{float}.\label{tab:weights-central-fourth}}
 \weighttablestart
 \tablebody{weights-central-N4}
 \weighttableend

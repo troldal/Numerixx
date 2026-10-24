@@ -96,9 +96,9 @@ the accuracy aimed for.
 The two-node rules (\code{Central<2>}, \code{Forward<1>} and \code{Backward<1>} for $f'$) therefore divide by
 $x_+ - x_-$ as evaluated. The quotient is then the exact slope of the secant through the two points where $f$ was
 actually evaluated, and only the rounding of the values of $f$ remains. The subtraction $x_+ - x_-$ is itself exact
-when $x_+ \le 2 x_-$ (for positive $x$), by Sterbenz's lemma:\cite[Thm~4.3.1]{sterbenz1974} two floating-point
+when $x_+ \le 2 x_-$ (for positive $x$), by Sterbenz's lemma (Theorem 4.3.1):\cite{sterbenz1974} two floating-point
 numbers of the same sign within a factor of two of each other have an exactly representable
-difference.\cite[Thm~2.5]{higham2002} That holds roughly for
+difference (Higham's Theorem 2.5).\cite{higham2002} That holds roughly for
 $h \le \abs{x} / 3$. For larger steps the subtraction rounds once, a relative error of at most $\epsmach / 2$, which
 is harmless.
 
@@ -130,7 +130,7 @@ distance in $x$ over which $f$ changes appreciably.} Then
 \end{equation*}
 For a \code{double}, $\epsmach^{1/3} = \num{\valRootEpsThreeDouble}$ and $\epsmach^{2/3} = \num{\valModelCentralTwoFirstDouble}$:
 at its best step the central difference keeps about \num{\valModelDigitsCentralTwoFirstDouble} of the 16
-digits.\cite{nocedal2006} The same argument for the forward difference, with its error $h \abs{f''} / 2$, gives a best
+digits (Nocedal and Wright,\cite{nocedal2006} Section 8.1). The same argument for the forward difference, with its error $h \abs{f''} / 2$, gives a best
 step near $\epsmach^{1/2} w$ and a relative error near $\epsmach^{1/2} = \num{\valModelForwardOneFirstDouble}$, about
 8 digits. That difference, not the cost, is why the central difference is the default.
 
@@ -159,7 +159,7 @@ The scale $\scale$ is the library's guess for $w$. For large $\abs{x}$ it makes 
 of $x$: functions of a physical quantity often vary on a scale comparable to its size, as the enthalpy varies with
 $T/\SI{1000}{\kelvin}$. Near zero $\abs{x}$ says nothing about the scale, and the step becomes absolute,
 $\epsmach^{1/3}$ in the units of $x$. This choice of scale is
-standard in numerical optimisation.\cite{dennis1996} For the thread, $\scale = \SI{1000}{\kelvin}$ and the default
+standard in numerical optimisation (Dennis and Schnabel,\cite{dennis1996} Section 5.4). For the thread, $\scale = \SI{1000}{\kelvin}$ and the default
 step is \SI{\valCpDefaultStep}{\kelvin}; the relative error is \num{\valCpDefaultRelError}, on the model line near the
 bottom of the V (\cref{fig:v-curve}). Every stencil of the library has a default step of the same form,
 $\epsmach^{1/(\aorder + \dorder)} \scale$ (\cref{ch:stencils,ch:orders}).
@@ -269,9 +269,9 @@ Here the failure is loud, because the logarithm returns NaN below zero. A functi
 but meaningless there, such as a fit sampled outside its range, would return a wrong value without complaint; the
 one-sided rules of \cref{ch:stencils} are the tool for such an edge.
 
-Units matter at large $\abs{x}$ too. A property near room temperature varies on the scale of the absolute
-temperature. In kelvin the guess is $\scale = 293$ at \SI{20}{\degreeCelsius}; in degrees Celsius it is $\scale = 20$,
-a default step about 15 times too small, which on the rounding branch costs about one digit.
+Units matter at large $\abs{x}$ too: a property near room temperature varies on the scale of the absolute
+temperature, but at \SI{20}{\degreeCelsius} the guess is $\scale = 20$ in degrees Celsius against 293 in kelvin, a
+default step about 15 times too small, which on the rounding branch costs about one digit.
 
 \begin{marginfigure}
 \centering
@@ -306,15 +306,13 @@ $10^{-8}$ gives about five correct digits, not \num{\valHeadlineFirstDigits}, an
 $(\noise / \epsmach)^{1/3}$ times the default.
 
 Two cautions on $\noise$. A solver's tolerance is the noise level only when its convergence test is on the output
-itself, relative to the output. A flash that converges a residual, such as an energy balance or the equality of
-fugacities, in its own units, or a simulator that converges tear streams, has a tolerance that is not $\noise$; then
-measure $\noise$, as shown below. And a smooth $f$ can be less accurate than $\epsmach$ too: if $f$ is computed by
-cancellation, as a difference of large terms, its rounding error is $\epsmach$ times the largest intermediate,
-$k \epsmach \abs{f}$ with $k \gg 1$; treat $k \epsmach$ as the noise level.
+itself, relative to it; a flash that converges a residual (an energy balance, equal fugacities) in its own units, or
+a simulator that converges tear streams, has a tolerance that is not $\noise$: measure $\noise$, as shown below. And
+if $f$ is computed by cancellation, as a difference of large terms, its rounding error is $\epsmach$ times the
+largest intermediate, $k \epsmach \abs{f}$ with $k \gg 1$; treat $k \epsmach$ as the noise level.
 
-An inaccurate function is not noisy if it is smooth: a fitted correlation such as the thread's Shomate polynomial
-may describe its substance to four digits, yet its values are smooth to the last digit, and its derivative, the fit's,
-is accurate to $\epsmach^{2/3}$.
+A smooth but inaccurate $f$ is not noisy: the thread's Shomate fit describes nitrogen to about four digits, yet
+its derivative, the fit's, is accurate to $\epsmach^{2/3}$.
 
 \begin{marginfigure}
 \centering
@@ -343,16 +341,18 @@ Mor\'e and Wild's procedure,\cite{more2011} kept in the book's example header:
 Applied to the friction factor of \cref{sec:using-solver}, computed by bisection to a relative tolerance of
 $10^{-10}$, at eight points spaced by the default step,
 \snippet{03-rounding-noise-estimate}{noise-estimate-use}
-it reports a noise of \num{\valNoiseEstimateFriction} relative to $f$ (difference order
-\num{\valNoiseEstimateFrictionK}, \num{\valNoiseEstimateEvals} evaluations), against an actual root-mean-square
-deviation from the exact root of \num{\valNoiseEstimateFrictionActual} over the same points. On the noisy
-$\mathrm{e}^x$ above it reports \num{\valNoiseEstimateNoisy}, close to the root mean square $\noise / \sqrt{3}$ of a
-uniform noise of half-width $\noise = \num{\valNoiseEstimateNoisyEta}$; on the clean $\mathrm{e}^x$,
-\num{\valNoiseEstimateClean}, the level of rounding. The library does not measure the noise for you: a noise-aware
-step is one of its deferred features (\cref{sec:using-not}).
+it reports \num{\valNoiseEstimateFriction} relative to $f$ (order \num{\valNoiseEstimateFrictionK},
+\num{\valNoiseEstimateEvals} evaluations); the actual root-mean-square deviation from the exact root is
+\num{\valNoiseEstimateFrictionActual}. On the noisy $\mathrm{e}^x$ above it reports \num{\valNoiseEstimateNoisy}, near
+$\noise / \sqrt{3}$ for $\noise = \num{\valNoiseEstimateNoisyEta}$; on the clean one, \num{\valNoiseEstimateClean}. If
+no three orders agree, it reports $k = 0$: the spacing is too large for the smooth part to drop below the noise
+within eight points; retry with a tenth of the spacing, or fall back to the solver's tolerance, as the listing does.
+A spacing on the scale of $f$ itself can make the orders agree by accident at a wrong level (the full procedure tests
+signs and adjusts the spacing): use the default step, check $k$, and distrust a level near $\epsmach$ for a solver.
+The header, \code{docs/deriv-book/code/noise.hpp}, is under the repository's MIT licence; the library itself does not
+measure noise, a deferred feature (\cref{sec:using-not}).
 
-Ridders' method does not help here as much as elsewhere. Its error estimate assumes that $f$ is accurate to about
-$\epsmach$, so for a noisy $f$ it can be optimistic. Over \num{\valNoiseRiddersCases} points in $[0.2, 3]$ the
+Ridders' estimate assumes that $f$ is accurate to about $\epsmach$, so for a noisy $f$ it can be optimistic. Over \num{\valNoiseRiddersCases} points in $[0.2, 3]$ the
 estimate covered the actual error in \SI{\valNoiseCleanRiddersCoverage}{\percent} of the cases for the clean
 $\mathrm{e}^x$, but only in \SI{\valNoiseEightRiddersCoverage}{\percent} for $\noise = 10^{-8}$, where the worst
 error was \num{\valNoiseEightRiddersWorstRatio} times its estimate. \Cref{sec:using-solver} differentiates the
@@ -360,13 +360,10 @@ friction factor with this rule.
 
 \section{Float, double and more digits}\label{sec:rounding-types}
 
-Everything above holds for any number type, with its own $\epsmach$. A \code{float} has
-$\epsmach = \num{\valEpsFloat}$, so its central difference reaches only about $\epsmach^{2/3} =
-\num{\valModelCentralTwoFirstFloat}$, at a default step of \num{\valFloatDefaultStep} for $\abs{x} \le 1$
-(\cref{fig:float-double}); on $\mathrm{e}^x$ at $x = 1$ the default step gives \num{\valFloatDefaultRelError}. A
-type with 50 decimal digits has $\epsmach = \num{\valEpsMultiprecision}$ and reaches far beyond \code{double}
-(\cref{sec:using-types}). In \code{double} the first derivative is rarely the limit; higher derivatives are
-(\cref{ch:orders}).
+Everything above holds for any number type, with its own $\epsmach$. A \code{float}, $\epsmach =
+\num{\valEpsFloat}$, reaches only about $\epsmach^{2/3} = \num{\valModelCentralTwoFirstFloat}$; on $\mathrm{e}^x$ at
+1 its default step gives \num{\valFloatDefaultRelError} (\cref{fig:float-double}). A 50-digit type, $\epsmach =
+\num{\valEpsMultiprecision}$, reaches far beyond \code{double} (\cref{sec:using-types}).
 
 \begin{marginfigure}
 \centering
@@ -390,8 +387,7 @@ Before you accept the default step, answer six questions.
   \item \emph{Is $\abs{f}$ much larger than $\scale \abs{f'}$}, as for an enthalpy with a formation term or an
     absolute pressure with a small slope? Expect to lose about $\log_{10} (\abs{f} / (\scale \abs{f'}))$ digits;
     subtract a constant reference from $f$ before differentiating if you can (\cref{sec:rounding-best}).
-  \item \emph{Which method and order?} The default step depends on both; a step chosen for one rule is wrong for
-    another (\cref{ch:orders}).
-  \item \emph{Unsure?} Use Ridders' method, which chooses its own step and estimates its error (\cref{ch:ridders}), or
-    check a stencil's result by repeating it with a doubled and a halved step (\cref{sec:using-check}).
+  \item \emph{Which method and order?} A step chosen for one rule is wrong for another (\cref{ch:orders}).
+  \item \emph{Unsure?} Use Ridders' method, which chooses its step and estimates its error (\cref{ch:ridders}), or
+    repeat a stencil at $2h$ and $h/2$ (\cref{sec:using-check}).
 \end{enumerate}

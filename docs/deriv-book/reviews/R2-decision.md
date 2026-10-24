@@ -159,7 +159,8 @@ to the solver's tolerance; a spacing on the scale of f itself can make the order
 wrong level, which More and Wild's full procedure guards against with a sign test and a spacing adjustment, so use
 the default step of `Central<2>`, as here, and check k; and the header is `docs/deriv-book/code/noise.hpp` of the
 repository, under its MIT licence, to copy. (The numerics reviewer's optional note that sigma is a root mean square
-while eta is a half-width is already in the text's "close to the root mean square eta / sqrt(3)".)
+while eta is a half-width is already in the text's "close to the root mean square eta / sqrt(3)".) *Corrected at the
+stage-7 close: the retry direction is reversed here; see section 7.*
 
 ### T10. The edge rule's two slips (numerics-07a, evidence-08)
 
@@ -413,3 +414,25 @@ one page by rule). The reference list stays one page under every option of T7. I
 89, the next cuts, in order, are the `estimate-pitfalls` listing of 7.2 reduced to its four code lines (-6), 3.8's
 checklist items to one line each (-4), and then PLAN.md 1.1's order (B.2's worked example, Chapter 9's tables to
 `\footnotesize`, Sidebar 7.1 to half its length).
+
+## 7. Corrections recorded at the stage-7 close (editor, 2026-10-24)
+
+Two findings of the fundamentals author's own probing of the noise recipe (`fund/probe.cpp` in the session's
+scratchpad, with the book's `estimate_noise`), reported in `responses/R2-03-rounding.md` and carried into the text;
+the decisions above are left as written.
+
+1. **T9's retry direction was reversed.** The letter says that k = 0 means "the spacing is so small that the smooth
+   part has not dropped below the noise within the eight points", with the retry at ten times the spacing. The probe
+   shows the opposite: on sin(50x)(1 + 1e-8 u) at x = 1, h = 0.1 settles at k = 1 at a wrong level (2.2 |f|),
+   h = 1e-2 and 1e-3 report k = 0, and h = 1e-4 and the default step report the noise (4.7e-9 and 7.8e-9 against
+   eta / sqrt(3) = 5.8e-9); on the clean exp(-x^2) at 2.5, h = 0.1 to 1e-3 report k = 0 and h = 1e-4 the rounding
+   level. So k = 0 means that the spacing is too large for the smooth part to fall below the noise within eight
+   points, and the retry is with a tenth of the spacing; ten times the spacing leads into the wrong-level case.
+   3.6 says so ("retry with a tenth of the spacing, or fall back to the solver's tolerance, as the listing does").
+   7.4.3 and the quick reference make no statement about the retry and agree with 3.6 as they stand.
+2. **A level near epsilon is implausible for a solver.** On the bisection friction factor the recipe settles at
+   k = 3 at about 7e-17 to 9e-17 relative at some spacings (Re = 1e5 with h = 0.61, the default step being 0.6055;
+   Re = 1e6 with the default step), the rounding level, although the solver's noise is about 1e-10: the quantised
+   output repeats its values at those eight points. At the default steps of Re = 2e4 to 2e5 and at 0.25 to 10
+   times the default step at Re = 1e5 it gives 2.6e-11 to 6.1e-11. 3.6 adds "distrust a level near epsilon for a
+   solver". DS22's quoted values are unaffected.

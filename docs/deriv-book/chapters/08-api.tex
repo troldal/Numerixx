@@ -37,7 +37,7 @@ Name & Kind & Section\\
 The module is one header, \code{<numerixx/deriv.hpp>}, which includes \code{<numerixx/math.hpp>}. Both are
 header-only, need C++23 and no other library; the CMake target is \code{numerixx::numerixx}. \Cref{tab:api-names}
 lists the public names. Everything in a namespace \code{detail} is internal: it may change without notice, and the
-book reads it only to generate the tables of \cref{ch:tables}. The enumeration \code{error} may gain values in a
+book names it only where the declarations of \cref{sec:api-derivative} do and to generate the tables of \cref{ch:tables}. The enumeration \code{error} may gain values in a
 later version. The examples of the book name the function, the method tags, \code{Estimate} and \code{error} with
 \code{using} declarations (\code{code/07-using-expected.cpp}).
 
@@ -71,11 +71,12 @@ Each has a twin with the additional constraint \code{detail::noisy<N, T>}, marke
   \item \code{T}, the real type, deduced from \code{x} alone; it must satisfy \code{nxx::real} and provide the
     \code{numeric_limits} members of \cref{sec:api-real}. The step's type, \code{std::type_identity_t<T>}, is
     non-deduced, so a \code{double} step converts to a multiprecision \code{T}; the conversion is implicit, so for a
-    \code{float} \code{x} write \code{1e-3f}, since a \code{double} step is diagnosed under \code{-Wconversion}.
+    \code{float} \code{x} write \code{1e-3f}, since a \code{double} step is diagnosed under \code{-Wconversion} unless
+    \code{float} holds it exactly.
   \item \code{F}, the callable. The constraint \code{detail::callable<F, T>} is
     \code{std::invocable<F &, T const &>}, with a result convertible to \code{T}: \code{fn} is called as a named
     lvalue through \code{std::invoke}, with a \code{T const} lvalue, so a callable that rejects rvalues works, and so
-    does a pointer to a member function of \code{T} itself. For a member function of your own model, capture the
+    does a pointer to a const member function of \code{T} itself. For a member function of your own model, capture the
     object in a lambda.
 \end{itemize}
 \endgroup
@@ -90,13 +91,11 @@ precondition. For a stencil, \code{h} well above $\ulp(x)$: a two-node rule fail
 and near a power of two a step can move $x$ on one side only, so that \code{Central<2>} divides by a half-ulp distance
 and returns a finite value that is mostly rounding.
 
-
 \paragraph{Default steps.} For a stencil of accuracy order P, $h = \epsmach^{1/(P+N)} \max(\abs{x}, 1)$, computed as
 \code{root_epsilon<P + N, T>()} times the scale; there is no accessor for it. For Ridders' method the initial step is
 $\max(\abs{x}, 1)/32$ for $f'$ and $\max(\abs{x}, 1)/4$ for $f''$ to $f''''$. Pass a step when \code{fn} varies faster
 than $\max(\abs{x}, 1)$, or when the derivative is much smaller than the error $\epsmach^{P/(P+N)}$; use the overload
 without a step in generic code that varies N (\cref{tab:default-steps}).
-
 
 \paragraph{Result.} An \code{Estimate<T>} (\cref{sec:api-estimate}) whose \code{abs_error} is filled by Ridders'
 method and empty for the stencils, or \code{error::non_finite}.
@@ -175,17 +174,8 @@ terminates without exceptions); read \code{r->value} after testing \code{r}.
 \code{template<int P> struct Backward;}\hfill\code{// 1 <= P <= 6}\\
 \code{struct Ridders {};}
 \end{signature}
-The methods are empty tags, passed as the first template argument of \code{derivative}; their weights are internal.
-P is the accuracy order, the $\order(h^P)$ of the error, not the number of points. A tag with an order outside its
-range is rejected by the constraint of \code{derivative}; completing the type itself fails a \code{static_assert}
-(``\code{Central<P> needs an even order P from 2 to 10}'', ``\code{Forward<P> needs an order P from 1 to 6}''). A
-stencil whose integer weights the type \code{T} cannot hold exactly fails a \code{static_assert} too (``this rule's
-integer weights are not exact in T''); every type with 24 significant bits or more holds them all. That check is in
-the body of the evaluator, not in a constraint: a \code{requires}-expression reports such a call as valid (for
-\code{Central<10>} with \code{std::float16_t}, say), and the call then fails to compile inside the library.
-\Cref{tab:api-methods} gives the nodes, the cost and the default step of each.
-
-\begin{table}
+% Placed here, [h], so that it does not float into 8.6 and split a sentence there (R2-library-06).
+\begin{table}[h]
 \sidecaption{The methods for the N-th derivative: nodes in units of $h$, evaluations of \code{fn}, default step
 and error estimate, as \code{deriv.hpp} documents them. $s = \max(\abs{x}, 1)$. The weights are in
 \cref{ch:tables}.\label{tab:api-methods}}
@@ -206,10 +196,19 @@ Method & Nodes & Evaluations & Default step & Estimate\\
 \bottomrule
 \end{tabular}
 \end{table}
+The methods are empty tags, passed as the first template argument of \code{derivative}; their weights are internal.
+P is the accuracy order, the $\order(h^P)$ of the error, not the number of points. A tag with an order outside its
+range is rejected by the constraint of \code{derivative}; completing the type itself fails a \code{static_assert}
+(``\code{Central<P> needs an even order P from 2 to 10}'', ``\code{Forward<P> needs an order P from 1 to 6}''). A
+stencil whose integer weights the type \code{T} cannot hold exactly fails a \code{static_assert} too (``this rule's
+integer weights are not exact in T''); every type with 24 significant bits or more holds them all. That check is in
+the body of the evaluator, not in a constraint: a \code{requires}-expression reports such a call as valid (for
+\code{Central<10>} with \code{std::float16_t}, say), and the call then fails to compile inside the library.
+\Cref{tab:api-methods} gives the nodes, the cost and the default step of each.
 
 The two-node rules divide by the distance between the points actually evaluated, \code{Central<2>} for $f''$ by its
 actual offsets (\cref{sb:actual-distance,sb:actual-offsets}), the other rules by $\den h$ and then $N - 1$ times by
-$h$. \code{Ridders} extrapolates the \code{Central<2>} rule of order N in a Richardson tableau; its constants are in
+$h$, in the order that avoids a spurious underflow or overflow (by $h$ first when $\den h > 1 > h$). \code{Ridders} extrapolates the \code{Central<2>} rule of order N in a Richardson tableau; its constants are in
 \cref{tab:ridders-constants}.
 
 \section{The precision warning}\label{sec:api-warning}
@@ -245,7 +244,8 @@ relative estimate of \num{\valFloatFourthRiddersAtOneRelEstimate} that says the 
 $-a$ convert to \code{T}, which admits expression templates (\cref{sb:expression-templates}). The tests check that
 \code{float}, \code{double}, \code{long double}, \code{cpp_bin_float_50} with and without expression templates and
 \code{cpp_dec_float_50} satisfy it, and that \code{int}, \code{unsigned} and \code{cpp_rational} do not. The
-algorithms also read \code{radix}, \code{digits} and \code{denorm_min()}, which the concept does not check: a type
+algorithms also read \code{radix}, \code{digits}, \code{epsilon()}, \code{max()} and \code{denorm_min()}, which the
+concept does not check: a type
 without them passes the constraints and then fails to compile inside the header. A type of your own, here a wrapper
 of \code{double} with the arithmetic, a total order and construction from \code{int} and no default constructor,
 needs exactly the members below (\code{code/07-using-usertype.cpp}, which differentiates $\mathrm{e}^x$ with it):
@@ -267,5 +267,7 @@ see.
 
 \snippet{08-api-usage}{api-rejected}
 A type given explicitly as the second template argument, as in
-\code{derivative<Ridders, double>(fn, x)}, does not compile either, because that argument is the order; \code{T} is always deduced from \code{x}. A callable that cannot
+\code{derivative<Ridders, double>(fn, x)}, does not compile either, because that argument is the order; \code{T} is
+deduced from \code{x}, never from \code{h}, unless it is given as the third template argument. A callable that cannot
+
 be called with a \code{T const} lvalue, or whose result does not convert to \code{T}, fails \code{detail::callable}.

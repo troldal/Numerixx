@@ -133,9 +133,10 @@ Both error terms have the form constant times a power of $h$ times a derivative 
 the forward difference and $\frac{1}{6} h^2 f'''$ for the central one. In general a rule for the $N$-th derivative
 has a truncation error whose leading term is
 \begin{equation*}
-  \errc\, h^{\aorder} f^{(\aorder + \dorder)}(x),
+  \pm \errc\, h^{\aorder} f^{(\aorder + \dorder)}(x),
 \end{equation*}
-and $\aorder$ is its \emph{accuracy order}.\mnote{The \emph{derivative order} $\dorder$ says which derivative is
+with $\errc > 0$ its size and a sign fixed by the rule ($+$ for both rules here; \cref{ch:tables} gives it for every
+rule), and $\aorder$ is its \emph{accuracy order}.\mnote{The \emph{derivative order} $\dorder$ says which derivative is
 computed; this chapter has $\dorder = 1$ throughout. \Cref{ch:orders} treats $\dorder = 2$ to 4.} The forward
 difference has accuracy order 1 and the central difference accuracy order 2; we write that their errors are
 $\order(h)$ and $\order(h^2)$. The statement is about small steps: as $h$ tends to 0, the error divided by

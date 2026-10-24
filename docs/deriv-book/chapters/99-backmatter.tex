@@ -26,9 +26,10 @@ $n_k$, $w_k$ & the nodes of a rule (integer offsets: the samples are at $x + n_k
 $c_k$, $\den$ & the integer numerators and their common denominator, $w_k = c_k / \den$, as the library stores
   them and \cref{ch:tables} tabulates them\\
 $x_k$, $f_k$ & $x + n_k h$ and $f(x_k)$, the $k$-th point and sample\\
-$K$ & the largest $\abs{n_k}$ of a rule; the rule spans $K h$ on each side of $x$\\
+$K$ & the largest $\abs{n_k}$ of a rule; the rule reaches at most $K h$ from $x$\\
 $\mom{j}$ & the $j$-th moment of a rule, $\sum_k w_k n_k^j$ (with $c_k$: $\sum_k c_k n_k^j$)\\
-$\errc$ & the error constant: leading truncation term $\errc\, h^{\aorder} f^{(\aorder + \dorder)}$\\
+$\errc$ & the error constant, the magnitude of the leading truncation term $\pm \errc\, h^{\aorder} f^{(\aorder +
+  \dorder)}$, whose sign is that of $\mom{\dorder + \aorder}$ (\cref{ch:tables} gives the term signed)\\
 $\ampl$ & the rounding amplification, $\sum_k \abs{w_k}$\\
 $\epsmach$ & machine epsilon of the type, \code{std::numeric_limits<T>::epsilon()}: $2^{-52}$ for \code{double};
   the book uses $\epsmach$, not the unit roundoff $\epsmach / 2$\\

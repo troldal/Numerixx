@@ -22,8 +22,10 @@ int main()
 // the step, in K, as the third argument
 for (double const h : {1e-2, 1e-8}) {
     auto const d = derivative(H, T0, h);
-    if (d) std::println("h = {:.0e} K: rel. error {:.1e}",
-                        h, std::abs(d->value - cp) / cp);
+    if (d) {
+        std::println("h = {:.0e} K: rel. error {:.1e}",
+                     h, std::abs(d->value - cp) / cp);
+    }
 }
 // </explicit-step>
 

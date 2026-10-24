@@ -37,8 +37,9 @@ The numbers $\mom{j}$ are the moments of the rule, and they decide everything. T
 f^{(\dorder)}$ plus an error of order $h^{\dorder + \aorder}$ exactly when $\mom{\dorder} = \dorder!$ and every
 other moment up to $\mom{\dorder + \aorder - 1}$ vanishes; these are the moment conditions. The first moment that
 does not vanish, $\mom{\dorder + \aorder}$, gives the leading error term of the rule,
-$\errc\, h^{\aorder} f^{(\dorder + \aorder)}$ with $\errc = \abs{\mom{\dorder + \aorder}} / (\dorder + \aorder)!$,
-and $\aorder$ is the accuracy order.
+$\pm \errc\, h^{\aorder} f^{(\dorder + \aorder)}$: its sign is that of $\mom{\dorder + \aorder}$, which the tables
+of \cref{ch:tables} give, and $\errc = \abs{\mom{\dorder + \aorder}} / (\dorder + \aorder)!$ is its magnitude;
+$\aorder$ is the accuracy order.
 
 Take the four-point central rule for $f'$, the library's \code{Central<4>}. Its nodes are $-2, -1, 1, 2$. A rule
 that is to be exact for the odd function $f(x + t) = t$ and give zero for even functions has antisymmetric
@@ -49,8 +50,8 @@ is $a = \tfrac23$ and $b = -\tfrac{1}{12}$:
   f'(x) = \frac{f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h)}{12 h} + \frac{h^4}{30} f^{(5)}(\xi).
   \label{eq:stencils-central-four}
 \end{equation}
-The error comes from $\mom{5} = 2a + 64 b = -4$, so $\errc = 4/5! = 1/30$, and the rule's value is $f'$ minus
-that term: it underestimates $f'$ where $f^{(5)} > 0$.\sidenote{The single intermediate point $\xi$ in the span
+The error comes from $\mom{5} = 2a + 64 b = -4$: the signed coefficient is $\mom{5} / 5! = -1/30$, so
+$\errc = 1/30$ and the rule's value is $f'$ minus that term; it underestimates $f'$ where $f^{(5)} > 0$.\sidenote{The single intermediate point $\xi$ in the span
 of the stencil comes from the interpolation error formula (\cref{sec:derivations-moments}); the next term is $h^6$,
 since all even moments vanish.} Two more points have raised the order from 2 to 4. \Cref{tab:weights-central-first}
 in \cref{ch:tables} lists the nodes, weights, $\ampl$ and $\errc$ of every central rule for $f'$, and the general
@@ -81,7 +82,7 @@ A rule for the $\dorder$-th derivative of accuracy order $\aorder$ on the nodes 
   \qquad \mom{\dorder} = \dorder!,
 \]
 a linear system for the weights. The library does not solve it as a system. It uses the Lagrange formula
-(Burden et al.\cite[Sect.~4.1]{burden2016}): the polynomial $p$ that interpolates the samples at the nodes, in the
+(Burden et al.,\cite{burden2016} Section 4.1): the polynomial $p$ that interpolates the samples at the nodes, in the
 scaled variable $t$ with $x + t h$, is $p(t) = \sum_k f_k L_k(t)$ with $L_k(t) = \prod_{j \ne k} (t - n_j) / (n_k - n_j)$,
 and its $\dorder$-th derivative at $t = 0$ gives the weights directly:
 \[
@@ -107,7 +108,7 @@ well as in double (the largest numerator is 6,222,216); the generator checks thi
 and a type too narrow to hold a rule's integers, such as half precision under \code{Central<10>}, is rejected by a
 \code{static_assert} rather than used with rounded weights. The tests check every table against the moment
 conditions with a moment function of their own, and against the published rows of Fornberg\cite{fornberg1988} and
-Chapra;\cite[ch.~23]{chapra2015} they also use the exactness on polynomials, with a point and a step that are short
+Chapra (Chapter 23);\cite{chapra2015} they also use the exactness on polynomials, with a point and a step that are short
 binary fractions so that no rounding occurs, and check that \code{Central<4>} on $x^4$ returns exactly 4 at compile
 time and at run time.
 \end{sidebar}
@@ -182,8 +183,8 @@ carries the rounding with weight $4/12$, and it would leave the inner nodes' rou
 by a fixed multiple of $h$ and keeps the third term, which the tests allow for (\cref{sec:guarantees-verification}).
 
 The second price is smoothness. The error term in \cref{eq:stencils-central-four} holds only if $f$ has
-$\aorder + \dorder$ continuous derivatives across the whole stencil, which spans $K h$ on each side of $x$ with $K$
-the largest node, and both $K$ and the default step grow with the order: on the thread \code{Central<6>} samples
+$\aorder + \dorder$ continuous derivatives across the whole stencil, which reaches $K h$ from $x$ on the sides it
+samples, with $K$ the largest node, and both $K$ and the default step grow with the order: on the thread \code{Central<6>} samples
 up to \SI{\valCpCentralSixStep}{\kelvin} times three on either side of $T_0$. A kink or a range break anywhere in
 that span gives a wrong value without any failure, and a higher order makes it worse, not better; \cref{sec:using-pitfalls}
 measures this on the thread's own range break. The third price is evaluations: $\aorder + \dorder - 1$ per call

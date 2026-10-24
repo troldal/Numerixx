@@ -1194,6 +1194,30 @@ namespace {
                 value(o, "RiddersUncoveredOthers" + suffix, functions_with_counts(uncovered, main_fn));
             }
         });
+        // A smaller initial step usually restores the margin (R2-numerics-03): every uncovered case of the study,
+        // all four orders, rerun with a quarter and a sixty-fourth of the default initial step (max(|x|, 1) over
+        // the library's divisor for the order), and how many of them are then covered. Sidebar 6.2 quotes the
+        // three counts.
+        int margin_cases = 0, quarter_covered = 0, sixty_fourth_covered = 0;
+        for_each(derivative_orders{}, [&](auto n) {
+            constexpr int N = decltype(n)::value;
+            double const divisor = static_cast<double>(nxx::deriv::detail::ridders_divisors[static_cast<std::size_t>(N - 1)]);
+            for (Case const &c : all[N].records) {
+                if (c.covered) continue;
+                ++margin_cases;
+                double const exact = study[c.fn].exact(N, c.x);
+                double const h0 = std::max(std::abs(c.x), 1.0) / divisor;
+                auto const covered_at = [&](double h) {
+                    auto const r = derivative<Ridders, N>(study[c.fn].fn, c.x, h);
+                    return r && r->abs_error && std::abs(r->value - exact) <= *r->abs_error;
+                };
+                quarter_covered += covered_at(h0 / 4) ? 1 : 0;
+                sixty_fourth_covered += covered_at(h0 / 64) ? 1 : 0;
+            }
+        });
+        value(o, "RiddersMarginCases", integer(margin_cases));
+        value(o, "RiddersMarginQuarterCovered", integer(quarter_covered));
+        value(o, "RiddersMarginSixtyFourthCovered", integer(sixty_fourth_covered));
         value(o, "RiddersCases", integer(all[1].cases));
         value(o, "RiddersPlotEvery", integer(plot_every));
         value(o, "RiddersPlotCases", integer(all[1].plotted));

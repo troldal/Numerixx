@@ -92,8 +92,6 @@ if (r) {                // test first: r holds a result
     // if (*r) would test v != 0: false here, as v is 0.
     std::println("{} +- {:.1e}", v, *e.abs_error);
 }
-// r.value() is std::expected's accessor: it throws when r
-// holds no result. r->value is the estimate's member.
 // </estimate-pitfalls>
     // clang-format on
     static_assert(std::same_as<std::remove_cvref_t<decltype(*r)>, Estimate<double>>);
@@ -106,23 +104,27 @@ if (r) {                // test first: r holds a result
 
     // clang-format off
 // <ridders-check>
-// Did it work, and is it right? For Ridders, also compare
-// the error estimate with the accuracy you need (tol).
-auto const accept = [](auto const &res, double tol) {
-    return res
-        && *res->abs_error <= tol * std::abs(res->value);
+// Did it work, and is the estimate within what you accept:
+// atol in the derivative's units, rtol relative? A stencil
+// result has no estimate and fails the check.
+auto const accept = [](auto const &res, double atol,
+                       double rtol) {
+    return res && res->abs_error
+        && *res->abs_error
+               <= atol + rtol * std::abs(res->value);
 };
 auto const at_T0 = derivative<Ridders>(H, T0);
-// 1 mK above the range break of section 7.8: a value, but
-// with a large estimate.
+// 1 mK above the range break of 7.8: a large estimate
 auto const at_break = derivative<Ridders>(
     [](double T) { return book::nitrogen_H_joined(T); },
     book::junction_T + 1e-3);
-std::println("{} {}", accept(at_T0, 1e-8),
-    accept(at_break, 1e-8)); // true false
+std::println("{} {}", accept(at_T0, 0.0, 1e-8),
+    accept(at_break, 0.0, 1e-8)); // true false
 // </ridders-check>
     // clang-format on
-    ok = ok && at_break.has_value() && accept(at_T0, 1e-8) && !accept(at_break, 1e-8);
+    ok = ok && at_break.has_value() && accept(at_T0, 0.0, 1e-8) && !accept(at_break, 0.0, 1e-8);
+    // A stencil result has no estimate: the check rejects it instead of reading an empty optional.
+    ok = ok && !accept(derivative(H, T0), 1.0, 1.0);
 
     if (!ok) std::println("FAILED: a claim of the text does not hold");
     return ok ? 0 : 1;

@@ -134,7 +134,7 @@ estimate is off by \num{\valCpDefaultRelError} relative. This closed form is the
 differentiate a function whose derivative we know so that every error can be measured; in practice you would
 differentiate one whose derivative you do not know, and \cref{ch:using} does so with a friction factor that comes
 from a solver. The closed form is exact for the \emph{function}, not for nitrogen: at \SI{1000}{\kelvin} the tables
-give \SI{\valCpTableValue}{\joule\per\mole\per\kelvin},\cite[Part~II, p.~1621]{chase1998} from which the fit
+give \SI{\valCpTableValue}{\joule\per\mole\per\kelvin} (Part~II, p.~1621),\cite{chase1998} from which the fit
 differs by \num{\valCpFitVsTableRelDiff} relative. That is a matter for the property data, not for the derivative.
 
 Ridders' method adapts its step and reports an estimate of its own error in \code{abs_error}:
@@ -151,26 +151,6 @@ estimate can be trusted.
 
 \Cref{tab:method-summary} chooses a method for the five situations that cover most uses; the full decision table is
 \cref{tab:method-choice} in \cref{ch:using}.
-
-\begin{table}
-\sidecaption{The method in five situations. Each row is a call \code{derivative<M>(fn, x)}, or
-\code{derivative<M>(fn, x, h)} with the step given; $\epsmach$ is the machine epsilon of the type ($2^{-52}$ for
-\code{double}); $w$ is the distance in $x$ over which $f$ changes appreciably (\cref{sec:rounding-scale}); $\noise$
-is the relative accuracy of $f$, how many digits of it you can trust, for example $10^{-8}$ for a solver converged
-to a relative tolerance of $10^{-8}$ on its output (\cref{sec:rounding-noise}). Evaluations are those
-of \code{fn} for $f'$. The full table, with the evidence for each row, is \cref{tab:method-choice}; the
-quick-reference page at the end of the book repeats this one.\label{tab:method-summary}}
-\centering\footnotesize
-\renewcommand{\arraystretch}{1.15}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{33mm}>{\raggedright\arraybackslash}p{36mm}%
-  >{\raggedright\arraybackslash}p{36mm}@{}}
-\toprule
-Situation & Method \code{M} and step & Cost and accuracy\\
-\midrule
-\tablerows{chapters/shared-method-summary}
-\bottomrule
-\end{tabular}
-\end{table}
 
 \paragraph{Accuracy.} At the default step a first derivative in \code{double} has about
 \num{\valHeadlineFirstDigits} correct digits, a fourth derivative about \num{\valHeadlineFourthDigits}: the medians of
@@ -190,9 +170,34 @@ typically \num{\valRiddersEvalsMedianFirst} for $f'$ and never more than \num{\v
   \item $f$ has a kink or a range break within a few steps of $x$ (\cref{sec:using-pitfalls}).
 \end{itemize}
 A stencil reports no error estimate: if in doubt, repeat the call with the steps $2h$ and $h/2$ and count the digits
-that agree (\cref{sec:using-check}). For Ridders' method, read the estimate: use \code{r->value} only if
-\code{*r->abs_error <= tol * std::abs(r->value)} for the relative tolerance \code{tol} you need. A value with a large
-estimate is one the method could not make accurate (\cref{sec:using-result}).
+that agree (\cref{sec:using-check}). For Ridders' method, read the estimate before you report a value: accept the
+result \code{res} only if \code{res && res->abs_error && *res->abs_error <= atol + rtol * std::abs(res->value)}
+(\cref{sec:using-result}). Take \code{rtol} $= 10^{-n}$ for a value reported to $n$ significant figures and
+\code{atol} as the error you can accept in the derivative's units, which is what decides near a zero of $f'$; inside
+an iteration no check is needed. A passed check says that the estimate is small, not that the value is right where
+the estimate is blind, as at a kink.
+
+% The table follows the two checks so that the list of the three silent failures is never split by
+% the float (R2-engineer-03); it still precedes the paragraph that cites it on the page.
+\begin{table}
+\sidecaption{The method in five situations. Each row is a call \code{derivative<M>(fn, x)}, or
+\code{derivative<M>(fn, x, h)} with the step given; $\epsmach$ is the machine epsilon of the type ($2^{-52}$ for
+\code{double}); $w$ is the distance in $x$ over which $f$ changes appreciably (\cref{sec:rounding-scale}); $\noise$
+is the relative accuracy of $f$, how many digits of it you can trust, for example $10^{-8}$ for a solver converged
+to a relative tolerance of $10^{-8}$ on its output (\cref{sec:rounding-noise}). Evaluations are those
+of \code{fn} for $f'$. The full table, with the evidence for each row, is \cref{tab:method-choice}; the
+quick-reference page at the end of the book repeats this one.\label{tab:method-summary}}
+\centering\footnotesize
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{33mm}>{\raggedright\arraybackslash}p{36mm}%
+  >{\raggedright\arraybackslash}p{36mm}@{}}
+\toprule
+Situation & Method \code{M} and step & Cost and accuracy\\
+\midrule
+\tablerows{chapters/shared-method-summary}
+\bottomrule
+\end{tabular}
+\end{table}
 
 \paragraph{Where to read on.} Why the central difference beats the forward one: \cref{ch:taylor}. Why a smaller step
 is not better, and when to pass your own: \cref{ch:rounding}. More points and one-sided rules: \cref{ch:stencils};

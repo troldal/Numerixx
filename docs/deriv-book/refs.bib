@@ -116,14 +116,17 @@
   isbn      = {0-13-322495-3}
 }
 
-@techreport{ieee754-2019,
-  title       = {{IEEE} Standard for Floating-Point Arithmetic},
-  institution = {Institute of Electrical and Electronics Engineers},
-  number      = {IEEE Std 754-2019 (Revision of IEEE 754-2008)},
-  address     = {Piscataway, NJ},
-  year        = {2019},
-  isbn        = {978-1-5044-5924-2},
-  doi         = {10.1109/IEEESTD.2019.8766229}
+% A book entry with the standard's number in the series: the achemso style prints neither the number nor the
+% publisher of a technical report, and a manual entry drops the DOI (R2-evidence-06). No "at" sign may appear in
+% this comment: BibTeX reads one as the start of an entry.
+@book{ieee754-2019,
+  title     = {{IEEE} Standard for Floating-Point Arithmetic},
+  series    = {IEEE Std 754-2019 (Revision of IEEE 754-2008)},
+  publisher = {Institute of Electrical and Electronics Engineers},
+  address   = {Piscataway, NJ},
+  year      = {2019},
+  isbn      = {978-1-5044-5924-2},
+  doi       = {10.1109/IEEESTD.2019.8766229}
 }
 
 % ---------------------------------------------------------------- the alternatives (Chapter 1, Sidebar 1.1)
