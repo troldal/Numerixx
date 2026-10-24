@@ -72,7 +72,10 @@ Presets: `clang-cl`, `cl`, `gcc`, `clang`, `emscripten`; each builds Debug into 
   `Central4`).
 - **Callbacks** are named `fn`. Qualify internal calls (`nxx::deriv::...`) so user types cannot hijack them by ADL.
 - **Tests.** Reference values come from closed forms or independent high-precision sources, never from Numerixx
-  itself; each tolerance is justified by an error estimate in a comment.
+  itself; each tolerance is justified by an error estimate in a comment. One exception: a bound on the quality of a
+  result for which no independent value exists, such as Ridders' error estimate in a multiprecision type whose guard
+  digits no prototype models, may be a regression baseline from a recorded run of Numerixx. It is labelled as such in
+  the test, with the commit it came from, and never replaces the correctness check against a closed form.
 - **Generality.** Justify features on general numerical grounds; do not name downstream projects in code, docs or
   commits.
 

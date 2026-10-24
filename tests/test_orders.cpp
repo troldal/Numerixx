@@ -629,11 +629,12 @@ TEST_CASE("orders: stencils with the default step")
 
 TEST_CASE("orders: multiprecision types")
 {
-    // Ridders f'' to f'''' of exp at 1: coverage as for double (the actual error within 6 times the estimate), and
-    // the estimate bounded per type by twice the first C++ run, as for f' (docs/design.md: the decimal prototype does
-    // not model these types' guard digits). The first run gave relative estimates of 2.7e-43, 1.6e-39 and 8.1e-36 for
-    // cpp_bin_float_50 (with and without expression templates alike), 1.0e-42, 3.9e-39 and 2.6e-36 for
-    // cpp_dec_float_50, and relative errors 13 to 2600 times smaller.
+    // Ridders f'' to f'''' of exp at 1: coverage as for double (the actual error within 6 times the estimate), and the
+    // estimate bounded per type by twice the first C++ run, commit d39e31b, as for f': a regression baseline (the test
+    // rule's exception in CLAUDE.md; the decimal prototype does not model these types' guard digits). The first run
+    // gave relative estimates of 2.7e-43, 1.6e-39 and 8.1e-36 for cpp_bin_float_50 (with and without expression
+    // templates alike), 1.0e-42, 3.9e-39 and 2.6e-36 for cpp_dec_float_50, and relative errors 13 to 2600 times
+    // smaller.
     auto const check = []<typename T>(T, double bound2, double bound3, double bound4) {
         auto const exp = [](T const &x) { return T(mp::exp(x)); };
         T const e = T(mp::exp(T(1)));

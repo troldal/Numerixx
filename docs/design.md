@@ -169,7 +169,7 @@ In short (for every order N, `PHASE4_API.md`):
 - doctest. Every constexpr function has `static_assert` tests next to run-time tests of the same cases.
 - Ridders: the actual error must be within 6 times the estimate, and the estimate within twice the independent
   Python prototype's value for the case (for the multiprecision types, which the prototype does not model, twice the
-  first C++ run's). Polynomials with dyadic x and h are exact, with the rounding floor of the predicted level as the
+  first C++ run's: a regression baseline, as the test rule in CLAUDE.md allows, labelled with its commit). Polynomials with dyadic x and h are exact, with the rounding floor of the predicted level as the
   estimate (binary types only).
 - Stencil tables are checked by `static_assert` against the moment conditions of their order and a reduced
   denominator, with a moment function in the test file, independent of the generator (a Taylor check against the

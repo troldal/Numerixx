@@ -310,8 +310,10 @@ TEST_CASE("ridders: failures, untrusted results and the level cap")
 
 TEST_CASE("ridders: multiprecision types")
 {
-    // References from the first C++ run (relative estimates): bin50 exp 4.4e-47, log 3.7e-46; dec50 exp 4.1e-46,
-    // log 2.1e-45. cpp_dec_float's guard digits keep its rounding below its epsilon, so its floor is conservative.
+    // The estimate's ceiling is a regression baseline (the test rule's exception in CLAUDE.md): the relative estimates
+    // of the first C++ run, commit 1023248: bin50 exp 4.4e-47, log 3.7e-46; dec50 exp 4.1e-46, log 2.1e-45. The
+    // prototype does not model these types; cpp_dec_float's guard digits keep its rounding below its epsilon, so its
+    // floor is conservative. The coverage check (actual within 6 times the estimate) uses the closed forms.
     auto const check = []<typename T>(T, char const *exp_reference, char const *log_reference) {
         using std::abs;
         auto const accurate_mp = [](auto const &r, T const &exact, T const &reference) {
