@@ -19,6 +19,7 @@ using nxx::deriv::error;      // why there is no value
 #include <cmath>
 #include <concepts>
 #include <print>
+#include <type_traits>
 
 namespace {
 
@@ -85,20 +86,43 @@ auto const slope = derivative(H, T0).and_then(
 // <estimate-pitfalls>
 auto const cosine = [](double x) { return std::cos(x); };
 auto const r = derivative<Ridders>(cosine, 0.0);
-auto const e = *r;     // an Estimate<double>, not a double
-double const v = *r;   // the value, by the conversion
-if (r) std::println("a result: {}", v); // true: r holds one
-// if (*r) would test v != 0, not whether r holds a value.
-// Test has_value() before reading the error estimate.
-if (r->abs_error.has_value()) {
-    std::println("{} +- {:.1e}", e.value, *e.abs_error);
+if (r) {                // test first: r holds a result
+    auto const e = *r;  // an Estimate<double>, not a double
+    double const v = *r; // the value, by the conversion
+    // if (*r) would test v != 0: false here, as v is 0.
+    std::println("{} +- {:.1e}", v, *e.abs_error);
 }
+// r.value() is std::expected's accessor: it throws when r
+// holds no result. r->value is the estimate's member.
 // </estimate-pitfalls>
     // clang-format on
-    static_assert(std::same_as<decltype(e), Estimate<double> const>);
+    static_assert(std::same_as<std::remove_cvref_t<decltype(*r)>, Estimate<double>>);
+    // value() is std::expected's own accessor (it throws std::bad_expected_access on failure, which this test does
+    // not exercise: the Emscripten build runs without exceptions); it returns the Estimate, not a double.
+    static_assert(std::same_as<decltype(r.value()), Estimate<double> const &>);
     // cos is even about 0, so cos(h) - cos(-h) is exactly 0 at every level: the value is exactly 0, and *r tests
     // false although r holds a value (written out as a cast: Clang's -Wconversion rejects if (*r) itself).
-    ok = ok && r && v == 0.0 && !static_cast<bool>(*r) && e.abs_error.has_value();
+    ok = ok && r && r->value == 0.0 && !static_cast<bool>(*r) && r->abs_error.has_value();
+
+    // clang-format off
+// <ridders-check>
+// Did it work, and is it right? For Ridders, also compare
+// the error estimate with the accuracy you need (tol).
+auto const accept = [](auto const &res, double tol) {
+    return res
+        && *res->abs_error <= tol * std::abs(res->value);
+};
+auto const at_T0 = derivative<Ridders>(H, T0);
+// 1 mK above the range break of section 7.8: a value, but
+// with a large estimate.
+auto const at_break = derivative<Ridders>(
+    [](double T) { return book::nitrogen_H_joined(T); },
+    book::junction_T + 1e-3);
+std::println("{} {}", accept(at_T0, 1e-8),
+    accept(at_break, 1e-8)); // true false
+// </ridders-check>
+    // clang-format on
+    ok = ok && at_break.has_value() && accept(at_T0, 1e-8) && !accept(at_break, 1e-8);
 
     if (!ok) std::println("FAILED: a claim of the text does not hold");
     return ok ? 0 : 1;

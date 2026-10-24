@@ -29,7 +29,7 @@ The appendices hold the floating-point facts and the derivations the sidebars ci
 precede the references.
 
 A reader in a hurry has two shortcuts. \Cref{sec:why-summary}, ``If you read nothing else'', chooses a method for
-the five situations that cover most uses and gives the one check every call needs. And the
+the five situations that cover most uses and gives the two checks every call needs. And the
 \hyperref[ch:quick-reference]{quick-reference page}, the last page of the book (page
 \pageref{ch:quick-reference}), is the whole interface on one sheet: the call in its forms, the result, the failures,
 the method choice, how to check a result that comes without an error estimate, and the pitfalls that matter most.
@@ -40,8 +40,10 @@ Every number in this book that comes from a computation was produced by the libr
 the book's sources runs \code{nxx::deriv} and writes the values, the data behind every plot and the bodies of the
 tables, and the text quotes them by name. The generator checks the weight tables against their defining equations
 and the thread example against an independent evaluation each time it runs. Every code listing is quoted from a
-compiled program that runs as a test of the library and checks what the text claims about it. The book describes
-the library as it is; a feature it does not have is named as deferred, never promised.
+compiled program that runs as a test of the library and checks what the text claims about it, with two exceptions:
+the declarations of \cref{ch:api} are transcribed from the library's header and checked against it at every build,
+and the CMake snippet of \cref{sec:using-call} is quoted from a file the book's build does not configure. The book
+describes the library as it is; a feature it does not have is named as deferred, never promised.
 
 \section*{The version}
 
@@ -52,20 +54,26 @@ repository are the ground truth; where this book and the code disagree, the code
 \section*{How this document was prepared}
 
 This document was prepared with the use of AI, under the direction of its author, who defined its scope, approved
-its plan and its evidence, read every stage, decided every contested point and is responsible for its content.
+its plan, its evidence and every stage, decided every contested point and is responsible for its content.
 
-The work ran as a staged process with AI models in named roles, coordinated by the author. An editor (Anthropic's
-Claude, Fable 5.1) wrote the plan, the notation, the data generator, the front and back matter, and integrated the
-chapters. Three authors drafted the chapters in parallel: the fundamentals of Part~I (Claude Opus 5.5), the methods
-chapters and the derivations (Claude Fable 5.1), and the chapter on using the library together with Part~II (Claude
-Opus). The stages so far are the plan, the evidence (the data sets, the figures and the compiled examples, produced
-before the prose that uses them), the drafting of the chapters, and this integration. Still to come, and to be
-recorded here at release, are two rounds of review by five further AI readers and reviewers, two in the role of the
-target audience (a practising process engineer and an engineering-software developer) and three as peer reviewers
-of the numerical claims, of every statement against the code, and of the numbers, figures and citations; the
-authors' revisions; and an independent review by a second vendor's model (OpenAI Codex). The references were
-entered from the plan and are marked unverified until the evidence reviewer has checked each against the work
-itself.
+The work ran as a staged process with AI models in named roles, coordinated by a main session (Anthropic's Claude,
+Fable 5.1) that set up the book's folder, its layout, its build and checks and the skeleton of its data generator,
+launched the other agents and reported to the author. An editor (Claude Fable 5.1) wrote the plan, the notation,
+the data generator, the front and back matter and the decision letters, and integrated the chapters. Three authors
+drafted the chapters in parallel and wrote the code examples: the fundamentals of Part~I (Claude Opus 5.5), the
+methods chapters and the derivations (Claude Fable 5.1), and the chapter on using the library together with Part~II
+(Claude Opus 5.5). Before any prose was written, the plan was reviewed by a reader in the role of a practising
+process engineer and by the numerics reviewer, and the thread example's data and the generator's first results
+were verified by the evidence reviewer. The integrated draft was then reviewed in one round by five reviewers: two
+readers in the role of the target audience, a practising process engineer and an engineering-software developer
+(Claude Opus 5.5), and three peer reviewers, of the numerical and mathematical claims (Claude Fable 5.1), of every
+statement and listing against the code (Claude Opus 5.5), and of the numbers, figures and citations (Claude
+Opus 5.5); the editor decided on every finding, the author approved the decisions, and the authors revised their
+chapters. Still to come, and to be recorded here at release, are a second, targeted round of review and two
+independent reviews by other models, OpenAI Codex and Cline with DeepSeek V4.1 Flash 1017.
 
-The numbers, data sets, tables and listings were generated by the library, not written by any model, as described
-above. The layout follows an earlier design document of the author's.
+The numbers, the plotted data and the bodies of the generated tables were computed by running the library through
+the book's data generator; no model typed them. The code listings are compiled and run as tests; the declarations
+of \cref{ch:api} are transcribed from the library's header and checked against it at every build. Every reference
+was checked by the evidence reviewer against the work or a library catalogue. The layout follows an earlier design
+document of the author's.

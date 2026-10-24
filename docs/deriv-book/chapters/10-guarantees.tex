@@ -34,8 +34,12 @@ Method & $N = 1$ & 2 & 3 & 4 & $N = 1$ & 2 & 3 & 4 & $N = 1$ & 2 & 3 & 4\\
 \end{table*}
 
 The error model of \cref{ch:stencils} explains the table: a rule of accuracy order P at its default step has an error
-of about $\epsmach^{P/(P+N)}$, relative (\cref{tab:default-steps}), and the double column agrees with it to within
-about a factor of ten. In round numbers, \code{Central<2>} in double gives \num{\valHeadlineFirstDigits} correct
+of about $\epsmach^{P/(P+N)}$, relative (\cref{tab:default-steps}). Against the double column, the central rules lie
+below the model by up to a factor of \num{\valModelRatioCentralBelowMax} for $f'$ to $f'''$ and up to
+\num{\valModelRatioCentralFourthAbove} times above it for $f''''$; \code{Forward<2>} lies up to
+\num{\valModelRatioForwardTwoAbove} times above it, and \code{Forward<4>} \num{\valModelRatioForwardFourThird} and
+\num{\valModelRatioForwardFourFourth} times above it for $f'''$ and $f''''$, by its larger amplification $\ampl$,
+which the model drops (measured). In round numbers, \code{Central<2>} in double gives \num{\valHeadlineFirstDigits} correct
 digits for $f'$ and \num{\valHeadlineFourthDigits} for $f''''$; Ridders' method \num{\valHeadlineRiddersFirstDigits}
 and \num{\valHeadlineRiddersFourthDigits}. Higher orders pay most in the wide type, where the
 step can grow far before truncation matters; the float column shows why the fourth derivative in float warns.
@@ -53,8 +57,10 @@ faster or is noisier, the figures do not hold until the step is fitted (\cref{fi
 Ridders' method returns an estimate of its error, not a bound. Its quality was measured on a random study
 (\cref{fig:ridders-coverage}): \num{\valRiddersFunctions} smooth functions with closed-form derivatives ($\mathrm{e}^x$,
 $\sin x$, $\log x$, $\sqrt{x}$, $1/x$, $1/(1 + 25x^2)$, $x^5$, $\mathrm{e}^{-x^2}$, $\tanh x$), each at
-\num{\valRiddersPointsPerFunction} random points in $[0.2, 3]$, in double, with the default initial steps, no noise
-and no singularity within the initial step. \Cref{tab:ridders-statistics} gives the results per derivative order. The
+\num{\valRiddersPointsPerFunction} random points in $[0.2, 3]$, in double, with the default initial steps and no
+noise. For $f'$ no singularity lies within the initial step; for $f''$ to $f''''$ the initial step $s/4$ (and the
+span $2 h_0$ of $f'''$ and $f''''$) reaches past zero for $x$ below 0.25 (0.5), which are the restarts of
+\cref{tab:ridders-statistics}. The table gives the results per derivative order. The
 coverage is the fraction of cases whose estimate is at least the actual error; the ratio is actual error over
 estimate, so a ratio below 1 is covered.
 
@@ -106,7 +112,10 @@ The cost of a derivative is counted in evaluations of $f$, which dominate whenev
 operations; the library's own work is one weighted sum per stencil and one tableau row per level of Ridders' method.
 \Cref{tab:cost} gives the counts. For a stencil they are exact: one evaluation per node. For Ridders' method they
 depend on $f$ and $x$; the table gives the median and the range of the random study and the cap, which no call
-exceeds.
+exceeds. For $f'$ in double, Ridders' \num{\valRiddersEvalsMedianFirst} evaluations (median) against a stencil's
+2 to 6 buy about \num{\valHeadlineRiddersFirstDigits} digits against \num{\valHeadlineFirstDigits} for
+\code{Central<2>}, as many as \code{Central<4>} gives and none over \code{Central<6>} (\cref{tab:accuracy-matrix}),
+and an estimate of the error.
 
 \begin{table}
 \sidecaption{Evaluations of $f$ per derivative, by method and derivative order N. Stencils: exact. Ridders: measured
@@ -123,10 +132,13 @@ Method & $N = 1$ & 2 & 3 & 4\\
 
 \section{Limits}\label{sec:guarantees-limits}
 
-\paragraph{Orders.} The derivative order is 1 to 4. \code{Central<P>} stops at $P = 10$: beyond it the gain is under
-half a digit even for 50-digit types. The one-sided rules stop at $P = 6$, where the rounding amplification $\ampl$ is
-already \num{\valAmplForwardSix} for $f'$ and \num{\valAmplForwardSixFourth} for $f''''$
-(\cref{tab:weights-forward-first,tab:weights-forward-fourth}).
+\paragraph{Orders.} The derivative order is 1 to 4. The caps on P are design decisions (\code{docs/PHASE2_API.md}).
+\code{Central<P>} stops at $P = 10$: by the model's exponent, a \code{Central<12>} would gain about
+\num{\valCapGainCentralTwelveFirstDouble} digit for $f'$ in double and \num{\valCapGainCentralTwelveFirstMultiprecision}
+in a 50-digit type (\num{\valCapGainCentralTwelveFourthDouble} and \num{\valCapGainCentralTwelveFourthMultiprecision}
+for $f''''$), on a still wider stencil. The one-sided rules stop at $P = 6$, where the rounding amplification $\ampl$
+is already \num{\valAmplForwardSix} for $f'$ and \num{\valAmplForwardSixFourth} for $f''''$
+(\cref{tab:weights-forward-first,tab:weights-forward-fourth}) and grows about as fast as a higher order pays.
 
 \paragraph{Types.} The integer weights must be exact in \code{T}, which every type with 24 significant bits or more
 satisfies; a narrower type fails a \code{static_assert}. A fourth derivative in a type with an epsilon above $10^{-7}$
@@ -138,8 +150,10 @@ That is a rule of thumb, not a property of $f$; \cref{sec:using-pitfalls} shows 
 \paragraph{Domain edges.} Ridders' method needs the nearest point at which $f$ is not finite a minimum distance away,
 because the levels it spends restarting come out of its budget of \num{\valRiddersLevelCap}. For $\log x$ at
 $x = 2^{-k}$ with the default first-derivative step it returned a value down to $k = \num{\valRiddersEdgeLimitExponent}$,
-ten correct digits down to $k = \num{\valRiddersEdgeTenDigitsExponent}$, and used its whole budget from
-$k = \num{\valRiddersEdgeCapExponent}$ (measured, \cref{fig:ridders-edge}). The design record derives the first limit,
+with an estimate grown to flag the loss, but ten correct digits only down to
+$k = \num{\valRiddersEdgeTenDigitsExponent}$; it used its whole budget from $k = \num{\valRiddersEdgeCapExponent}$
+(measured, \cref{fig:ridders-edge}). For ten digits, keep the nearest bad point at least
+$2^{-\num{\valRiddersEdgeTenDigitsExponent}} \max(\abs{x}, 1)$ away. The design record derives the first limit,
 $2^{-34} \max(\abs{x}, 1)$, from the initial step $s/32$ and the cap, and $2^{-31} \max(\abs{x}, 1)$ for $f''$ to
 $f''''$, whose initial step is $s/4$; the second is derived, not measured. Exactly at an edge, the one-sided rules
 apply.
@@ -161,9 +175,13 @@ Each guarantee below is stated with the hypothesis it rests on and with how it i
     values. An exception thrown by \code{fn} or by the operations of \code{T} passes through unchanged. Verified by
     inspection: the headers contain no \code{throw} and no \code{try}.
   \item \emph{Where \code{fn} is called.} Only at finite points: the overflow checks come before any point is formed.
-    A stencil calls \code{fn} once per node, and \code{Forward<P>} never below $x$, \code{Backward<P>} never above.
-    Ridders' method calls it at most 64, 65, 128 and 129 times for $f'$ to $f''''$. Verified by tests that count and
-    log the calls.
+    A stencil calls \code{fn} once per node, and, for a step $h > 0$ (the precondition, an \code{assert} that
+    \code{NDEBUG} removes), \code{Forward<P>} never below $x$ and \code{Backward<P>} never above. Ridders' method
+    calls it at most \num{\valRiddersMaxEvalsFirst}, \num{\valRiddersMaxEvalsSecond}, \num{\valRiddersMaxEvalsThird}
+    and \num{\valRiddersMaxEvalsFourth} times for $f'$ to $f''''$. Verified by tests that count and log the calls.
+  \item \emph{No shared state.} The headers hold no global, static or thread-local variable other than compile-time
+    constants, and \code{fn} is called on the calling thread, one call at a time. Concurrent calls of
+    \code{derivative} are therefore as safe as the concurrent calls of \code{fn} they make. Verified by inspection.
   \item \emph{No allocation.} Only fixed-size arrays and \code{std::optional} on the stack; a \code{T} that allocates
     does so in its own operations. Verified by inspection.
   \item \emph{Failures are values, also at compile time.} Every failure is detected before the arithmetic that would
@@ -181,7 +199,8 @@ Each guarantee below is stated with the hypothesis it rests on and with how it i
     The build pins neither. Verified on the five toolchains of the continuous integration (GCC, Clang, MSVC,
     clang-cl, Emscripten), by tests that compare constant and run-time results, and by \code{code/07-using-constexpr.cpp}.
   \item \emph{\code{root_epsilon}} is within an ulp of $\epsmach^{1/N}$. Verified against references computed to 80
-    digits, for \code{float} and \code{double} and N from 2 to 2000.
+    digits for selected N from 2 to 2000 in \code{float} and \code{double}, and for the multiprecision types against
+    60-digit references.
   \item \emph{Types.} \code{derivative} is tested on \code{float}, \code{double}, \code{cpp_bin_float_50} with and
     without expression templates, and \code{cpp_dec_float_50}; \code{long double} satisfies the concept and is tested
     in \code{root_epsilon} only.
@@ -192,11 +211,15 @@ estimate, which is an estimate (\cref{sec:guarantees-ridders}); and the default 
 \section{How it is verified}\label{sec:guarantees-verification}
 
 The library's tests are one doctest executable and three build tests, listed in \cref{tab:tests}. Their reference
-values come from closed forms, from published tables\cite{fornberg1988,chapra2015} or from an independent
-prototype, never from \nxx{} itself, and each tolerance is justified by an error estimate in a comment. They run on
-the five toolchains of the continuous integration with warnings as errors. Each development phase ended with
-independent reviews, one by another model, whose findings and decisions are recorded in the design record
-(\code{docs/PHASE3_API.md}, \code{docs/PHASE4_API.md}, \code{docs/design.md}). The book's own examples build and run
+values come from closed forms, from the published tables of Fornberg\cite{fornberg1988} and
+Chapra\cite[ch.~23]{chapra2015} or from an independent
+prototype, never from \nxx{} itself, and each tolerance is justified by an error estimate in a comment. The stencils,
+for example, are held to $(\errc + 2\ampl)\,\epsmach^{P/(P+N)}$ relative on $\mathrm{e}^x$, truncation plus the
+rounding of the samples and of the points, for a selection of rules and orders, two-node rules included; the tests'
+comment calls it an estimate, not a bound, and reports measured errors 4 to 16 times below it on its three points.
+They run on the five toolchains of the continuous integration with warnings as errors. Each phase was reviewed by
+specialised review agents, Phase~4 also by another vendor's model (OpenAI Codex); the findings and decisions are
+recorded in the design record (\code{docs/PHASE3_API.md}, \code{docs/PHASE4_API.md}, \code{docs/design.md}). The book's own examples build and run
 as tests, and its data generator checks every table against its moment conditions and the thread's function against
 an independent exact evaluation each time it runs.
 
@@ -211,8 +234,9 @@ File & What it checks\\
   \code{root_epsilon} against 80-digit roots, the same at compile time and run time\\
 \code{test_deriv.cpp} & \code{Central<2>} with the default step on float, double and multiprecision types; two calls
   of \code{fn}; non-finite results as errors\\
-\code{test_stencils.cpp} & every stencil with its default step against $(\errc + 2\ampl)\,\epsmach^{P/(P+1)}$, an
-  estimate rather than a bound; one-sided rules never cross $x$; one call per node; failures; multiprecision\\
+\code{test_stencils.cpp} & stencils of each family with their default step against $(\errc + 2\ampl)\,
+  \epsmach^{P/(P+1)}$; one-sided rules never cross $x$; one call per node; failures; multiprecision\\
+
 \code{test_callables.cpp} & \code{fn} called through \code{std::invoke} with a \code{T const} lvalue: member pointers,
   callables that reject rvalues\\
 \code{test_ridders.cpp} & exact results on polynomials with the floor as the estimate; accuracy and coverage

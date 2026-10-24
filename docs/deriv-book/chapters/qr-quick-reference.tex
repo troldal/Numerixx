@@ -22,22 +22,30 @@ target \code{numerixx::numerixx} (\cref{sec:api-synopsis}).
 \end{itemize}
 \code{fn} takes a \code{T}; \code{x} fixes \code{T}, any \code{nxx::real} type.
 
-\qrhead{The result.} A \code{std::expected<Estimate<T>, error>}. \code{if (d)}, read \code{d->value};
-\code{d->abs_error} holds Ridders' error estimate, an estimate and not a bound, and is empty for the stencils.
-Otherwise \code{d.error()} is \code{error::non_finite}. The minimal check is \code{if (!d)} (\cref{sec:using-result}).
+\qrhead{The result.} A \code{std::expected<Estimate<T>, error>}: \code{d->value} is the estimate,
+\code{*d->abs_error} Ridders' error estimate (empty for the stencils), \code{d.error()} the reason for a failure.
+\code{d.value()} is \code{std::expected}'s accessor and throws on a failure: test, then read \code{d->value}.
+
+\qrhead{Two checks} (\cref{sec:using-result}). \emph{Did it work?} \code{if (d)}. \emph{Is it right?} A wrong step
+scale, a noisy $f$ or a break near $x$ return a wrong value without failing: if in doubt, repeat at $2h$ and $h/2$.
+For Ridders, also require \code{*r->abs_error <= tol * std::abs(r->value)}.
 
 \qrhead{Failures.} \code{non_finite}: \code{x} not finite; \code{fn} infinite or NaN at a sample; an overflow; a step
-below the resolution of \code{x}. A step $\le 0$ is a bug (\code{assert}). A float fourth derivative warns at compile
-time.
+below the resolution of \code{x}. A step $\le 0$ is a bug (an \code{assert}, gone under \code{NDEBUG}). A float
+fourth derivative warns at compile time.
 
 \qrhead{Methods} (relative accuracy in double at the default step).
 \begin{itemize}\setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}
-  \item \code{Central<P>}, P = 2, 4, \ldots, 10: $P + N - 1$ evaluations; about $\epsmach^{P/(P+N)}$, for $f'$
-    \num{\valExpCentralTwoRelError} (P = 2) and \num{\valExpCentralFourRelError} (P = 4).
+  \item \code{Central<P>}, P = 2, 4, \ldots, 10: $P + N - 1$ evaluations; about $\epsmach^{P/(P+N)}$; with P = 2
+    about \num{\valHeadlineFirstDigits} digits for $f'$ and \num{\valHeadlineFourthDigits} for $f''''$.
   \item \code{Forward<P>}, \code{Backward<P>}, P = 1 to 6: $P + N$ evaluations, never below (above) $x$; larger
     errors than \code{Central<P>}.
-  \item \code{Ridders}: a median of \num{\valRiddersEvalsMedianFirst} evaluations for $f'$, at most 64, 65, 128 and
-    129 for $f'$ to $f''''$; about \num{\valHeadlineRiddersFirstDigits} digits for $f'$; an error estimate.
+  \item \code{Ridders}: a median of \num{\valRiddersEvalsMedianFirst} evaluations for $f'$, at most
+    \num{\valRiddersMaxEvalsFirst}, \num{\valRiddersMaxEvalsSecond}, \num{\valRiddersMaxEvalsThird} and
+    \num{\valRiddersMaxEvalsFourth} for $f'$ to $f''''$; about \num{\valHeadlineRiddersFirstDigits} digits for $f'$;
+    an error estimate. Near a bad point it returns a value down to
+    $2^{-\num{\valRiddersEdgeLimitExponent}} \max(\abs{x}, 1)$ away, ten digits only down to
+    $2^{-\num{\valRiddersEdgeTenDigitsExponent}} \max(\abs{x}, 1)$ (for $f'$).
 \end{itemize}
 
 \columnbreak
@@ -51,6 +59,9 @@ Situation & Method and step & Cost and accuracy\\
 \bottomrule
 \end{tabular}}
 
+\qrhead{Your own step.} \code{h = nxx::math::root_epsilon<3, double>() * w;} for $\epsmach^{1/3} w$, and
+\code{h = std::cbrt(eta) * std::max(std::abs(x), 1.0);} for a noisy $f$.
+
 \qrhead{No error estimate? Check it} (\cref{sec:using-check}). Repeat at $2h$ and $h/2$ and count the agreeing
 digits, or compare with \code{Central<4>} or with Ridders' method. Where $f' \approx 0$, judge the absolute error.
 Check the sign against the physics.
@@ -63,7 +74,9 @@ Check the sign against the physics.
     and use \code{Forward<P>} or \code{Backward<P>} at the edge.
   \item \emph{Evaluable is not smooth.} A kink or a range break within a step of $x$ gives a wrong value from every
     method, without failing; only Ridders' estimate flags it.
-  \item \emph{\code{auto} on the result.} \code{auto e = *d} is an \code{Estimate}; write \code{d->value}.
+  \item \emph{\code{auto} and \code{.value()}.} \code{auto e = *d} is an \code{Estimate}, and \code{d.value()}
+    throws on a failure; write \code{d->value}.
+
 \end{itemize}
 
 \qrhead{Where to look.} Every name: \cref{ch:api}. Weights, default steps and Ridders' constants: \cref{ch:tables}.

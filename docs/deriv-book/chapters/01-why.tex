@@ -67,12 +67,13 @@ $(x, 1)$ gives $(f(x), f'(x))$ at the end, exact to rounding, at a cost of a sma
 needs the function's source, written for a generic number type (a C++ template, for instance), and a library that
 supplies the pair type.\cite{griewank2008}
 
-The \emph{complex step} uses $f'(x) \approx \operatorname{Im} f(x + \mathrm{i} h) / h$. No two nearly equal values
-are subtracted, so the step can be taken far below the limit that rounding sets for a finite difference, and the
-result is exact to rounding with one evaluation. It needs $f$ implemented for complex arguments and analytic near
-$x$: an absolute value, a comparison or a table lookup inside $f$ breaks it. It is a form of automatic
-differentiation in disguise.\cite{squire1998} Lyness and Moler's contour-integral methods extend the idea to higher
-derivatives of analytic functions.\cite{lyness1967}
+The \emph{complex step} uses $f'(x) \approx \operatorname{Im} f(x + \mathrm{i} h) / h$.\cite{squire1998} No two
+nearly equal values are subtracted, so the step can be taken far below the limit that rounding sets for a finite
+difference, and the result is exact to rounding with one evaluation. It needs $f$ implemented for complex arguments
+and analytic near $x$: an absolute value, a comparison or a table lookup inside $f$ breaks it. It is closely related
+to forward-mode automatic differentiation.\cite{martins2003} The complex step is a special case of Lyness and Moler's
+earlier contour-integral methods, which also give higher derivatives of analytic functions;\cite{lyness1967} Squire
+and Trapp brought the simple first-derivative form back into use.
 
 \code{nxx::deriv} takes any callable \code{fn} that maps a real number to a real number, and assumes nothing else:
 not its source, not a complex extension, not even smoothness beyond what the error terms of the later chapters
@@ -93,8 +94,9 @@ through one function, \code{derivative}, with these choices.
   \item \emph{Derivatives of order 1 to 4}, $f'$ to $f^{(4)}$.
   \item \emph{Any real type}: \code{float}, \code{double}, or a user type with more digits such as those of
     Boost.Multiprecision.
-  \item \emph{No exceptions.} A failure is a value: the result is a \code{std::expected} that holds either an
-    estimate or the error \code{non_finite}.
+  \item \emph{No exceptions from the library.} A failure is a value: the result is a \code{std::expected} that holds
+    either an estimate or the error \code{non_finite}. The library throws nothing itself; an exception thrown by
+    \code{fn} passes through unchanged, and \code{derivative} is not \code{noexcept}.
   \item \emph{A default step}, so that a call needs only the function and the point.
 \end{itemize}
 The calls themselves are the subject of \cref{ch:using}; \cref{ch:api} lists every one.
@@ -107,39 +109,43 @@ in $T/1000$ plus a $1/T$ term, one set of coefficients per temperature range.} a
 tables.\cite{nist-webbook,chase1998} We use the range \SIrange{500}{2000}{\kelvin} and the point
 $T_0 = \SI{1000}{\kelvin}$. The function returns $\enth(T)$, the enthalpy relative to its value at
 \SI{298.15}{\kelvin}, in \si{\joule\per\mole}, so that $\dd \enth / \dd T$ is $\cp$ in
-\si{\joule\per\mole\per\kelvin} directly. The coefficients and the function are defined once, in a header shared by
-every example of the book:
+\si{\joule\per\mole\per\kelvin} directly. The whole program is short:
+\snippet{01-why-program}{program}
+It prints $\cp = \num{\valCpDefaultValueLong}$\,\si{\joule\per\mole\per\kelvin}. The heat capacity is one call:
+without a method or a step, \code{derivative} uses \code{Central<2>}, the central difference of \cref{fig:secant},
+with its default step, here \SI{\valCpDefaultStep}{\kelvin}; \cref{ch:rounding} explains where it comes from.
+
+The result \code{d} holds either an estimate or the reason why there is none. \code{if (d)} is true when there is an
+estimate, and only then is \code{d->value}, the derivative, read; the \code{else} branch handles the failure. The test
+is not a formality. A call fails, with the error \code{error::non_finite}, for example when \code{fn} returns an
+infinite or NaN value at a point the method samples, or when the step is too small to move $x$ (\cref{ch:rounding}).
+Every listing in Part~I reads a result this way.
+
+The first include is the book's own header, not the library's: \code{book::} is the namespace of the book's
+examples, and \code{shomate.hpp} defines the fit once for all of them, with the WebBook's coefficients and its
+expression for $\enth$:
 \snippetheader{shomate}{shomate}
-\needspace{14\baselineskip}%
+and the enthalpy itself, in \si{\joule\per\mole}:
 \snippetheader{shomate}{shomate-H}
 
-The heat capacity is one call. Without a method or a step, \code{derivative} uses \code{Central<2>}, the central
-difference of \cref{fig:secant}, with its default step:
-\snippet{01-why-first}{first}
-It prints $\cp = \num{\valCpDefaultValueLong}$\,\si{\joule\per\mole\per\kelvin}. The default step here is
-\SI{\valCpDefaultStep}{\kelvin}; \cref{ch:rounding} explains where it comes from.
-
-How good is that? For this function we know the answer. The WebBook also publishes the fit's $\cp(T)$, the exact
-derivative of $\enth(T)$, which gives $\cp(T_0) = \num{\valCpExactLong}$\,\si{\joule\per\mole\per\kelvin}. The
-estimate is off by \num{\valCpDefaultRelError} relative. This closed form is the \emph{answer key} of the book. We differentiate a function whose derivative we know
-so that every error can be measured; in practice you would differentiate one whose derivative you do not know, and
-\cref{ch:using} does so with a friction factor that comes from a solver. The closed form is exact for the
-\emph{function}, not for nitrogen: the fit itself reproduces the tabulated heat capacity of nitrogen to about four
-significant figures, which is a matter for the property data, not for the derivative.
+How good is the estimate? For this function we know the answer. The WebBook also publishes the fit's $\cp(T)$, the
+exact derivative of $\enth(T)$, which gives $\cp(T_0) = \num{\valCpExactLong}$\,\si{\joule\per\mole\per\kelvin}. The
+estimate is off by \num{\valCpDefaultRelError} relative. This closed form is the \emph{answer key} of the book. We
+differentiate a function whose derivative we know so that every error can be measured; in practice you would
+differentiate one whose derivative you do not know, and \cref{ch:using} does so with a friction factor that comes
+from a solver. The closed form is exact for the \emph{function}, not for nitrogen: at \SI{1000}{\kelvin} the tables
+give \SI{\valCpTableValue}{\joule\per\mole\per\kelvin},\cite[Part~II, p.~1621]{chase1998} from which the fit
+differs by \num{\valCpFitVsTableRelDiff} relative. That is a matter for the property data, not for the derivative.
 
 Ridders' method adapts its step and reports an estimate of its own error in \code{abs_error}:
 \snippet{01-why-first}{first-ridders}
 After \num{\valCpRiddersEvals} evaluations of $\enth$, against the stencil's two, it returns
-$\cp = \num{\valCpRiddersValue}$\,\si{\joule\per\mole\per\kelvin} with an error estimate of
+$\cp = \num{\valCpRiddersValue}$\,\si{\joule\per\mole\per\kelvin} with an error estimate\mnote{\code{abs_error} is a
+\code{std::optional}, empty for the stencils; the \code{*} in \code{*r->abs_error} reads it.} of
 \SI{\valCpRiddersEstimate}{\joule\per\mole\per\kelvin}. The actual error is
 \SI{\valCpRiddersActual}{\joule\per\mole\per\kelvin}, or \num{\valCpRiddersRelError} relative, so the estimate is
-honest here: it is larger than the actual error. \Cref{ch:ridders} shows how the
-method works and how far its estimate can be trusted.
-
-Both listings test the result before using it: \code{if (d)} is true when \code{derivative} returned an estimate,
-and only then is \code{d->value} read. The test is not a formality. A call fails, with the error \code{error::non_finite},
-for example when \code{fn} returns an infinite or NaN value at a point the method samples, or when the step is too small to move
-$x$ (\cref{ch:rounding}).
+honest here: it is larger than the actual error. \Cref{ch:ridders} shows how the method works and how far its
+estimate can be trusted.
 
 \section{If you read nothing else}\label{sec:why-summary}
 
@@ -149,7 +155,9 @@ $x$ (\cref{ch:rounding}).
 \begin{table}
 \sidecaption{The method in five situations. Each row is a call \code{derivative<M>(fn, x)}, or
 \code{derivative<M>(fn, x, h)} with the step given; $\epsmach$ is the machine epsilon of the type ($2^{-52}$ for
-\code{double}), $w$ the scale on which $f$ varies and $\noise$ the relative accuracy of $f$. Evaluations are those
+\code{double}); $w$ is the distance in $x$ over which $f$ changes appreciably (\cref{sec:rounding-scale}); $\noise$
+is the relative accuracy of $f$, how many digits of it you can trust, for example $10^{-8}$ for a solver converged
+to a relative tolerance of $10^{-8}$ on its output (\cref{sec:rounding-noise}). Evaluations are those
 of \code{fn} for $f'$. The full table, with the evidence for each row, is \cref{tab:method-choice}; the
 quick-reference page at the end of the book repeats this one.\label{tab:method-summary}}
 \centering\footnotesize
@@ -171,8 +179,20 @@ Situation & Method \code{M} and step & Cost and accuracy\\
 \paragraph{Cost.} A stencil costs a fixed number of evaluations, two for \code{Central<2>} and $f'$; Ridders' method
 typically \num{\valRiddersEvalsMedianFirst} for $f'$ and never more than \num{\valRiddersMaxEvalsFirst} (\cref{tab:cost}).
 
-\paragraph{The one check.} Test the result before you use it, as in the listings above: \code{if (d)}, then
-\code{d->value}. A stencil reports no error estimate; \cref{sec:using-check} shows how to check its result.
+\paragraph{Did it work?} Test the result before you use it, as in the program of \cref{sec:why-first}:
+\code{if (d)}, then \code{d->value}, and an \code{else} that handles the failure.
+
+\paragraph{Is it right?} A value can be wrong without any warning. Three situations cause most such errors:
+\begin{itemize}
+  \item $f$ varies on a scale far from $\max(\abs{x}, 1)$ in your units, such as a narrow transition or a small
+    mole fraction (\cref{sec:rounding-scale});
+  \item $f$ is the output of a solver, or otherwise less accurate than the number type (\cref{sec:rounding-noise});
+  \item $f$ has a kink or a range break within a few steps of $x$ (\cref{sec:using-pitfalls}).
+\end{itemize}
+A stencil reports no error estimate: if in doubt, repeat the call with the steps $2h$ and $h/2$ and count the digits
+that agree (\cref{sec:using-check}). For Ridders' method, read the estimate: use \code{r->value} only if
+\code{*r->abs_error <= tol * std::abs(r->value)} for the relative tolerance \code{tol} you need. A value with a large
+estimate is one the method could not make accurate (\cref{sec:using-result}).
 
 \paragraph{Where to read on.} Why the central difference beats the forward one: \cref{ch:taylor}. Why a smaller step
 is not better, and when to pass your own: \cref{ch:rounding}. More points and one-sided rules: \cref{ch:stencils};

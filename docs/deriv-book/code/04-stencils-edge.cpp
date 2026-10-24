@@ -29,8 +29,9 @@ int main()
 // instead of returning a plausible number.
 auto const H = [](double T) {
     using book::nitrogen;
-    if (T < nitrogen.T_min || T > nitrogen.T_max)
+    if (T < nitrogen.T_min || T > nitrogen.T_max) {
         return std::numeric_limits<double>::quiet_NaN();
+    }
     return book::shomate_H(nitrogen, T);
 };
 double const T_edge = book::nitrogen.T_min; // 500 K

@@ -92,7 +92,8 @@ the default.
 
 There is a second way to see the cancellation. The mirror image of the forward difference is the \emph{backward
 difference} $(f(x) - f(x - h)) / h$, the library's \code{Backward<1>}, the rule for a function known only below $x$.
-By the same expansion its error is $-h f''(x) / 2 + \order(h^2)$: the same size as the forward difference's, with
+By the same expansion its error is $-h f''(x) / 2 + \order(h^2)$,\mnote{$\order(h^2)$, ``of order $h^2$'': terms
+of size $h^2$ and smaller, which shrink at least as fast as $h^2$ (\cref{sec:taylor-order}).} the same size as the forward difference's, with
 the opposite sign. The central difference is exactly the mean of the two,
 \begin{equation*}
   \frac{f(x + h) - f(x - h)}{2h}
@@ -188,8 +189,7 @@ is more accurate by orders of magnitude.
 The same check takes a few lines of code. The listing computes both differences at steps of \SI{2}{\kelvin} and
 \SI{1}{\kelvin} and prints the ratio of their errors:
 \snippet{02-taylor-steps}{forward-vs-central}
-The forward ratio comes out close to 2 and the central ratio close to 4; the example checks that each lies within
-0.1 of its predicted value. At such steps the rounding errors of \cref{ch:rounding} are negligible, and the
+The forward ratio comes out close to 2 and the central ratio close to 4. At such steps the rounding errors of \cref{ch:rounding} are negligible, and the
 next terms of the series shift the ratios only slightly.
 
 \section{Exactness on polynomials}\label{sec:taylor-exact}

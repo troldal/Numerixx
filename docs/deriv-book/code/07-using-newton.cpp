@@ -16,27 +16,32 @@ double H(double T)
 
 // clang-format off
 // <newton>
+// Why solve_T returns no temperature.
+enum class solve_error { no_slope, no_convergence };
+
 struct Newton
 {
-    double T;  // the last iterate, K
-    int steps; // 20 means: not converged
+    double T;  // the solution, K
+    int steps; // the iterations it took
 };
 
 // The temperature at which H(T) = H_target, by Newton's
 // method from T: the slope dH/dT = cp from derivative().
-std::expected<Newton, nxx::deriv::error>
+std::expected<Newton, solve_error>
 solve_T(double H_target, double T)
 {
-    Newton n{ T, 0 };
-    while (n.steps < 20) {
-        auto const cp = nxx::deriv::derivative(H, n.T);
-        if (!cp) return std::unexpected(cp.error());
-        double const dT = (H(n.T) - H_target) / cp->value;
-        n.T -= dT;
-        ++n.steps;
-        if (std::abs(dT) < 1e-9) break; // K
+    for (int steps = 1; steps <= 20; ++steps) {
+        auto const cp = nxx::deriv::derivative(H, T);
+        if (!cp) {
+            return std::unexpected(solve_error::no_slope);
+        }
+        double const dT = (H(T) - H_target) / cp->value;
+        T -= dT;
+        if (std::abs(dT) < 1e-9) { // K
+            return Newton{ T, steps };
+        }
     }
-    return n;
+    return std::unexpected(solve_error::no_convergence);
 }
 // </newton>
 // clang-format on
@@ -47,13 +52,15 @@ int main()
     // clang-format off
 // <newton-call>
 auto const s = solve_T(H(1000.0), 800.0);
-if (s && s->steps < 20) {
+if (s) {
     std::println("T = {:.9f} K, {} steps", s->T, s->steps);
+} else if (s.error() == solve_error::no_convergence) {
+    std::println("no convergence in 20 steps");
 }
 // </newton-call>
     // clang-format on
     if (!s) {
-        std::println("FAILED: no slope");
+        std::println("FAILED: no temperature");
         return 1;
     }
     double const error = std::abs(s->T - T_star);

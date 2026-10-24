@@ -1,8 +1,8 @@
 // E13 (Chapter 7, section 7.4; values DS18): sensitivities of an Arrhenius rate k = A exp(-Ea / (R T)) to the
 // temperature and to the activation energy, each by a lambda that holds the other arguments fixed; the scaled
-// sensitivity d ln k / d ln Ea that engineers report; and a loop that fills one Jacobian column per parameter and
-// counts the evaluations. Parameters as in data/README.md (the generator uses the same): A = 1e10 1/s,
-// Ea = 80 kJ/mol, T = 600 K, R = 8.31446261815324 J/(mol K). The answer keys are the closed forms
+// sensitivity d ln k / d ln Ea that engineers report; and a loop over the parameters (A, Ea) that computes the
+// sensitivity to each and counts the evaluations. Parameters as in data/README.md (the generator uses the same):
+// A = 1e10 1/s, Ea = 80 kJ/mol, T = 600 K, R = 8.31446261815324 J/(mol K). The answer keys are the closed forms
 // dk/dT = k Ea / (R T^2), dk/dEa = -k / (R T), dk/dA = k / A and d ln k / d ln Ea = -Ea / (R T).
 
 #include <numerixx/deriv.hpp>
@@ -83,12 +83,11 @@ std::println("d ln k / d ln Ea = {:.4f}", S);
 
     // clang-format off
 // <jacobian>
-// dk/dp for the parameters p = (A, Ea): one Ridders call
-// per column, the other parameter held fixed. evals counts
-// the calls of the model: the cost of the Jacobian.
+// The sensitivities dk/dp to the parameters p = (A, Ea):
+// one Ridders call each, the other parameter held fixed;
+// evals counts the calls of the model.
 std::array<double, 2> const p{ A, Ea };
-std::array<double, 2> J{};
-std::array<int, 2> cost{};
+std::array<double, 2> dk_dp{};
 int evals = 0;
 for (std::size_t j = 0; j < p.size(); ++j) {
     auto const k_j = [&](double v) {
@@ -97,22 +96,22 @@ for (std::size_t j = 0; j < p.size(); ++j) {
         ++evals;
         return rate(q[0], q[1], T);
     };
-    int const before = evals;
     auto const d = derivative<Ridders>(k_j, p[j]);
     if (!d) return 1;
-    J[j] = d->value;
-    cost[j] = evals - before;
+    dk_dp[j] = d->value;
 }
-std::println("J = [{:.6e}, {:.6e}], {} evaluations",
-    J[0], J[1], evals);
 // </jacobian>
     // clang-format on
-    std::println("per column: {} (A), {} (Ea)", cost[0], cost[1]);
+    std::println("dk/dp = [{:.6e}, {:.6e}], {} evaluations", dk_dp[0], dk_dp[1], evals);
     // k is linear in A, so Ridders stops at the first exact agreement (the generator measures 4 evaluations and a
     // relative error of 0); the Ea column is the same call as above.
-    ok = ok && relative(J[0], k0 / A) <= 1e-8 && relative(J[1], exact_Ea) <= 1e-8;
-    // The cost is the sum over the columns, each within Ridders' cap of 64 evaluations for f'.
-    ok = ok && evals == cost[0] + cost[1] && cost[0] >= 1 && cost[0] <= 64 && cost[1] >= 1 && cost[1] <= 64;
+    ok = ok && relative(dk_dp[0], k0 / A) <= 1e-8 && relative(dk_dp[1], exact_Ea) <= 1e-8;
+    // The cost is the sum over the parameters, each within Ridders' cap of 64 evaluations for f'.
+    int column_A = 0;
+    auto const k_A = [&](double v) { ++column_A; return rate(v, Ea, T); };
+    ok = ok && derivative<Ridders>(k_A, A).has_value();
+    std::println("per parameter: {} (A), {} (Ea)", column_A, evals - column_A);
+    ok = ok && column_A >= 2 && column_A <= 64 && evals - column_A >= 2 && evals - column_A <= 64;
 
     if (!ok) std::println("FAILED: a claim of the text does not hold");
     return ok ? 0 : 1;

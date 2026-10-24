@@ -1,7 +1,8 @@
 % Appendix B: Derivations (methods author). PLAN.md section 1.4: the proofs the sidebars only cite. B.1 Taylor
 % expansions and the moment conditions, B.2 the Lagrange formula, B.3 Richardson extrapolation, B.4 the error model
-% and the best step. No figures, no listings; the typed numbers are exact constants or values of the closed formulas
-% derived here (the cost factors of B.4, which the header also states).
+% and the best step. No figures, no listings; the typed numbers are exact constants, the generated cost factors of
+% B.4 are macros. Revised at stage 6 per reviews/R1-decision.md (T8, library-17, evidence-21); the changes are listed
+% in responses/R1-a2-derivations.md.
 \chapter{Derivations}\label{ch:derivations}
 
 This appendix proves what the sidebars of \cref{ch:stencils,ch:orders,ch:ridders} only cite: why the moment
@@ -13,7 +14,8 @@ numerators $c_k = \den w_k$ every moment is multiplied by $\den$.
 
 \section{Taylor expansions and the moment conditions}\label{sec:derivations-moments}
 
-Taylor's theorem with the Lagrange remainder gives, for each node, with $x_k = x + n_k h$,
+Taylor's theorem with the Lagrange remainder\cite[Sect.~1.1]{burden2016} gives, for each node, with
+$x_k = x + n_k h$,
 \[
   f(x_k) = \sum_{j=0}^{m-1} \frac{f^{(j)}(x)}{j!}\, n_k^j h^j + \frac{f^{(m)}(\xi_k)}{m!}\, n_k^m h^m,
   \qquad \xi_k \text{ between } x \text{ and } x_k .
@@ -31,19 +33,31 @@ remainder, and dividing by $h^{\dorder}$ gives
   \frac{1}{h^{\dorder}} \sum_k w_k f(x_k) = f^{(\dorder)}(x) + \frac{h^{\aorder}}{(\dorder + \aorder)!}
   \sum_k w_k n_k^{\dorder + \aorder} f^{(\dorder + \aorder)}(\xi_k).
 \]
-The remainder is $\order(h^{\aorder})$, which is the accuracy order. If moreover $f^{(\dorder + \aorder)}$ is
-continuous and the products $w_k n_k^{\dorder + \aorder}$ all have one sign, the intermediate-value theorem
-collapses the sum to a single point: the remainder is $\mom{\dorder + \aorder}\, h^{\aorder} f^{(\dorder +
-\aorder)}(\xi) / (\dorder + \aorder)!$ for some $\xi$ in the span of the stencil. That is the form in
-\cref{eq:stencils-central-four} and \cref{eq:orders-second}, with the error constant
+The remainder is $\order(h^{\aorder})$, which is the accuracy order, and since each $\xi_k$ tends to $x$ with
+$h$, the remainder is $\mom{\dorder + \aorder}\, h^{\aorder} f^{(\dorder + \aorder)}(x) / (\dorder + \aorder)! +
+\order(h^{\aorder + 1})$ for every rule. This asymptotic form is what the error model uses, with the error constant
 \begin{equation}
   \errc = \frac{\abs{\mom{\dorder + \aorder}}}{(\dorder + \aorder)!}, \qquad
   \text{or } \frac{\abs{\mom{\dorder + \aorder}}}{(\dorder + \aorder)!\,\den} \text{ with the integer numerators,}
   \label{eq:derivations-errc}
 \end{equation}
-as \cref{ch:tables} tabulates it. When the products do not share a sign, as for some one-sided rules, the
-single-point form is not guaranteed, but the asymptotic statement, $\errc h^{\aorder} f^{(\dorder + \aorder)}(x)
-+ \order(h^{\aorder + 1})$, holds in every case, and it is the one the error model uses.
+as \cref{ch:tables} tabulates it.
+
+The sharper statement with a single intermediate point, as in \cref{eq:stencils-central-four} and
+\cref{eq:orders-second}, needs one more argument, and which argument depends on the rule. If the products
+$w_k n_k^{\dorder + \aorder}$ all have one sign, the intermediate-value theorem collapses the sum above to one
+point: the remainder is $\mom{\dorder + \aorder}\, h^{\aorder} f^{(\dorder + \aorder)}(\xi) / (\dorder + \aorder)!$
+for some $\xi$ in the span of the stencil. That is the case for \cref{eq:orders-second}, whose products are
+$1, 0, 1$, but not for \cref{eq:stencils-central-four}, whose products $-\tfrac83, \tfrac23, \tfrac23, -\tfrac83$
+have mixed signs, nor for any central rule for $f'$ above order 2, nor for some one-sided rules. For the first
+derivative the single-point form follows instead from the interpolation error formula, as Burden et
+al.\cite[Sect.~4.1]{burden2016} derive the five-point formulas: with $x$ itself among the nodes (added with the
+weight 0 where the rule omits it, which changes nothing), $f(x + th) - p(t)$ equals $f^{(m)}(\xi(t)) \prod_j (t -
+n_j)\, h^m / m!$, and differentiating once at $t = 0$, where the node product vanishes, leaves $f'(x) - p'(0)/h =
+f^{(m)}(\xi)\, h^{m-1} \prod_{n_j \ne 0} (-n_j) / m!$ with one $\xi$. For \code{Central<4>} the product over the
+nodes $-2, -1, 1, 2$ is $4$ and $m = 5$, which gives the $+ h^4 f^{(5)}(\xi) / 30$ of
+\cref{eq:stencils-central-four}; the one-sided rules, which contain $x$ as a node, are covered by the same formula.
+For the higher derivatives and mixed signs the book uses only the asymptotic form.
 
 For a symmetric stencil, nodes in pairs $\pm n$ with $w_{-n} = (-1)^{\dorder} w_n$, every moment $\mom{j}$ with
 $j - \dorder$ odd vanishes identically, so the expansion of a central rule contains only the powers
@@ -70,24 +84,24 @@ $p$ $\dorder$ times at $t = 0$ and dividing by $h^{\dorder}$ gives an estimate o
   w_k = L_k^{(\dorder)}(0) = \dorder!\,[t^{\dorder}]\, L_k(t),
   \label{eq:derivations-lagrange}
 \end{equation}
-the coefficient of $t^{\dorder}$ in $L_k$ times $\dorder!$, which is what the header's generator computes with
-exact integer arithmetic. These weights satisfy the moment conditions, for the following reason. Interpolation on
-$m$ nodes reproduces every polynomial of degree below $m$: if $f(x + t h) = t^j$ with $j < m$, then $p(t) = t^j$
-exactly, since both sides are polynomials of degree below $m$ that agree at $m$ points. For that $f$ the
-samples are $f(x_k) = n_k^j$, so $\sum_k w_k n_k^j = p^{(\dorder)}(0) = (t^j)^{(\dorder)}(0)$, which is
-$\dorder!$ for $j = \dorder$ and 0 for every other $j < m$. These are exactly the moment conditions up to
-$\mom{m-1}$, so the Lagrange weights are the unique solution of that linear system, and the rule's order is at
-least $m - \dorder$. For the one-sided rules $m = \aorder + \dorder$ and the order is exactly $\aorder$, since
-$\mom{m}$ does not vanish; for the central rules $m = \aorder + \dorder - 1$ and the symmetry argument of
-\cref{sec:derivations-moments} supplies the missing condition $\mom{m} = 0$.
+the coefficient of $t^{\dorder}$ in $L_k$ times $\dorder!$, which is what the library's generator computes with
+exact integer arithmetic.\cite[Sect.~4.1]{burden2016} These weights satisfy the moment conditions, for the
+following reason. Interpolation on $m$ nodes reproduces every polynomial of degree below $m$: if $f(x + t h) = t^j$
+with $j < m$, then $p(t) = t^j$ exactly, since both sides are polynomials of degree below $m$ that agree at $m$
+points. For that $f$ the samples are $f(x_k) = n_k^j$, so $\sum_k w_k n_k^j = p^{(\dorder)}(0) =
+(t^j)^{(\dorder)}(0)$, which is $\dorder!$ for $j = \dorder$ and 0 for every other $j < m$. These are exactly the
+moment conditions up to $\mom{m-1}$, so the Lagrange weights are the unique solution of that linear system, and
+the rule's order is at least $m - \dorder$. For the one-sided rules $m = \aorder + \dorder$ and the order is
+exactly $\aorder$, since $\mom{m}$ does not vanish; for the central rules $m = \aorder + \dorder - 1$ and the
+symmetry argument of \cref{sec:derivations-moments} supplies the missing condition $\mom{m} = 0$.
 
-The header's own worked example is \code{Central<4>} for $f'$ on the nodes $-2, -1, 1, 2$. For the node
+The library's own worked example is \code{Central<4>} for $f'$ on the nodes $-2, -1, 1, 2$. For the node
 $n_k = -1$, the numerator of $L_k$ is $(t + 2)(t - 1)(t - 2) = t^3 - t^2 - 4t + 4$ and its denominator
 $(-1 + 2)(-1 - 1)(-1 - 2) = 6$, so $w_{-1} = 1! \cdot (-4) / 6 = -2/3$; the other three nodes give $1/12$,
 $2/3$ and $-1/12$. Over the common denominator 12 the numerators are $1, -8, 8, -1$, the table the tests check
 against Fornberg's.\cite{fornberg1988} The same computation for Chapra's backward rule for the fourth derivative
 on the nodes $-5, \ldots, 0$ gives $-2, 11, -24, 26, -14, 3$ over 1, the row the tests compare with the
-published one.\cite{chapra2015}
+published one.\cite[ch.~23]{chapra2015}
 
 \section{Richardson extrapolation}\label{sec:derivations-richardson}
 
@@ -99,14 +113,14 @@ by \cref{sec:derivations-moments} every \code{Central<2>} rule has one. With $h_
              = \Aij{i}{j-1} + \frac{\Aij{i}{j-1} - \Aij{i-1}{j-1}}{4^j - 1}.
   \label{eq:derivations-tableau}
 \end{equation}
-The claim is that column $j$ has an expansion starting at $h^{2j + 2}$. By induction on $j$: suppose
-$\Aij{i}{j-1} = f^{(\dorder)} + c\, h_i^{2j} + \order(h_i^{2j+2})$ with a coefficient $c$ that does not depend on
-$i$, which holds for $j = 1$ with $c = a_2$. The parent one level up has the step $2 h_i$, so $\Aij{i-1}{j-1} =
-f^{(\dorder)} + c\, 4^j h_i^{2j} + \order(h_i^{2j+2})$. In the combination $4^j \Aij{i}{j-1} - \Aij{i-1}{j-1}$
-the $h^{2j}$ terms cancel exactly and the constant term is $(4^j - 1) f^{(\dorder)}$; dividing by $4^j - 1$
-leaves $f^{(\dorder)} + \order(h_i^{2j+2})$, again with a leading coefficient independent of $i$. The two forms
-in \cref{eq:derivations-tableau} are equal by a line of algebra, and the second is the one the library computes
-(\cref{sb:difference-form}).
+The claim is that column $j$ has an expansion starting at $h^{2j + 2}$.\cite[Sect.~4.2]{burden2016} By induction
+on $j$: suppose $\Aij{i}{j-1} = f^{(\dorder)} + c\, h_i^{2j} + \order(h_i^{2j+2})$ with a coefficient $c$ that does
+not depend on $i$, which holds for $j = 1$ with $c = a_2$. The parent one level up has the step $2 h_i$, so
+$\Aij{i-1}{j-1} = f^{(\dorder)} + c\, 4^j h_i^{2j} + \order(h_i^{2j+2})$. In the combination $4^j \Aij{i}{j-1} -
+\Aij{i-1}{j-1}$ the $h^{2j}$ terms cancel exactly and the constant term is $(4^j - 1) f^{(\dorder)}$; dividing by
+$4^j - 1$ leaves $f^{(\dorder)} + \order(h_i^{2j+2})$, again with a leading coefficient independent of $i$. The two
+forms in \cref{eq:derivations-tableau} are equal by a line of algebra, and the second is the one the library
+computes (\cref{sb:difference-form}).
 
 The a posteriori estimate follows from the same expansion. With $\Aij{i}{j-1} - f^{(\dorder)} = c\, h_i^{2j} +
 \cdots$ and $\Aij{i-1}{j-1} - f^{(\dorder)} = 4^j c\, h_i^{2j} + \cdots$,
@@ -162,9 +176,11 @@ for \code{Central<2>} and $f'$ it is \num{\valStepCostCentralTwoFirst}. For the 
 \num{\valStepConstantCentralTwoSecond} for $f''$ and \num{\valStepConstantCentralTwoFourth} for $f''''$ with
 \code{Central<2>}, and the cost by \cref{eq:derivations-cost} is \num{\valStepCostCentralTwoSecond} and
 \num{\valStepCostCentralTwoFourth}; for \code{Central<4>} and $f''''$ it is \num{\valStepCostCentralFourFourth}, the
-largest of the library's rules. These are the figures the header and the design record state, rounded, and they are
-model figures for a function that varies on the scale $\scale$ exactly. The design record
-reports the opposite experience on nine test functions that vary faster than $\scale$: half the default step was
-better for every order, by a factor 1.2 to 1.8 for \code{Central<2>}, which is why the library keeps the plain
-convention of \cref{eq:orders-step} for every order and states its sensitivity instead
+largest of the library's rules. These agree with the design record's figures of 3.5, 11 and 15
+(\code{docs/PHASE4_API.md}); the 1.64 that the library's documentation gives for \code{Central<10>} is a rounding
+of $\kappa = \num{\valStepConstantCentralTenFirst}$, where the formula gives \num{\valStepCostCentralTenFirst}. They
+are model figures for a function that varies on the scale $\scale$ exactly. The design record's prototype
+(\code{docs/PHASE4_API.md}) reports the opposite experience on nine test functions that vary faster than $\scale$:
+half the default step was better for every order, by a factor 1.2 to 1.8 for \code{Central<2>}, which is why the
+library keeps the plain convention of \cref{eq:orders-step} for every order and states its sensitivity instead
 (\cref{sb:step-constant}, \cref{sb:fourth-sensitivity}).

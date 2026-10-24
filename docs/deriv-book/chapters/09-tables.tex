@@ -9,8 +9,10 @@
 
 The tables of this chapter are the single source of the weights and constants that Part~I quotes. Every body was
 written by the book's data generator from the library itself, from the same internal tables that
-\code{derivative} uses, and the generator checks each rule against its moment conditions before writing it; the
-library's tests compare the rules with published tables.\cite{fornberg1988,chapra2015}
+\code{derivative} uses (the few constants that are literals of the library's code are transcribed, as
+\cref{sec:tables-ridders} says), and the generator checks each rule against its moment conditions before writing it;
+the library's tests compare the rules with the published tables of Fornberg\cite{fornberg1988} and
+Chapra.\cite[ch.~23]{chapra2015}
 
 \section{How to read the tables}\label{sec:tables-reading}
 
@@ -43,7 +45,11 @@ It is not tabulated.
 \Cref{tab:weights-central-first,tab:weights-central-second,tab:weights-central-third,tab:weights-central-fourth}
 give \code{Central<P>} for $\dorder = 1$ to 4 and $\aorder = 2$ to 10. Each pair of nodes adds two orders; $\errc$
 falls quickly with $\aorder$ and $\ampl$ grows slowly, which is why the central rules of high order pay off in wide
-types (\cref{tab:accuracy-matrix}). The rules with $\aorder = 2$ are the textbook formulas: the central difference,
+types (\cref{tab:accuracy-matrix}). The cap at $\aorder = 10$ is a design decision (\code{docs/PHASE2_API.md}): by
+the model's exponent alone, a \code{Central<12>} would gain about \num{\valCapGainCentralTwelveFirstDouble} digit for
+$f'$ in double and \num{\valCapGainCentralTwelveFirstMultiprecision} in a 50-digit type (for $f''''$,
+\num{\valCapGainCentralTwelveFourthDouble} and \num{\valCapGainCentralTwelveFourthMultiprecision}), over a stencil on
+which $f$ must be smooth that much wider, and the library stops there. The rules with $\aorder = 2$ are the textbook formulas: the central difference,
 the three-point second difference, the four-point rule for $f'''$ and the five-point rule for $f''''$.
 
 \begin{table*}
@@ -81,9 +87,9 @@ float.\label{tab:weights-central-fourth}}
 \Cref{tab:weights-forward-first,tab:weights-forward-second,tab:weights-forward-third,tab:weights-forward-fourth}
 give \code{Forward<P>} for $\dorder = 1$ to 4 and $\aorder = 1$ to 6. A one-sided rule gains one order per node, and
 both its constants are larger than those of the central rule of the same order: $\ampl$ grows to
-\num{\valAmplForwardSix} for $f'$ with $\aorder = 6$ and to \num{\valAmplForwardSixFourth} for $f''''$, which is why
-the one-sided rules stop at
-$\aorder = 6$.
+\num{\valAmplForwardSix} for $f'$ with $\aorder = 6$ and to \num{\valAmplForwardSixFourth} for $f''''$. The cap at
+$\aorder = 6$ is a design decision (\code{docs/PHASE2_API.md}): beyond it the amplification grows about as fast as the
+higher order pays, by the model, so the library stops there.
 
 \begin{table*}
 \caption{\code{Forward<P>} for the first derivative, $f'$. \code{Backward<P>}: nodes negated, the same
@@ -145,6 +151,9 @@ Method & $P$ & $N$ & Exponent & Step & Model error & Evaluations\\
 \Cref{tab:ridders-constants} collects the constants of Ridders' method, the same for every derivative order except
 where the value depends on $\dorder$; \cref{ch:ridders} and \cref{sb:floor-coverage} explain them, and the design
 record in the repository (\code{docs/PHASE3_API.md}, \code{docs/PHASE4_API.md}) gives the evidence for each choice.
+The level cap and the initial-step divisors are read from the library; the ratio, the stall and the two factors of
+the untrusted-result test are literals of its code, transcribed by the generator.
+
 The level cap counts every level attempted, restarts included; with two or four evaluations per level it gives the
 maximum evaluations of the last row.
 

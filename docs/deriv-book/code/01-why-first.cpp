@@ -28,8 +28,10 @@ if (d) std::println("cp = {:.10f} J/(mol K)", d->value);
 // <first-ridders>
 using nxx::deriv::Ridders;
 auto const r = nxx::deriv::derivative<Ridders>(H, T0);
-if (r) std::println("cp = {:.12f} +- {:.1e} J/(mol K)",
-                    r->value, *r->abs_error);
+if (r) {
+    std::println("cp = {:.12f} +- {:.1e} J/(mol K)",
+                 r->value, *r->abs_error);
+}
 // </first-ridders>
     // clang-format on
 

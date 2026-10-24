@@ -1,29 +1,32 @@
 % F15 fig:ridders-edge (Chapter 6, margin). Ridders for log x at x = 2^-k against k with the default initial step
 % s/32 = 1/32 (DS10, data/ridders-edge.csv): above, the evaluations of fn (each halving of x costs one more restart,
-% about two evaluations); below, the relative error, which stays near rounding until the level budget runs short.
-% The three measured limits are marked from the generated values: the budget of 64 evaluations is first exhausted
-% at k = \valRiddersEdgeCapExponent, ten correct digits last hold at k = \valRiddersEdgeTenDigitsExponent, and a
-% value is last returned at k = \valRiddersEdgeLimitExponent; beyond it the result is non_finite (the nan rows break
-% the curve). The last CSV row (x = 0.01, a non-integer k, E10) is dropped by the x expression.
+% about two evaluations, until the budget of 64 is used up at k = \valRiddersEdgeCapExponent, the plateau); below,
+% the relative error, which stays near rounding until the level budget runs short. Two measured limits are marked
+% from the generated values and the three regions labelled (R1-engineer-24): ten correct digits last hold at
+% k = \valRiddersEdgeTenDigitsExponent, and a value is last returned at k = \valRiddersEdgeLimitExponent; beyond it
+% the result is non_finite (the nan rows break the curve). The x axis carries k and, below it, the order of magnitude
+% of x = 2^-k (2^-10 is 9.8e-4, 2^-20 9.5e-7, 2^-30 9.3e-10, 2^-40 9.1e-13). The last CSV row (x = 0.01, a
+% non-integer k, E10) is dropped by the x expression.
 \begin{tikzpicture}
 \begin{groupplot}[group style={group size=1 by 2, vertical sep=3mm, xticklabels at=edge bottom},
-  eqtufte, width=36mm, height=22mm, xmin=2, xmax=40, xtick={10,20,30,40}, unbounded coords=jump]
+  eqtufte, width=34mm, height=22mm, xmin=2, xmax=40, xtick={10,20,30,40},
+  xticklabels={10\\$\approx 10^{-3}$, 20\\$\approx 10^{-6}$, 30\\$\approx 10^{-9}$, 40\\$\approx 10^{-12}$},
+  xticklabel style={align=center, font=\sffamily\tiny}, unbounded coords=jump]
   \nextgroupplot[ymin=0, ymax=70, ytick={16,32,48,64}, ylabel={evaluations}]
   \addplot[black!75] table[col sep=comma, comment chars={\#},
     x expr={\thisrow{k} == floor(\thisrow{k}) ? \thisrow{k} : nan}, y=evaluations] {data/ridders-edge.csv};
-  \draw[muted, thin] (axis cs:\valRiddersEdgeCapExponent, 0) -- (axis cs:\valRiddersEdgeCapExponent, 70);
   \draw[muted, thin] (axis cs:\valRiddersEdgeTenDigitsExponent, 0) -- (axis cs:\valRiddersEdgeTenDigitsExponent, 70);
   \draw[accent, thin] (axis cs:\valRiddersEdgeLimitExponent, 0) -- (axis cs:\valRiddersEdgeLimitExponent, 70);
-  \node[muted, font=\tiny, anchor=south east, inner sep=1pt] at (axis cs:\valRiddersEdgeCapExponent, 70) {cap};
-  \node[muted, font=\tiny, anchor=south, inner sep=1pt, yshift=1.1em] at (axis cs:\valRiddersEdgeTenDigitsExponent, 70) {10 digits};
-  \node[accent, font=\tiny, anchor=south west, inner sep=1pt] at (axis cs:\valRiddersEdgeLimitExponent, 70) {last value};
+  \node[muted, font=\tiny, anchor=south east, inner sep=1pt] at (axis cs:\valRiddersEdgeCapExponent, 64) {budget used up};
   \nextgroupplot[ymode=log, log basis y=10, ymin=1e-16, ymax=1, ytick={1e-15,1e-10,1e-5,1},
-    ylabel={relative error}, xlabel={$k$ ($x = 2^{-k}$)}]
+    ylabel={relative error}, xlabel={$k$, and $x = 2^{-k}$}]
   \addplot[black!75] table[col sep=comma, comment chars={\#},
     x expr={\thisrow{k} == floor(\thisrow{k}) ? \thisrow{k} : nan}, y=rel_error] {data/ridders-edge.csv};
-  \draw[muted, thin] (axis cs:\valRiddersEdgeCapExponent, 1e-16) -- (axis cs:\valRiddersEdgeCapExponent, 1);
   \draw[muted, thin] (axis cs:\valRiddersEdgeTenDigitsExponent, 1e-16) -- (axis cs:\valRiddersEdgeTenDigitsExponent, 1);
   \draw[accent, thin] (axis cs:\valRiddersEdgeLimitExponent, 1e-16) -- (axis cs:\valRiddersEdgeLimitExponent, 1);
-  \node[accent, font=\tiny, anchor=north west, inner sep=1pt] at (axis cs:\valRiddersEdgeLimitExponent, 1e-12) {non-finite};
+  % the three regions: ten digits (left of the first line), digits lost (between), fails (right of the accent line)
+  \node[muted, font=\tiny, anchor=south, inner sep=1pt] at (axis cs:16, 1e-9) {ten digits};
+  \node[muted, font=\tiny, anchor=south east, inner sep=1pt, align=right] at (axis cs:\valRiddersEdgeTenDigitsExponent, 3e-3) {digits\\lost};
+  \node[accent, font=\tiny, anchor=north west, inner sep=1pt] at (axis cs:\valRiddersEdgeLimitExponent, 1e-10) {fails};
 \end{groupplot}
 \end{tikzpicture}

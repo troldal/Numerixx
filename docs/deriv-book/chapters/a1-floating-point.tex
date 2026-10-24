@@ -58,9 +58,8 @@ more honest estimate of its error.
 \section{The ends of the range}\label{sec:fp-range}
 
 The largest finite number is $\fmax$. A result beyond it rounds to infinity, and infinity minus infinity is NaN, not a
-number. The library checks the points, differences, sums and products that could overflow before it forms them, and the
-final quotient after it, and reports \code{error::non_finite} instead of returning an infinity or a NaN; it never
-calls \code{fn} at a point that is not finite.
+number. The library checks what could overflow (before it is formed; the final quotient after) and reports
+\code{error::non_finite} instead; it never calls \code{fn} at a point that is not finite.
 
 At the other end, below the smallest normal number (\num{\valMinDouble} for \code{double}) the exponent can fall no
 further, and the numbers continue with a fixed spacing equal to the smallest subnormal, \num{\valDenormMinDouble}.
@@ -72,15 +71,16 @@ nonzero value of $f$ is $\epsmach \abs{f}$, but never less than the smallest sub
 
 A finite difference evaluates $f$ at $x + h$, and that sum is rounded like any other. The function therefore sees
 $\fl(x + h)$, which differs from $x + h$ by up to $\ulp(x) / 2$. Two consequences follow, both met in
-\cref{ch:rounding}. A step below $\ulp(x) / 2$ does not move $x$ at all: then $\fl(x + h) = x$ and no difference can
-be formed, which the library reports as \code{error::non_finite} (\cref{sb:ulp}). And for any step the distance
+\cref{ch:rounding}. A step below $\ulp(x) / 2$ does not move $x$. If neither $x + h$ nor $x - h$ moves, the library
+reports \code{error::non_finite}; if only one moves, as can happen near a power of two, the result is finite but
+mostly rounding (\cref{sb:ulp}). Hence the precondition: a step well above $\ulp(x)$. And for any step the distance
 between the two points of the central difference is not exactly $2h$, which is why the two-node rules divide by the
 distance actually evaluated (\cref{sb:actual-distance}).
 
 \section{Cancellation}\label{sec:fp-cancellation}
 
-The subtraction of two nearby numbers is exact: if $a / 2 \le b \le 2a$, then $a - b$ is representable and
-$\fl(a - b) = a - b$ (Sterbenz's lemma).\cite{sterbenz1974} The danger is not in the subtraction but in its inputs.
+The subtraction of two nearby numbers of the same sign is exact: if $a, b > 0$ and $a / 2 \le b \le 2a$, then
+$\fl(a - b) = a - b$ (Sterbenz's lemma; likewise for $a, b < 0$).\cite[Thm~4.3.1]{sterbenz1974} The danger is not in the subtraction but in its inputs.
 If $a$ and $b$ carry errors $\delta_a$ and $\delta_b$ from earlier rounding, the difference carries
 $\delta_a - \delta_b$, and its relative error is
 \begin{equation*}
@@ -94,7 +94,7 @@ $2h$ magnifies what is left (\cref{sec:rounding-v}).
 \section{Other types}\label{sec:fp-types}
 
 Nothing above is special to binary: decimal types round to decimal digits, with their own $\epsmach$, and
-multiprecision types such as \code{cpp_bin_float_50} of Boost.Multiprecision, with
-$p = \num{\valDigitsMultiprecision}$ bits and $\epsmach = \num{\valEpsMultiprecision}$, follow the same rules with more
-digits. The library needs from a type only what \code{std::numeric_limits} describes, its arithmetic and its comparisons
-(the concept \code{nxx::real}, \cref{ch:api}), and its error model needs only $\epsmach$.
+multiprecision types such as \code{cpp_bin_float_50} of Boost.Multiprecision ($p = \num{\valDigitsMultiprecision}$
+bits, $\epsmach = \num{\valEpsMultiprecision}$) follow the same rules with more digits. What the library needs from a
+type, its arithmetic, its comparisons and a few members of \code{std::numeric_limits}, is listed in
+\cref{sec:api-real}; its error model needs only $\epsmach$.

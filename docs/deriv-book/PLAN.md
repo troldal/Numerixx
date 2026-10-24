@@ -44,29 +44,34 @@ If the integrated build exceeds 88, the editor cuts in this order: Appendix B de
 Chapter 9 to `\footnotesize`, S13 and S14 shortened to half a page, then one sidebar per methods chapter moved to
 Appendix B.
 
-| Block | Item | Pages |
-|---|---|---|
-| Front matter | Title page | 1 |
-| | About this document (preface, how to read, AI statement) | 2 |
-| | Contents (tocdepth 1) | 2 |
-| | List of sidebars | 1 |
-| Part pages | Part I, Part II | 2 |
-| Part I | 1 Why numerical derivatives | 5 |
-| | 2 Finite differences from Taylor's theorem | 6 |
-| | 3 Rounding and the choice of step | 9 |
-| | 4 Higher-order and one-sided stencils | 7 |
-| | 5 Second to fourth derivatives | 6 |
-| | 6 Ridders' extrapolation | 7 |
-| | 7 Using the library | 9 |
-| Part II | 8 API reference | 5 |
-| | 9 Tables | 5 |
-| | 10 Accuracy, cost, limits and guarantees | 5 |
-| Appendices | A Floating-point essentials | 2 |
-| | B Derivations | 4 |
-| Back matter | Notation and glossary | 1 |
-| | References | 2 |
-| | Quick reference (the last page) | 1 |
-| **Sum** | | **82** |
+| Block | Item | Pages | Actual at stage 6 |
+|---|---|---|---|
+| Front matter | Title page | 1 | 1 |
+| | About this document (preface, how to read, AI statement) | 2 | 2 |
+| | Contents (tocdepth 1) | 2 | 3 |
+| | List of sidebars | 1 | 1 |
+| Part pages | Part I, Part II | 2 | 2 |
+| Part I | 1 Why numerical derivatives | 5 | 6 |
+| | 2 Finite differences from Taylor's theorem | 6 | 5 |
+| | 3 Rounding and the choice of step | 9 | 9 |
+| | 4 Higher-order and one-sided stencils | 7 | 6 |
+| | 5 Second to fourth derivatives | 6 | 5 |
+| | 6 Ridders' extrapolation | 7 | 8 |
+| | 7 Using the library | 9 | 13 |
+| Part II | 8 API reference | 5 | 7 |
+| | 9 Tables | 5 | 4 |
+| | 10 Accuracy, cost, limits and guarantees | 5 | 5 |
+| Appendices | A Floating-point essentials | 2 | 2 |
+| | B Derivations | 4 | 4 |
+| Back matter | Notation and glossary | 1 | 3 |
+| | References | 2 | 1 |
+| | Quick reference (the last page) | 1 | 1 |
+| **Sum** | | **82** | **88** |
+
+The last column is the stage-6 close-out build (2026-10-24): title page, vi, 81 numbered pages, at the top of the
+acceptable band. Chapter 7 carries the round-1 additions (E1b's checks, E21 to E23, the CMake file, the decision
+table's evidence) and is the chapter to cut first if round 2 adds length; its listings are kept whole by
+`\needspace` guards, which cost a few blank lines per page break.
 
 Front matter 6, part pages 2, Part I 49, Part II 15, appendices 6, back matter 4: 82.
 
@@ -439,6 +444,7 @@ own wording is quoted.
 | $\xi$ | the intermediate point of Taylor's remainder |
 | $T$ (mathematics) | temperature in the thread example; the C++ type parameter is always `\code{T}` |
 | $u$ | not used: the book speaks of $\varepsilon$ only |
+| $w$ | the scale on which $f$ varies, in the units of $x$; $s$ is the library's guess for it (round 1, T5: Chapter 3 derives the best step with $w$ and introduces $s$ as the guess) |
 
 ### 2.3 Proposed macros (editor adds them to `macros.tex` at stage 2; authors mark any others `%% NEW-MACRO`)
 
@@ -583,6 +589,29 @@ digits.
 Macro names are letters only (a LaTeX command name cannot contain digits: `CentralFour`, `First`; `N1` only in file
 names). `data/README.md` maps every file and macro to its figure or chapter; the editor keeps it current.
 
+### 4.4 Stage-6 extensions (the round-1 decisions, `reviews/R1-decision.md` section 4)
+
+Added by the editor before the authors' revision; every value is in `data/values.tex` and `data/README.md` maps it.
+
+| Set | Macros and files | Computation and use |
+|---|---|---|
+| HT | `\valHandCalcTruncationHundredth` | $\mathrm{e} \cdot 0.01^2 / 6$, the truncation term alone at $h = 0.01$ (3.2, R1-evidence-03) |
+| DS1b | `\valCpTableValue`, `\valCpFitVsTableRelDiff` | The tabulated $c_p$ of nitrogen at 1000 K, 32.697 J/(mol K), a cited constant in the generator (`chase1998`, Part II, p. 1621), and the fit's relative difference from it (1.4, R1-evidence-19) |
+| E6 | `\valEdgeRiddersStatus`, `\valEdgeRiddersEvals` (and `\valEdgeRiddersRelError` if a value is returned) | Ridders at 500 K with the NaN wrapper (4.4, R1-evidence-18) |
+| DS7 | `\valDefaultStepSpreadAbove`, `\valDefaultStepSpreadBelow` | Over every rule, the largest value over the median and the median over the smallest value (4.2, R1-evidence-14) |
+| DS9 | per N: `\valRiddersZeroError...` (renamed from `RiddersExactCases`: bit-exact results, not observed stops), `\valRiddersZeroOnQuintic...`, `\valRiddersZeroFunctions...`; `\valRiddersTailCases...`, `\valRiddersTailMinEvals...`, `\valRiddersTailRestarts...`, `\valRiddersTailFunctions...` (the functions with their counts, most frequent first, as LaTeX text); where cases are uncovered, `\valRiddersUncoveredMainFunction...`, `...MainCount`, `...MainMinX`, `...MainMaxX`, `...Others` | The histogram's tail is the cases above the median evaluation count (6.5, F14b, T7); the zero-error split (Sidebar 6.2, F14); the uncovered cases' function (Sidebar 6.2, R1-numerics-12). Coverage prints two decimals where one decimal would read 100.0 with a case uncovered (R1-numerics-17e) |
+| DS10 | `\valRiddersEdgeEvalsInterior` | $\log x$ at $x = 1/4$ (the $k = 2$ row), the comparison for $x = 0.01$ (6.4, R1-evidence-10) |
+| DS13 | `\valMisjudgeCost{CentralTwoFirst,CentralTwoFourth,CentralFourFourth}`; `\valCapGainCentralTwelve{First,Fourth}{Double,Multiprecision}`; `\valModelDigitsCentralTwo{First..Fourth}Double` | The model's growth of the total error for a step off by a factor 2 at the balance, $\max((N 2^{-P} + P 2^N), (N 2^P + P 2^{-N})) / (P + N)$ (3.5, Sidebar 5.1, 5.3, T9); the digits a `Central<12>` would gain by the exponent alone (4.4, 9.3, 10.4, T10); $-\log_{10} \varepsilon^{P/(P+N)}$ to one decimal (5.2, T13) |
+| DS14 | the untrusted-result row | "estimate at least $\lvert A \rvert / 4$ and more than 64 times the floor" (R1-library-20) |
+| DS15 | `\valHeadline{First,Fourth}Digits`, `\valHeadlineRidders{First,Fourth}Digits` now rounded, not floored (values 11, 5, 14, 9); `\valModelRatioCentralBelowMax`, `\valModelRatioCentralFourthAbove`, `\valModelRatioForwardTwoAbove`, `\valModelRatioForwardFour{Third,Fourth}` | The measured medians against $\varepsilon^{P/(P+N)}$ in double, per family (10.1, T12, T13) |
+| DS22 | `\valNoiseEstimate{Friction,Noisy,Clean}` (the estimate, relative to $\lvert f \rvert$), `...K` (the difference order accepted), `...Step`; `\valNoiseEstimateFrictionActual` (the root mean square deviation of the bisection output from the implicit solution over the same points); `\valNoiseEstimateNoisyEta`; `\valNoiseEstimatePoints`, `\valNoiseEstimateEvals` | E21's recipe `book::estimate_noise` (`code/noise.hpp`) at eight points spaced by $\varepsilon^{1/3} \max(\lvert x \rvert, 1)$: on the bisection friction factor at $Re = 10^5$ ($\eta = 10^{-10}$), on the noisy $\mathrm{e}^x$ of E17 at 1 ($\eta = 10^{-8}$) and on the clean $\mathrm{e}^x$ (3.6, 7.4.3, T3) |
+| E22 | `\valJacobianBalanceHandMaxRelError`, `\valJacobianBalanceHandEvals`, `\valJacobianBalanceCallMaxRelError`, `\valJacobianBalanceCallEvals`, `\valJacobianBalanceStep{T,N}` | The $2 \times 2$ Jacobian of section 5's E22 by the hand-applied central stencil (two model calls per column) and by one `derivative` call per entry (7.4.2, T2) |
+
+The shared headers gained `code/colebrook.hpp` (the friction factor of E20 and E21: `book::friction`, the
+`implicit-function` snippet, `book::friction_fixed_point`, `book::friction_exact`, `book::friction_slope_exact`) and,
+in `code/noise.hpp`, the recipe `book::estimate_noise` with the snippet `noise-estimate`. The generator reads both,
+so the numbers of DS21 and DS22 come from the same code the examples quote.
+
 ---
 
 ## 5. Examples (`code/`)
@@ -614,16 +643,21 @@ $Re = 10^5$, $\eta = 10^{-10}$, bisection on $[1, 20]$ in $1/\sqrt{f}$; E19: $\d
 | E8 | 5 | `05-orders-float.cpp` | `float-fourth`: a float fourth derivative inside the silencing pragma (the file builds with warnings as errors, so the pragma is the point); the macro alternative in a comment | `has_value()`; the text quotes DS6 for the numbers |
 | E9 | 6 | `06-ridders-basic.cpp` | `ridders-cp`: Ridders on $H$ at $T_0$ with a counting wrapper; prints value, estimate, evaluations | Actual error at most 6 times the estimate; evaluations at most 64 |
 | E10 | 6 | `06-ridders-edge.cpp` | `edge-restart`: $\log x$ at 0.01, Ridders restarts (the default initial step 1/32 crosses 0); `Central<2>` with its default step does not | Ridders has a value, covered, evaluations above 16 and at most 64 (measured 24); the stencil's relative error at most $10^{-6}$ (measured $1.2 \cdot 10^{-7}$: the truncation $h^2 / (3 x^2)$ with the step scaled by $s = 1$, not by $x$; the text uses this as the small-$\lvert x \rvert$ cross-reference to 3.5). The plan's earlier $10^{-9}$ was wrong |
-| E11 | 7 | `07-using-expected.cpp` | `expected-basics` (`if (d)`, `d.error()`, `*d`, `d->value`, `value_or`); `expected-chain` (`transform`, `and_then`); `estimate-pitfalls` (`auto` deduces `Estimate`; `if (*r)` tests the value; test `has_value()` before `*abs_error`) | `non_finite` for $\log x$ at 0 with the central rule; the chain's result; `std::same_as<decltype(e), Estimate<double>>` |
+| E11 | 7 | `07-using-expected.cpp` | (Round 1: `ridders-check` added, the tolerance test on `abs_error` quoted in 7.2; the `names` snippet is no longer quoted, 8.1 names the using-declarations and the file in prose.) `expected-basics` (`if (d)`, `d.error()`, `*d`, `d->value`, `value_or`); `expected-chain` (`transform`, `and_then`); `estimate-pitfalls` (`auto` deduces `Estimate`; `if (*r)` tests the value; test `has_value()` before `*abs_error`) | `non_finite` for $\log x$ at 0 with the central rule; the chain's result; `std::same_as<decltype(e), Estimate<double>>` |
 | E12 | 7 | `07-using-newton.cpp` | `newton`: $T$ from $H(T) = H^\ast$ with the slope from `derivative(H, T)` | Final error at most $10^{-6}$ K; at most 10 iterations |
 | E13 | 7 | `07-using-sensitivity.cpp` | `sensitivity`: an Arrhenius rate $k(T) = A \mathrm{e}^{-E_a/(R T)}$ with stated illustrative parameters; $\partial k / \partial T$ and $\partial k / \partial E_a$ by lambdas capturing the rest, Ridders; `scaled`: the scaled sensitivity $\dd \ln k / \dd \ln E_a = (E_a / k)\, \partial k / \partial E_a$; `jacobian`: a loop over the parameters $(A, E_a)$ that fills one Jacobian column per parameter and counts the evaluations | Covered (6x) and relative errors at most $10^{-8}$ against the closed forms $k E_a / (R T^2)$ and $-k / (R T)$; the scaled sensitivity equals $-E_a / (R T)$ to $10^{-8}$; the evaluation count equals the sum over the columns |
 | E14 | 7 | `07-using-multiprecision.cpp` | `multiprecision`: `cpp_bin_float_50`, $\mathrm{e}^x$ at 1 with `Central<6>` and Ridders; `T(*r)` and `-> T` | `Central<6>` relative error at most $10^{-40}$ ($\varepsilon^{6/7}$ is about $10^{-43}$); Ridders covered |
 | E15 | 7 | `07-using-constexpr.cpp` | `constexpr`: `static_assert(derivative(cube, 2.0, 0.25) == 12.0625)`, a `non_finite` as a constant, Ridders exact on $x^3$ | The `static_assert`s; `main` returns 0 |
 | E16 | 8 | `08-api-usage.cpp` | `api-overloads` (default step, explicit step, integer and `order` N, Ridders); `api-rejected` (`requires`-expressions showing that `Central<3>`, order 5, `bool`, an `int` argument do not compile) | The `static_assert`s; `main` calls each accepted form and returns 0 |
-| E17 | 3 | `03-rounding-noise.cpp` | `noisy-function`: $\mathrm{e}^x$ with its value perturbed by a deterministic relative noise $\eta = 10^{-8}$ (`book::noisy` from `code/noise.hpp`, the same perturbation as DS19); the default step, the step $\eta^{1/3} s$, and Ridders with its estimate; `noisy-coverage`: Ridders over a handful of points, counting how often the estimate covers the error | The fitted step's error below the default's (measured $1.2 \cdot 10^{-6}$ against $9.4 \cdot 10^{-4}$); the fitted step's relative error at most $10^{-4}$ (the model gives about $\eta^{2/3} = 5 \cdot 10^{-6}$); Ridders' estimate is **not** asserted to fail at $x = 1$ (there it covers, ratio 0.17): the example prints the estimate and the error and counts coverage over its handful of points for the reader at the keyboard, but the chapter text quotes only DS19's coverage macros over 300 points (about 91 % with a worst ratio of 42), never the example's own count |
+| E17 | 3 | `03-rounding-noise.cpp` | (Round 1: the snippet is no longer quoted; 3.6 shows the call as inline code and names the file as the source of the measurement.) `noisy-function`: $\mathrm{e}^x$ with its value perturbed by a deterministic relative noise $\eta = 10^{-8}$ (`book::noisy` from `code/noise.hpp`, the same perturbation as DS19); the default step, the step $\eta^{1/3} s$, and Ridders with its estimate; `noisy-coverage`: Ridders over a handful of points, counting how often the estimate covers the error | The fitted step's error below the default's (measured $1.2 \cdot 10^{-6}$ against $9.4 \cdot 10^{-4}$); the fitted step's relative error at most $10^{-4}$ (the model gives about $\eta^{2/3} = 5 \cdot 10^{-6}$); Ridders' estimate is **not** asserted to fail at $x = 1$ (there it covers, ratio 0.17): the example prints the estimate and the error and counts coverage over its handful of points for the reader at the keyboard, but the chapter text quotes only DS19's coverage macros over 300 points (about 91 % with a worst ratio of 42), never the example's own count |
 | E18 | 7 | `07-using-check.cpp` | `check-by-steps`: $c_p$ at $T_0$ with `Central<2>` at $h$, $2h$ and $h/2$, and the agreeing digits counted; `check-by-order`: the same against `Central<4>`; `check-by-ridders`: Ridders as the independent check; `check-absolute`: a point where $f'$ is near 0 (the thread's $H''$ has no zero in range, so $\sin x$ near $\pi/2$), where the absolute error is the one to look at | The three stencil values agree to at least 8 digits with each other and with the closed form; the Ridders estimate covers the stencil's actual error (if not, the example prints why: the stencil's error is not what Ridders estimates); $c_p > 0$ |
 | E19 | 7 | `07-using-kink.cpp` | `kink`: the published nitrogen enthalpy across the 500 K range break (`book::nitrogen_H_joined`, DS20) at $\delta = 1$ mK inside the stencil's span: `Central<2>` and `Central<4>` return finite values with a large error, Ridders returns a large estimate; the same at $\delta = 50$ K outside the span, where all agree | Both stencils return a value whose relative error exceeds $10^{-3}$ (measured 4.3 and 0.041); Ridders' estimate exceeds $10^{-3}$ of its value (measured $6.2 \cdot 10^{-3}$, flagged); outside the span every error is at most $10^{-8}$ (measured below $10^{-11}$) |
-| E20 | 7 | `07-using-solver.cpp` | `implicit-function`: the Colebrook friction factor $f(Re)$ solved by bisection on $1/\sqrt{f}$ to a relative tolerance $\eta$ (no formula for $f$, so none for $\dd f / \dd Re$; the output is quantised at $\eta$); `implicit-derivative`: `derivative<Ridders>` and `Central<2>` with the default step and with $h = \eta^{1/3} Re$; the answer key by implicit differentiation of the Colebrook equation | Relative error of the fitted-step stencil at most $10^{-4}$ for $\eta = 10^{-10}$ (measured $7 \cdot 10^{-8}$; the model gives about $\eta^{2/3} = 2 \cdot 10^{-7}$); the default-step stencil's error is larger than the fitted step's (measured $5.5 \cdot 10^{-5}$); Ridders' estimate is reported, not asserted (measured: it covers, ratio 0.066). One sentence may contrast a fixed-point solver, whose output is smooth between count changes (`\valSolverFixedPoint...`) |
+| E20 | 7 | `07-using-solver.cpp` | `implicit-function`: the Colebrook friction factor $f(Re)$ solved by bisection on $1/\sqrt{f}$ to a relative tolerance $\eta$ (no formula for $f$, so none for $\dd f / \dd Re$; the output is quantised at $\eta$); `implicit-derivative`: `derivative<Ridders>` and `Central<2>` with the default step and with $h = \eta^{1/3} Re$; the answer key by implicit differentiation of the Colebrook equation | Relative error of the fitted-step stencil at most $10^{-4}$ for $\eta = 10^{-10}$ (measured $7 \cdot 10^{-8}$; the model gives about $\eta^{2/3} = 2 \cdot 10^{-7}$); the default-step stencil's error is larger than the fitted step's (measured $5.5 \cdot 10^{-5}$); Ridders' estimate is reported, not asserted (measured: it covers, ratio 0.066). One sentence may contrast a fixed-point solver, whose output is smooth between count changes (`\valSolverFixedPoint...`). **Round 1:** the solver moves to the shared header `code/colebrook.hpp` (`book::friction`), quoted with `\snippetheader{colebrook}{implicit-function}`; the example deletes its own copy and keeps `implicit-derivative` |
+| E1b | 1 | `01-why-program.cpp` | `program`: the complete first program of 1.4 (R1-decision T4), quoted whole between markers on the file's first and last lines: `#include "shomate.hpp"`, `#include <numerixx/deriv.hpp>`, `#include <print>`, `main`, the lambda `H` for `book::shomate_H(book::nitrogen, T)`, `T0 = 1000.0`, the call `nxx::deriv::derivative(H, T0)`, `if (d) ... else ...` printing `d->value` or the failure, and `return d ? 0 : 1;`. Every line within 60 characters; the text says once that `book::` is the namespace of the book's example header | Exit status 0 when a value was returned; the printed value is `\valCpDefaultValueLong`'s |
+| E21 | 3 | `03-rounding-noise-estimate.cpp` | `noise-estimate-use`: the recipe `book::estimate_noise` (quoted from `code/noise.hpp` with `\snippetheader{noise}{noise-estimate}`) applied to the friction factor of E20 (`book::friction(re, 1e-10)` from `code/colebrook.hpp`) at $Re = 10^5$ and to the noisy $\mathrm{e}^x$ of E17 at 1, with $h = $ `root_epsilon<3, double>() * max(|x|, 1)` and the default eight points; prints the estimate relative to $f$, the difference order used and the cost (eight evaluations). Chapter 3.6 quotes DS22 (`\valNoiseEstimate...`); 7.4.3 quotes `\valNoiseEstimateFriction` | The friction estimate within a factor 10 of $\eta = 10^{-10}$ and the noisy-$\mathrm{e}^x$ estimate within a factor 3 of $\eta / \sqrt{3}$ (a uniform noise of half-width $\eta$ has that root mean square); the order used at least 2 |
+| E22 | 7 | `07-using-jacobian.cpp` | (Stage-6 close-out: the book quotes the loop of `jacobian(r, x)` only, de-indented between the markers; the function's header and `return J` stay in the file and the prose names them. `jacobian-by-calls` is named in the prose, not printed.) `jacobian-balances`: a $2 \times 2$ Jacobian of two residuals in the unknowns $T$ (K) and $n$ (mol), $r_1 = n H(T) - Q$ (an energy balance on the thread's enthalpy) and $r_2 = n R T / V - P$ (an ideal-gas pressure), the model as one function returning both residuals, at $T = 1000$ K, $n = 2$ mol, $V = 1$ m$^3$, $R = 8.31446261815324$, with $Q$ and $P$ chosen so that both residuals vanish there; the central stencil applied by hand to the vector residual, column $j$ from the model at $x_j \pm h_j$ with $h_j = $ `root_epsilon<3, double>() * max(|x_j|, 1)` (two model calls per column, four in all); `jacobian-by-calls`: the same by one `derivative` call per entry on a lambda that evaluates the whole model (eight model calls). Closed-form partials as the answer key: $n c_p(T)$, $H(T)$, $n R / V$, $R T / V$. 7.4.2's loop over the parameters of the Arrhenius rate is renamed "parameter sensitivities" and printed (`jacobian` of E13, kept) | Every entry within $10^{-8}$ of its closed form by both ways (the generator measures about $10^{-11}$ and $10^{-10}$, `\valJacobianBalance...`); the call counts 4 and 8 |
+| E23 | 7 | `07-using-usertype.cpp` | `usertype-limits`: a strong typedef `Real` over `double` (members `+ - * /`, unary minus, `<=>` and `==`, construction from `int`), with `std::numeric_limits<Real>` specialised to exactly the members the module uses, `is_specialized`, `is_integer`, `is_bounded`, `is_exact`, `radix`, `digits`, `epsilon()`, `max()`, `denorm_min()`, and not inheriting `numeric_limits<double>`; `usertype-call`: `derivative(f, Real(1))` with `Central<2>` and Ridders on $\mathrm{e}^x$. Quoted in Sidebar 7.1 and 8.7 (R1-developer-01) | `static_assert(nxx::real<Real>)`; both calls return a value within $10^{-9}$ of $\mathrm{e}$ |
+| CMake | 7 | `getting-started.cmake` (editor-owned; quoted with `\cmakefile{getting-started}`) | The three steps of 7.1 "Getting the library": `FetchContent_Declare` at a pinned commit, `FetchContent_MakeAvailable`, `target_link_libraries(app PRIVATE numerixx::numerixx)`; the one listing the build does not configure (section 8, item 23) | none (not built) |
 
 E14 needs the `boost_multiprecision` target that `tests/CMakeLists.txt` creates (decision A2). E19's function depends
 on decision A1 (section 1.3).
@@ -748,9 +782,11 @@ edit `generate_data.cpp`, `data/` or `macros.tex`.
     `if (*r)` is a `-Wfloat-conversion` error under Clang with `-Werror`, although the header documents it as
     compiling: the examples write `static_cast<bool>(*r)` or compare explicitly, and the text names `if (*r)` only
     as the pitfall, with that caveat (library issue U-2 in section 12.3).
-18. **Snippet code.** Every `if` in a snippet is braced (Clang's `-Wmisleading-indentation` fires on column-0
-    code); snippet names may be hyphenated (`\snippet` braces its range ends); `tools/check.py` rejects a
-    `\snippet` whose markers are missing or enclose nothing.
+18. **Snippet code.** Every multi-line `if` in a snippet is braced (Clang's `-Wmisleading-indentation` fires on
+    column-0 code); a single-line `if (d) std::println(...);` may stay unbraced (round 1, R1-library-16: it builds
+    clean on both compilers and reads better). Snippet names may be hyphenated (`\snippet` braces its range ends);
+    `tools/check.py` rejects a `\snippet` whose markers are missing or enclose nothing. `return 1;` from `main` stays
+    in the examples: they are tests, as 1.4 and the front matter say.
 19. **Figures.** `restrict x to domain` (and `y`) on a logarithmic pgfplots axis takes natural-logarithm bounds
     ($\ln 10^{-2} = -4.61$). A margin float (`marginfigure`, `margintable`) must not be placed beside a full-width
     float (`figure*`, `table*`): keep them a page apart (F14b and F15 against F12 and F14 in Chapter 6).
@@ -760,6 +796,21 @@ edit `generate_data.cpp`, `data/` or `macros.tex`.
 21. **Listings and the asterisk.** Plex Mono sets `*` raised, so `a * b` in a listing reads as a superscript to
     some eyes. Possible fix `literate={*}{{\textasteriskcentered}}1` in the `bkcode` style: a preamble change, for
     the author to decide (listed in 12.2, S2-19); until then accepted.
+22. **The transcribed declarations (round 1, T14).** The `signature` blocks of Chapter 8 are the one typed code in
+    the book: the declarations are transcribed from `include/numerixx/deriv.hpp` and `math.hpp` (quoting them would
+    need markers in a public header, which the book may not add), and `tools/check.py` fails the build when a
+    `\code{...}` line of a block no longer occurs in the headers, comments stripped and whitespace removed. The
+    front matter says so.
+23. **The CMake file (round 1, T4).** `code/getting-started.cmake`, quoted whole in 7.1 with `\cmakefile`, is the
+    one listing the book's build does not configure or run; `check.py` only checks that the file exists. The front
+    matter says so. Everything else quoted in the book is a compiled example or a generated table.
+24. **"Digits" (round 1, T13).** "About $n$ digits" is the rounded value of $-\log_{10}$ of the error, never its
+    floor; the headline macros are rounded by the generator, and the model's digits are quoted to one decimal from
+    `\valModelDigits...`. Counts and levels stated as facts are macros, not words.
+25. **The two checks (round 1, T1).** Part I reads a result as `d->value` and the estimate as `*r->abs_error`
+    (glossed at its first use); the implicit conversion of `Estimate<T>` appears only in 7.2 and Chapter 8. Section
+    1.5 and the quick reference teach two checks, "did it work" (`if (d)`) and "is it right" (the silent failures of
+    3.5, 3.6 and 7.8, the repeat at $2h$ and $h/2$, and for Ridders a tolerance on `abs_error`).
 
 ---
 
@@ -774,7 +825,7 @@ Each stage ends at a checkpoint with the author; commits to `dev` follow an appr
 | 4 Integration | editor | `main.tex` inputs; merged macros; one voice and terminology (section 8); every `\cref` resolves; the front matter (preface, how to read, the AI statement as the process actually ran: models, roles, rounds) and the back matter (notation, glossary); the layout test and the gallery removed; the full build clean, `tools/check.py` with no errors and every warning cleared or justified; total pages within 74 to 88 | The integrated PDF and the AI statement draft |
 | 5 Review round 1 | the five reviewers, in parallel | `reviews/R1-engineer.md`, `R1-developer.md`, `R1-numerics.md`, `R1-library.md`, `R1-evidence.md` (every reference verified or rejected); editor: `reviews/R1-decision.md` | The decision letter's summary; anything contested or scope-changing |
 | 6 Revision | authors | Chapters revised per the decision letter; `responses/R1-<chapter-id>.md`; regenerated data if the library changed (none expected) | -- (the editor checks the responses) |
-| 7 Review round 2 | targeted reviewers; Codex | `reviews/R2-*.md` on the revised chapters; `reviews/R2-codex.md` from `codex exec -s read-only --ephemeral --color never -o <scratchpad>/codex_review.md "<prompt>"` naming the PDF, the sources, CLAUDE.md and PLAN.md and asking for ranked findings with evidence; `R2-decision.md`; final fixes | The final PDF |
+| 7 Review round 2 | targeted reviewers; Codex; Cline with DeepSeek V4.1 Flash 1017 (R1-decision, approved; the model per the author, 2026-10-24, S6-11) | `reviews/R2-*.md` on the revised chapters; `reviews/R2-codex.md` from `codex exec -s read-only --ephemeral --color never -o <scratchpad>/codex_review.md "<prompt>"` naming the PDF, the sources, CLAUDE.md and PLAN.md and asking for ranked findings with evidence, and `reviews/R2-cline.md` from the Cline review with the same brief; `R2-decision.md`; final fixes | The final PDF |
 | 8 Release | editor; author | The AI statement made current; the version statement filled; `data/` regenerated and its diff reviewed; commit and push to `dev` | The release |
 
 ---
@@ -947,4 +998,20 @@ Nothing was rejected outright; A6 and A8 were accepted in a modified form for th
 | S4-10 | Repetition between chapters: the noise-coverage figures of DS19 were quoted in 3.6, 6.4, 7.4 and 10.2 | Kept as deliberate cross-references (each quotes the macro and points to 3.6); 6.4's wrong count fixed (S4-4). The list of the nine study functions appears in S11 (self-contained sidebar) and 10.2 (reference): kept | -- |
 | S4-11 | Layout of the integrated build (83 pages: title, vi, 76): the notation table of the back matter did not fit below its heading and left a near-empty page; Sidebar 6.3 split after two lines; seven listings split across pages with a few lines stranded (1.4 `shomate-H`, 4.4 `validity-edge`, 7.2 `expected-basics` and `estimate-pitfalls`, 7.4 `newton` and `implicit-derivative`, 7.8 `kink`); Table 9.8 dropped to a page bottom under a gap because `topnumber` = 3 caps the weight tables stacked at a page top | The notation table is two tables; `\needspace` guards before the sidebar and the listings (a guard moves the whole block to the next page, leaving a few blank lines, which is the lesser evil); Chapter 9 sets `topnumber` to 4 and `main.tex` restores 3 after it. Margin floats never share a page with a full-width float (F14b and F15 on pages 35 and 36 against F12 on 32 and F14 on 34; F16 on 42 and F18 on 48 against T1 on 41); Chapter 2's title breaks as planned in the contents and the running heads; no overfull box; sidebars 2.1 and 5.1 still break after a displayed equation or four lines, which is tolerable for a breakable box | `99-backmatter.tex`, `06-ridders.tex`, `01-why.tex`, `04-stencils.tex`, `07-using.tex`, `09-tables.tex`, `main.tex` |
 | S4-12 | The appendices were headed "Chapter A" and "Chapter B": `preamble.tex` hard-coded the word "Chapter" in the chapter title format | Changed to `\@chapapp`, which the report class sets to "Appendix" after `\appendix`: a one-token correction of the title format, not a design change, made by the editor and **listed for the author's approval** with the integrated PDF | `preamble.tex` |
+| S6-1 | Stage 6, the editor's items before the authors' revision (`reviews/R1-decision.md` section 4; every decision approved by the author on 2026-10-23) | Done: the AI statement rewritten (the coordinating main session on Fable 5.1, the stage-1 plan reviews, the stage-2 verification, the authors' listings and the editor's generator, the transcribed declarations and the CMake file as the two exceptions, round 1, and the two independent reviews to come: OpenAI Codex and Cline, then with MiMo-V2.6-Pro, since 2026-10-24 with DeepSeek V4.1 Flash 1017, S6-11); `refs.bib` per the reference table (`sterbenz1974`, `ieee754-2019` corrected, `more2011` and `martins2003` added, every UNVERIFIED note removed, sections cited at the sentence); `articletitle=true` and the appendix naming (`\crefalias{chapter}{appendix}` in `main.tex`); the glossary and notation of the back matter; `code/colebrook.hpp` and `book::estimate_noise` in `code/noise.hpp`; `code/getting-started.cmake` and `\cmakefile`; the generator's extensions of 4.4; `check.py`'s signature and `\cmakefile` checks; the "restarts" label of F14b removed and `RiddersExactCases` renamed `RiddersZeroError` in its two users (Chapter 6 and the F14 comment); sections 2, 5, 8 (items 18, 22 to 25) and `data/README.md` | this plan, `chapters/00-frontmatter.tex`, `99-backmatter.tex`, `refs.bib`, `preamble.tex`, `main.tex`, `macros.tex`, `code/`, `tools/`, `figures/06-ridders-cost.tex` |
 | S4-13 | The log reports `Font shape T1/cmss/b/n undefined` twice, from the tableau table of Chapter 6: `siunitx` in `detect-all` (text) mode takes the minus sign of a negative exponent from the TS1 encoding, which IBM Plex Sans lacks, so every such minus falls back to Computer Modern Sans; the two warnings are the bold accent cells of F12's error table, where the bold fallback does not exist either and medium is used. Cosmetic (the signs are the right size and nearly the right shape) and present since the stage-2 layout | Not changed: a fix is a preamble decision for the author (for example `\sisetup{mode = math}` for `\num`, or loading the TS1 companion of Plex). Noted for the review of the integrated PDF | `preamble.tex` (unchanged) |
+
+### 12.5 Stage-6 close-out decisions (editor, 2026-10-24, from the authors' responses and the re-integrated build)
+
+| Id | Finding | Decision | Where |
+|---|---|---|---|
+| S6-2 | Two quoted snippet lines exceeded 60 characters (`code/03-rounding-step.cpp` `too-small`, 61; `code/noise.hpp` `noise-estimate`, 62) | Both within 60: `noise-estimate` reflowed (the root-mean-square vector is `rms`, its header comment re-wrapped); `too-small` reads `if (!tiny && tiny.error() == error::non_finite)` under a `using nxx::deriv::error` and a one-line comment, a trivial edit of the fundamentals author's file, noted for the author. `code/getting-started.cmake` reflowed to 60-character comment lines | `code/noise.hpp`, `code/03-rounding-step.cpp`, `code/getting-started.cmake` |
+| S6-3 | Chapter 7 over its allowance (14 pages at the authors' hand-in, total 91) | The practice author's three suggestions taken: the CMake reflow; E22's `jacobian-balances` quotes the loop of `jacobian(r, x)` only (the markers moved inside the function, the loop de-indented, the prose names the function and `J`); Sidebar 7.2 shortened (the bounds $Q = \max(2K, d)$, $h \le \Omega/2Q$, $\lvert x \rvert \le \Omega - Qh$ and the helper names `sum_fits`, `product_fits` dropped, every fact kept: pre-arithmetic detection, the exact radix comparison, the saturating floors, the final-quotient exception). Then the `\needspace` guards the author had removed were restored where the integrated layout stranded listing lines: `expected-chain` (two comment lines), `ridders-check` (its last three lines), `check-by-steps`; and nine sentences of 7.4.2, 7.4.3, 7.5, 7.6, 7.7, 7.8 and 7.9 were tightened by a few words each where a paragraph's last line held one to three words (no fact or cross-reference lost; the deferred-features list says "a noise-aware step", as 10.7 does). Chapter 7 is 13 pages (41 to 53) with every listing in one piece; total 88 | `07-using.tex`, `code/07-using-jacobian.cpp` |
+| S6-4 | Chapter 4: the margin figure F8 (`fig:one-sided`) and the full-width F7 (`fig:stencil-nodes`, side caption) shared page 26 with their captions overlapping | F8 anchored before the paragraph that cites it; the two now share the page without a collision (the only margin float beside a full-width float in the book; Chapters 6 and 7 are clear as at stage 4) | `04-stencils.tex` |
+| S6-5 | Back matter: the first notation table left half of page 77 empty after the authors' revisions moved the break | The split between the two tables moved ($\varepsilon$ to $D_i$ into the first); six glossary entries tightened without a change of meaning. Appendix A.6 repeated the list of `numeric_limits` members that 8.7 and Sidebar 7.1 give; it now points to 8.7 | `99-backmatter.tex`, `a1-floating-point.tex` |
+| S6-6 | The two optional macros the authors asked for | Added: `\valExpRiddersFirstRelError` (DS15, 1.3e-14, Ridders' median for $f'$ on $\mathrm{e}^x$ in double), quoted in 6.5 beside the headline digits; `\valRiddersEdgeLimitRelEstimate` (DS10, 0.10, the relative estimate at $x = 2^{-34}$), quoted in 6.4 in place of the typed "a tenth of the value". 7.8 and 10.4 keep "an estimate that has grown to flag the loss" and may quote it in round 2 | `tools/generate_data.cpp`, `06-ridders.tex`, `data/README.md` |
+| S6-7 | The reference table (section 6) cites Nocedal and Wright at 3.3 and Dennis and Schnabel at 3.4; the fundamentals author's response omitted the citations | Cited at the sentence, without the section qualifiers: the achemso style prints each qualified citation as an extra numbered entry ("Ref. 14, Sect. 8.1"), and two more would run the reference list to a second page. The sections stay in the table | `03-rounding.tex` |
+| S6-8 | The thirteen response files against `R1-decision.md` | Every accepted finding addressed or its non-change justified; the only gap was S6-7. Recorded without change: E22's `jacobian-by-calls` is named in the prose, not printed; the `names` snippet of E11 is no longer quoted (8.1 names the file); T0's Ridders row stays as the decision letter settled it; Chapter 7 names "MSVC and clang-cl of Visual Studio 2026" without a compiler version because `ci.yml` names only the runner | this plan (section 5, E11, E17, E22) |
+| S6-9 | The stage-6 layout (88 pages: title, vi, 81) | No overfull box, no undefined reference, `check.py` 0 errors 0 warnings, 24 example tests pass, `data/` diff limited to `values.tex`, `table-ridders-constants.tex` and `README.md`. Guards remain at 3.4 (7), 4.4 (14) and 6.6 (10); Chapter 1 needs none. Tolerated: the sidebars 3.2, 5.1, 6.2, 7.1 and 7.2 break across pages (breakable boxes, as at stage 4); Chapter 3's `noise-estimate-use` listing splits five and four lines over pages 20 and 21 (page 21 is full, so a guard would push the checklist's last item onto a page of its own); half a page blank at the ends of Chapters 5 and 8 and of Appendix B. The `T1/cmss/b/n` font warnings of S4-13 remain | -- |
+| S6-10 | The AI statement | Confirmed as it stands apart from S6-11: every sentence true at the close of stage 6 ("the authors revised their chapters"); the last sentence names what is still to come. The version paragraph keeps its TODO for the release commit | `00-frontmatter.tex` |
+| S6-11 | The author's change of the round-2 Cline model (2026-10-24): DeepSeek V4.1 Flash 1017 in place of MiMo-V2.6-Pro | "Cline with DeepSeek V4.1 Flash 1017" in the AI statement, in S6-1 above and in the approval note of `reviews/R1-decision.md`; the stage-7 row of the schedule (section 9), which had named Codex only, now lists the Cline review and its output file `reviews/R2-cline.md` | `00-frontmatter.tex`, `reviews/R1-decision.md`, this plan |

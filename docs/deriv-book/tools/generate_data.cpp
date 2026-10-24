@@ -24,6 +24,7 @@
 
 #include <numerixx/deriv.hpp>
 
+#include "colebrook.hpp"
 #include "noise.hpp"
 #include "shomate.hpp"
 
@@ -454,6 +455,8 @@ namespace {
             value(o, "HandCalcExact", sig(e_at_one, 6));
             value(o, "HandCalcErrorRatio", sig(first_error / second_error));
             value(o, "HandCalcLastDiff", fixed(last_diff, 5));
+            // The truncation error alone at h = 0.01, e h^2 / 6, against the row's error (R1-evidence-03).
+            value(o, "HandCalcTruncationHundredth", sig(e_at_one * 0.01 * 0.01 / 6));
         }
     }
 
@@ -483,6 +486,12 @@ namespace {
         value(o, "CpExact", sig(cp, 5));
         value(o, "CpExactLong", sig(cp, 12));
         value(o, "EnthalpyExact", sig(Hn(0), 6));
+        // The tabulated heat capacity of nitrogen at 1000 K, 32.697 J/(mol K): M. W. Chase, Jr., NIST-JANAF
+        // Thermochemical Tables, 4th ed., 1998, Part II, p. 1621 (chase1998); the fit's closed form against it
+        // (R1-evidence-19). A cited constant, not a computation.
+        constexpr double cp_table = 32.697;
+        value(o, "CpTableValue", sig(cp_table, 5));
+        value(o, "CpFitVsTableRelDiff", sig(std::abs(cp - cp_table) / cp_table));
         double const h_default = nxx::math::root_epsilon<3, double>() * T0;
         value(o, "CpDefaultStep", sig(h_default));
         auto const d = derivative(H, T0);
@@ -538,6 +547,13 @@ namespace {
         }
         value(o, "EdgeForwardTwoRelError", sig(*f2));
         value(o, "EdgeForwardFourRelError", sig(*f4));
+        // Ridders exactly at the edge (R1-evidence-18): every level of every tableau samples below the range, so the
+        // method restarts until its budget is spent.
+        int calls = 0;
+        auto const r = derivative<Ridders>(Counted{ wrapped, &calls }, T_edge);
+        value(o, "EdgeRiddersStatus", r ? "finite" : "non-finite");
+        value(o, "EdgeRiddersEvals", integer(calls));
+        if (r) value(o, "EdgeRiddersRelError", sig(*rel_error(r, cp)));
     }
 
     // ------------------------------------------------------------------------------------------------ DS2, DS3, DS5
@@ -797,6 +813,21 @@ namespace {
         value(o, "ExpForwardTwoRelError", sig(*forward[2].median));
         value(o, "ExpForwardSixRelError", sig(*forward[6].median));
         value(o, "ExpCentralTwoAtOneRelError", sig(*exp_default_double<Central<2>, 1>(1.0)));
+        // The spread of the eleven points about the median, over every rule (R1-evidence-14): the largest value is
+        // at most a few times the median, the smallest tens of times below it.
+        double above = 0;
+        double below = 0;
+        auto const widen = [&](Spread const &s) {
+            if (!s.median) return;
+            above = std::max(above, *s.max / *s.median);
+            below = std::max(below, *s.median / *s.min);
+        };
+        for (std::size_t P = 1; P <= 10; ++P) {
+            widen(central[P]);
+            widen(forward[P]);
+        }
+        value(o, "DefaultStepSpreadAbove", sig(above));
+        value(o, "DefaultStepSpreadBelow", sig(below));
     }
 
     // ------------------------------------------------------------------------------------------------ DS8
@@ -974,6 +1005,24 @@ namespace {
     constexpr int points_per_function = 300;
     constexpr int plot_every = 3; // the scatter F14 draws every third case (TeX's memory, see ds9_coverage_order)
 
+    // The functions' names as the text writes them, in the order of `study` (for the macros that name functions).
+    constexpr char const *const study_latex[] = {
+        "$\\mathrm{e}^x$", "$\\sin x$", "$\\log x$", "$\\sqrt{x}$", "$1/x$", "the Runge function", "$x^5$",
+        "$\\mathrm{e}^{-x^2}$", "$\\tanh x$",
+    };
+
+    // One case of the random study, kept so that the summary can look at subsets (the histogram's tail, the
+    // zero-error cases, the uncovered cases).
+    struct Case
+    {
+        std::size_t fn;
+        double x;
+        double evaluations;
+        bool covered;
+        bool zero;
+        bool restarted;
+    };
+
     struct Statistics
     {
         int cases = 0;
@@ -985,7 +1034,33 @@ namespace {
         double worst_ratio = 0;
         std::vector<double> ratios;
         std::vector<double> evaluations;
+        std::vector<Case> records;
     };
+
+    // Coverage in percent to one decimal, as the style decision says, except where one decimal would read 100.0
+    // while a case is uncovered: then two (R1-numerics-17e).
+    std::string coverage_percent(int covered, int cases)
+    {
+        std::string const s = percent(static_cast<double>(covered) / cases);
+        return s == "100.0" && covered < cases ? fixed(100.0 * covered / cases, 2) : s;
+    }
+
+    // The functions of a subset of cases, each with its count, most frequent first: "$1/x$ (69), $\log x$ (46)".
+    std::string functions_with_counts(std::vector<Case> const &cases, std::size_t skip = std::size(study))
+    {
+        std::array<int, std::size(study)> count{};
+        for (Case const &c : cases) ++count[c.fn];
+        std::vector<std::size_t> order;
+        for (std::size_t f = 0; f < std::size(study); ++f)
+            if (count[f] > 0 && f != skip) order.push_back(f);
+        std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) { return count[a] > count[b]; });
+        std::string text;
+        for (std::size_t i = 0; i < order.size(); ++i) {
+            if (i > 0) text += i + 1 == order.size() ? " and " : ", ";
+            text += std::string(study_latex[order[i]]) + " (" + std::to_string(count[order[i]]) + ")";
+        }
+        return text.empty() ? "none" : text;
+    }
 
     template<int N>
     Statistics ds9_coverage_order(Output &o)
@@ -1030,6 +1105,7 @@ namespace {
                 st.ratios.push_back(ratio);
                 st.worst_ratio = std::max(st.worst_ratio, ratio);
                 st.evaluations.push_back(static_cast<double>(log.xs.size()));
+                st.records.push_back({ f, x, static_cast<double>(log.xs.size()), actual <= estimate, actual == 0, was_restarted });
                 out << f << ',' << study[f].name << ',' << cell(x) << ',' << cell(exact) << ',' << cell(actual) << ','
                     << cell(estimate) << ',' << cell(actual / std::abs(exact)) << ',' << cell(estimate / std::abs(exact)) << ','
                     << log.xs.size() << ',' << (was_restarted ? 1 : 0) << '\n';
@@ -1051,25 +1127,78 @@ namespace {
             Statistics const st = ds9_coverage_order<N>(o);
             all[N] = st;
             std::string const suffix = names[N];
-            value(o, "RiddersCoverage" + suffix, percent(static_cast<double>(st.covered) / st.cases));
+            value(o, "RiddersCoverage" + suffix, coverage_percent(st.covered, st.cases));
             value(o, "RiddersUncovered" + suffix, integer(st.cases - st.covered));
             value(o, "RiddersMedianRatio" + suffix, sig(median(st.ratios)));
             value(o, "RiddersWorstRatio" + suffix, sig(st.worst_ratio));
             std::vector<double> ev = st.evaluations;
             std::sort(ev.begin(), ev.end());
+            double const median_evals = ev[ev.size() / 2];
             value(o, "RiddersEvalsMin" + suffix, integer(static_cast<long long>(ev.front())));
-            value(o, "RiddersEvalsMedian" + suffix, integer(static_cast<long long>(ev[ev.size() / 2])));
+            value(o, "RiddersEvalsMedian" + suffix, integer(static_cast<long long>(median_evals)));
             value(o, "RiddersEvalsMax" + suffix, integer(static_cast<long long>(ev.back())));
-            value(o, "RiddersExactCases" + suffix, integer(st.exact));
+            value(o, "RiddersZeroError" + suffix, integer(st.exact));
             value(o, "RiddersRestarted" + suffix, integer(st.restarts));
             value(o, "RiddersFailed" + suffix, integer(st.failed));
+
+            // The tail of the evaluation histogram: the cases above the median count, with the restarts among them
+            // and the functions they come from (R1-numerics-02, R1-evidence-02).
+            std::vector<Case> tail;
+            for (Case const &c : st.records)
+                if (c.evaluations > median_evals) tail.push_back(c);
+            double tail_min = ev.back();
+            int tail_restarts = 0;
+            for (Case const &c : tail) {
+                tail_min = std::min(tail_min, c.evaluations);
+                tail_restarts += c.restarted ? 1 : 0;
+            }
+            value(o, "RiddersTailCases" + suffix, integer(static_cast<long long>(tail.size())));
+            value(o, "RiddersTailMinEvals" + suffix, integer(static_cast<long long>(tail.empty() ? 0 : tail_min)));
+            value(o, "RiddersTailRestarts" + suffix, integer(tail_restarts));
+            value(o, "RiddersTailFunctions" + suffix, functions_with_counts(tail));
+
+            // The cases with an actual error of exactly 0: how many on x^5, over how many functions
+            // (R1-numerics-03, R1-evidence-04). They are bit-exact results, not observed exact stops.
+            std::vector<Case> zero;
+            for (Case const &c : st.records)
+                if (c.zero) zero.push_back(c);
+            int on_quintic = 0;
+            std::array<bool, std::size(study)> seen{};
+            for (Case const &c : zero) {
+                on_quintic += study[c.fn].name == std::string_view("quintic") ? 1 : 0;
+                seen[c.fn] = true;
+            }
+            value(o, "RiddersZeroOnQuintic" + suffix, integer(on_quintic));
+            value(o, "RiddersZeroFunctions" + suffix, integer(static_cast<long long>(std::count(seen.begin(), seen.end(), true))));
+
+            // The uncovered cases: the function that holds most of them, its count and range of x, and the others
+            // (R1-numerics-12).
+            std::vector<Case> uncovered;
+            for (Case const &c : st.records)
+                if (!c.covered) uncovered.push_back(c);
+            if (!uncovered.empty()) {
+                std::array<int, std::size(study)> count{};
+                for (Case const &c : uncovered) ++count[c.fn];
+                std::size_t const main_fn = static_cast<std::size_t>(std::max_element(count.begin(), count.end()) - count.begin());
+                double x_min = std::numeric_limits<double>::infinity();
+                double x_max = 0;
+                for (Case const &c : uncovered)
+                    if (c.fn == main_fn) {
+                        x_min = std::min(x_min, c.x);
+                        x_max = std::max(x_max, c.x);
+                    }
+                value(o, "RiddersUncoveredMainFunction" + suffix, study_latex[main_fn]);
+                value(o, "RiddersUncoveredMainCount" + suffix, integer(count[main_fn]));
+                value(o, "RiddersUncoveredMainMinX" + suffix, sig(x_min));
+                value(o, "RiddersUncoveredMainMaxX" + suffix, sig(x_max));
+                value(o, "RiddersUncoveredOthers" + suffix, functions_with_counts(uncovered, main_fn));
+            }
         });
         value(o, "RiddersCases", integer(all[1].cases));
         value(o, "RiddersPlotEvery", integer(plot_every));
         value(o, "RiddersPlotCases", integer(all[1].plotted));
         value(o, "RiddersFunctions", integer(static_cast<long long>(std::size(study))));
         value(o, "RiddersPointsPerFunction", integer(points_per_function));
-        value(o, "RiddersExactCases", integer(all[1].exact));
         return all;
     }
 
@@ -1087,6 +1216,7 @@ namespace {
         std::optional<int> limit_k;
         std::optional<int> ten_digits_k;
         std::optional<int> cap_k;
+        std::optional<double> limit_rel_estimate; // the relative estimate at the last x that returns a value
         auto const row = [&](double k, double x) {
             int calls = 0;
             auto const r = derivative<Ridders>(Counted{ log_fn, &calls }, x);
@@ -1100,7 +1230,12 @@ namespace {
         for (int k = 2; k <= 40; ++k) {
             double const x = std::ldexp(1.0, -k);
             auto const [ok, covered, e, calls, r] = row(k, x);
-            if (ok) limit_k = k;
+            // log x away from its edge, for the comparison with x = 0.01 (R1-evidence-10): the k = 2 row.
+            if (k == 2) value(o, "RiddersEdgeEvalsInterior", integer(calls));
+            if (ok) {
+                limit_k = k;
+                limit_rel_estimate = *r->abs_error / (1 / x);
+            }
             if (ok && covered && e && *e < 1e-10) ten_digits_k = k;
             if (!cap_k && calls >= 2 * nxx::deriv::detail::ridders_levels) cap_k = k;
         }
@@ -1108,6 +1243,8 @@ namespace {
         if (limit_k && ten_digits_k && cap_k) {
             value(o, "RiddersEdgeLimit", sig(std::ldexp(1.0, -*limit_k)));
             value(o, "RiddersEdgeLimitExponent", integer(*limit_k));
+            // The estimate at that limit, relative to the derivative: the flag the text describes (6.4, 7.8).
+            value(o, "RiddersEdgeLimitRelEstimate", sig(*limit_rel_estimate));
             value(o, "RiddersEdgeTenDigits", sig(std::ldexp(1.0, -*ten_digits_k)));
             value(o, "RiddersEdgeTenDigitsExponent", integer(*ten_digits_k));
             value(o, "RiddersEdgeCapExponent", integer(*cap_k));
@@ -1369,6 +1506,32 @@ namespace {
         step_cost.template operator()<Central<4>, 4>("CentralFourFourth");
         double const k_ten = step_cost.template operator()<Central<10>, 1>("CentralTenFirst");
         value(o, "StepConstantCentralTenFirst", sig(k_ten));
+        // Misjudging the scale by a factor 2 (R1-numerics-06, R1-library-09): a step h*/2 multiplies the rounding
+        // term by 2^N and a step 2 h* the truncation term by 2^P; with the two terms in the ratio N : P at the
+        // balance, the total error grows by (N 2^-P + P 2^N) / (P + N) or (N 2^P + P 2^-N) / (P + N), whichever
+        // is larger.
+        auto const misjudge = [&](int P, int N, std::string const &name) {
+            double const halved = (N * std::pow(2.0, -P) + P * std::pow(2.0, N)) / (P + N);
+            double const doubled = (N * std::pow(2.0, P) + P * std::pow(2.0, -N)) / (P + N);
+            value(o, "MisjudgeCost" + name, sig(std::max(halved, doubled)));
+        };
+        misjudge(2, 1, "CentralTwoFirst");
+        misjudge(2, 4, "CentralTwoFourth");
+        misjudge(4, 4, "CentralFourFourth");
+        // What the next central order would gain by the model's exponent alone, in digits: -log10(eps) times
+        // (12/13 - 10/11) for f' (R1-numerics-07, R1-evidence-05); the constants S and C are left out, as 9.4 says.
+        auto const cap_gain = [&](double eps, int N, std::string const &name) {
+            double const digits = -std::log10(eps) * (12.0 / (12 + N) - 10.0 / (10 + N));
+            value(o, "CapGainCentralTwelve" + name, sig(digits));
+        };
+        cap_gain(dbl_eps, 1, "FirstDouble");
+        cap_gain(dbl_eps, 4, "FourthDouble");
+        cap_gain(std::ldexp(1.0, -167), 1, "FirstMultiprecision"); // cpp_bin_float_50: eps = 2^-167
+        cap_gain(std::ldexp(1.0, -167), 4, "FourthMultiprecision");
+        // The model's digits for Central<2> in double, -log10(eps^(P/(P+N))) to one decimal (R1-numerics-17h).
+        char const *const words[] = { "", "First", "Second", "Third", "Fourth" };
+        for (int N = 1; N <= 4; ++N)
+            value(o, std::string("ModelDigitsCentralTwo") + words[N] + "Double", fixed(-std::log10(dbl_eps) * 2.0 / (2 + N), 1));
     }
 
     void ds14_ridders_constants(Output &o)
@@ -1388,7 +1551,7 @@ namespace {
         tab << "Initial step, divisor of $\\max(\\lvert x \\rvert, 1)$ & " << div[0] << " (\\(f'\\)), " << div[1]
             << " (\\(f''\\) to \\(f''''\\)) \\\\\n";
         tab << "Levels without improvement before the stop & 2 \\\\\n";
-        tab << "Untrusted result: estimate at least $\\lvert A \\rvert / 4$ and above the floor by & 4, 64 \\\\\n";
+        tab << "Untrusted result: estimate at least $\\lvert A \\rvert / 4$ and more than 64 times the floor & 4, 64 \\\\\n";
         tab << "Level cap (restarts included) & " << cap << " \\\\\n";
         tab << "Evaluations per level & 2, 2, 4, 4 \\\\\n";
         tab << "Evaluations of $f(x)$, once & 0, 1, 0, 1 \\\\\n";
@@ -1476,11 +1639,37 @@ namespace {
         }
         value(o, "AccuracyMatrixHasMultiprecision", have_mp ? "1" : "0");
         value(o, "AccuracyMatrixPoints", integer(static_cast<long long>(typical_points.size())));
-        // The headline digits of section 1.5: floor(-log10) of the double Central<2> medians for f' and f''''.
-        value(o, "HeadlineFirstDigits", integer(static_cast<long long>(std::floor(-std::log10(*rows[0].dbl[1].median)))));
-        value(o, "HeadlineFourthDigits", integer(static_cast<long long>(std::floor(-std::log10(*rows[0].dbl[4].median)))));
-        value(o, "HeadlineRiddersFirstDigits", integer(static_cast<long long>(std::floor(-std::log10(*rows[5].dbl[1].median)))));
-        value(o, "HeadlineRiddersFourthDigits", integer(static_cast<long long>(std::floor(-std::log10(*rows[5].dbl[4].median)))));
+        // The headline digits of section 1.5: -log10 of the double Central<2> and Ridders medians for f' and f'''',
+        // rounded to the nearest integer (R1-decision T13: "about N digits" is the rounded figure, not the floor).
+        auto const digits = [](std::optional<double> const &median) {
+            return integer(static_cast<long long>(std::lround(-std::log10(*median))));
+        };
+        value(o, "HeadlineFirstDigits", digits(rows[0].dbl[1].median));
+        value(o, "HeadlineFourthDigits", digits(rows[0].dbl[4].median));
+        value(o, "HeadlineRiddersFirstDigits", digits(rows[5].dbl[1].median));
+        value(o, "HeadlineRiddersFourthDigits", digits(rows[5].dbl[4].median));
+        // Ridders' median relative error for f' in double, the companion of \valExpCentral...RelError (6.5, 6.6, 7.3).
+        value(o, "ExpRiddersFirstRelError", sig(*rows[5].dbl[1].median));
+        // The measured medians against the model eps^(P/(P+N)) in double (R1-numerics-05, R1-evidence-11): the
+        // central rules lie below the model for f' to f''' and above it for f''''; the one-sided rules above it by
+        // up to their amplification.
+        auto const model = [](int P, int N) { return std::pow(dbl_eps, static_cast<double>(P) / (P + N)); };
+        int const orders[] = { 2, 4, 6, 2, 4 }; // P of rows 0 to 4
+        double central_below = 0;
+        double central_fourth_above = 0;
+        double forward_two_above = 0;
+        for (std::size_t i = 0; i < 5; ++i)
+            for (int N = 1; N <= 4; ++N) {
+                double const ratio = *rows[i].dbl[static_cast<std::size_t>(N)].median / model(orders[i], N);
+                if (i < 3 && N < 4) central_below = std::max(central_below, 1 / ratio);
+                if (i < 3 && N == 4) central_fourth_above = std::max(central_fourth_above, ratio);
+                if (i == 3) forward_two_above = std::max(forward_two_above, ratio);
+            }
+        value(o, "ModelRatioCentralBelowMax", sig(central_below));
+        value(o, "ModelRatioCentralFourthAbove", sig(central_fourth_above));
+        value(o, "ModelRatioForwardTwoAbove", sig(forward_two_above));
+        value(o, "ModelRatioForwardFourThird", sig(*rows[4].dbl[3].median / model(4, 3)));
+        value(o, "ModelRatioForwardFourFourth", sig(*rows[4].dbl[4].median / model(4, 4)));
         return rows;
     }
 
@@ -1728,70 +1917,14 @@ namespace {
 
     // ------------------------------------------------------------------------------------------------ DS21
 
-    // E20: the Darcy friction factor from the Colebrook equation 1/sqrt(f) = -2 log10(eps_r / 3.7 + 2.51 / (Re sqrt f)),
-    // written in x = 1/sqrt(f): G(x) = x + 2 log10(a + b x / Re) = 0 with a = eps_r / 3.7, b = 2.51. G increases
-    // with x, so bisection on [1, 20] (f from 1 to 1/400) finds the root. Parameters (data/README.md; the example
-    // must use the same): eps_r = 1e-4, Re = 1e5, eta = 1e-10.
-    constexpr double colebrook_a = 1e-4 / 3.7;
-    constexpr double colebrook_b = 2.51;
-
-    double colebrook_G(double x, double Re) { return x + 2 * std::log10(colebrook_a + colebrook_b * x / Re); }
-
-    // Bisection to a relative tolerance eta on x: the output is quantised at eta, which is the noise of Chapter 3.6.
-    double friction_bisection(double Re, double eta)
-    {
-        double lo = 1.0;
-        double hi = 20.0;
-        while (hi - lo > eta * hi) {
-            double const mid = (lo + hi) / 2;
-            if (colebrook_G(mid, Re) > 0)
-                hi = mid;
-            else
-                lo = mid;
-        }
-        double const x = (lo + hi) / 2;
-        return 1 / (x * x);
-    }
-
-    // Fixed-point iteration x <- -2 log10(a + b x / Re) from x = 7 until the step is below eta |x|: the output is
-    // smooth in Re except where the iteration count changes (computed for comparison).
-    double friction_fixed_point(double Re, double eta)
-    {
-        double x = 7.0;
-        for (int i = 0; i < 1000; ++i) {
-            double const next = -2 * std::log10(colebrook_a + colebrook_b * x / Re);
-            bool const done = std::abs(next - x) <= eta * std::abs(next);
-            x = next;
-            if (done) break;
-        }
-        return 1 / (x * x);
-    }
-
-    // The answer key: the root to machine precision by Newton on G, then df/dRe by implicit differentiation,
-    // df/dRe = -G_Re / G_f with G written in f: G = f^(-1/2) + 2 log10(u), u = a + b / (Re sqrt f).
-    double friction_exact(double Re)
-    {
-        double x = 7.0;
-        for (int i = 0; i < 100; ++i) {
-            double const u = colebrook_a + colebrook_b * x / Re;
-            double const g = x + 2 * std::log10(u);
-            double const dg = 1 + 2 / std::numbers::ln10 * (colebrook_b / Re) / u;
-            double const next = x - g / dg;
-            if (next == x) break;
-            x = next;
-        }
-        return 1 / (x * x);
-    }
-
-    double friction_derivative_exact(double Re)
-    {
-        double const f = friction_exact(Re);
-        double const u = colebrook_a + colebrook_b / (Re * std::sqrt(f));
-        double const c = 2 / std::numbers::ln10;
-        double const G_f = -0.5 * std::pow(f, -1.5) * (1 + c * colebrook_b / (Re * u));
-        double const G_Re = -c * colebrook_b / (u * Re * Re * std::sqrt(f));
-        return -G_Re / G_f;
-    }
+    // E20: the Darcy friction factor from the Colebrook equation, solved by bisection to the tolerance eta (the noise
+    // of Chapter 3.6) or by fixed-point iteration (for comparison), with the implicit-function derivative as the
+    // answer key; all from the shared header code/colebrook.hpp, which the examples include too. Parameters
+    // (data/README.md; the examples must use the same): eps_r = 1e-4, Re = 1e5, eta = 1e-10.
+    using book::friction_exact;
+    using book::friction_fixed_point;
+    double friction_bisection(double Re, double eta) { return book::friction(Re, eta); }
+    double friction_derivative_exact(double Re) { return book::friction_slope_exact(Re); }
 
     void ds21_solver(Output &o)
     {
@@ -1834,6 +1967,107 @@ namespace {
                 << cell(rel_error(derivative<Central<2>>(fp, Re, h), exact)) << '\n';
     }
 
+    // ------------------------------------------------------------------------------------------------ DS22
+
+    // E21: the noise level measured from a difference table (book::estimate_noise of code/noise.hpp, the same
+    // function the example calls), at eight points spaced by the default step of Central<2>, eps^(1/3) max(|x|, 1):
+    // on the bisection friction factor at Re = 1e5 (eta = 1e-10), on the noisy e^x of E17 (eta = 1e-8) and on the
+    // clean e^x, all at the points of their examples. The recipe reports the root mean square of the noise, which
+    // for a uniform noise of half-width eta |f| is eta |f| / sqrt(3), and for the quantised bisection output a
+    // fraction of eta |f|; the text says "about".
+    void ds22_noise_estimate(Output &o)
+    {
+        std::size_t const points = 8;
+        value(o, "NoiseEstimatePoints", integer(static_cast<long long>(points)));
+        value(o, "NoiseEstimateEvals", integer(static_cast<long long>(points)));
+        auto const report = [&](auto fn, double x, std::string const &name) {
+            double const h = nxx::math::root_epsilon<3, double>() * std::max(std::abs(x), 1.0);
+            book::NoiseEstimate const e = book::estimate_noise(fn, x, h, points - 1);
+            if (e.k == 0) {
+                o.fail("DS22: the noise estimate did not settle for " + name);
+                return;
+            }
+            value(o, "NoiseEstimate" + name, sig(e.sigma / std::abs(fn(x))));
+            value(o, "NoiseEstimate" + name + "K", integer(e.k));
+            value(o, "NoiseEstimate" + name + "Step", sig(h));
+        };
+        double const Re = 1e5;
+        double const eta = 1e-10;
+        auto const friction = [eta](double re) { return friction_bisection(re, eta); };
+        report(friction, Re, "Friction");
+        // The actual deviation of the bisection output from the implicit solution over the same eight points, as a
+        // root mean square relative to f, for the comparison with the estimate.
+        {
+            double const h = nxx::math::root_epsilon<3, double>() * Re;
+            double sum = 0;
+            for (std::size_t i = 0; i < points; ++i) {
+                double const re = Re + static_cast<double>(i) * h;
+                double const d = (friction(re) - friction_exact(re)) / friction_exact(re);
+                sum += d * d;
+            }
+            value(o, "NoiseEstimateFrictionActual", sig(std::sqrt(sum / static_cast<double>(points))));
+        }
+        report([](double x) { return book::noisy(std::exp(x), x, 1e-8); }, 1.0, "Noisy");
+        value(o, "NoiseEstimateNoisyEta", sig(1e-8));
+        report(exp_fn, 1.0, "Clean");
+    }
+
+    // ------------------------------------------------------------------------------------------------ E22
+
+    // The Jacobian of two balances (R1-decision T2): unknowns T (K) and n (mol), residuals r1 = n H(T) - Q (an
+    // energy balance on the thread's enthalpy) and r2 = n R T / V - P (an ideal-gas pressure), with Q and P chosen
+    // so that both vanish at the point. Closed-form partials: dr1/dT = n cp(T), dr1/dn = H(T), dr2/dT = n R / V,
+    // dr2/dn = R T / V. Two ways: the central stencil applied by hand to the vector residual at x_j +- h_j (two
+    // model calls per column), and one derivative() call per entry (two model calls each). Parameters
+    // (data/README.md; the example must use the same): T = 1000 K, n = 2 mol, V = 1 m^3, R = 8.31446261815324.
+    void e22_jacobian(Output &o)
+    {
+        double const R = 8.31446261815324;
+        double const T = T0;
+        double const n = 2.0;
+        double const V = 1.0;
+        double const Q = n * Hn(0, T);
+        double const P = n * R * T / V;
+        int calls = 0;
+        auto const residuals = [&](double t, double nn) {
+            ++calls;
+            return std::array<double, 2>{ nn * Hn(0, t) - Q, nn * R * t / V - P };
+        };
+        double const exact[2][2] = { { n * Hn(1, T), Hn(0, T) }, { n * R / V, R * T / V } };
+        double const h[2] = { nxx::math::root_epsilon<3, double>() * std::max(std::abs(T), 1.0),
+                              nxx::math::root_epsilon<3, double>() * std::max(std::abs(n), 1.0) };
+        // (b) by hand: column j from r(x + h_j e_j) and r(x - h_j e_j).
+        double hand_max = 0;
+        calls = 0;
+        for (int j = 0; j < 2; ++j) {
+            auto const plus = residuals(T + (j == 0 ? h[0] : 0), n + (j == 1 ? h[1] : 0));
+            auto const minus = residuals(T - (j == 0 ? h[0] : 0), n - (j == 1 ? h[1] : 0));
+            for (int i = 0; i < 2; ++i) {
+                double const J = (plus[static_cast<std::size_t>(i)] - minus[static_cast<std::size_t>(i)]) / (2 * h[j]);
+                hand_max = std::max(hand_max, std::abs(J - exact[i][j]) / std::abs(exact[i][j]));
+            }
+        }
+        value(o, "JacobianBalanceHandMaxRelError", sig(hand_max));
+        value(o, "JacobianBalanceHandEvals", integer(calls));
+        // (a) with the library: one call per entry, each on a lambda that evaluates the whole model.
+        double call_max = 0;
+        calls = 0;
+        for (int i = 0; i < 2; ++i) {
+            auto const dT = derivative([&](double t) { return residuals(t, n)[static_cast<std::size_t>(i)]; }, T);
+            auto const dn = derivative([&](double nn) { return residuals(T, nn)[static_cast<std::size_t>(i)]; }, n);
+            if (!dT || !dn) {
+                o.fail("E22: a Jacobian entry failed");
+                return;
+            }
+            call_max = std::max(call_max, std::abs(dT->value - exact[i][0]) / std::abs(exact[i][0]));
+            call_max = std::max(call_max, std::abs(dn->value - exact[i][1]) / std::abs(exact[i][1]));
+        }
+        value(o, "JacobianBalanceCallMaxRelError", sig(call_max));
+        value(o, "JacobianBalanceCallEvals", integer(calls));
+        value(o, "JacobianBalanceStepT", sig(h[0]));
+        value(o, "JacobianBalanceStepN", sig(h[1]));
+    }
+
 } // namespace
 
 int main(int argc, char **argv)
@@ -1873,6 +2107,8 @@ int main(int argc, char **argv)
     ds19_noise(o);
     ds20_kink(o);
     ds21_solver(o);
+    ds22_noise_estimate(o);
+    e22_jacobian(o);
 
     if (o.failures > 0) {
         std::fprintf(stderr, "generator: %d self-check(s) failed\n", o.failures);

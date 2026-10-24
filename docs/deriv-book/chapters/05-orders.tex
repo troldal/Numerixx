@@ -1,5 +1,7 @@
 % Chapter 5: Second to fourth derivatives (methods author). PLAN.md section 1.4; sidebars S8 and S9; figures F10
-% and F11; examples E7 and E8. No table (Chapter 9 has them).
+% and F11; examples E7 and E8 (E8's listing is quoted in Chapter 8 since round 1). No table (Chapter 9 has them).
+% Revised at stage 6 per reviews/R1-decision.md (T9, T13, engineer-17, engineer-19, engineer-20, developer-16,
+% library-12, evidence-21); the changes are listed in responses/R1-05-orders.md.
 \chapter{Second to fourth derivatives}\label{ch:orders}
 
 The slope of a heat capacity, $\dd \cp / \dd T$, is the second derivative of the enthalpy; the curvature a solver
@@ -33,20 +35,21 @@ works for $f'$ and $f'''$ with the central rules and not for $f''$.}
   f'''(x)  &\approx \frac{f(x + 2h) - 2 f(x + h) + 2 f(x - h) - f(x - 2h)}{2 h^3}, \\
   f''''(x) &\approx \frac{f(x + 2h) - 4 f(x + h) + 6 f(x) - 4 f(x - h) + f(x - 2h)}{h^4},
 \end{align*}
-the centred rules of $\order(h^2)$ in Chapra's tables,\cite{chapra2015} whose $\order(h^4)$ rules are
+the centred rules of $\order(h^2)$ in Chapra's tables,\cite[ch.~23]{chapra2015} whose $\order(h^4)$ rules are
 \code{Central<4>}. The one-sided families work for every order too, \code{Forward<P>} on the nodes
 $0, \ldots, \aorder + \dorder - 1$, and \code{Backward<P>} on their mirror image; their amplification grows
 quickly with $\dorder$ (\cref{tab:weights-forward-fourth}), but exactly at an edge they are what works. The
 library's three-point rule for $f''$ is evaluated in a slightly different form from \cref{eq:orders-second},
-from the offsets of the points as they were actually rounded (\cref{sb:actual-offsets}); the value is the same
-whenever the points are exact. The complete tables for $\dorder = 2$ to 4 are in \cref{ch:tables}.
+from the offsets of the points as they were actually rounded (\cref{sb:actual-offsets}); the two forms agree in
+exact arithmetic whenever the points are exact. The complete tables for $\dorder = 2$ to 4 are in \cref{ch:tables}.
 
 \section{Why accuracy falls with the order}\label{sec:orders-accuracy}
 
 \begin{figure}
 \sidecaption{The V of \code{Central<2>} for $\dorder = 1$ to 4, $\mathrm{e}^x$ at 1: the truncation branches
 nearly coincide, the rounding branch steepens as $1/h^{\dorder}$ and the minimum rises. Why the fourth derivative
-gives four digits where the first gives eleven. Data \code{data/step-error-orders.csv}.\label{fig:v-curve-orders}}
+gives about \num{\valHeadlineFourthDigits} digits where the first gives \num{\valHeadlineFirstDigits}. Data
+\code{data/step-error-orders.csv}.\label{fig:v-curve-orders}}
 \centering
 \input{figures/05-orders-v-curve-orders}
 \end{figure}
@@ -65,9 +68,11 @@ doubles the rounding error of $f'$ and multiplies that of $f''''$ by sixteen. Th
 and its minimum, worked out in \cref{sec:derivations-model}, is of order $\epsmach^{\aorder/(\aorder + \dorder)}$.
 For \code{Central<2>} in double that is $\epsmach^{2/3}$, $\epsmach^{1/2}$, $\epsmach^{2/5}$ and
 $\epsmach^{1/3}$: \num{\valModelCentralTwoFirstDouble}, \num{\valModelCentralTwoSecondDouble},
-\num{\valModelCentralTwoThirdDouble} and \num{\valModelCentralTwoFourthDouble}, roughly eleven, eight, six and
-five digits. The minima of \cref{fig:v-curve-orders} rise accordingly, and the measured medians at the default
-step, in \cref{fig:order-accuracy}, follow the model within its usual factor: \num{\valDoubleFourthCentralRelError}
+\num{\valModelCentralTwoThirdDouble} and \num{\valModelCentralTwoFourthDouble}, that is
+\num{\valModelDigitsCentralTwoFirstDouble}, \num{\valModelDigitsCentralTwoSecondDouble},
+\num{\valModelDigitsCentralTwoThirdDouble} and \num{\valModelDigitsCentralTwoFourthDouble} digits. The minima of
+\cref{fig:v-curve-orders} rise accordingly, and the measured medians at the default step, in
+\cref{fig:order-accuracy}, follow the model within its usual factor: \num{\valDoubleFourthCentralRelError}
 for the fourth derivative against \num{\valExpCentralTwoRelError} for the first. These are the
 \num{\valHeadlineFourthDigits} and \num{\valHeadlineFirstDigits} digits that \cref{ch:why} promised. What is lost to each
 order, and why float cannot afford a fourth derivative at all, is quantified in \cref{sb:fourth-sensitivity}.
@@ -89,7 +94,8 @@ By \cref{eq:orders-model} the rounding error of a rule for $f^{(\dorder)}$ is $\
 h^{\dorder}$, so each halving of the step multiplies it by $2^{\dorder}$, and the balance with truncation is
 reached at a larger step and a larger error: at the best step the error is of order
 $\epsmach^{\aorder/(\aorder + \dorder)}$, and the exponent falls from $\tfrac23$ for $f'$ to $\tfrac13$ for
-$f''''$ with \code{Central<2>}. In double that is the difference between about eleven digits and about five;
+$f''''$ with \code{Central<2>}. In double that is the difference between about
+\num{\valModelDigitsCentralTwoFirstDouble} digits and about \num{\valModelDigitsCentralTwoFourthDouble};
 \code{Central<4>} does better, $\epsmach^{4/5}$ to $\epsmach^{1/2}$, at two more evaluations
 (\cref{tab:default-steps}).
 
@@ -102,11 +108,14 @@ third derivative is still usable, \num{\valFloatThirdRiddersRelError} with Ridde
 carries the warning of \cref{sec:orders-float}.
 
 The step sensitivity grows the same way. The rounding term is proportional to $h^{-\dorder}$ and the truncation
-term to $h^{\aorder}$. A step a factor 2 below the right one multiplies the rounding term by $2^{\dorder}$; a step a
-factor 2 above it multiplies the truncation term by $2^{\aorder}$. The default step assumes that $f$ varies on the
-scale $\scale$, so misjudging that scale by a factor 2 costs up to $2^{\dorder}$ in error: a factor 2 for $f'$ with
-\code{Central<2>} and up to 16 for $f''''$, the figure the header states. A step on $f$'s own scale
-(\cref{sec:rounding-scale}) removes the sensitivity; Ridders removes the need to know the scale at all.
+term to $h^{\aorder}$: a step a factor 2 below the right one multiplies the rounding term by $2^{\dorder}$, and a
+step a factor 2 above it multiplies the truncation term by $2^{\aorder}$. The default step assumes that $f$
+varies on the scale $\scale$, and at the model's balance misjudging that scale by a factor 2 grows the total error
+by at most \num{\valMisjudgeCostCentralTwoFirst} for $f'$ and \num{\valMisjudgeCostCentralTwoFourth} for $f''''$
+with \code{Central<2>}, and \num{\valMisjudgeCostCentralFourFourth} for \code{Central<4>} and $f''''$; the factor
+16 that the library's documentation quotes for $f''''$ is the growth of the rounding term alone, $2^{\dorder}$.
+A step on $f$'s own scale (\cref{sec:rounding-scale}) removes the sensitivity; Ridders removes the need to know
+the scale at all.
 \end{sidebar}
 
 \begin{figure}
@@ -134,32 +143,28 @@ $\epsmach^{1/3}$, $\epsmach^{1/4}$, $\epsmach^{1/5}$ and $\epsmach^{1/6}$ times 
 lists every rule's exponent, step and model error. The constant that the model would add,
 $(\dorder \ampl / (\aorder \errc))^{1/(\aorder + \dorder)}$, is \num{\valStepConstantCentralTwoSecond} for $f''$ and
 \num{\valStepConstantCentralTwoFourth} for $f''''$ with \code{Central<2>}, and dropping it costs more by the model
-as $\dorder$ grows; yet on the test functions, which vary faster than $\scale$, half the default step was better
-for every order, so the library keeps one convention and documents the sensitivity instead
-(\cref{sec:derivations-model}).
+as $\dorder$ grows; yet in the design record's prototype (\code{docs/PHASE4_API.md}), on test functions that vary
+faster than $\scale$, half the default step was better for every order, so the library keeps one convention and
+documents the sensitivity instead (\cref{sec:derivations-model}).
 
-That sensitivity is the practical point. The rounding term grows as $h^{-\dorder}$ and the truncation term as
-$h^{\aorder}$, so a step off by a factor 2 from the right one costs up to $2^{\dorder}$ in error, 16 for the fourth
-derivative (\cref{sb:fourth-sensitivity}). When $f$ varies on a scale $w$ much smaller than $\scale$, pass
+That sensitivity is the practical point. A step off by a factor 2 from the right one grows the total error, by the
+model, by up to \num{\valMisjudgeCostCentralTwoFirst} for $f'$ and \num{\valMisjudgeCostCentralTwoFourth} for the
+fourth derivative with \code{Central<2>} (\cref{sb:fourth-sensitivity}), and the rounding term alone by
+$2^{\dorder}$. When $f$ varies on a scale $w$ much smaller than $\scale$, pass
 $h = \epsmach^{1/(\aorder + \dorder)} w$ as \cref{sec:rounding-scale} does for $f'$; and since the default step
 depends on both the method and the order, generic code that varies $\dorder$ should call the default-step overload
-rather than pass one $h$ for every order, as the header warns.
+rather than pass one $h$ for every order.
 
 \section{The float warning}\label{sec:orders-float}
 
 A fourth derivative in float is mostly rounding noise: \num{\valFloatFourthCentralRelError} relative with
 \code{Central<2>} on $\mathrm{e}^x$, measured as a median, against \num{\valDoubleFourthCentralRelError} in
-double (\cref{fig:order-accuracy}, \cref{sb:fourth-sensitivity}). The library says so at compile time. A call
-with $\dorder = 4$ and a type whose epsilon is above $10^{-7}$ selects a deprecated overload of
-\code{derivative}, and the compiler reports the deprecation at the caller's line, with a message that names the
-remedy: use double, or silence the warning. The criterion is decided with integers,
-$\mathrm{radix}^{\mathrm{digits} - 1} < 10^7$, so it holds for float, decimal32 and bfloat16 and not for double;
-any method triggers it, Ridders included, and the third derivative never does. Two ways to silence it: a pragma
-around the call, which is what the example below does, since it builds with warnings as errors; or
-\code{NUMERIXX_NO_PRECISION_WARNING}, defined the same way in every translation unit, best on the command line,
-which turns the deprecated overloads off everywhere:
-\snippet{05-orders-float}{float-fourth}
-The result is the same with or without the warning. What one gets for it, in float, is a fourth derivative with
+double (\cref{fig:order-accuracy}, \cref{sb:fourth-sensitivity}). The library says so at compile time: a call
+with $\dorder = 4$ and a type whose epsilon is above $10^{-7}$, which is float, decimal32 or bfloat16 but not
+double, selects a deprecated overload of \code{derivative}, and the compiler reports the deprecation at the
+caller's line, with a message that names the remedy. The cure is to use double. Where a float fourth derivative is
+wanted all the same, the warning can be silenced for one call or for the whole build, and the result is the same
+with or without it (\cref{sec:api-warning}, which quotes the call and its numbers); what one gets is a value with
 about two correct digits and, from Ridders, an estimate of \num{\valFloatFourthRiddersRelEstimate} relative that
 says so (\cref{fig:order-accuracy}).
 
@@ -173,7 +178,8 @@ start pays. A level costs 2 evaluations for $f'$ and $f''$ and 4 for $f'''$ and 
 for the even orders, which is kept across restarts. And the gain over a stencil grows with the order: for the fourth
 derivative in double, Ridders reaches a median of \num{\valDoubleFourthRiddersRelError} where \code{Central<2>}
 reaches \num{\valDoubleFourthCentralRelError}, four more digits for a median of \num{\valRiddersEvalsMedianFourth}
-evaluations over the random study of \cref{ch:ridders}, against five. \Cref{fig:order-accuracy} shows the three methods side by side.
+evaluations over the random study of \cref{ch:ridders}, against five. \Cref{fig:order-accuracy} shows the three
+methods side by side.
 
 \section{The thread: $\dd \cp / \dd T$}\label{sec:orders-thread}
 
@@ -185,10 +191,9 @@ The stencil's relative error is \num{\valCpSecondRelError}, below the model's \n
 \cref{sec:orders-accuracy}; Ridders returns a value \num{\valCpRiddersSecondRelError} off with an estimate of
 \SI{\valCpRiddersSecondEstimate}{\joule\per\mole\per\kelvin\squared} against an actual error of
 \SI{\valCpRiddersSecondActual}{\joule\per\mole\per\kelvin\squared}, after \num{\valCpRiddersSecondEvals} evaluations.
-The integer and the enumerator spell the same order:
+The integer and the enumerator spell the same order, and the two calls return equal results, value and estimate
+alike:
 \snippet{05-orders-second}{order-enum}
-The example checks that the two results compare equal, value and estimate alike, which the defaulted \code{==} of
-\code{Estimate} does.
 
 \begin{sidebar}[label=sb:actual-offsets]{The three-point $f''$ from the actual offsets}
 The two-node rules of \cref{sb:actual-distance} divide by the distance between the points as evaluated, which
@@ -198,14 +203,15 @@ With $x_+ = \fl(x + h)$ and $x_- = \fl(x - h)$ it forms $h_+ = x_+ - x$ and $h_-
   f''(x) \approx \frac{\dfrac{f(x_+) - f(x)}{h_+} - \dfrac{f(x) - f(x_-)}{h_-}}{(h_+ + h_-) / 2},
 \]
 the second divided difference of the three points where they actually are. The offsets $h_+$ and $h_-$ are exact
-for every $0 < h \le \abs{x}$, in any radix, by Sterbenz's lemma:\cite{sterbenz1974} $x_+$ and $x$ lie within a
-factor 2 of each other, and so do $x$ and $x_-$, so the subtractions round nothing. With exact offsets the formula
-is exact for every quadratic whatever the rounding of the points, and the point-rounding term that a nominal-step
-formula carries, about $\epsmach \abs{x f'} / h^2$, drops out. This mattered most for Ridders in float, whose
-second-derivative levels use the same form: in the design record's prototype the nominal step gave a worst case
-of 8.7 times the estimate, the actual offsets 1.4. The form also never computes $h^2$, which underflows in double
-for $h$ below about $10^{-154}$; every rule with more nodes divides by $\den h$ and then by $h$ again,
-$\dorder - 1$ times, for the same reason. Only \code{Central<2>} for $f''$ uses the offsets; the rules with more
-nodes divide by the nominal step, as \cref{sec:stencils-price} explains, and Ridders' levels for $f'''$ and
-$f''''$ account for the point rounding in their floor instead (\cref{sb:floor-coverage}).
+for every $0 < h \le \abs{x}$, in any radix, by Sterbenz's lemma:\cite[Thm~4.3.1]{sterbenz1974} $x_+$ and $x$ lie
+within a factor 2 of each other and have the same sign, and so do $x$ and $x_-$, so the subtractions round nothing.
+With exact offsets the formula is exact for every quadratic whatever the rounding of the points, and the
+point-rounding term that a nominal-step formula carries, about $\epsmach \abs{x f'} / h^2$, drops out. This
+mattered most for Ridders in float, whose second-derivative levels use the same form: in the prototype of the design
+record (\code{docs/PHASE4_API.md}) the nominal step gave a worst case of 8.7 times the estimate, the actual offsets
+1.4. The form also never computes $h^2$, which underflows in double for $h$ below about $10^{-154}$; every rule
+with more nodes divides by $\den h$ and then by $h$ again, $\dorder - 1$ times, for the same reason. Only
+\code{Central<2>} for $f''$ uses the offsets; the rules with more nodes divide by the nominal step, as
+\cref{sec:stencils-price} explains, and Ridders' levels for $f'''$ and $f''''$ account for the point rounding in
+their floor instead (\cref{sb:floor-coverage}).
 \end{sidebar}

@@ -5,7 +5,11 @@ Errors (each rule is in CLAUDE.md):
 - a source file (.tex, .bib) that is not ASCII;
 - \\footnote or \\marginnote in a chapter (use \\sidenote or \\mnote);
 - a \\snippet or \\snippetheader whose file does not exist or whose markers "// <name>" and "// </name>" are
-  missing or enclose no line (listings would print nothing, or the wrong lines, without a warning);
+  missing or enclose no line (listings would print nothing, or the wrong lines, without a warning); a \\cmakefile
+  whose file does not exist;
+- a \\code{...} line of a `signature` block (the transcribed declarations of Chapter 8, PLAN.md section 8) that does
+  not occur, comments stripped and whitespace removed, in include/numerixx/deriv.hpp or math.hpp (a drift of the
+  header from the book);
 - a hand-edited file in data/ (every file there must carry the generator's header);
 - in the log: a LaTeX error, an undefined reference or citation, an overfull box wider than 1 pt, or a warning
   that labels may have changed (the build needs another run).
@@ -38,6 +42,37 @@ def snippet_problem(source: pathlib.Path, marker: str) -> str:
     return ''
 
 
+def normalised_code(text: str) -> str:
+    """C++ text with its comments stripped and every whitespace character removed, for a comparison that ignores
+    line breaks and the header's documentation comments."""
+    text = re.sub(r'/\*.*?\*/', ' ', text, flags=re.S)
+    text = re.sub(r'//[^\n]*', ' ', text)
+    return re.sub(r'\s+', '', text)
+
+
+def signature_problems() -> list:
+    """The \\code{...} lines of every `signature` block (Chapter 8) that do not occur in the library's headers: the
+    declarations are transcribed, and this keeps them true to the header. A line that is a comment, or empty once
+    its trailing semicolon is removed, is skipped; a "see below" placeholder comment is stripped like any comment."""
+    headers = ''
+    for name in ('deriv.hpp', 'math.hpp'):
+        headers += (HERE.parent.parent / 'include' / 'numerixx' / name).read_text(encoding='utf-8', errors='replace')
+        headers += '\n'
+    normalised_headers = normalised_code(headers)
+    problems = []
+    for path in sorted(HERE.glob('chapters/*.tex')):
+        text = path.read_text(encoding='ascii', errors='replace')
+        for block in re.finditer(r'\\begin\{signature\}(.*?)\\end\{signature\}', text, flags=re.S):
+            for piece in re.findall(r'\\code\{((?:[^{}]|\{[^{}]*\})*)\}', block.group(1)):
+                # A comment, or a namespace line (presentation: the header nests its namespaces), is not a declaration.
+                if piece.strip().startswith('//') or piece.strip().startswith('namespace'):
+                    continue
+                code = normalised_code(piece).rstrip(';')
+                if code and code not in normalised_headers:
+                    problems.append(f'{path.relative_to(HERE)}: signature line not in the headers: {piece.strip()}')
+    return problems
+
+
 def main() -> int:
     errors, warnings = [], []
     for path in sorted(list(HERE.glob('*.tex')) + list(HERE.glob('*.bib')) + list(HERE.glob('chapters/*.tex'))
@@ -60,6 +95,10 @@ def main() -> int:
                 problem = snippet_problem(source, marker)
                 if problem:
                     errors.append(f'{path.relative_to(HERE)}:{n}: \\{macro}{{{name}}}{{{marker}}}: {problem}')
+            for name in re.findall(r'\\cmakefile\{([^}]*)\}', code):
+                if not (HERE / 'code' / (name + '.cmake')).is_file():
+                    errors.append(f'{path.relative_to(HERE)}:{n}: \\cmakefile{{{name}}}: no file code/{name}.cmake')
+    errors.extend(signature_problems())
     for path in sorted(HERE.glob('data/*')):
         if path.name == 'README.md' or path.is_dir():
             continue

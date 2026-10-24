@@ -5,73 +5,21 @@
 // Reynolds number with the default step, with the step eta^(1/3) Re, and by Ridders. Parameters as in
 // data/README.md (the generator uses the same): eps_r = 1e-4, Re = 1e5, eta = 1e-10, bisection on [1, 20] in
 // x = 1/sqrt(f). The answer key is the implicit-function derivative df/dRe = -G_Re / G_f of the Colebrook equation
-// at its root found to machine precision by Newton's method.
+// at its root found to machine precision by Newton's method. The solver and the answer key are those of the shared
+// header colebrook.hpp (book::friction, book::friction_exact, book::friction_slope_exact), which the generator
+// and E21 use too.
 
 #include <numerixx/deriv.hpp>
 
+#include "colebrook.hpp"
+
 #include <cmath>
-#include <numbers>
 #include <print>
 
 using nxx::deriv::derivative;
 using nxx::deriv::Ridders;
 
-// clang-format off
-// <implicit-function>
-// The Darcy friction factor f(Re): the Colebrook equation
-// in x = 1/sqrt(f), relative roughness 1e-4, is G(x) = 0.
-// G grows with x: bisect on [1, 20] to the tolerance eta.
-double friction(double Re, double eta)
-{
-    auto const G = [Re](double x) {
-        return x
-            + 2 * std::log10(1e-4 / 3.7 + 2.51 * x / Re);
-    };
-    double lo = 1.0, hi = 20.0;
-    while (hi - lo > eta * hi) {
-        double const mid = (lo + hi) / 2;
-        if (G(mid) > 0)
-            hi = mid;
-        else
-            lo = mid;
-    }
-    double const x = (lo + hi) / 2;
-    return 1 / (x * x);
-}
-// </implicit-function>
-// clang-format on
-
 namespace {
-
-    constexpr double colebrook_a = 1e-4 / 3.7;
-    constexpr double colebrook_b = 2.51;
-
-    // The root to machine precision by Newton's method on G, from x = 7.
-    double friction_exact(double Re)
-    {
-        double x = 7.0;
-        for (int i = 0; i < 100; ++i) {
-            double const u = colebrook_a + colebrook_b * x / Re;
-            double const g = x + 2 * std::log10(u);
-            double const dg = 1 + 2 / std::numbers::ln10 * (colebrook_b / Re) / u;
-            double const next = x - g / dg;
-            if (next == x) break;
-            x = next;
-        }
-        return 1 / (x * x);
-    }
-
-    // df/dRe = -G_Re / G_f, with G written in f: G = f^(-1/2) + 2 log10(u), u = a + b / (Re sqrt(f)), where a and b
-    // are colebrook_a and colebrook_b.
-    double friction_slope_exact(double Re)
-    {
-        double const f = friction_exact(Re);
-        double const u = colebrook_a + colebrook_b / (Re * std::sqrt(f));
-        double const c = 2 / std::numbers::ln10;
-        double const G_f = -0.5 * std::pow(f, -1.5) * (1 + c * colebrook_b / (Re * u));
-        double const G_Re = -c * colebrook_b / (u * Re * Re * std::sqrt(f));
-        return -G_Re / G_f;
-    }
 
     double relative(double value, double exact) { return std::abs(value - exact) / std::abs(exact); }
 
@@ -84,7 +32,7 @@ int main()
 // <implicit-derivative>
 double const Re = 1e5, eta = 1e-10;
 auto const f = [eta](double re) {
-    return friction(re, eta);
+    return book::friction(re, eta);
 };
 // The default step assumes f accurate to machine epsilon.
 auto const d = derivative(f, Re);
@@ -99,8 +47,8 @@ auto const r = derivative<Ridders>(f, Re);
         std::println("FAILED: a method did not return a value");
         return 1;
     }
-    double const exact = friction_slope_exact(Re);
-    std::println("f = {:.6f}, df/dRe = {:.6e} (implicit differentiation)", friction_exact(Re), exact);
+    double const exact = book::friction_slope_exact(Re);
+    std::println("f = {:.6f}, df/dRe = {:.6e} (implicit differentiation)", book::friction_exact(Re), exact);
     std::println("default step:  {:.6e}, relative error {:.1e}", d->value, relative(*d, exact));
     std::println("step {:.0f}:     {:.6e}, relative error {:.1e}", h, dh->value, relative(*dh, exact));
     std::println("Ridders:       {:.6e}, relative error {:.1e}, relative estimate {:.1e}, ratio {:.2f}", r->value,

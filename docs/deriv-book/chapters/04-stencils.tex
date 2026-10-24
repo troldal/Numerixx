@@ -1,13 +1,15 @@
 % Chapter 4: Higher-order and one-sided stencils (methods author). PLAN.md section 1.4; sidebars S6 and S7;
 % figures F6 to F9; examples E5 and E6; the margin table of node counts (style decision 1).
+% Revised at stage 6 per reviews/R1-decision.md (T6, T8, T10, numerics-08, numerics-17b, numerics-17d, evidence-14,
+% evidence-18, evidence-22, library-13, engineer-19, engineer-20); the changes are listed in responses/R1-04-stencils.md.
 \chapter{Higher-order and one-sided stencils}\label{ch:stencils}
 
 \Cref{ch:taylor} built the forward and the central difference from Taylor's theorem, and \cref{ch:rounding} showed
-that the central difference reaches about eleven digits in double and no more, because below its best step the
-rounding of $f$ takes over. This chapter asks what more points buy. The answer is a higher accuracy order, which
-lets the step grow and the error fall, at a price in rounding, in smoothness and in evaluations. It also answers a
-practical question that the central difference cannot: how to differentiate at the edge of a domain, where $f$ is
-defined on one side of $x$ only. The thread continues: $\cp = \dd \enth / \dd T$ of nitrogen at
+that the central difference reaches about \num{\valHeadlineFirstDigits} digits in double and no more, because below
+its best step the rounding of $f$ takes over. This chapter asks what more points buy. The answer is a higher accuracy
+order, which lets the step grow and the error fall, at a price in rounding, in smoothness and in evaluations. It
+also answers a practical question that the central difference cannot: how to differentiate at the edge of a domain,
+where $f$ is defined on one side of $x$ only. The thread continues: $\cp = \dd \enth / \dd T$ of nitrogen at
 $T_0 = \SI{1000}{\kelvin}$, and at the lower end of the fit's range.
 
 \section{Stencils: nodes, weights and the moment conditions}\label{sec:stencils-moments}
@@ -44,24 +46,21 @@ weights, $w_{-1} = -a$, $w_1 = a$, $w_{-2} = -b$, $w_2 = b$, so every even momen
 odd moments that remain give two conditions, $\mom{1} = 2a + 4b = 1$ and $\mom{3} = 2a + 16b = 0$, whose solution
 is $a = \tfrac23$ and $b = -\tfrac{1}{12}$:
 \begin{equation}
-  f'(x) = \frac{f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h)}{12 h} - \frac{h^4}{30} f^{(5)}(\xi).
+  f'(x) = \frac{f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h)}{12 h} + \frac{h^4}{30} f^{(5)}(\xi).
   \label{eq:stencils-central-four}
 \end{equation}
-The error comes from $\mom{5} = 2a + 64 b = -4$, so $\errc = 4/5! = 1/30$. Two more points have raised the order
-from 2 to 4.\sidenote{The sign and the intermediate point $\xi$ follow as in \cref{sb:remainder}: the next term is
-$h^6$, since all even moments vanish.} The library stores every rule as integer numerators $c_k$ over one common
-denominator $\den$, here $1, -8, 8, -1$ over 12, so that the weights are exact in every real type; with the
-integers the moment conditions read $\mom{\dorder} = \dorder!\,\den$. \Cref{tab:weights-central-first} in
-\cref{ch:tables} lists the nodes, numerators, $\ampl$ and $\errc$ of every central rule for $f'$, and the general
-machinery that produces them, one formula over the nodes, is in \cref{sb:moments}. One consequence of the
-moment conditions is worth keeping in mind: a rule of order $\aorder$ is exact for every polynomial of degree up to
-$\dorder + \aorder - 1$, because all the derivatives in its error terms vanish. The tests use this with a point and
-a step that are short binary fractions, where no rounding occurs, so that \code{Central<4>} on $x^4$ returns
-exactly 4 at compile time and at run time.
+The error comes from $\mom{5} = 2a + 64 b = -4$, so $\errc = 4/5! = 1/30$, and the rule's value is $f'$ minus
+that term: it underestimates $f'$ where $f^{(5)} > 0$.\sidenote{The single intermediate point $\xi$ in the span
+of the stencil comes from the interpolation error formula (\cref{sec:derivations-moments}); the next term is $h^6$,
+since all even moments vanish.} Two more points have raised the order from 2 to 4. \Cref{tab:weights-central-first}
+in \cref{ch:tables} lists the nodes, weights, $\ampl$ and $\errc$ of every central rule for $f'$, and the general
+machinery that produces them, one formula over the nodes, is in \cref{sb:moments}. One consequence of the moment
+conditions is worth keeping in mind: a rule of order $\aorder$ is exact for every polynomial of degree up to
+$\dorder + \aorder - 1$, because all the derivatives in its error terms vanish.
 
 \begin{margintable}
-\caption{Nodes and evaluations of \code{fn} per call, as the header documents them, for the derivative order
-$\dorder$. The central rules omit node 0 for odd $\dorder$.\label{tab:stencils-nodes}}
+\caption{Nodes and evaluations of \code{fn} per call of a stencil, for the derivative order $\dorder$. The central
+rules omit node 0 for odd $\dorder$. Ridders' nodes per level are in \cref{tab:api-methods}.\label{tab:stencils-nodes}}
 \centering\scriptsize
 \setlength{\tabcolsep}{2.5pt}
 \begin{tabular}{@{}lcc@{}}
@@ -71,7 +70,6 @@ Method & Nodes & Evaluations\\
 \code{Central<P>} & $\aorder + \dorder - 1$ & $\aorder + \dorder - 1$\\
 \code{Forward<P>} & $\aorder + \dorder$ & $\aorder + \dorder$\\
 \code{Backward<P>} & $\aorder + \dorder$ & $\aorder + \dorder$\\
-\code{Ridders} & $\pm h_0 / 2^i$ & 2, 4 per level\\
 \bottomrule
 \end{tabular}
 \end{margintable}
@@ -83,8 +81,8 @@ A rule for the $\dorder$-th derivative of accuracy order $\aorder$ on the nodes 
   \qquad \mom{\dorder} = \dorder!,
 \]
 a linear system for the weights. The library does not solve it as a system. It uses the Lagrange formula
-(Burden et al.\cite{burden2016}): the polynomial $p$ that interpolates the samples at the nodes, in the scaled
-variable $t$ with $x + t h$, is $p(t) = \sum_k f_k L_k(t)$ with $L_k(t) = \prod_{j \ne k} (t - n_j) / (n_k - n_j)$,
+(Burden et al.\cite[Sect.~4.1]{burden2016}): the polynomial $p$ that interpolates the samples at the nodes, in the
+scaled variable $t$ with $x + t h$, is $p(t) = \sum_k f_k L_k(t)$ with $L_k(t) = \prod_{j \ne k} (t - n_j) / (n_k - n_j)$,
 and its $\dorder$-th derivative at $t = 0$ gives the weights directly:
 \[
   w_k = L_k^{(\dorder)}(0) = \dorder!\,[t^{\dorder}] \prod_{j \ne k} \frac{t - n_j}{n_k - n_j},
@@ -92,20 +90,26 @@ and its $\dorder$-th derivative at $t = 0$ gives the weights directly:
 where $[t^{\dorder}]$ takes the coefficient of $t^{\dorder}$. Why this solves the moment conditions: $p$
 reproduces every polynomial of degree below the number of nodes, so for $f = t^j$ the weighted sum equals the
 $\dorder$-th derivative of $t^j$ at 0, which is $\dorder!$ for $j = \dorder$ and 0 otherwise
-(\cref{sec:derivations-lagrange}). The worked example in the header's own documentation is the node $-1$ of
-\code{Central<4>}: $\prod_{j \ne k} (t - n_j) = (t + 2)(t - 1)(t - 2) = t^3 - t^2 - 4t + 4$, whose $t^1$
-coefficient is $-4$, over $\prod (n_k - n_j) = (-1 + 2)(-1 - 1)(-1 - 2) = 6$, so $w = -2/3$, as in
-\cref{eq:stencils-central-four}.
+(\cref{sec:derivations-lagrange}). The library's own worked example is the node $-1$ of \code{Central<4>}:
+$\prod_{j \ne k} (t - n_j) = (t + 2)(t - 1)(t - 2) = t^3 - t^2 - 4t + 4$, whose $t^1$ coefficient is $-4$, over
+$\prod (n_k - n_j) = (-1 + 2)(-1 - 1)(-1 - 2) = 6$, so $w = -2/3$, as in \cref{eq:stencils-central-four}.
 
-One \code{consteval} function evaluates this formula for every family and order; each family only supplies its
-nodes. It works in exact rational arithmetic (\code{long long}, reduced with the greatest common divisor), then
-puts all weights over their least common multiple, so a table holds integers only. The largest intermediate is
-$12! \cdot 4!$ (\code{Central<10>} for the fourth derivative), far inside \code{long long}. Every numerator and
-denominator must fit in 24 bits, which keeps the weights exact in float as well as in double (the largest numerator
-is 6,222,216); the generator checks this before narrowing to \code{int}, and a type too narrow to hold a rule's
-integers, such as half precision under \code{Central<10>}, is rejected by a \code{static_assert} rather than used
-with rounded weights. The tests check every table against the moment conditions with a moment function of their
-own, and against the published rows of Fornberg\cite{fornberg1988} and Chapra.\cite{chapra2015}
+The library stores every rule as integer numerators $c_k$ over one common denominator $\den$, so that
+$w_k = c_k / \den$; for \code{Central<4>} the numerators are $1, -8, 8, -1$ over 12, and with the integers the
+moment conditions read $\mom{\dorder} = \dorder!\,\den$. This is the form \cref{ch:tables} tabulates, and it keeps
+the weights exact in every real type. One \code{consteval} function evaluates the Lagrange formula for every
+family and order; each family only supplies its nodes. It works in exact rational arithmetic (\code{long long},
+reduced with the greatest common divisor), then puts all weights over their least common multiple, so a table
+holds integers only. The largest intermediate it reaches is $12!$ (the end node's product of node differences for
+\code{Central<10>} and the fourth derivative; $12! \cdot 4!$ is a bound that is not reached), far inside
+\code{long long}. Every numerator and denominator must fit in 24 bits, which keeps the weights exact in float as
+well as in double (the largest numerator is 6,222,216); the generator checks this before narrowing to \code{int},
+and a type too narrow to hold a rule's integers, such as half precision under \code{Central<10>}, is rejected by a
+\code{static_assert} rather than used with rounded weights. The tests check every table against the moment
+conditions with a moment function of their own, and against the published rows of Fornberg\cite{fornberg1988} and
+Chapra;\cite[ch.~23]{chapra2015} they also use the exactness on polynomials, with a point and a step that are short
+binary fractions so that no rounding occurs, and check that \code{Central<4>} on $x^4$ returns exactly 4 at compile
+time and at run time.
 \end{sidebar}
 
 \section{The order ladder}\label{sec:stencils-ladder}
@@ -114,8 +118,7 @@ own, and against the published rows of Fornberg\cite{fornberg1988} and Chapra.\c
 \sidecaption{Relative error against $h$ for \code{Central<2>} to \code{Central<10>}, $\mathrm{e}^x$ at 1: steeper
 truncation slopes, rounding branches that nearly coincide, and minima that slide up the common rounding line as the
 best step grows. A higher order buys accuracy by letting the step grow; the minimum falls from about
-$\epsmach^{2/3}$ to about $\epsmach^{10/11}$, three and a half decades. Data
-\code{data/step-error-exp.csv}.\label{fig:order-ladder}}
+$\epsmach^{2/3}$ to about $\epsmach^{10/11}$. Data \code{data/step-error-exp.csv}.\label{fig:order-ladder}}
 \centering
 \input{figures/04-stencils-order-ladder}
 \end{figure}
@@ -145,8 +148,9 @@ Diminishing returns beyond 4 or 6 for double. Data
 
 The returns diminish. \Cref{fig:default-step-accuracy} shows the error at the default step against the order:
 going from \code{Central<2>} to \code{Central<4>} gains two decades, from \code{Central<4>} to \code{Central<10>}
-less than two more, and the whiskers show that at a single point the rounding part of the error is luck by a
-factor of ten either way. In double, \code{Central<4>} is close to as good as it gets for $f'$; the higher orders
+less than two more, and the whiskers show that at a single point the error lies up to about
+\num{\valDefaultStepSpreadAbove} times above the median and up to \num{\valDefaultStepSpreadBelow} times below it,
+by luck in the rounding. In double, \code{Central<4>} is close to as good as it gets for $f'$; the higher orders
 earn their keep with wider types, where $\epsmach$ is smaller and $\epsmach^{\aorder/(\aorder+1)}$ has further to
 fall (\cref{sec:using-types}).
 
@@ -172,10 +176,10 @@ for the rounding of the samples $f_k$, but the points $x + n_k h$ are rounded to
 / 2$, which moves its sample by about that times $f'$. Over the stencil this adds a third term,
 $(\ampl / 2)\, \epsmach \abs{x f'} / h$, of the same order as the second. The two-node rules escape it: they divide
 by the distance between the points actually evaluated rather than by $2h$, which removes the point rounding exactly
-(\cref{sb:actual-distance}). A rule with more nodes cannot, because dividing by the outer distance would correct the
-outer nodes only and enlarge the error of the others, by a factor 4 for \code{Central<4>}; it divides by $\den h$.
-That is why the tests budget $(\errc + 2 \ampl)\, \epsmach^{\aorder/(\aorder + 1)}$ for every multi-node rule, an
-estimate rather than a bound, below which the measured errors stay by a factor of 4 to 16.
+(\cref{sb:actual-distance}). A rule with more nodes cannot. Dividing by the distance between its outer nodes would
+not remove their rounding but quadruple it, since their weight in \code{Central<4>} is $1/12$ and the distance
+carries the rounding with weight $4/12$, and it would leave the inner nodes' rounding untouched; so the rule divides
+by a fixed multiple of $h$ and keeps the third term, which the tests allow for (\cref{sec:guarantees-verification}).
 
 The second price is smoothness. The error term in \cref{eq:stencils-central-four} holds only if $f$ has
 $\aorder + \dorder$ continuous derivatives across the whole stencil, which spans $K h$ on each side of $x$ with $K$
@@ -219,6 +223,15 @@ $-\aorder, \ldots, 0$, with the weights reversed and multiplied by $(-1)^{\dorde
 $x$ (\cref{fig:stencil-nodes}). Both include $x$ itself, so they also serve at the upper end of a range, where
 \code{Backward<P>} stays inside it, and for a function that is cheap to evaluate on one side only.
 
+% The margin figure is anchored before the paragraph that cites it so that its caption clears the margin caption of
+% fig:stencil-nodes at the foot of the same page (stage-6 layout check).
+\begin{marginfigure}
+\centering
+\input{figures/04-stencils-one-sided}
+\caption{\code{Forward<2>} against \code{Central<2>} and \code{Forward<4>} against \code{Central<4>}: the same
+slopes, higher floors (a larger $\ampl$). Data \code{data/step-error-exp.csv}.\label{fig:one-sided}}
+\end{marginfigure}
+
 Each point buys one order. \code{Forward<P>} has $\aorder + 1$ weights and no symmetry to help, so the
 $\aorder + 1$ moment conditions $\mom{0}, \ldots, \mom{\aorder}$ fix them and $\mom{\aorder + 1}$ is the first
 that does not vanish: order $\aorder$ from $\aorder + 1$ points. A central rule gets its even moments for nothing
@@ -232,15 +245,8 @@ alternate in sign and grow, so the samples cancel more and the rounding is ampli
 the rounding branch shifted up. At the default step on $\mathrm{e}^x$, \code{Forward<2>} reaches
 \num{\valExpForwardTwoRelError} where \code{Central<2>} reaches \num{\valExpCentralTwoRelError}, and
 \code{Forward<6>} \num{\valExpForwardSixRelError} where \code{Central<6>} reaches \num{\valExpCentralSixRelError}
-(\cref{fig:default-step-accuracy}). The one-sided rules go up to order 6; beyond that the amplification, already
-\num{\valAmplForwardSix} for $f'$, would cost more than the order gains.
-
-\begin{marginfigure}
-\centering
-\input{figures/04-stencils-one-sided}
-\caption{\code{Forward<2>} against \code{Central<2>} and \code{Forward<4>} against \code{Central<4>}: the same
-slopes, higher floors (a larger $\ampl$). Data \code{data/step-error-exp.csv}.\label{fig:one-sided}}
-\end{marginfigure}
+(\cref{fig:default-step-accuracy}). The one-sided rules stop at order 6, a design decision discussed with the
+central cap in \cref{sec:stencils-choosing}.
 
 The thread shows why the edge matters. Its Shomate fit is valid from \SI{500}{\kelvin} to \SI{2000}{\kelvin}, but
 the formula, a polynomial plus a $1/T$ term, evaluates without complaint at \SI{499}{\kelvin} and returns a
@@ -251,20 +257,26 @@ sampling there fails with \code{non_finite} instead of succeeding; the one-sided
 succeed, \code{Forward<2>} with its three points and \code{Forward<4>} with five:
 \needspace{14\baselineskip}%
 \snippet{04-stencils-edge}{validity-edge}
-The example checks that the central rule fails and that both one-sided results are within $10^{-8}$ of the closed
-form; measured, \code{Forward<2>} is \num{\valEdgeForwardTwoRelError} off and \code{Forward<4>}
-\num{\valEdgeForwardFourRelError}. \Cref{ch:ridders} shows what Ridders' method, which restarts below a failing
-step, does at the same edge.
-Below \SI{500}{\kelvin} the published enthalpy of nitrogen is a different fit, and the two do not meet, which
-makes the junction the range break of \cref{sec:using-pitfalls}.
+Measured, \code{Forward<2>} is \num{\valEdgeForwardTwoRelError} off the closed form and \code{Forward<4>}
+\num{\valEdgeForwardFourRelError}. Ridders' method, which restarts below a step at which $f$ is not finite
+(\cref{ch:ridders}), does not help exactly at an edge: with the same wrapper at \SI{500}{\kelvin} every level
+samples below the range, each restart halves the step in vain, and the result is \valEdgeRiddersStatus{} after
+\num{\valEdgeRiddersEvals} evaluations, the level cap; near such an edge rather than at it, as for $\log x$ close
+to 0, it recovers (\cref{sec:ridders-trust}). Below \SI{500}{\kelvin} the published enthalpy of nitrogen is a
+different fit, and the two do not meet, which makes the junction the range break of \cref{sec:using-pitfalls}.
 
 \section{Choosing P}\label{sec:stencils-choosing}
 
 As a rule: \code{Central<2>} or \code{Central<4>} for double inside an iteration, where two or four evaluations buy
-eleven to thirteen digits and the step is the default; \code{Central<6>} and above only for wide types, where
-$\epsmach$ is small enough for the order to pay (\cref{sec:using-types} uses \code{Central<6>} with fifty
-digits); \code{Forward<2>} or \code{Forward<4>}, or their mirrors, exactly at an edge and nowhere else, since
-their constants are larger. For a value to report with an error estimate, use Ridders. The caps, order 10 for the
-central rules and 6 for the one-sided ones, and the reasons for them are in \cref{sec:guarantees-limits}; the
-decision table by situation is \cref{tab:method-choice}, and every rule's nodes, weights and constants are in
-\cref{ch:tables}.
+a relative error of about \num{\valExpCentralTwoRelError} or \num{\valExpCentralFourRelError} with the default
+step; \code{Central<6>} and above only for wide types, where $\epsmach$ is small enough for the order to pay
+(\cref{sec:using-types} uses \code{Central<6>} with fifty digits); \code{Forward<2>} or \code{Forward<4>}, or
+their mirrors, exactly at an edge and nowhere else, since their constants are larger. For a value to report with
+an error estimate, use Ridders. The caps are design decisions recorded in the design record of the repository
+(\code{docs/PHASE2_API.md}), not measured limits. The central rules stop at order 10: by the model's exponent
+alone, a rule of order 12 would gain about \num{\valCapGainCentralTwelveFirstDouble} digit for $f'$ in double and
+\num{\valCapGainCentralTwelveFirstMultiprecision} in a 50-digit type (\num{\valCapGainCentralTwelveFourthDouble} and
+\num{\valCapGainCentralTwelveFourthMultiprecision} for the fourth derivative), and the library stops there. The
+one-sided rules stop at order 6, where the amplification, already \num{\valAmplForwardSix} for $f'$, grows about
+as fast as the exponent pays (\cref{sec:guarantees-limits}). The decision table by situation is
+\cref{tab:method-choice}, and every rule's nodes, weights and constants are in \cref{ch:tables}.

@@ -1,9 +1,10 @@
 % References of the book. Every entry must be a real work, checked against the work itself (or a library
 % catalogue) by the evidence reviewer: author names, title, year, publisher or journal, volume, pages, DOI.
 % Never add an entry from memory without checking it; mark an unchecked entry with a note field "UNVERIFIED"
-% until it is checked. The entries below are those of PLAN.md section 6, entered by the editor at stage 2 from
-% the plan's data and memory: every one carries note = {UNVERIFIED} until the evidence reviewer has checked it
-% (review round 1), and none may be cited before then. Accented names use LaTeX accents (ASCII file).
+% until it is checked. Every entry below was checked by the evidence reviewer on 2026-10-23 (review round 1,
+% reviews/R1-evidence.md, the reference table): metadata against Crossref or a library catalogue, and the content
+% where the work was open. Where only the metadata could be checked, the comment says so. Accented names use LaTeX
+% accents (ASCII file). Sections and theorems are cited at the citing sentence, not in the entry.
 
 % ---------------------------------------------------------------- numerical differentiation, extrapolation
 @book{burden2016,
@@ -11,9 +12,9 @@
   title     = {Numerical Analysis},
   edition   = {10},
   publisher = {Cengage Learning},
-  address   = {Boston},
+  address   = {Boston, MA},
   year      = {2016},
-  note      = {UNVERIFIED}
+  isbn      = {978-1-305-25366-7}
 }
 
 @book{chapra2015,
@@ -23,9 +24,11 @@
   publisher = {McGraw-Hill Education},
   address   = {New York},
   year      = {2015},
-  note      = {UNVERIFIED}
+  isbn      = {978-0-07-339792-4}
 }
 
+% Metadata verified in Crossref; the paper itself is behind a paywall and was not seen. The step ratio and the
+% stopping rules the book describes are the library's, not the paper's (R1-numerics-11, R1-evidence-17).
 @article{ridders1982,
   author  = {Ridders, C. J. F.},
   title   = {Accurate computation of {F}'(x) and {F}'(x){F}''(x)},
@@ -34,8 +37,7 @@
   number  = {2},
   pages   = {75--76},
   year    = {1982},
-  doi     = {10.1016/S0141-1195(82)80057-0},
-  note    = {UNVERIFIED}
+  doi     = {10.1016/S0141-1195(82)80057-0}
 }
 
 @article{fornberg1988,
@@ -46,8 +48,7 @@
   number  = {184},
   pages   = {699--706},
   year    = {1988},
-  doi     = {10.1090/S0025-5718-1988-0935077-0},
-  note    = {UNVERIFIED}
+  doi     = {10.1090/S0025-5718-1988-0935077-0}
 }
 
 @article{richardson1911,
@@ -58,8 +59,7 @@
   volume  = {210},
   pages   = {307--357},
   year    = {1911},
-  doi     = {10.1098/rsta.1911.0009},
-  note    = {UNVERIFIED}
+  doi     = {10.1098/rsta.1911.0009}
 }
 
 @article{richardson1927,
@@ -69,8 +69,7 @@
   volume  = {226},
   pages   = {299--361},
   year    = {1927},
-  doi     = {10.1098/rsta.1927.0008},
-  note    = {UNVERIFIED}
+  doi     = {10.1098/rsta.1927.0008}
 }
 
 @book{sidi2003,
@@ -81,8 +80,7 @@
   publisher = {Cambridge University Press},
   address   = {Cambridge},
   year      = {2003},
-  doi       = {10.1017/CBO9780511546815},
-  note      = {UNVERIFIED}
+  doi       = {10.1017/CBO9780511546815}
 }
 
 % ---------------------------------------------------------------- floating-point arithmetic
@@ -93,8 +91,7 @@
   publisher = {Society for Industrial and Applied Mathematics},
   address   = {Philadelphia},
   year      = {2002},
-  doi       = {10.1137/1.9780898718027},
-  note      = {UNVERIFIED}
+  doi       = {10.1137/1.9780898718027}
 }
 
 @article{goldberg1991,
@@ -105,31 +102,31 @@
   number  = {1},
   pages   = {5--48},
   year    = {1991},
-  doi     = {10.1145/103162.103163},
-  note    = {UNVERIFIED}
+  doi     = {10.1145/103162.103163}
 }
 
+% Sterbenz's lemma is Theorem 4.3.1 with its corollary, p. 138.
 @book{sterbenz1974,
   author    = {Sterbenz, Pat H.},
   title     = {Floating-Point Computation},
+  series    = {Prentice-Hall Series in Automatic Computation},
   publisher = {Prentice-Hall},
-  address   = {Englewood Cliffs},
+  address   = {Englewood Cliffs, NJ},
   year      = {1974},
-  note      = {UNVERIFIED}
+  isbn      = {0-13-322495-3}
 }
 
-@misc{ieee754-2019,
-  author       = {{IEEE}},
-  title        = {{IEEE} Standard for Floating-Point Arithmetic},
-  howpublished = {IEEE Std 754-2019},
-  publisher    = {Institute of Electrical and Electronics Engineers},
-  address      = {New York},
-  year         = {2019},
-  doi          = {10.1109/IEEESTD.2019.8766229},
-  note         = {UNVERIFIED}
+@techreport{ieee754-2019,
+  title       = {{IEEE} Standard for Floating-Point Arithmetic},
+  institution = {Institute of Electrical and Electronics Engineers},
+  number      = {IEEE Std 754-2019 (Revision of IEEE 754-2008)},
+  address     = {Piscataway, NJ},
+  year        = {2019},
+  isbn        = {978-1-5044-5924-2},
+  doi         = {10.1109/IEEESTD.2019.8766229}
 }
 
-% ---------------------------------------------------------------- the alternatives (Chapter 1, S1)
+% ---------------------------------------------------------------- the alternatives (Chapter 1, Sidebar 1.1)
 @article{lyness1967,
   author  = {Lyness, J. N. and Moler, C. B.},
   title   = {Numerical differentiation of analytic functions},
@@ -138,8 +135,7 @@
   number  = {2},
   pages   = {202--210},
   year    = {1967},
-  doi     = {10.1137/0704019},
-  note    = {UNVERIFIED}
+  doi     = {10.1137/0704019}
 }
 
 @article{squire1998,
@@ -150,8 +146,19 @@
   number  = {1},
   pages   = {110--112},
   year    = {1998},
-  doi     = {10.1137/S003614459631241X},
-  note    = {UNVERIFIED}
+  doi     = {10.1137/S003614459631241X}
+}
+
+% The connection between the complex step and automatic differentiation (R1-evidence-07).
+@article{martins2003,
+  author  = {Martins, Joaquim R. R. A. and Sturdza, Peter and Alonso, Juan J.},
+  title   = {The complex-step derivative approximation},
+  journal = {ACM Transactions on Mathematical Software},
+  volume  = {29},
+  number  = {3},
+  pages   = {245--262},
+  year    = {2003},
+  doi     = {10.1145/838250.838251}
 }
 
 @book{griewank2008,
@@ -161,11 +168,23 @@
   publisher = {Society for Industrial and Applied Mathematics},
   address   = {Philadelphia},
   year      = {2008},
-  doi       = {10.1137/1.9780898717761},
-  note      = {UNVERIFIED}
+  doi       = {10.1137/1.9780898717761}
 }
 
 % ---------------------------------------------------------------- the step, noise, optimisation texts
+% The difference-table estimate of the noise level (ECnoise), section 3.6 (R1-evidence-06).
+@article{more2011,
+  author  = {Mor{\'e}, Jorge J. and Wild, Stefan M.},
+  title   = {Estimating computational noise},
+  journal = {SIAM Journal on Scientific Computing},
+  volume  = {33},
+  number  = {3},
+  pages   = {1292--1314},
+  year    = {2011},
+  doi     = {10.1137/100786125}
+}
+
+% The step for a noisy function (section 4 of the paper treats the central difference).
 @article{more2012,
   author  = {Mor{\'e}, Jorge J. and Wild, Stefan M.},
   title   = {Estimating derivatives of noisy simulations},
@@ -174,10 +193,11 @@
   number  = {3},
   pages   = {19:1--19:21},
   year    = {2012},
-  doi     = {10.1145/2168773.2168777},
-  note    = {UNVERIFIED}
+  doi     = {10.1145/2168773.2168777}
 }
 
+% A corrected reprint of the Prentice-Hall edition of 1983. The scaled step is in section 5.4, the effect of an
+% inexact slope on Newton's method in chapter 5; cite the section at the sentence.
 @book{dennis1996,
   author    = {Dennis, Jr., J. E. and Schnabel, Robert B.},
   title     = {Numerical Methods for Unconstrained Optimization and Nonlinear Equations},
@@ -186,10 +206,10 @@
   publisher = {Society for Industrial and Applied Mathematics},
   address   = {Philadelphia},
   year      = {1996},
-  doi       = {10.1137/1.9781611971200},
-  note      = {UNVERIFIED (first published by Prentice-Hall, 1983; sections 5.4 and 5.6)}
+  doi       = {10.1137/1.9781611971200}
 }
 
+% Metadata verified; section 8.1 (finite-difference derivative approximations, from p. 194) from the contents.
 @book{nocedal2006,
   author    = {Nocedal, Jorge and Wright, Stephen J.},
   title     = {Numerical Optimization},
@@ -198,8 +218,7 @@
   publisher = {Springer},
   address   = {New York},
   year      = {2006},
-  doi       = {10.1007/978-0-387-40065-5},
-  note      = {UNVERIFIED (section 8.1)}
+  doi       = {10.1007/978-0-387-40065-5}
 }
 
 @article{gill1983,
@@ -210,15 +229,15 @@
   number  = {2},
   pages   = {310--321},
   year    = {1983},
-  doi     = {10.1137/0904025},
-  note    = {UNVERIFIED}
+  doi     = {10.1137/0904025}
 }
 
 % ---------------------------------------------------------------- the thread's data (decision A1)
-% Both verified by the evidence reviewer on 2026-10-23 (scratchpad record thread-data-nitrogen.md): Chase 1998
-% against the title page and verso of Part II, the NAIST and EPA HERO catalogue records and NIST's monograph list;
-% the WebBook against its main page, its Citation Guide and the DOI resolver. Cite the WebBook for the Shomate
-% equations and the coefficients (its own fit of January 2009), Chase 1998 for the tabulated data the fit represents.
+% Both verified by the evidence reviewer at stage 2 (2026-10-23; scratchpad record thread-data-nitrogen.md): Chase
+% 1998 against the title page and verso of Part II, the NAIST and EPA HERO catalogue records and NIST's monograph
+% list; the WebBook against its main page, its Citation Guide and the DOI resolver; the 24 coefficients re-checked
+% against the page at round 1. Cite the WebBook for the Shomate equations and the coefficients (its own fit of
+% January 2009), Chase 1998 for the tabulated data the fit represents (nitrogen: Part II, p. 1621).
 @book{chase1998,
   author    = {Chase, Jr., Malcolm W.},
   title     = {{NIST-JANAF} Thermochemical Tables},
@@ -244,8 +263,8 @@
                Chase 1998), \url{https://webbook.nist.gov/cgi/cbook.cgi?ID=C7727379&Mask=1}, retrieved 23~October~2026}
 }
 
-% Optional, if the text names the equation's origin. Metadata verified in Crossref by the evidence reviewer; the
-% paper itself was not seen, so whether it contains the WebBook's five-term form is unverified.
+% Optional, if the text names the equation's origin; not cited. Metadata verified in Crossref; the paper itself was
+% not seen, so whether it contains the WebBook's five-term form is unverified.
 @article{shomate1954,
   author  = {Shomate, C. Howard},
   title   = {A method for evaluating and correlating thermodynamic data},
@@ -254,14 +273,12 @@
   number  = {4},
   pages   = {368--372},
   year    = {1954},
-  doi     = {10.1021/j150514a018},
-  note    = {UNVERIFIED (content not seen; metadata checked)}
+  doi     = {10.1021/j150514a018}
 }
 
 % ---------------------------------------------------------------- the friction-factor example (Chapter 7, E20)
-% Requested by the practice author at stage 3 (the Colebrook equation of section 7.4); entered by the editor from the
-% author's data. The DOI is the one the practice author believes correct; nothing here has been checked against the
-% work or a catalogue yet.
+% Metadata and DOI verified in Crossref at round 1; the printed form of the equation's constants was not seen, so the
+% text cites the equation "in its common form".
 @article{colebrook1939,
   author  = {Colebrook, C. F.},
   title   = {Turbulent flow in pipes, with particular reference to the transition region between the smooth and rough
@@ -271,17 +288,16 @@
   number  = {4},
   pages   = {133--156},
   year    = {1939},
-  doi     = {10.1680/ijoti.1939.13150},
-  note    = {UNVERIFIED}
+  doi     = {10.1680/ijoti.1939.13150}
 }
 
 % ---------------------------------------------------------------- the language (optional, Chapters 7 and 8)
+% Existence and date verified (SCC standards database); not cited.
 @misc{iso14882-2024,
   author       = {{ISO/IEC}},
   title        = {Programming languages -- {C++}},
   howpublished = {ISO/IEC 14882:2024},
   publisher    = {International Organization for Standardization},
   address      = {Geneva},
-  year         = {2024},
-  note         = {UNVERIFIED}
+  year         = {2024}
 }

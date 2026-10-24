@@ -143,12 +143,16 @@
   list entry={\protect\numberline{\thetcbcounter}#2}, #1}
 \newcommand{\listofsidebars}{\tcblistof[\chapter*]{sbr}{List of sidebars}}
 % ---------------------------------------------------------------- references
-\usepackage[journal=iecred,doi=true]{achemso}  % numbered reference list (package form; loads natbib + mciteplus)
+\usepackage[journal=iecred,doi=true,articletitle=true]{achemso}  % numbered reference list (package form; loads natbib + mciteplus); article titles printed (R1-evidence-25)
 \setcitestyle{super,comma,sort&compress,open={[},close={]}}  % bracketed superscripts, never confused with sidenotes
 \usepackage[colorlinks=true,linkcolor=accent,citecolor=accent,urlcolor=accent,filecolor=accent]{hyperref}
 \usepackage[capitalise,nameinlink]{cleveref}
 \crefname{tcb@cnt@sidebar}{Sidebar}{Sidebars}
 \Crefname{tcb@cnt@sidebar}{Sidebar}{Sidebars}
+% The appendices are referred to as "Appendix A": main.tex aliases the chapter counter to this type after \appendix
+% (R1-engineer-18).
+\crefname{appendix}{Appendix}{Appendices}
+\Crefname{appendix}{Appendix}{Appendices}
 % ---------------------------------------------------------------- tables
 \setlength{\heavyrulewidth}{0.08em}
 \setlength{\lightrulewidth}{0.05em}

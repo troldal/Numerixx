@@ -30,27 +30,29 @@ $K$ & the largest $\abs{n_k}$ of a rule; the rule spans $K h$ on each side of $x
 $\mom{j}$ & the $j$-th moment of a rule, $\sum_k w_k n_k^j$ (with $c_k$: $\sum_k c_k n_k^j$)\\
 $\errc$ & the error constant: leading truncation term $\errc\, h^{\aorder} f^{(\aorder + \dorder)}$\\
 $\ampl$ & the rounding amplification, $\sum_k \abs{w_k}$\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\begin{center}\small
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{@{}>{\raggedright}p{27mm}>{\raggedright\arraybackslash}p{82mm}@{}}
-\toprule
-Symbol & Meaning\\
-\midrule
 $\epsmach$ & machine epsilon of the type, \code{std::numeric_limits<T>::epsilon()}: $2^{-52}$ for \code{double};
   the book uses $\epsmach$, not the unit roundoff $\epsmach / 2$\\
 $\ulp(x)$ & unit in the last place: the spacing of the floating-point numbers at $x$\\
 $\fl(\cdot)$ & the rounded result of an operation\\
 $\fmax$ & the largest finite value of the type, \code{std::numeric_limits<T>::max()}\\
 $\scale$ & $\max(\abs{x}, 1)$, the scale of the default steps\\
-$w$ & the scale on which $f$ varies, when it is not $\scale$\\
+$w$ & the scale on which $f$ varies; $\scale$ is the library's guess for it\\
 $\noise$ & the noise level: the relative accuracy of $f$ when it is worse than $\epsmach$\\
 $E(h)$, $\etrunc(h)$, $\eround(h)$ & the error model and its truncation and rounding parts\\
 $\hbest$ & the best step of the error model\\
 $\Dc{h}$, $D_i$ & the base difference (the \code{Central<2>} rule of order $\dorder$) at step $h$; $D_i = \Dc{h_i}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% Two tabulars, split so that the first fills its page: a tabular cannot break across pages, and one table of all
+% the symbols left the first page of the notation half empty (stage-6 layout check).
+\begin{center}\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}>{\raggedright}p{27mm}>{\raggedright\arraybackslash}p{82mm}@{}}
+\toprule
+Symbol & Meaning\\
+\midrule
 $\Aij{i}{j}$ & Ridders' tableau entry at level $i$, column $j$; $\Aij{i}{0} = D_i$\\
 $r_i$ & the rounding floor of level $i$ of the tableau\\
 $e_{i,j}$, $\errest$ & the estimate of a tableau entry, and the returned error estimate \code{abs_error}\\
@@ -69,33 +71,62 @@ $\Rgas$ & the gas constant\\
 \begin{description}\setlength{\itemsep}{1pt}
   \item[accuracy order $\aorder$] The power of $h$ in a rule's leading truncation error, $\order(h^{\aorder})$;
     the number in \code{Central<P>}, \code{Forward<P>} and \code{Backward<P>}. Not the number of points.
+  \item[aggregate] A C++ class with public members and no user-written constructor, which can be initialised
+    member by member in braces, \code{Estimate{value, abs_error}}, and by \emph{designated initialisers},
+    \code{Estimate{.value = 1.0}} (\cref{sec:api-estimate}).
+  \item[aliasing] Samples that lie: a function that oscillates faster than the step can look constant, or like a
+    polynomial, at every sample (\cref{sb:aliasing}).
+  \item[amplification $\ampl$] The sum of the absolute weights of a rule, $\sum_k \abs{w_k}$, by which the rounding
+    of the samples reaches the result (\cref{sec:stencils-ladder}).
+  \item[cancellation] The loss of leading digits when two nearly equal numbers are subtracted: their difference keeps
+    only the digits in which they differ, rounding errors included (\cref{sec:rounding-v}).
   \item[coverage] The fraction of cases in a study whose error estimate is at least the actual error.
   \item[derivative order $\dorder$] Which derivative is computed, 1 to 4; the template argument \code{N} or a
     value of \code{order}.
-  \item[error estimate] The \code{abs_error} of a result: an estimate of its absolute error, filled by Ridders'
-    method and empty for the stencils; an estimate, not a bound.
+  \item[error estimate] The \code{abs_error} of a result, filled by Ridders' method and empty for the stencils: an
+    estimate of the absolute error, not a bound.
   \item[estimate] A returned value of a derivative; the \code{value} of an \code{Estimate<T>}.
   \item[evaluation] One call of \code{fn}; the unit of cost.
   \item[kink] A point where $f$ or one of its derivatives jumps: a range break between two fits, a phase boundary,
     an \code{if}. A rule whose span contains one returns a wrong value without failing.
   \item[level, column, entry, tableau] Ridders' method halves the step once per level; the extrapolated values
-    form a triangular tableau whose column $j$ is free of the error terms up to $h^{2j}$; an entry is one value in it.
-  \item[machine epsilon $\epsmach$] The spacing of the floating-point numbers just above 1.
+    form a triangular tableau whose column $j$ is free of the error terms up to $h^{2j}$; an entry is one of its
+    values.
+  \item[lvalue] In C++, an expression that names an object, such as a variable; \code{fn} is called with a
+    \code{T const} lvalue (\cref{sec:api-derivative}).
+  \item[machine epsilon $\epsmach$] The distance from 1 to the next number of the type.
+  \item[moment conditions] The equations that fix a rule's weights: $\sum_k w_k n_k^j$ is $\dorder!$ for
+    $j = \dorder$ and 0 for every other $j$ below $\dorder + \aorder$ (\cref{sec:stencils-moments}).
   \item[node] An integer offset $n_k$ of a rule; the sample is taken at $x + n_k h$.
   \item[noise level $\noise$] The relative accuracy of $f$ when it is worse than $\epsmach$ (a solver's tolerance,
     for instance); it replaces $\epsmach$ in the rounding branch of the error model.
   \item[non-finite] An infinite or NaN value; the one failure of \code{derivative}, \code{error::non_finite}.
+  \item[requires-expression] A C++ expression \code{requires (X x) { e; }}, true when the statement
+    \code{e} would compile for an \code{x} of type \code{X}; the book's test of what the library rejects
+    (\cref{sec:api-rejected}).
   \item[restart] Ridders' method discarding its tableau and starting again from a smaller step, after a non-finite
     value or an untrusted result.
+  \item[Richardson extrapolation] Combining two estimates of known error orders so that the leading error term
+    cancels: $(4 \Dc{h/2} - \Dc{h}) / 3$ for the central difference, repeated in Ridders' tableau
+    (\cref{sec:ridders-richardson}).
   \item[rounding error] The part of the error that comes from the rounding of the values of $f$ (and of the points);
     it grows as the step shrinks.
+  \item[rounding floor] The rounding error of a base difference of Ridders' tableau, below which no entry of that
+    level can claim an estimate (\cref{sec:ridders-estimate}).
   \item[rule] A formula for a derivative: a stencil with its weights, such as the central difference.
   \item[sample] A value $f_k = f(x + n_k h)$ at a node.
   \item[scale $\scale$] $\max(\abs{x}, 1)$, the length on which the default steps assume $f$ to vary.
   \item[stencil] The pattern of nodes of a rule, and the family of rules that share it (\code{Central<P>}); a
-    stencil method, as against Ridders' method, samples a fixed pattern of points.
+    stencil method, as against Ridders', samples a fixed pattern of points.
   \item[step $h$] The distance between $x$ and the points at which $f$ is sampled, in the units of $x$; the default
-    step is the one the library chooses when none is passed.
+    step is the library's choice when none is passed.
+  \item[structured binding] The C++ form \code{auto const [value, abs_error] = *r} that names the members of an
+    aggregate at once (\cref{sec:api-estimate}).
   \item[truncation error] The error of a rule in exact arithmetic, from truncating the Taylor series; it shrinks
     with the step.
+  \item[unit roundoff] Half the machine epsilon, $\epsmach / 2$, the largest relative error of one rounding; many
+    texts call it $u$, this book uses $\epsmach$ (\cref{sec:fp-epsilon}).
+  \item[untrusted result] A Ridders result whose estimate is at least a quarter of its value and far above the
+    rounding floor; the method restarts below it and returns it only if the budget runs out
+    (\cref{sb:floor-coverage}).
 \end{description}

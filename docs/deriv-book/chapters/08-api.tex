@@ -11,14 +11,7 @@ numbers.
 
 \section{Synopsis}\label{sec:api-synopsis}
 
-The module is one header, \code{<numerixx/deriv.hpp>}, which includes \code{<numerixx/math.hpp>}. Both are
-header-only, need C++23 and no other library; the CMake target is \code{numerixx::numerixx}. \Cref{tab:api-names}
-lists the public names. Everything in a namespace \code{detail} is internal: it may change without notice, and the
-book reads it only to generate the tables of \cref{ch:tables}. The enumeration \code{error} may gain values in a
-later version. A program usually starts with
-\snippet{07-using-expected}{names}
-
-\begin{table}
+\begin{table}[h]
 \sidecaption{The public names. \code{deriv.hpp} declares those in \code{nxx::deriv}, \code{math.hpp} those in
 \code{nxx} and \code{nxx::math}.\label{tab:api-names}}
 \centering\footnotesize
@@ -41,9 +34,16 @@ Name & Kind & Section\\
 \end{tabular}
 \end{table}
 
+The module is one header, \code{<numerixx/deriv.hpp>}, which includes \code{<numerixx/math.hpp>}. Both are
+header-only, need C++23 and no other library; the CMake target is \code{numerixx::numerixx}. \Cref{tab:api-names}
+lists the public names. Everything in a namespace \code{detail} is internal: it may change without notice, and the
+book reads it only to generate the tables of \cref{ch:tables}. The enumeration \code{error} may gain values in a
+later version. The examples of the book name the function, the method tags, \code{Estimate} and \code{error} with
+\code{using} declarations (\code{code/07-using-expected.cpp}).
+
 \section{\texorpdfstring{\code{derivative}}{derivative}}\label{sec:api-derivative}
 
-\paragraph{Declarations.} Two overloads, with a step and with the default step:
+\paragraph{Declarations.} Two overloads, with a step and with the default step.
 \begin{signature}
 \code{template<typename M = Central<2>, auto N = 1, real T, typename F>}\\
 \sigindent\code{requires detail::method<M> && detail::valid_order<N>}\\
@@ -62,58 +62,69 @@ Each has a twin with the additional constraint \code{detail::noisy<N, T>}, marke
 \paragraph{Template parameters.}
 \begingroup\raggedright
 \begin{itemize}
-  \item \code{M}, the method: \code{Central<P>} (the default is \code{Central<2>}), \code{Forward<P>},
-    \code{Backward<P>} or \code{Ridders}. \code{detail::method<M>} accepts the three stencil families with an accepted
-    order and \code{Ridders}, and nothing else: the set is closed, so users cannot add a method.
+  \item \code{M}, the method: \code{Central<P>} (by default \code{Central<2>}), \code{Forward<P>},
+    \code{Backward<P>} or \code{Ridders}. \code{detail::method<M>} accepts these with an accepted order, and nothing
+    else: users cannot add a method.
   \item \code{N}, the derivative order: 1 (the default) to 4, as a value of any integer type except \code{bool}, or as
     an \code{order}. \code{detail::valid_order<N>} compares an integer in its own type, so a value beyond the range of
     \code{int} is not wrapped into 1 to 4.
-  \item \code{T}, the real type, deduced from \code{x} alone; it must satisfy \code{nxx::real}
-    (\cref{sec:api-real}). The type of the step is non-deduced, \code{std::type_identity_t<T>}, so that a
-    \code{double} step converts to a multiprecision \code{T} instead of making deduction fail.
+  \item \code{T}, the real type, deduced from \code{x} alone; it must satisfy \code{nxx::real} and provide the
+    \code{numeric_limits} members of \cref{sec:api-real}. The step's type, \code{std::type_identity_t<T>}, is
+    non-deduced, so a \code{double} step converts to a multiprecision \code{T}; the conversion is implicit, so for a
+    \code{float} \code{x} write \code{1e-3f}, since a \code{double} step is diagnosed under \code{-Wconversion}.
   \item \code{F}, the callable. The constraint \code{detail::callable<F, T>} is
     \code{std::invocable<F &, T const &>}, with a result convertible to \code{T}: \code{fn} is called as a named
-    lvalue through \code{std::invoke}, with a \code{T const} lvalue, so member pointers work, and so does a callable
-    that rejects rvalues.
+    lvalue through \code{std::invoke}, with a \code{T const} lvalue, so a callable that rejects rvalues works, and so
+    does a pointer to a member function of \code{T} itself. For a member function of your own model, capture the
+    object in a lambda.
 \end{itemize}
 \endgroup
 
 \paragraph{Parameters.} \code{fn}, the function to differentiate. \code{x}, the point. \code{h}, the step of a
 stencil, or the initial step of Ridders' method.
 
-\paragraph{Preconditions.} \code{h > 0} and \code{h} finite, checked with \code{assert}: a bad step is a bug in the
-caller, not a run-time failure. For a stencil, \code{h} well above $\ulp(x)$; a step below the resolution of
-\code{x} is detected and returns \code{non_finite}, but a step of a few ulps gives a finite value that is mostly
-rounding. The overload without a step has no precondition.
+\paragraph{Preconditions.} \code{h > 0} and \code{h} finite, checked by an \code{assert}: a bad step is a bug in the
+caller. Under \code{NDEBUG} the check is compiled out and the behaviour unspecified (\code{Forward<1>} with a
+negative step evaluates below $x$); validate a computed step, or use the overload without a step, which has no
+precondition. For a stencil, \code{h} well above $\ulp(x)$: a two-node rule fails only when its two points coincide,
+and near a power of two a step can move $x$ on one side only, so that \code{Central<2>} divides by a half-ulp distance
+and returns a finite value that is mostly rounding.
+
 
 \paragraph{Default steps.} For a stencil of accuracy order P, $h = \epsmach^{1/(P+N)} \max(\abs{x}, 1)$, computed as
-\code{root_epsilon<P + N, T>()} times the scale. For Ridders' method the initial step is $\max(\abs{x}, 1)/32$ for
-$f'$ and $\max(\abs{x}, 1)/4$ for $f''$ to $f''''$. The header advises passing a step when \code{fn} varies faster
-than $\max(\abs{x}, 1)$, or when the derivative is much smaller than the error $\epsmach^{P/(P+N)}$, and using the
-overload without a step in generic code that varies N (\cref{tab:default-steps}).
+\code{root_epsilon<P + N, T>()} times the scale; there is no accessor for it. For Ridders' method the initial step is
+$\max(\abs{x}, 1)/32$ for $f'$ and $\max(\abs{x}, 1)/4$ for $f''$ to $f''''$. Pass a step when \code{fn} varies faster
+than $\max(\abs{x}, 1)$, or when the derivative is much smaller than the error $\epsmach^{P/(P+N)}$; use the overload
+without a step in generic code that varies N (\cref{tab:default-steps}).
+
 
 \paragraph{Result.} An \code{Estimate<T>} (\cref{sec:api-estimate}) whose \code{abs_error} is filled by Ridders'
 method and empty for the stencils, or \code{error::non_finite}.
 
 \paragraph{Failures.} \code{error::non_finite} when no finite estimate exists: \code{x} is not finite; \code{fn}
 returned an infinite or NaN value; a difference, term, sum or quotient would overflow; a point $x + k h$ would
-overflow; or \code{h} is below the resolution of \code{x} (for a rule with more than two nodes, also when neighbouring
-points round to the same value). For Ridders' method, specifically: \code{fn(x)} is not finite for an even N (after
-one evaluation), or no tableau reached two finite levels. A level at which \code{fn} is not finite makes the method
-restart below that step; if the levels run out during restarts after an untrusted result, that result is returned, as
-a value with its large \code{abs_error}, not as a failure.
+overflow; or \code{h} is below the resolution of \code{x}: the points of a two-node rule coincide, or, for a rule with
+more nodes, $x + h$ or $x - h$ rounds to $x$ or neighbouring points round to the same value. For Ridders' method,
+specifically: \code{fn(x)} is not finite for an even N (after one evaluation), or no tableau reached two finite
+levels. A level at which \code{fn} is not finite makes the method restart below that step. An untrusted result, one
+whose \code{abs_error} is at least a quarter of $\abs{\text{value}}$ and far above rounding, makes it restart too; it
+is nevertheless returned, as a value with its large \code{abs_error} and not as a failure, when the step reaches the
+resolution of $x$ or the levels run out during the restarts. Test \code{abs_error} before relying on such a value
+(\cref{sec:using-result}).
 
 \paragraph{Cost.} A stencil calls \code{fn} once per node: $P + N - 1$ times for \code{Central<P>}, $P + N$ for
 \code{Forward<P>} and \code{Backward<P>}. Ridders' method calls it 2 times per level for $f'$ and $f''$, 4 times for
-$f'''$ and $f''''$, plus \code{fn(x)} once for $f''$ and $f''''$: at most 64, 65, 128 and 129 times
+$f'''$ and $f''''$, plus \code{fn(x)} once for $f''$ and $f''''$: at most \num{\valRiddersMaxEvalsFirst},
+\num{\valRiddersMaxEvalsSecond}, \num{\valRiddersMaxEvalsThird} and \num{\valRiddersMaxEvalsFourth} times
 (\cref{tab:cost}). \code{fn} is called only at finite points. No memory is allocated.
 
 \paragraph{Exceptions and constant evaluation.} Numerixx throws nothing and catches nothing; an exception thrown by
-\code{fn} or by the operations of \code{T} passes through unchanged. Both overloads are \code{constexpr}. Failures
+\code{fn} or by the operations of \code{T} passes through unchanged, and neither overload is \code{noexcept}. Both
+are \code{constexpr}. Failures
 are detected before the arithmetic that would produce them, so they are error values in constant expressions too,
 except an overflow of a final quotient, which GCC rejects at compile time (\cref{sb:constexpr-overflow}).
 
-\paragraph{Example.} Every accepted form, on the thread's enthalpy at $T_0$ (\code{code/08-api-usage.cpp}):
+\paragraph{Example.} One call of each form, on the thread's enthalpy at $T_0$ (\code{code/08-api-usage.cpp}):
 \snippet{08-api-usage}{api-overloads}
 
 \section{\texorpdfstring{\code{Estimate<T>}}{Estimate<T>}}\label{sec:api-estimate}
@@ -130,14 +141,19 @@ except an overflow of a final quotient, which GCC rejects at compile time (\cref
 \code{value} is the estimate of the derivative. \code{abs_error} is an estimate of $\abs{\text{value} -
 \text{exact}}$, not a guaranteed bound; it is empty for the stencils. For Ridders' method it is the change of the best
 tableau entry from its parent, but at least the rounding error of the difference it came from and at least its distance
-to the latest diagonal entry (\cref{sb:floor-coverage}).
+to the latest diagonal entry (\cref{sb:floor-coverage}). It saturates at \code{max()} where the estimate would
+overflow (a large \code{fn} over a tiny step), and then says only that the method could not estimate its error.
 
-\code{Estimate} is an aggregate, so it takes designated initialisers and structured bindings,
-\code{auto const [value, abs_error] = *r}. It converts implicitly to \code{T}. Where a conversion is not considered,
-in \code{auto}, \code{std::format} and the arithmetic operator templates of Boost.Multiprecision (its comparisons do
-accept it), write \code{e.value} or \code{T(e)}. The conversion also applies where it may surprise: \code{if (*r)} tests the value against 0, not whether
-there is a result, and \code{int n = *r} truncates the value (\cref{sec:using-result}). The defaulted \code{==}
-compares both members; without it, \code{==} would compare only the values, through the conversion.
+\code{Estimate} is an aggregate (designated initialisers, structured bindings: \code{auto const [v, e] = *r}). It
+converts implicitly to \code{T}, except where no conversion is considered: \code{auto}, \code{std::format} and the
+arithmetic operator templates of Boost.Multiprecision (its comparisons do accept it); write \code{e.value} or
+\code{T(e)}. It also converts where it may surprise: \code{if (*r)} tests the value against 0, not whether there is
+a result (diagnosed by Clang under \code{-Wconversion}, not by GCC), and \code{int n = *r} truncates, with a
+\code{-Wfloat-conversion} warning (\cref{sec:using-result}). The defaulted \code{==} compares both members of two
+\code{Estimate}s; comparing with a \code{T}, as \code{*r == 2.0} or \code{r == 2.0} on the \code{std::expected},
+compares the value only, and the latter is false when \code{r} holds an error. \code{r.value()} is not the member but
+the accessor of \code{std::expected}, which throws \code{std::bad_expected_access} when there is no result (or
+terminates without exceptions); read \code{r->value} after testing \code{r}.
 
 \section{\texorpdfstring{\code{error}}{error} and \texorpdfstring{\code{order}}{order}}\label{sec:api-error-order}
 
@@ -164,7 +180,9 @@ P is the accuracy order, the $\order(h^P)$ of the error, not the number of point
 range is rejected by the constraint of \code{derivative}; completing the type itself fails a \code{static_assert}
 (``\code{Central<P> needs an even order P from 2 to 10}'', ``\code{Forward<P> needs an order P from 1 to 6}''). A
 stencil whose integer weights the type \code{T} cannot hold exactly fails a \code{static_assert} too (``this rule's
-integer weights are not exact in T''); every type with 24 significant bits or more holds them all.
+integer weights are not exact in T''); every type with 24 significant bits or more holds them all. That check is in
+the body of the evaluator, not in a constraint: a \code{requires}-expression reports such a call as valid (for
+\code{Central<10>} with \code{std::float16_t}, say), and the call then fails to compile inside the library.
 \Cref{tab:api-methods} gives the nodes, the cost and the default step of each.
 
 \begin{table}
@@ -182,31 +200,34 @@ Method & Nodes & Evaluations & Default step & Estimate\\
 \code{Forward<P>} & $0, 1, \ldots, P + N - 1$ & $P + N$ & $\epsmach^{1/(P+N)} s$ & no\\
 \code{Backward<P>} & $-(P + N - 1), \ldots, 0$ & $P + N$ & $\epsmach^{1/(P+N)} s$ & no\\
 \code{Ridders} & \code{Central<2>} of order N at $h/2^i$: $\pm h_i$ for $N \le 2$, $\pm h_i, \pm 2 h_i$ for $N \ge
-  3$, and $x$ for even N & 2 per level ($N \le 2$), 4 ($N \ge 3$), plus $f(x)$ once for even N; at most 64, 65, 128,
-  129 & $s/32$ ($N = 1$), $s/4$ ($N \ge 2$) & yes\\
+  3$, and $x$ for even N & 2 per level ($N \le 2$), 4 ($N \ge 3$), plus $f(x)$ once for even N; at most
+  \num{\valRiddersMaxEvalsFirst}, \num{\valRiddersMaxEvalsSecond}, \num{\valRiddersMaxEvalsThird},
+  \num{\valRiddersMaxEvalsFourth} & $s/32$ ($N = 1$), $s/4$ ($N \ge 2$) & yes\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The two-node rules, \code{Central<2>} for $f'$, \code{Forward<1>} and \code{Backward<1>}, divide by the distance
-between the points actually evaluated, and \code{Central<2>} for $f''$ uses the actual offsets of its points
-(\cref{sb:actual-distance,sb:actual-offsets}); rules with more nodes divide the weighted sum by $\den h$ and then by
-$h$, $N - 1$ more times, never by $h^N$. \code{Ridders} extrapolates the \code{Central<2>} rule of order N in
-a Richardson tableau until rounding stops the improvement; it restarts below a step at which \code{fn} is not finite,
-or below one whose result has at most two correct bits by its own estimate while that estimate is far above rounding.
-Its constants are in \cref{tab:ridders-constants}.
+The two-node rules divide by the distance between the points actually evaluated, \code{Central<2>} for $f''$ by its
+actual offsets (\cref{sb:actual-distance,sb:actual-offsets}), the other rules by $\den h$ and then $N - 1$ times by
+$h$. \code{Ridders} extrapolates the \code{Central<2>} rule of order N in a Richardson tableau; its constants are in
+\cref{tab:ridders-constants}.
 
 \section{The precision warning}\label{sec:api-warning}
 
-A fourth derivative in a type whose machine epsilon is above $10^{-7}$ is mostly rounding noise. The test is made with
-integers, $\beta^{\text{digits} - 1} < 10^7$ with $\beta$ the radix: \code{float}, \code{decimal32} and
-\code{bfloat16} qualify, \code{double} does not. Such a call selects the deprecated twin of \code{derivative}, whose
-warning reads ``the 4th derivative in a type with 7 or fewer significant digits is mostly rounding noise: use double,
+A fourth derivative in a type whose machine epsilon is above $10^{-7}$, tested with integers as
+$\beta^{\text{digits} - 1} < 10^7$ ($\beta$ the radix: \code{float}, \code{decimal32}, \code{bfloat16}, not
+\code{double}), selects the deprecated twin of \code{derivative}, whose warning reads
+ ``the 4th derivative in a type with 7 or fewer significant digits is mostly rounding noise: use double,
 or silence this warning at the call or with NUMERIXX\_NO\_PRECISION\_WARNING''. The warning is reported at the
 caller's line, so a pragma there silences it (\code{-Wdeprecated-declarations} on GCC and Clang, C4996 on MSVC), and a
 system-header include does not hide it. Defining \code{NUMERIXX_NO_PRECISION_WARNING} turns it off everywhere; it must
 be defined alike in every translation unit, best on the command line, since overload resolution would otherwise differ
-between them. \Cref{sec:orders-float} shows the pragma in a compiled example.
+between them. The pragma at the call, for both compiler families:
+\snippet{05-orders-float}{float-fourth}
+The result is the same with or without the warning. On $\mathrm{e}^x$ at 1, \code{Central<2>} is
+\num{\valFloatFourthCentralAtOneRelError} off and Ridders' method \num{\valFloatFourthRiddersAtOneRelError}, with a
+relative estimate of \num{\valFloatFourthRiddersAtOneRelEstimate} that says the result is rough (measured;
+\cref{sec:orders-float}).
 
 \section{\texorpdfstring{\code{nxx::real}}{nxx::real} and \texorpdfstring{\code{nxx::math}}{nxx::math}}\label{sec:api-real}
 
@@ -223,7 +244,12 @@ between them. \Cref{sec:orders-float} shows the pragma in a compiled example.
 \code{T} is constructible from \code{int} and totally ordered; and when $a + b$, $a - b$, $a \times b$, $a / b$ and
 $-a$ convert to \code{T}, which admits expression templates (\cref{sb:expression-templates}). The tests check that
 \code{float}, \code{double}, \code{long double}, \code{cpp_bin_float_50} with and without expression templates and
-\code{cpp_dec_float_50} satisfy it, and that \code{int}, \code{unsigned} and \code{cpp_rational} do not.
+\code{cpp_dec_float_50} satisfy it, and that \code{int}, \code{unsigned} and \code{cpp_rational} do not. The
+algorithms also read \code{radix}, \code{digits} and \code{denorm_min()}, which the concept does not check: a type
+without them passes the constraints and then fails to compile inside the header. A type of your own, here a wrapper
+of \code{double} with the arithmetic, a total order and construction from \code{int} and no default constructor,
+needs exactly the members below (\code{code/07-using-usertype.cpp}, which differentiates $\mathrm{e}^x$ with it):
+\snippet{07-using-usertype}{usertype-limits}
 
 The helpers use comparisons and $+ - \times /$ only, so they run in constant expressions and accept user types.
 \code{abs(x)} returns $\abs{x}$. \code{isfinite(x)} is false for infinities and NaN: it tests
@@ -235,7 +261,10 @@ The helpers use comparisons and $+ - \times /$ only, so they run in constant exp
 \section{Rejected calls}\label{sec:api-rejected}
 
 What the constraints reject does not compile: the error is reported at the call, not at run time. The example tests
-each case with a \code{requires}-expression:
+each case with a \code{requires}-expression. A type too narrow for a rule's integer weights is rejected by a
+\code{static_assert} inside the library instead (\cref{sec:api-methods}), which a \code{requires}-expression does not
+see.
+
 \snippet{08-api-usage}{api-rejected}
 A type given explicitly as the second template argument, as in
 \code{derivative<Ridders, double>(fn, x)}, does not compile either, because that argument is the order; \code{T} is always deduced from \code{x}. A callable that cannot

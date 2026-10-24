@@ -42,13 +42,16 @@ int main()
     // clang-format off
 // <check-by-steps>
 // Central<2> at its default step h, and at 2h and h/2
-double const h = nxx::math::root_epsilon<3, double>() * T0;
+// the default step: root_epsilon<P + N, T>() * max(|x|, 1)
+double const s_T = std::max(std::abs(T0), 1.0);
+double const h = nxx::math::root_epsilon<3, double>() * s_T;
 auto const d = derivative(H, T0, h);
 auto const d2 = derivative(H, T0, 2 * h);
 auto const d0 = derivative(H, T0, h / 2);
 if (!d || !d2 || !d0) return 1;
-double const agree =
-    std::min(digits(*d2, *d), digits(*d0, *d));
+double const agree = std::min(
+    digits(d2->value, d->value),
+    digits(d0->value, d->value));
 std::println("h, 2h, h/2 agree to {:.1f} digits", agree);
 // A physical check: a heat capacity is positive.
 if (d->value <= 0) std::println("cp <= 0: wrong");
@@ -67,7 +70,7 @@ if (d->value <= 0) std::println("cp <= 0: wrong");
 auto const c4 = derivative<Central<4>>(H, T0);
 if (c4) {
     std::println("Central<4> agrees to {:.1f} digits",
-        digits(*d, *c4));
+        digits(d->value, c4->value));
 }
 // </check-by-order>
     // clang-format on

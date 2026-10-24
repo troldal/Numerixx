@@ -1,7 +1,7 @@
 % F14b fig:ridders-cost (Chapter 6, margin). Histogram of the evaluations of fn per call over the random study
 % (DS9, data/ridders-coverage-N1.csv and -N2.csv): N = 1 (dark, even counts: 2 per level) and N = 2 (muted, odd
 % counts: 2 per level plus fn(x)). Unit bins centred on the integers, so the two series interleave. The tail of
-% N = 2 at 19 and 21 are the restarts of log and sqrt below x = 0.25, where h_0 = s/4 reaches below 0.
+% N = 2 at 19 and 21 is the slower convergence of several functions; the 11 restarts of log and sqrt below x = 0.25 are a small part of the last bar (R1-decision T7).
 \begin{tikzpicture}
 \begin{axis}[eqtufte, width=38mm, height=30mm,
   xmin=5.5, xmax=22.5, ymin=0, ymax=2100,
@@ -13,6 +13,5 @@
     table[col sep=comma, comment chars={\#}, y=evaluations] {data/ridders-coverage-N1.csv};
   \node[font=\tiny, anchor=south, inner sep=1pt] at (axis cs:14.5, 1900) {$\dorder = 1$};
   \node[font=\tiny, anchor=south, inner sep=1pt, text=black!55] at (axis cs:17.5, 1580) {$\dorder = 2$};
-  \node[font=\tiny, anchor=south west, inner sep=1pt, text=black!55] at (axis cs:19, 300) {restarts};
 \end{axis}
 \end{tikzpicture}

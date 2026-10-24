@@ -71,5 +71,9 @@
 % \tablerows{<path>}: the same for a hand-written row file of the chapters, used for the five rows of the method
 % choice T0 (chapters/shared-method-summary.tex), which 1.5 and the quick-reference page share.
 \newcommand{\tablerows}[1]{\csname @@input\endcsname #1.tex }
+% \cmakefile{<name>}: the CMake file code/<name>.cmake, quoted whole (section 7.1, "Getting the library"). The one
+% listing of the book that the build does not configure; PLAN.md section 8 records the exception.
+\newcommand{\cmakefile}[1]{\lstinputlisting[language={},morekeywords={include,add_executable,target_link_libraries,
+  FetchContent_Declare,FetchContent_MakeAvailable,GIT_REPOSITORY,GIT_TAG,PRIVATE}]{code/#1.cmake}}
 % --- generated values: data/values.tex defines one macro per number quoted in the text (\val...) ---
 \InputIfFileExists{data/values}{}{}

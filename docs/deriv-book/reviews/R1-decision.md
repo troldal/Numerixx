@@ -1,6 +1,6 @@
 # R1-decision: the editor's decisions on review round 1
 
-Approved by the author on 2026-10-23: every decision below, the four additions (E21, E22, the complete first program with the CMake snippet, E23), the two checks, rounded headline digits, the pragma move, the three preamble changes, captions keeping their data paths, and the rewritten AI statement to be approved with the stage-6 build. Review round 2 adds a Cline review with MiMo-V2.6-Pro beside the Codex review.
+Approved by the author on 2026-10-23: every decision below, the four additions (E21, E22, the complete first program with the CMake snippet, E23), the two checks, rounded headline digits, the pragma move, the three preamble changes, captions keeping their data paths, and the rewritten AI statement to be approved with the stage-6 build. Review round 2 adds a Cline review with DeepSeek V4.1 Flash 1017 beside the Codex review (the author's choice of model, 2026-10-24; the decision letter had named MiMo-V2.6-Pro).
 
 Editor: `book-editor` (Fable 5.1), 2026-10-23. Object: the five round-1 reviews of the integrated book at `aeec7e6`
 (83 pages): `R1-engineer.md` (25 findings), `R1-developer.md` (18), `R1-numerics.md` (17, of which 17 bundles eleven
