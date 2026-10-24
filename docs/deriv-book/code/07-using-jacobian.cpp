@@ -1,5 +1,5 @@
 // E22 (Chapter 7, section 7.4.2; values E22 in data/values.tex): the Jacobian of a set of balances. Two residuals in
-// the unknowns x = (T, n), T in K and n in mol: an energy balance r1 = n H(T) - Q on the thread's enthalpy, and an
+// the unknowns x = (T, n), T in K and n in mol: an energy balance r1 = n H(T) - Q on the nitrogen enthalpy, and an
 // ideal-gas pressure r2 = n R T / V - P, the model being one function that returns both. Parameters as in
 // data/README.md (the generator uses the same): T = 1000 K, n = 2 mol, V = 1 m^3, R = 8.31446261815324 J/(mol K),
 // with Q = n H(T) and P = n R T / V, so that both residuals vanish at the point. Two ways:

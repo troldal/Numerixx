@@ -1,36 +1,38 @@
-% F1 fig:secant (Chapter 1, margin): the tangent at x and two secants, a diagram without data. The curve is
+% F1 fig:secant (Chapter 1, text width): the tangent at x and two secants, a diagram without data. The curve is
 % exp(t) around x = 0 with a step of 0.7; any smooth curve would do, and the text does not name it. The forward
 % secant joins the points at x and x + h; the central secant joins the points at x - h and x + h and is nearly
-% parallel to the tangent: the one thing to notice, in accent. The lines end at staggered abscissas so that their
-% labels do not collide.
-\begin{tikzpicture}[x=17mm, y=10.5mm, font=\sffamily\scriptsize]
+% parallel to the tangent. The three lines have three colours and each label takes its line's colour (the author's
+% release decision: the margin version was hard to read). The lines end at staggered abscissas so that their labels
+% do not collide.
+\definecolor{secantforward}{HTML}{C8651B}
+\begin{tikzpicture}[x=34mm, y=21mm, font=\sffamily\footnotesize]
   \pgfmathsetmacro{\stepH}{0.7}
   \pgfmathsetmacro{\fMinus}{exp(-\stepH)}
   \pgfmathsetmacro{\fPlus}{exp(\stepH)}
   \pgfmathsetmacro{\slopeF}{(\fPlus - 1) / \stepH}              % slope of the forward secant
   \pgfmathsetmacro{\slopeC}{(\fPlus - \fMinus) / (2 * \stepH)}  % slope of the central secant
   % the axis with the three nodes
-  \draw[thin, black!55] (-1.2, -0.3) -- (1.25, -0.3);
+  \draw[thin, black!55] (-1.2, -0.3) -- (1.3, -0.3);
   \foreach \nodeX/\nodeLabel in {-\stepH/{$x - h$}, 0/{$x$}, \stepH/{$x + h$}} {
     \draw[thin, black!55] (\nodeX, -0.3) -- ++(0, -0.05)
-      node[below, black!70, inner sep=1.5pt] {\nodeLabel};
+      node[below, black!70, inner sep=2pt] {\nodeLabel};
     \draw[densely dotted, black!40] (\nodeX, -0.3) -- (\nodeX, {exp(\nodeX)});
   }
   % the function
-  \draw[line width=0.8pt, black!80, domain=-1.2:1.22, samples=60, smooth] plot (\x, {exp(\x)})
-    node[left, black!80, inner sep=2pt] {$f$};
+  \draw[line width=1pt, black!80, domain=-1.2:1.22, samples=60, smooth] plot (\x, {exp(\x)})
+    node[left, black!80, inner sep=3pt] {$f$};
   % the tangent at x: slope f'(x) = 1
-  \draw[line width=0.6pt, black!80] (-1.15, {1 - 1.15}) -- (0.95, {1 + 0.95})
-    node[right, inner sep=1.5pt] {tangent};
+  \draw[line width=0.8pt, black!80] (-1.15, {1 - 1.15}) -- (0.95, {1 + 0.95})
+    node[right, black!80, inner sep=2pt] {tangent};
   % the central secant through x - h and x + h
-  \draw[line width=0.6pt, accent] (-1.15, {\fMinus + (-1.15 + \stepH) * \slopeC})
+  \draw[line width=0.8pt, accent] (-1.15, {\fMinus + (-1.15 + \stepH) * \slopeC})
     -- (1.05, {\fMinus + (1.05 + \stepH) * \slopeC})
-    node[right, inner sep=1.5pt] {central};
+    node[right, accent, inner sep=2pt] {central secant};
   % the forward secant through x and x + h
-  \draw[line width=0.6pt, muted] (-0.3, {1 - 0.3 * \slopeF}) -- (1.15, {1 + 1.15 * \slopeF})
-    node[right, inner sep=1.5pt] {forward};
+  \draw[line width=0.8pt, secantforward] (-0.3, {1 - 0.3 * \slopeF}) -- (1.15, {1 + 1.15 * \slopeF})
+    node[right, secantforward, inner sep=2pt] {forward secant};
   % the sampled points
-  \fill[muted] (\stepH, \fPlus) circle (1.1pt);
-  \fill[accent] (-\stepH, \fMinus) circle (1.1pt);
-  \fill[black!80] (0, 1) circle (1.1pt);
+  \fill[black!80] (\stepH, \fPlus) circle (1.4pt);
+  \fill[accent] (-\stepH, \fMinus) circle (1.4pt);
+  \fill[black!80] (0, 1) circle (1.4pt);
 \end{tikzpicture}

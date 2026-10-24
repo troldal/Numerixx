@@ -115,17 +115,23 @@
 \fancyheadoffset[R]{\dimexpr\marginparsep+\marginparwidth\relax}
 \fancyfootoffset[R]{\dimexpr\marginparsep+\marginparwidth\relax}
 % ---------------------------------------------------------------- title page
-% Title, subtitle, author and edition centered over the full width (text block + margin).
+% Left-aligned on the text block like everything else, in the spirit of the Tufte-LaTeX book title page: generous
+% white space, the title large and light rather than bold, the subtitle muted, the author and the date low on the
+% page, and one accent, a short rule above the title (the author's release decision, 2026-10-24; the centred block
+% it replaces is in the history).
 \makeatletter
 \newcommand{\bkSubtitle}{}
 \renewcommand{\maketitle}{%
-  \begin{titlepage}\color{ink}\vspace*{0.22\textheight}
-  \begin{fullwidth}\centering
-    {\fontsize{24}{29}\selectfont\bfseries\@title\par}\vspace{2ex}
-    {\fontsize{13}{16}\selectfont\color{muted}\bkSubtitle\par}\vspace{6ex}
-    {\large\@author\par}\vspace{1ex}
+  \begin{titlepage}\color{ink}\raggedright
+    \vspace*{0.24\textheight}
+    {\color{accent}\rule{18mm}{0.8pt}\par}\vspace{4ex}
+    {\fontseries{l}\fontsize{30}{36}\selectfont\@title\par}\vspace{3ex}
+    {\fontsize{13}{17}\selectfont\color{muted}\bkSubtitle\par}
+    \vfill
+    {\large\@author\par}\vspace{1.2ex}
     {\normalsize\color{muted}\@date\par}
-  \end{fullwidth}\end{titlepage}}
+    \vspace*{0.14\textheight}
+  \end{titlepage}}
 \makeatother
 % ---------------------------------------------------------------- sidebars
 % A numbered box, numbered within the chapter (Sidebar 3.2), on the code ground with a thin accent rule on the

@@ -19,8 +19,7 @@ at $x = 1$ against a median of \num{\valExpCentralTwoRelError} (measured).
 \begin{table*}
 \caption{Measured accuracy: the median relative error of the derivative of $\mathrm{e}^x$ over
 \num{\valAccuracyMatrixPoints} points in $[0.5, 1]$, at the default steps, by method, derivative order N and type.
-$^{\ast}$\,Computed with the low-precision warning silenced (\cref{sec:api-warning}). Data
-\code{data/accuracy-matrix.csv}; 1.4e$-$5 stands for $1.4 \times 10^{-5}$.\label{tab:accuracy-matrix}}
+$^{\ast}$\,Computed with the low-precision warning silenced (\cref{sec:api-warning}). 1.4e$-$5 stands for $1.4 \times 10^{-5}$.\label{tab:accuracy-matrix}}
 \centering\footnotesize\setlength{\tabcolsep}{3pt}\sisetup{output-exponent-marker=\ensuremath{\mathrm{e}}}
 \begin{tabular}{@{}lcccc@{\hspace{9pt}}cccc@{\hspace{9pt}}cccc@{}}
 \toprule
@@ -46,7 +45,7 @@ step can grow far before truncation matters; the float column shows why the four
 
 Two caveats apply to every figure. First, the model gives an absolute error, $\epsmach \abs{f} / h^N$ in its rounding
 part, and the relative figures presuppose $\abs{f} \sim s^N \abs{f^{(N)}}$: true for $\mathrm{e}^x$ on $[0.5, 1]$, and
-nearly so for the thread's $\cp$, where $\abs{\enth} / (s \abs{\cp}) = \num{\valCpRelativeFactor}$
+nearly so for the nitrogen $\cp$, where $\abs{\enth} / (s \abs{\cp}) = \num{\valCpRelativeFactor}$
 (\cref{ch:rounding}). Near a zero of
 $f^{(N)}$ the relative error grows without bound while the absolute error stays (\cref{sec:using-check}). Second, the
 default steps assume that $f$ varies on the scale $\max(\abs{x}, 1)$ and is accurate to $\epsmach$; where it varies
@@ -66,8 +65,7 @@ estimate, so a ratio below 1 is covered.
 
 \begin{table}
 \sidecaption{Ridders' method on the random study: \num{\valRiddersCases} cases per derivative order, measured.
-Restarts are counted from a log of the calls. Data \code{data/ridders-coverage-N1.csv} to
-\code{-N4.csv}.\label{tab:ridders-statistics}}
+Restarts are counted from a log of the calls.\label{tab:ridders-statistics}}
 \centering\footnotesize
 \begin{tabular}{@{}lcccccc@{}}
 \toprule
@@ -134,9 +132,9 @@ Method & $N = 1$ & 2 & 3 & 4\\
 \section{Limits}\label{sec:guarantees-limits}
 
 \paragraph{Orders.} The derivative order is 1 to 4. The caps on P are design decisions (\code{docs/PHASE2_API.md}).
-\code{Central<P>} stops at $P = 10$: by the model's exponent, a \code{Central<12>} would gain about
-\num{\valCapGainCentralTwelveFirstDouble} digit for $f'$ in double and \num{\valCapGainCentralTwelveFirstMultiprecision}
-in a 50-digit type (\num{\valCapGainCentralTwelveFourthDouble} and \num{\valCapGainCentralTwelveFourthMultiprecision}
+\code{Central<P>} stops at $P = 10$: by the model's exponent, a \code{Central<12>} would cut the error of $f'$ by a factor of about \num{\valCapGainFactorCentralTwelveFirstDouble} in double and
+\num{\valCapGainFactorCentralTwelveFirstMultiprecision}
+in a 50-digit type (\num{\valCapGainFactorCentralTwelveFourthDouble} and \num{\valCapGainFactorCentralTwelveFourthMultiprecision}
 for $f''''$), on a still wider stencil. The one-sided rules stop at $P = 6$, where the rounding amplification $\ampl$
 is already \num{\valAmplForwardSix} for $f'$ and \num{\valAmplForwardSixFourth} for $f''''$
 (\cref{tab:weights-forward-first,tab:weights-forward-fourth}) and grows about as fast as a higher order pays.
@@ -223,7 +221,7 @@ comment calls it an estimate, not a bound, and reports measured errors 4 to 16 t
 They run on the five toolchains of the continuous integration with warnings as errors. Each phase was reviewed by
 specialised review agents, Phase~4 also by another vendor's model (OpenAI Codex); the findings and decisions are
 recorded in the design record (\code{docs/PHASE3_API.md}, \code{docs/PHASE4_API.md}, \code{docs/design.md}). The book's own examples build and run
-as tests, and its data generator checks every table against its moment conditions and the thread's function against
+as tests, and its data generator checks every table against its moment conditions and the nitrogen function against
 an independent exact evaluation each time it runs.
 
 \begin{table}
@@ -251,12 +249,5 @@ File & What it checks\\
 \end{tabular}
 \end{table}
 
-\section{Deferred features}\label{sec:guarantees-deferred}
 
-Deferred until a use needs it, none promised. From \code{docs/plan.md}: gradients and Jacobians, a derivative as a
-callable. From the Phase documents: several orders from shared evaluations, orders above 4, a default-step constant
-or scale parameter, mixed partials and Hessians, a tolerance for Ridders' method, variants of it, error estimates for
-the stencils, more \code{error} values, user-written stencils. From \code{docs/DERIV_TECHNIQUES.md}: noise-aware
-steps,\cite{more2012} and the complex step, automatic differentiation and contour methods, which need a generic,
-analytic $f$ and complex or dual number types (\cref{sb:alternatives}).
 

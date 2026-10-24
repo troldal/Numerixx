@@ -46,9 +46,9 @@ It is not tabulated.
 give \code{Central<P>} for $\dorder = 1$ to 4 and $\aorder = 2$ to 10. Each pair of nodes adds two orders; $\errc$
 falls quickly with $\aorder$ and $\ampl$ grows slowly, which is why the central rules of high order pay off in wide
 types (\cref{tab:accuracy-matrix}). The cap at $\aorder = 10$ is a design decision (\code{docs/PHASE2_API.md}): by
-the model's exponent alone, a \code{Central<12>} would gain about \num{\valCapGainCentralTwelveFirstDouble} digit for
-$f'$ in double and \num{\valCapGainCentralTwelveFirstMultiprecision} in a 50-digit type (for $f''''$,
-\num{\valCapGainCentralTwelveFourthDouble} and \num{\valCapGainCentralTwelveFourthMultiprecision}), over a stencil on
+the model's exponent alone, a \code{Central<12>} would cut the error of $f'$ by a factor of about \num{\valCapGainFactorCentralTwelveFirstDouble} in double and
+\num{\valCapGainFactorCentralTwelveFirstMultiprecision} in a 50-digit type (for $f''''$,
+\num{\valCapGainFactorCentralTwelveFourthDouble} and \num{\valCapGainFactorCentralTwelveFourthMultiprecision}), over a stencil on
 which $f$ must be smooth that much wider, and the library stops there. The rules with $\aorder = 2$ are the textbook formulas: the central difference,
 the three-point second difference, the four-point rule for $f'''$ and the five-point rule for $f''''$.
 

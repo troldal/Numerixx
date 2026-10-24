@@ -1,4 +1,4 @@
-// E9 (Chapter 6): Ridders' extrapolation on the thread, cp = dH/dT at T0, with a wrapper that counts the
+// E9 (Chapter 6): Ridders' extrapolation on the nitrogen example, cp = dH/dT at T0, with a wrapper that counts the
 // evaluations of fn. Prints the value, the error estimate and the count; the actual error is at most 6 times the
 // estimate (the tests' criterion; measured ratio 0.74) and the count at most 64 (the level cap for f'; measured 14).
 // Quoted with \snippet{06-ridders-basic}{ridders-cp}.
@@ -13,7 +13,7 @@
 int main()
 {
     using namespace nxx::deriv;
-    double const T0 = book::thread_T0;
+    double const T0 = book::nitrogen_T0;
     // clang-format off
 // <ridders-cp>
 // Ridders from the default initial step T0 / 32, with fn

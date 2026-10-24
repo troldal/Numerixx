@@ -37,7 +37,7 @@ if (r) {
 
     // The answer key: the closed-form cp of the same fit.
     double const exact = book::shomate_cp(book::nitrogen, T0);
-    if (T0 != book::thread_T0 || !d || !r) return 1;
+    if (T0 != book::nitrogen_T0 || !d || !r) return 1;
     double const d_rel = std::abs(d->value - exact) / exact;
     double const r_actual = std::abs(r->value - exact);
     std::println("exact cp = {:.12f} J/(mol K)", exact);

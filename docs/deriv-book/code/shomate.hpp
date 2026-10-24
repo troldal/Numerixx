@@ -1,4 +1,4 @@
-// The thread example of the book: the molar enthalpy of nitrogen gas in the Shomate form of the NIST Chemistry
+// The nitrogen example of the book: the molar enthalpy of nitrogen gas in the Shomate form of the NIST Chemistry
 // WebBook, with its closed-form derivatives up to order 6. The data generator (tools/generate_data.cpp) and the
 // examples in code/ include this one file, so the coefficients exist in exactly one place.
 //
@@ -110,12 +110,12 @@ constexpr Real shomate_cp(Shomate const &c, Real const &T)
         }
     }
 
-    // The thread's point: 1000 K, interior to the 500 to 2000 K range (its lower end, 500 K, is the domain edge of
+    // The nitrogen example's point: 1000 K, interior to the 500 to 2000 K range (its lower end, 500 K, is the domain edge of
     // Chapters 4 and 7).
-    inline constexpr double thread_T0 = 1000.0;
+    inline constexpr double nitrogen_T0 = 1000.0;
 
     // The enthalpy of nitrogen across the junction of the two lower ranges at 500 K, each range used where it is
-    // valid: the lower fit below 500 K, the thread's fit from 500 K on (the WebBook does not say which range applies
+    // valid: the lower fit below 500 K, the nitrogen fit from 500 K on (the WebBook does not say which range applies
     // exactly at a shared end point; this header gives the end point to the upper range). The two fits do not meet
     // exactly: at 500 K, H jumps by about 0.77 J/mol and cp by about -7.5e-5 J/(mol K), and dcp/dT falls by 17 %
     // (the evidence reviewer's junction check, 2026-10-23). This is the range break of the smoothness pitfall

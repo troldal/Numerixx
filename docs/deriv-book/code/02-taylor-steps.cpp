@@ -1,4 +1,4 @@
-// E2 (Chapter 2, section 2.3): the accuracy order measured on the thread. Halving the step halves the error of the
+// E2 (Chapter 2, section 2.3): the accuracy order measured on the nitrogen example. Halving the step halves the error of the
 // forward difference (order 1) and quarters that of the central difference (order 2), as long as truncation
 // dominates: at steps of 1 and 2 K the rounding error is about five orders of magnitude below the truncation error.
 
@@ -12,7 +12,7 @@
 int main()
 {
     auto const H = [](double T) { return book::shomate_H(book::nitrogen, T); };
-    double const T0 = book::thread_T0; // 1000 K
+    double const T0 = book::nitrogen_T0; // 1000 K
 
     // clang-format off
 // <forward-vs-central>

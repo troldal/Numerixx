@@ -19,7 +19,7 @@
 //
 // To add a data set: write a function below that computes it with the library and writes it with the helpers, call
 // it from main, and document in data/README.md which figure or chapter uses it. The generator returns 1 if a
-// self-check fails (a moment condition, the thread function against its verified values, Ridders' returned entry not
+// self-check fails (a moment condition, the nitrogen function against its verified values, Ridders' returned entry not
 // found in the tableau), so that the CMake target fails loudly.
 
 #include <numerixx/deriv.hpp>
@@ -343,18 +343,18 @@ namespace {
         return { median(v), v.front(), v.back() };
     }
 
-    // ------------------------------------------------------------------------------------------------ the thread
+    // ------------------------------------------------------------------------------------------------ the nitrogen example
 
-    constexpr double T0 = book::thread_T0;
+    constexpr double T0 = book::nitrogen_T0;
 
-    // H(T) of the thread as fn; its exact derivatives from the shared header.
+    // H(T) of the nitrogen example as fn; its exact derivatives from the shared header.
     constexpr auto H = [](double T) { return book::shomate_H(book::nitrogen, T); };
     double Hn(int n, double T = T0) { return book::shomate_derivative(book::nitrogen, T, n); }
 
     // The shared header against the evidence reviewer's exact evaluation of the published coefficients (rational
     // arithmetic, scratchpad record thread-data-nitrogen.md, 2026-10-23), at 1000 K and at the junction 500 K. These
     // are test oracles for the code, not numbers of the book.
-    void check_thread_function(Output &o)
+    void check_nitrogen_function(Output &o)
     {
         struct Case
         {
@@ -465,7 +465,7 @@ namespace {
     void ds1_step_error_cp(Output &o)
     {
         auto out = csv(o, "step-error-cp", "h,forward1,central2,central4,model_forward1,model_central2",
-            "thread H(T) at T0 = 1000 K, N = 1, relative errors against the closed-form cp; h in K");
+            "nitrogen H(T) at T0 = 1000 K, N = 1, relative errors against the closed-form cp; h in K");
         double const cp = Hn(1);
         double const H0 = std::abs(Hn(0));
         double const H2 = std::abs(Hn(2));
@@ -495,7 +495,7 @@ namespace {
         double const h_default = nxx::math::root_epsilon<3, double>() * T0;
         value(o, "CpDefaultStep", sig(h_default));
         auto const d = derivative(H, T0);
-        if (!d) o.fail("Central<2> on the thread with the default step");
+        if (!d) o.fail("Central<2> on the nitrogen example with the default step");
         value(o, "CpDefaultRelError", sig(*rel_error(d, cp)));
         value(o, "CpDefaultValueLong", sig(d->value, 12));
         value(o, "CpBestStep", sig(best.h));
@@ -865,7 +865,7 @@ namespace {
         int calls = 0;
         auto const r = derivative<Ridders>(Counted{ H, &calls }, T0);
         if (!r || calls % 2 != 0) {
-            o.fail("DS8: Ridders on the thread failed or restarted");
+            o.fail("DS8: Ridders on the nitrogen example failed or restarted");
             return;
         }
         std::size_t const used = static_cast<std::size_t>(calls / 2);
@@ -894,7 +894,7 @@ namespace {
         value(o, "TableauBestRelError", sig(std::abs(A[best->first][best->second] - cp) / cp));
 
         auto out = csv(o, "ridders-tableau", "i,j,h,A,error,estimate,floor",
-            "thread cp at T0: A = tableau entry (level i, column j), error = |A - cp| / cp, estimate = e_ij / cp "
+            "nitrogen cp at T0: A = tableau entry (level i, column j), error = |A - cp| / cp, estimate = e_ij / cp "
             "(max of the change from the parent and the floor; nan for j = 0), floor = r_i / cp; h in K");
         for (std::size_t i = 0; i < levels; ++i)
             for (std::size_t j = 0; j <= i; ++j) {
@@ -1332,9 +1332,12 @@ namespace {
             o.fail("E18: a derivative failed");
             return;
         }
-        value(o, "CheckStepsDigits", fixed(std::min(digits(d2->value, d->value), digits(d0->value, d->value)), 1));
-        value(o, "CheckExactDigits", fixed(digits(d->value, exact), 1));
-        value(o, "CheckOrderDigits", fixed(digits(d->value, c4->value), 1));
+        // "Agree to N digits" is the whole digits that agree: the floor of -log10 of the relative difference
+        // (PLAN.md style decision 24; the example prints the same floor).
+        auto const whole = [](double v) { return integer(static_cast<long long>(std::floor(v))); };
+        value(o, "CheckStepsDigits", whole(std::min(digits(d2->value, d->value), digits(d0->value, d->value))));
+        value(o, "CheckExactDigits", whole(digits(d->value, exact)));
+        value(o, "CheckOrderDigits", whole(digits(d->value, c4->value)));
         value(o, "CheckRiddersDiff", sig(std::abs(d->value - r->value)));
         value(o, "CheckStencilActual", sig(std::abs(d->value - exact)));
         value(o, "CheckRiddersEstimate", sig(*r->abs_error));
@@ -1354,8 +1357,8 @@ namespace {
         value(o, "CheckSineAbsError", sig(std::abs(s->value - std::cos(x))));
         value(o, "CheckSineRelError", sig(std::abs(s->value - std::cos(x)) / std::abs(std::cos(x))));
         value(o, "CheckSineSpread", sig(spread));
-        value(o, "CheckSineDigitsDerivative", fixed(-std::log10(spread / std::abs(s->value)), 1));
-        value(o, "CheckSineDigitsScale", fixed(-std::log10(spread / scale), 1));
+        value(o, "CheckSineDigitsDerivative", whole(-std::log10(spread / std::abs(s->value))));
+        value(o, "CheckSineDigitsScale", whole(-std::log10(spread / scale)));
     }
 
     // ------------------------------------------------------------------------------------------------ DS12
@@ -1542,20 +1545,25 @@ namespace {
         misjudge(2, 1, "CentralTwoFirst");
         misjudge(2, 4, "CentralTwoFourth");
         misjudge(4, 4, "CentralFourFourth");
-        // What the next central order would gain by the model's exponent alone, in digits: -log10(eps) times
-        // (12/13 - 10/11) for f' (R1-numerics-07, R1-evidence-05); the constants S and C are left out, as 9.4 says.
+        // What the next central order would gain by the model's exponent alone: -log10(eps) times
+        // (12/13 - 10/11) for f' in digits (R1-numerics-07, R1-evidence-05), and, since a fraction of a digit is
+        // not a count the book states, the same gain as a factor in the error, 10 to that power (style
+        // decision 24); the constants S and C are left out, as 9.4 says.
         auto const cap_gain = [&](double eps, int N, std::string const &name) {
             double const digits = -std::log10(eps) * (12.0 / (12 + N) - 10.0 / (10 + N));
             value(o, "CapGainCentralTwelve" + name, sig(digits));
+            value(o, "CapGainFactorCentralTwelve" + name, sig(std::pow(10.0, digits)));
         };
         cap_gain(dbl_eps, 1, "FirstDouble");
         cap_gain(dbl_eps, 4, "FourthDouble");
         cap_gain(std::ldexp(1.0, -167), 1, "FirstMultiprecision"); // cpp_bin_float_50: eps = 2^-167
         cap_gain(std::ldexp(1.0, -167), 4, "FourthMultiprecision");
-        // The model's digits for Central<2> in double, -log10(eps^(P/(P+N))) to one decimal (R1-numerics-17h).
+        // The model's digits for Central<2> in double, -log10(eps^(P/(P+N))) rounded to the nearest whole digit:
+        // "about N digits" (style decision 24; R1-numerics-17h asked for one decimal, the release for whole digits).
         char const *const words[] = { "", "First", "Second", "Third", "Fourth" };
         for (int N = 1; N <= 4; ++N)
-            value(o, std::string("ModelDigitsCentralTwo") + words[N] + "Double", fixed(-std::log10(dbl_eps) * 2.0 / (2 + N), 1));
+            value(o, std::string("ModelDigitsCentralTwo") + words[N] + "Double",
+                integer(std::lround(-std::log10(dbl_eps) * 2.0 / (2 + N))));
     }
 
     void ds14_ridders_constants(Output &o)
@@ -2039,7 +2047,7 @@ namespace {
     // ------------------------------------------------------------------------------------------------ E22
 
     // The Jacobian of two balances (R1-decision T2): unknowns T (K) and n (mol), residuals r1 = n H(T) - Q (an
-    // energy balance on the thread's enthalpy) and r2 = n R T / V - P (an ideal-gas pressure), with Q and P chosen
+    // energy balance on the nitrogen enthalpy) and r2 = n R T / V - P (an ideal-gas pressure), with Q and P chosen
     // so that both vanish at the point. Closed-form partials: dr1/dT = n cp(T), dr1/dn = H(T), dr2/dT = n R / V,
     // dr2/dn = R T / V. Two ways: the central stencil applied by hand to the vector residual at x_j +- h_j (two
     // model calls per column), and one derivative() call per entry (two model calls each). Parameters
@@ -2105,7 +2113,7 @@ int main(int argc, char **argv)
     o.tex.open(o.dir / "values.tex", std::ios::binary);
     o.tex << "% " << header << '\n';
 
-    check_thread_function(o);
+    check_nitrogen_function(o);
     hand_tables(o);
     ds1_step_error_cp(o);
     e6_validity_edge(o);

@@ -502,9 +502,9 @@ type and evaluator.
 ### In the code
 
 The stencils are three class templates, `Central<P>` (even P from 2 to 10), `Forward<P>` and `Backward<P>` (P from 1 to
-6). They are empty: the type only names the rule. The caps are design decisions: beyond `Central<10>` the model's gain
-is about 0.2 digit for f' in double and 0.7 in a 50-digit type, and the one-sided rounding factor S is already
-27.7 at P = 6.
+6). They are empty: the type only names the rule. The caps are design decisions: beyond `Central<10>` the model's error
+would fall by a factor of only about 1.7 for f' in double and about 5 in a 50-digit type, and the one-sided rounding
+factor S is already 27.7 at P = 6.
 
 **The tables** are computed at compile time by `detail::make_table<N>`, for the N-th derivative (section 10). Each
 family only supplies its nodes, and one generator turns nodes into weights by the Lagrange formula: the weight of node

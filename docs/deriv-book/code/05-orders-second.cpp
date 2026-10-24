@@ -1,4 +1,4 @@
-// E7 (Chapter 5): the second derivative of the thread, d cp / dT = H''(T0), with the three-point central rule and
+// E7 (Chapter 5): the second derivative of the nitrogen example, d cp / dT = H''(T0), with the three-point central rule and
 // with Ridders. The stencil's relative error is at most 1e-6 (the model gives about 2e-7: 4 eps |H| / (h^2 |H''|)
 // with h = 0.12 K, the factor |H| / (s^2 |H''|) being about 4 at T0; measured 6.5e-8); Ridders' estimate covers its
 // error. Quoted with \snippet{05-orders-second}{second-derivative} and \snippet{05-orders-second}{order-enum}.
@@ -14,7 +14,7 @@ int main()
 {
     using namespace nxx::deriv;
     auto const H = [](double T) { return book::shomate_H(book::nitrogen, T); };
-    double const T0 = book::thread_T0;
+    double const T0 = book::nitrogen_T0;
     // clang-format off
 // <second-derivative>
 // d cp / dT = H''(T0): the three-point rule with its

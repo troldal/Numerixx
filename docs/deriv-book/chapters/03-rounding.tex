@@ -39,8 +39,7 @@ steps the result has no correct digit at all. The curve has the shape of a V.
 \sidecaption{The V. Relative error of \code{Central<2>} for the heat capacity of nitrogen at
 $T_0 = \SI{1000}{\kelvin}$ against the step $h$, over the whole range of steps, with the model
 $E(h) / \cp$ of \cref{eq:error-model} dashed. Right of the bottom truncation dominates and the error falls as $h^2$;
-left of it rounding dominates and the error grows as $1/h$. The default step sits near the bottom. Data
-\code{data/step-error-cp.csv}.\label{fig:v-curve}}
+left of it rounding dominates and the error grows as $1/h$. The default step sits near the bottom.\label{fig:v-curve}}
 \centering
 \input{figures/03-rounding-v-curve}
 \end{figure}
@@ -78,7 +77,7 @@ model} of the central difference,
   \label{eq:error-model}
 \end{equation}
 The first term falls with $h$ and the second grows; their sum is the V. The dashed line in \cref{fig:v-curve} is this
-model for the thread, and the measured curve follows it, with one difference: on the rounding branch the measured
+model for the nitrogen example, and the measured curve follows it, with one difference: on the rounding branch the measured
 errors scatter below the model. The rounding errors of the two values have random signs and partly cancel, so the
 model gives their typical largest size, not their actual size at a particular step.
 
@@ -136,14 +135,14 @@ step near $\epsmach^{1/2} w$ and a relative error near $\epsmach^{1/2} = \num{\v
 
 The relative figure $\epsmach^{2/3}$ rests on the assumption $\abs{f} \approx w \abs{f'}$. The rounding term of
 \cref{eq:error-model} grows with $\abs{f}$, not with $\abs{f'}$, so a function whose values are large compared with
-$w \abs{f'}$ loses accuracy in proportion: about $\log_{10} (\abs{f} / (w \abs{f'}))$ digits. For the thread, with
+$w \abs{f'}$ loses accuracy in proportion: about $\log_{10} (\abs{f} / (w \abs{f'}))$ digits. For the nitrogen example, with
 $w = T_0$, $\abs{\enth} / (T_0 \abs{\cp}) = \num{\valCpRelativeFactor}$, close to 1. Had the enthalpy been referred to
 \SI{0}{\kelvin}, or included an enthalpy of formation, $\abs{\enth}$ would be larger and the derivative proportionally
 less accurate, although $\cp$ would be the same: a formation enthalpy of a few hundred kilojoules per mole, against
 $T_0 \cp$ of a few tens, costs about one digit. Near a point where $f'$ vanishes, the relative error has no meaning at
 all, while the absolute error stays near $\epsmach^{2/3} \abs{f} / w$.
 
-On the thread the measured curve reaches its lowest point, \num{\valCpBestRelError}, at \SI{\valCpBestStep}{\kelvin}.
+On the nitrogen example the measured curve reaches its lowest point, \num{\valCpBestRelError}, at \SI{\valCpBestStep}{\kelvin}.
 That is below the model, because the rounding errors happen to cancel there; a neighbouring step does several times
 worse. The model's level, not the luckiest point, is what to expect.
 
@@ -159,7 +158,7 @@ The scale $\scale$ is the library's guess for $w$. For large $\abs{x}$ it makes 
 of $x$: functions of a physical quantity often vary on a scale comparable to its size, as the enthalpy varies with
 $T/\SI{1000}{\kelvin}$. Near zero $\abs{x}$ says nothing about the scale, and the step becomes absolute,
 $\epsmach^{1/3}$ in the units of $x$. This choice of scale is
-standard in numerical optimisation (Dennis and Schnabel,\cite{dennis1996} Section 5.4). For the thread, $\scale = \SI{1000}{\kelvin}$ and the default
+standard in numerical optimisation (Dennis and Schnabel,\cite{dennis1996} Section 5.4). For the nitrogen example, $\scale = \SI{1000}{\kelvin}$ and the default
 step is \SI{\valCpDefaultStep}{\kelvin}; the relative error is \num{\valCpDefaultRelError}, on the model line near the
 bottom of the V (\cref{fig:v-curve}). Every stencil of the library has a default step of the same form,
 $\epsmach^{1/(\aorder + \dorder)} \scale$ (\cref{ch:stencils,ch:orders}).
@@ -250,8 +249,7 @@ method with an initial step on the same scale, $w/4$, is just as good: it return
 \sidecaption{The V for a narrow feature at a large $\abs{x}$, $\tanh((x - x_0)/w)$ with $x_0 = 1000$ and $w = 0.5$, at
 $x = x_0 + 0.2$. The default step $\epsmach^{1/3} \scale$ sits far to the right of the minimum, and the step
 $\epsmach^{1/3} w$ built from the feature's width lands at it. The default step guesses that $f$ varies on the scale
-$\scale = \max(\abs{x}, 1)$; put the scale $w$ on which it does vary in place of $\scale$. Data
-\code{data/step-scale.csv}.%
+$\scale = \max(\abs{x}, 1)$; put the scale $w$ on which it does vary in place of $\scale$.%
 \label{fig:step-scale}}
 \centering
 \input{figures/03-rounding-step-scale}
@@ -278,7 +276,7 @@ default step about 15 times too small, which on the rounding branch costs about 
 \input{figures/03-rounding-step-scale-small}
 \caption{The V of \code{Central<2>} for $y \ln y$ at $y = 10^{-6}$. Steps above $y$ cross zero, so the curve stops
 and the default step fails, while $\epsmach^{1/3} y$ gives the expected accuracy. The 1 in $\max(\abs{x}, 1)$ is in
-your units. Data \code{data/step-scale-small.csv}.\label{fig:step-scale-small}}
+your units.\label{fig:step-scale-small}}
 \end{marginfigure}
 
 \paragraph{Finding the scale.} The scale $w$ can usually be read off the model. For a transition it is the width of
@@ -311,7 +309,7 @@ a simulator that converges tear streams, has a tolerance that is not $\noise$: m
 if $f$ is computed by cancellation, as a difference of large terms, its rounding error is $\epsmach$ times the
 largest intermediate, $k \epsmach \abs{f}$ with $k \gg 1$; treat $k \epsmach$ as the noise level.
 
-A smooth but inaccurate $f$ is not noisy: the thread's Shomate fit describes nitrogen to about four digits, yet
+A smooth but inaccurate $f$ is not noisy: the nitrogen Shomate fit describes nitrogen to about four digits, yet
 its derivative, the fit's, is accurate to $\epsmach^{2/3}$.
 
 \begin{marginfigure}
@@ -319,8 +317,7 @@ its derivative, the fit's, is accurate to $\epsmach^{2/3}$.
 \input{figures/03-rounding-noise}
 \caption{The V of \code{Central<2>} on $\mathrm{e}^x$ at 1 with the values perturbed by a relative noise
 $\noise = 10^{-10}$ and $10^{-8}$, against the clean curve. The rounding branch lifts to $\noise \abs{f} / h$ and the
-minimum moves right and up; the dot marks the step $\noise^{1/3}$ for $\noise = 10^{-8}$. Data
-\code{data/step-error-noise.csv}.\label{fig:noise}}
+minimum moves right and up; the dot marks the step $\noise^{1/3}$ for $\noise = 10^{-8}$.\label{fig:noise}}
 \end{marginfigure}
 
 \Cref{fig:noise} measures this on $\mathrm{e}^x$ at $x = 1$, whose values are multiplied by $1 + \noise u$ with $u$
@@ -349,8 +346,7 @@ no three orders agree, it reports $k = 0$: the spacing is too large for the smoo
 within eight points; retry with a tenth of the spacing, or fall back to the solver's tolerance, as the listing does.
 A spacing on the scale of $f$ itself can make the orders agree by accident at a wrong level (the full procedure tests
 signs and adjusts the spacing): use the default step, check $k$, and distrust a level near $\epsmach$ for a solver.
-The header, \code{docs/deriv-book/code/noise.hpp}, is under the repository's MIT licence; the library itself does not
-measure noise, a deferred feature (\cref{sec:using-not}).
+The header, \code{docs/deriv-book/code/noise.hpp}, is under the repository's MIT licence.
 
 Ridders' estimate assumes that $f$ is accurate to about $\epsmach$, so for a noisy $f$ it can be optimistic. Over \num{\valNoiseRiddersCases} points in $[0.2, 3]$ the
 estimate covered the actual error in \SI{\valNoiseCleanRiddersCoverage}{\percent} of the cases for the clean
@@ -369,8 +365,7 @@ Everything above holds for any number type, with its own $\epsmach$. A \code{flo
 \centering
 \input{figures/03-rounding-float-double}
 \caption{The V of \code{Central<2>} for \code{float} and \code{double} on $\mathrm{e}^x$ at 1. Each floor lies at or
-below $\epsmach^{2/3}$ of its type (dashed), with the rounding scatter up to a decade or more below it. Data
-\code{data/step-error-float.csv}.\label{fig:float-double}}
+below $\epsmach^{2/3}$ of its type (dashed), with the rounding scatter up to a decade or more below it.\label{fig:float-double}}
 \end{marginfigure}
 
 \section{A checklist for the step}\label{sec:rounding-checklist}

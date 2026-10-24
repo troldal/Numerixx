@@ -109,8 +109,8 @@ namespace nxx::deriv {
         /**
          * @brief Whether `Central<p>` exists: p even, 2 <= p <= 10.
          *
-         * The cap is a design decision, not a measured limit: by the model's exponent alone, `Central<12>` would gain
-         * about 0.2 digit for f' in double and 0.7 in a 50-digit type.
+         * The cap is a design decision, not a measured limit: by the model's exponent alone, `Central<12>` would cut
+         * the error of f' by a factor of about 1.7 in double and about 5 in a 50-digit type.
          *
          * @param p The accuracy order.
          * @return true if the order is accepted.

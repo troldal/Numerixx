@@ -1,4 +1,4 @@
-// E12 (Chapter 7, section 7.4; figure F16, data set DS11): Newton's method for the temperature at which the thread's
+// E12 (Chapter 7, section 7.4; figure F16, data set DS11): Newton's method for the temperature at which the nitrogen example's
 // enthalpy takes a given value, an energy balance, with the slope dH/dT = cp from derivative(). The same iteration as
 // the generator's DS11: H_target = H(1000 K), start at 800 K, stop when the step is below 1e-9 K.
 
@@ -48,7 +48,7 @@ solve_T(double H_target, double T)
 
 int main()
 {
-    double const T_star = book::thread_T0;
+    double const T_star = book::nitrogen_T0;
     // clang-format off
 // <newton-call>
 auto const s = solve_T(H(1000.0), 800.0);

@@ -153,8 +153,7 @@ $\sqrt{10} \approx 3.2$ times smaller.
 \sidecaption{Relative error of \code{Forward<1>} and \code{Central<2>} against the step $h$ for the heat capacity of
 nitrogen, $\dd\enth / \dd T$ at $T_0 = \SI{1000}{\kelvin}$, for large steps. On logarithmic axes the errors fall on
 lines of slope 1 and 2: halving the step halves one error and quarters the other. Below \SI{0.01}{\kelvin} the
-central difference stops improving; why is the subject of \cref{ch:rounding}. Data
-\code{data/step-error-cp.csv}.\label{fig:fd-slopes}}
+central difference stops improving; why is the subject of \cref{ch:rounding}.\label{fig:fd-slopes}}
 \centering
 \input{figures/02-taylor-fd-slopes}
 \end{figure}
@@ -181,7 +180,7 @@ enthalpy of nitrogen, a smooth function of $T/\SI{1000}{\kelvin}$, steps of many
 sense. Most engineering functions vary on a scale comparable to the size of their argument; \cref{ch:rounding}
 builds the library's default step on that observation, and shows what to do when it fails.
 
-\Cref{fig:fd-slopes} tests the prediction on the thread, $\enth(T)$ at $T_0 = \SI{1000}{\kelvin}$, with the closed
+\Cref{fig:fd-slopes} tests the prediction on the nitrogen example, $\enth(T)$ at $T_0 = \SI{1000}{\kelvin}$, with the closed
 form of $\cp$ as the answer key. On logarithmic axes an error $\errc h^{\aorder}$ is a straight line of slope
 $\aorder$, and the two measured curves are such lines, of slopes 1 and 2. At every step shown, the central difference
 is more accurate by orders of magnitude.

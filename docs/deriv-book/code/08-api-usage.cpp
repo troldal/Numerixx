@@ -1,4 +1,4 @@
-// E16 (Chapter 8, sections 8.2 and 8.8): every accepted form of the call, on the thread's enthalpy at T0 = 1000 K,
+// E16 (Chapter 8, sections 8.2 and 8.8): every accepted form of the call, on the nitrogen enthalpy at T0 = 1000 K,
 // and the calls that do not compile, as requires-expressions that are false. main calls each accepted form and checks
 // that it succeeds; the static_asserts check the rejected ones.
 
@@ -48,7 +48,7 @@ namespace {
 
 int main()
 {
-    double const T0 = book::thread_T0;
+    double const T0 = book::nitrogen_T0;
     // clang-format off
 // <api-overloads>
 // f' by Central<2> with its default step

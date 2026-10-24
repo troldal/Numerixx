@@ -26,7 +26,7 @@ static_assert(derivative<Ridders>(cube, 2.0, 0.0625)
 // </constexpr>
 
 // <constexpr-failure>
-// The thread's fit, NaN outside its range: a failure is a
+// The nitrogen fit, NaN outside its range: a failure is a
 // value at compile time too.
 constexpr auto H_fit = [](double T) {
     if (T < 500.0)

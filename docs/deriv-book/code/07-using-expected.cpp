@@ -1,5 +1,5 @@
 // E11 (Chapter 7, section 7.2): the result of derivative(), a std::expected<Estimate<T>, error>. How to test it,
-// read it, chain it, and the traps of the conversion of Estimate<T> to T. The thread's enthalpy H(T) comes from the
+// read it, chain it, and the traps of the conversion of Estimate<T> to T. The nitrogen enthalpy H(T) comes from the
 // shared header; T0 = 1000 K.
 
 // clang-format off
@@ -32,7 +32,7 @@ namespace {
 int main()
 {
     bool ok = true;
-    double const T0 = book::thread_T0;
+    double const T0 = book::nitrogen_T0;
 
     // clang-format off
 // <expected-basics>

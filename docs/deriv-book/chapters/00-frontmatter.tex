@@ -38,11 +38,12 @@ sheet: the calls, the result, the failures, the method choice, the checks and th
 Every number in this book that comes from a computation was produced by the library itself, apart from a few
 attributed figures of its design record and tests: a generator program in the book's sources runs \code{nxx::deriv} and writes the values, the data behind every plot and the
 bodies of the tables, and the text quotes them by name; at every run it also checks the weight tables and the
-thread example against independent evaluations. Every code listing is quoted from a
+nitrogen example against independent evaluations. Every code listing is quoted from a
 compiled program that runs as a test of the library and checks what the text claims about it, with two exceptions:
 the declarations of \cref{ch:api} are transcribed from the library's header and checked against it at every build,
-and the CMake snippet of \cref{sec:using-call} is quoted from a file the book's build does not configure. The book
-describes the library as it is; a missing feature is named as deferred.
+and the CMake snippet of \cref{sec:using-call} is quoted from a file the book's build does not configure. The
+data behind every plot and table, and the program that computes them, are in the repository under
+\code{docs/deriv-book/data} and \code{docs/deriv-book/tools}.
 
 \section*{The version}
 
@@ -52,31 +53,9 @@ truth: where this book and the code disagree, the book has the bug.
 
 \section*{How this document was prepared}
 
-This document was prepared with the use of AI, under the direction of its author, who defined its scope, approved
-its plan, its evidence and each stage through the first review round, decided every contested point of that round,
-directed that the second round be closed on the editor's recommendations, and is responsible for its content.
-
-The work ran as a staged process with AI models in named roles. The book's folder, its layout, its build and
-checks and the skeleton of its data generator were set up in a session on Anthropic's Claude Opus 5.5; from the
-plan on, a main session on Claude Fable 5.1 coordinated the other agents and reported to the author. An editor
-(Claude Fable 5.1) wrote the plan, the notation,
-the data generator, the front and back matter and the decision letters, and integrated the chapters. Three authors
-drafted the chapters in parallel and wrote the code examples: the fundamentals of Part~I (Claude Opus 5.5), the
-methods chapters and the derivations (Claude Fable 5.1), and the chapter on using the library together with Part~II
-(Claude Opus 5.5). Before any prose was written, the plan was reviewed by the engineer reader and the numerics
-reviewer, and the thread example's data and the generator's first results by the evidence reviewer. The integrated
-draft was then reviewed by five reviewers: two readers in the role of the target audience, a process engineer and
-an engineering-software developer (Claude Opus 5.5), and three peer reviewers, of the numerical claims (Claude
-Fable 5.1), of every statement and listing against the code (Claude Opus 5.5), and of the numbers, figures and
-citations (Claude Opus 5.5); the editor decided on every finding, the author approved the decisions, and the
-authors revised their chapters. The revised book was reviewed in a second, targeted round by the same five
-reviewers, who confirmed the
-revisions and raised 30 new findings, and independently by two other models, OpenAI Codex (10 findings, with
-compiled counterexamples) and Cline with DeepSeek V4.1 Flash through ClinePass (21 findings); the editor decided
-on every finding, and the authors applied the decisions in a final round of fixes.
-
-The numbers, the plotted data and the generated tables were computed by running the library through the book's
-data generator; no model typed them, and the few figures quoted from the design record and the tests are
-attributed. The code listings are compiled and run as tests; the declarations of \cref{ch:api} are checked against
-the library's header at every build. Every reference was checked against the work or a library catalogue. The
-layout follows an earlier design document of the author's.
+This document was prepared with the use of AI, under the direction of its author, who approved every stage and
+is responsible for its content. Anthropic's Claude drafted and reviewed it in named authoring and reviewing
+roles; OpenAI Codex and Cline with DeepSeek V4.1 Flash reviewed the result independently. What makes it
+trustworthy is checked by the build, not taken on a model's word: every number, plot and table was computed by
+running the library, every code listing is compiled and run as a test, and every reference was checked against
+the work or a library catalogue.

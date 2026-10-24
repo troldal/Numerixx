@@ -35,13 +35,14 @@ a \emph{finite difference}. The secant through $x - h$ and $x + h$, placed symme
 to the tangent than the one through $x$ and $x + h$, as the figure shows. \Cref{ch:taylor} explains why, and
 \cref{ch:rounding} why the step cannot simply be made as small as we like.
 
-\begin{marginfigure}
-\centering
-\input{figures/01-why-secant}
-\caption{The tangent at $x$ and two secants. The central secant, through $x - h$ and $x + h$, is nearly parallel
+% A text-width figure in the body, not a margin figure (the author's release comment: too small to read there).
+\begin{figure}
+\sidecaption{The tangent at $x$ and two secants. The central secant, through $x - h$ and $x + h$, is nearly parallel
 to the tangent; the forward secant, through $x$ and $x + h$, is visibly steeper. A diagram, without
 data.\label{fig:secant}}
-\end{marginfigure}
+\centering
+\input{figures/01-why-secant}
+\end{figure}
 
 \section{The alternatives in one page}\label{sec:why-alternatives}
 
@@ -77,8 +78,7 @@ and Trapp brought the simple first-derivative form back into use.
 
 \code{nxx::deriv} takes any callable \code{fn} that maps a real number to a real number, and assumes nothing else:
 not its source, not a complex extension, not even smoothness beyond what the error terms of the later chapters
-need. That is the case the other tools do not cover. Automatic differentiation and the complex step are deferred
-features of the library, named as such in \cref{ch:using}.
+need. That is the case the other tools do not cover.
 \end{sidebar}
 
 \section{What the library offers}\label{sec:why-offers}

@@ -62,8 +62,8 @@ Decisions in force. Each one says why; change it here before changing the code.
   of the error, not the number of points: for the N-th derivative `Central<P>` has P + N - 1 nodes (without 0 for odd
   N), the one-sided rules P + N. They are empty tags; their tables are internal (`detail::make_table<N>`), because no
   current use needs user-written stencils. The caps are the same for every N and are design decisions, not measured
-  limits: by the model's exponent alone, `Central<12>` would gain about 0.2 digit for f' in double and 0.7 in a 50-digit
-  type, and the one-sided rounding factor `S = sum |w| / den`, 27.7 at P = 6 for f' (4019 for f''''), grows about as
+  limits: by the model's exponent alone, `Central<12>` would cut the error of f' by a factor of about 1.7 in double and
+  about 5 in a 50-digit type, and the one-sided rounding factor `S = sum |w| / den`, 27.7 at P = 6 for f' (4019 for f''''), grows about as
   fast as the order pays (`Forward<7>` would lower the best error for f' by about 14 %, `Forward<8>` not at all).
 - The weights of every rule come from one consteval generator, the Lagrange formula
   `w_k = N! [t^N] prod_{j != k} (t - n_j) / (n_k - n_j)` (Burden et al.), in exact long long arithmetic over one common

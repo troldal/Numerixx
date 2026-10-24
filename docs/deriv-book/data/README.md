@@ -4,7 +4,7 @@ Written only by `tools/generate_data.cpp` (CMake target `numerixx_book_data`, al
 carries the generator's header, and `tools/check.py` rejects one that does not. Never edit these files by hand: change
 the generator and rerun it. The generated files are committed, so that a diff shows when a number in the book changes.
 The data sets are DS1 to DS21 of `PLAN.md` section 4.3; the generator exits with status 1 if one of its self-checks
-fails (the thread function against the evidence reviewer's exact values, a moment condition, Ridders' returned entry
+fails (the nitrogen function against the evidence reviewer's exact values, a moment condition, Ridders' returned entry
 not found in the tableau, a `\val` macro defined twice).
 
 ## Conventions
@@ -15,7 +15,7 @@ not found in the tableau, a `\val` macro defined twice).
   `\SI{\valX}{unit}`. Naming: `<X>RelError` is |value - exact| / |exact|;
   `<X>Actual` is |value - exact|; `<X>Estimate` is the returned `abs_error` (absolute, in the derivative's unit);
   `<X>RelEstimate` is `abs_error` / |exact|; `<X>Evals` the number of evaluations of fn; `<X>Value` the returned value
-  to twelve digits; `<X>Step` a step in the argument's unit (kelvin for the thread).
+  to twelve digits; `<X>Step` a step in the argument's unit (kelvin for the nitrogen example).
 - `<figure>.csv`: one file per plotted data set; `#` comment lines first (the header, then the data set's description),
   then the column names, then the rows, read with `\addplot table[col sep=comma, comment chars={\#}]`. A result that is
   not finite is written as `nan`, which pgfplots skips (set `unbounded coords=jump` to break the curve there). Steps are
@@ -31,7 +31,7 @@ not found in the tableau, a `\val` macro defined twice).
   libm calls that remain (exp, sin, log, tanh) are shared by fn and the reference value. `data/` is generated on the gcc
   preset (GCC 16, UCRT); another libm may change the last bits and the exact-zero counts of DS9, which the committed
   files and their diff make visible.
-- The thread: nitrogen's Shomate enthalpy from `code/shomate.hpp` (range 500 to 2000 K) at T0 = 1000 K; H in J/mol
+- The nitrogen example: the Shomate enthalpy of nitrogen from `code/shomate.hpp` (range 500 to 2000 K) at T0 = 1000 K; H in J/mol
   (relative to 298.15 K), T and steps in K, cp in J/(mol K). exp(x) is the function of the method figures.
 - "Default-step accuracy" sets (DS6, DS7, DS15) report the median over 11 points x = 0.5, 0.55, ..., 1 (same scale,
   same step), with the smallest and largest value alongside; a single point's rounding error is luck by a factor of ten.
@@ -67,7 +67,7 @@ not found in the tableau, a `\val` macro defined twice).
 | DS10 | `ridders-edge.csv` (`k, x, ok, covered, rel_error, rel_estimate, evaluations`; last row x = 0.01 with k = log2(1/x)) | `RiddersEdge{Limit,LimitExponent,TenDigits,TenDigitsExponent,CapExponent}`, `RiddersEdgeAtOneHundredth{RelError,Actual,Estimate,RelEstimate,Evals,Value}`, `RiddersEdgeEvalsAtOneHundredth`, `RiddersEdgeEvalsInterior` (the k = 2 row: log x without a restart), `RiddersEdgeLimitRelEstimate` (the relative estimate at the last x that still returns a value, 2^-34), `EdgeCentralAtOneHundredthRelError` | F15 `fig:ridders-edge`, E10 (ch. 6, 6.4), ch. 10 (10.4) |
 | DS11 | `newton.csv` (`iteration, T, residual, error`; residual in J/mol, error in K) | `Newton{Iterations,FinalError,FinalResidual,Start}` | F16 `fig:newton`, E12 (ch. 7, 7.4) |
 | DS12 | `table-weights-central-N1.tex` .. `-N4.tex`, `table-weights-forward-N1.tex` .. `-N4.tex` (columns: P, nodes, numerators, d, S, C, leading error term) | `Ampl{Central,Forward}<P>`, `Errc{Central,Forward}<P>` with P in words (`Two`, `Six`) for N = 1; `AmplForwardSixFourth` (the largest S of all the tables) | T4 to T11 (ch. 9, 9.2, 9.3); S and C quoted in ch. 4 |
-| DS13 | `table-default-steps.tex` (family, P, N, exponent, step for double at s = 1, model error, evaluations) | `RootEps{Three,Four,Five,Six}Double`, `RootEpsThreeFloat`, `ModelCentralTwo{First,Second,Third,Fourth}Double`, `ModelCentralTenFirstDouble`, `ModelCentralTwo{First,Fourth}Float`, `ModelForwardOne{First,Fourth}Double`, `StepConstantCentralTwo{First,Second,Fourth}`, `StepConstantCentralTenFirst`, `StepCost{CentralTwoFirst,CentralTwoSecond,CentralTwoFourth,CentralFourFourth,CentralTenFirst}` (the model's cost of dropping the constant, App. B.4), `MisjudgeCost{CentralTwoFirst,CentralTwoFourth,CentralFourFourth}` (the model's growth of the error for a step off by a factor 2, the larger of the halved and doubled cases), `CapGainCentralTwelve{First,Fourth}{Double,Multiprecision}` (the digits a Central<12> would gain by the exponent alone), `ModelDigitsCentralTwo{First,Second,Third,Fourth}Double` (-log10 of the model error, one decimal) | T12 (ch. 9, 9.4); ch. 3 (3.3, 3.4, S5), ch. 5 (5.2, S8), App. A |
+| DS13 | `table-default-steps.tex` (family, P, N, exponent, step for double at s = 1, model error, evaluations) | `RootEps{Three,Four,Five,Six}Double`, `RootEpsThreeFloat`, `ModelCentralTwo{First,Second,Third,Fourth}Double`, `ModelCentralTenFirstDouble`, `ModelCentralTwo{First,Fourth}Float`, `ModelForwardOne{First,Fourth}Double`, `StepConstantCentralTwo{First,Second,Fourth}`, `StepConstantCentralTenFirst`, `StepCost{CentralTwoFirst,CentralTwoSecond,CentralTwoFourth,CentralFourFourth,CentralTenFirst}` (the model's cost of dropping the constant, App. B.4), `MisjudgeCost{CentralTwoFirst,CentralTwoFourth,CentralFourFourth}` (the model's growth of the error for a step off by a factor 2, the larger of the halved and doubled cases), `CapGainCentralTwelve{First,Fourth}{Double,Multiprecision}` (the digits a Central<12> would gain by the exponent alone, a fraction; not quoted) and `CapGainFactorCentralTwelve{...}` (the same gain as a factor in the error, 10 to that power; quoted in 4.5, 9.2 and 10.4), `ModelDigitsCentralTwo{First,Second,Third,Fourth}Double` (-log10 of the model error, rounded to a whole digit) | T12 (ch. 9, 9.4); ch. 3 (3.3, 3.4, S5), ch. 5 (5.2, S8), App. A |
 | DS14 | `table-ridders-constants.tex` (constant, value) | `RiddersLevelCap`, `RiddersDivisor{First,Higher}`, `RiddersMaxEvals{First,Second,Third,Fourth}` | T13 (ch. 9, 9.5), S11, ch. 10 |
 | DS15 | `accuracy-matrix.csv` (`method, type, N, median, min, max`), `table-accuracy-matrix.tex` (method; N = 1..4 for float, double, cpp_bin_float_50; float N = 4 marked `*`) | `AccuracyMatrixHasMultiprecision`, `AccuracyMatrixPoints`, `Headline{First,Fourth}Digits`, `HeadlineRidders{First,Fourth}Digits` (-log10 of the median, rounded to the nearest integer), `ExpRiddersFirstRelError` (Ridders' median for f' in double, the figure behind its headline digits), `ModelRatioCentralBelowMax` (central rules, N = 1 to 3: the model over the median), `ModelRatioCentralFourthAbove` (central rules, N = 4: the median over the model), `ModelRatioForwardTwoAbove`, `ModelRatioForwardFour{Third,Fourth}` | T14 (ch. 10, 10.1); 1.5 |
 | DS16 | `table-cost.tex` (method; evaluations per N; Ridders median with range, then the caps) | | T15 (ch. 10, 10.3); 1.5 |

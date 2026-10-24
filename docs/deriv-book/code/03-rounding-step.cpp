@@ -1,4 +1,4 @@
-// E3 (Chapter 3, sections 3.2 to 3.4): a smaller step is not always better. On the thread, a step of 1e-2 K is
+// E3 (Chapter 3, sections 3.2 to 3.4): a smaller step is not always better. On the nitrogen example, a step of 1e-2 K is
 // near the bottom of the V (F3), 1e-8 K is far down its rounding branch, and the default step beats the latter. A
 // step below the spacing of the doubles at 1000 K cannot move T0 at all, and the library reports non_finite.
 
@@ -12,7 +12,7 @@
 int main()
 {
     auto const H = [](double T) { return book::shomate_H(book::nitrogen, T); };
-    double const T0 = book::thread_T0; // 1000 K
+    double const T0 = book::nitrogen_T0; // 1000 K
     double const cp = book::shomate_cp(book::nitrogen, T0);
     using nxx::deriv::derivative;
     using nxx::deriv::error;

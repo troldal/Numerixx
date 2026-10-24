@@ -9,7 +9,7 @@ that the central difference reaches about \num{\valHeadlineFirstDigits} digits i
 its best step the rounding of $f$ takes over. This chapter asks what more points buy. The answer is a higher accuracy
 order, which lets the step grow and the error fall, at a price in rounding, in smoothness and in evaluations. It
 also answers a practical question that the central difference cannot: how to differentiate at the edge of a domain,
-where $f$ is defined on one side of $x$ only. The thread continues: $\cp = \dd \enth / \dd T$ of nitrogen at
+where $f$ is defined on one side of $x$ only. The nitrogen example continues: $\cp = \dd \enth / \dd T$ of nitrogen at
 $T_0 = \SI{1000}{\kelvin}$, and at the lower end of the fit's range.
 
 \section{Stencils: nodes, weights and the moment conditions}\label{sec:stencils-moments}
@@ -75,6 +75,17 @@ Method & Nodes & Evaluations\\
 \end{tabular}
 \end{margintable}
 
+% Anchored before Sidebar 4.1 and placed [t], so that it is set before the margin Figure 4.2 (the author's
+% release comment: the two were in the wrong order); its first reference opens Section 4.2.
+\begin{figure}[t]
+\sidecaption{Relative error against $h$ for \code{Central<2>} to \code{Central<10>}, $\mathrm{e}^x$ at 1: steeper
+truncation slopes, rounding branches that nearly coincide, and minima that slide up the common rounding line as the
+best step grows. A higher order buys accuracy by letting the step grow; the minimum falls from about
+$\epsmach^{2/3}$ to about $\epsmach^{10/11}$.\label{fig:order-ladder}}
+\centering
+\input{figures/04-stencils-order-ladder}
+\end{figure}
+
 \begin{sidebar}[label=sb:moments]{The moment conditions and the Lagrange generator}
 A rule for the $\dorder$-th derivative of accuracy order $\aorder$ on the nodes $n_1, \ldots, n_m$ satisfies
 \[
@@ -115,18 +126,9 @@ time and at run time.
 
 \section{The order ladder}\label{sec:stencils-ladder}
 
-\begin{figure}
-\sidecaption{Relative error against $h$ for \code{Central<2>} to \code{Central<10>}, $\mathrm{e}^x$ at 1: steeper
-truncation slopes, rounding branches that nearly coincide, and minima that slide up the common rounding line as the
-best step grows. A higher order buys accuracy by letting the step grow; the minimum falls from about
-$\epsmach^{2/3}$ to about $\epsmach^{10/11}$. Data \code{data/step-error-exp.csv}.\label{fig:order-ladder}}
-\centering
-\input{figures/04-stencils-order-ladder}
-\end{figure}
-
 \Cref{fig:order-ladder} puts the five central rules on one plot. From here to the end of the chapter the function is
-$\mathrm{e}^x$ at $x = 1$ rather than the thread, because every derivative of $\mathrm{e}^x$ equals the function,
-so the errors of different orders are comparable; the thread returns in \cref{sec:stencils-price}. Three things
+$\mathrm{e}^x$ at $x = 1$ rather than the nitrogen example, because every derivative of $\mathrm{e}^x$ equals the function,
+so the errors of different orders are comparable; the nitrogen example returns in \cref{sec:stencils-price}. Three things
 to see. On the right, where truncation dominates, each curve is a line whose slope is its order $\aorder$: the
 error of \code{Central<4>} falls sixteen times per halving of the step, that of \code{Central<10>} a thousand
 times. On the left, where rounding dominates, the curves nearly coincide: the rounding error is $\ampl \epsmach
@@ -143,8 +145,7 @@ and \num{\valModelCentralTenFirstDouble}; measured at the default steps the medi
 \input{figures/04-stencils-default-step-accuracy}
 \caption{Relative error at the default step against $\aorder$ for \code{Central<P>} and \code{Forward<P>},
 $\mathrm{e}^x$: the median over eleven points in $[0.5, 1]$, the whiskers the smallest and largest value.
-Diminishing returns beyond 4 or 6 for double. Data
-\code{data/default-step-accuracy.csv}.\label{fig:default-step-accuracy}}
+Diminishing returns beyond 4 or 6 for double.\label{fig:default-step-accuracy}}
 \end{marginfigure}
 
 The returns diminish. \Cref{fig:default-step-accuracy} shows the error at the default step against the order:
@@ -166,7 +167,7 @@ with the error constant $\errc$ and the amplification $\ampl$ defined from the w
 model of \cref{ch:rounding} is the case $\errc = \tfrac16$, $\ampl = 1$. The best step is proportional to
 $\epsmach^{1/(\aorder + 1)}$ and the best error to $\epsmach^{\aorder/(\aorder + 1)}$, as in \cref{sb:step-constant}
 and \cref{sec:derivations-model}; the default step is $\epsmach^{1/(\aorder + 1)} \scale$ with $\scale = \max(\abs{x}, 1)$,
-without the constant that $\errc$ and $\ampl$ would add. On the thread this is visible in the steps themselves:
+without the constant that $\errc$ and $\ampl$ would add. On the nitrogen example this is visible in the steps themselves:
 \code{Central<2>} differentiates $\enth$ with a step of \SI{\valCpDefaultStep}{\kelvin}, \code{Central<4>} with
 \SI{\valCpCentralFourStep}{\kelvin} and \code{Central<6>} with \SI{\valCpCentralSixStep}{\kelvin}, and the relative
 errors fall from \num{\valCpDefaultRelError} to \num{\valCpCentralFourRelError} and \num{\valCpCentralSixRelError}:
@@ -184,10 +185,10 @@ by a fixed multiple of $h$ and keeps the third term, which the tests allow for (
 
 The second price is smoothness. The error term in \cref{eq:stencils-central-four} holds only if $f$ has
 $\aorder + \dorder$ continuous derivatives across the whole stencil, which reaches $K h$ from $x$ on the sides it
-samples, with $K$ the largest node, and both $K$ and the default step grow with the order: on the thread \code{Central<6>} samples
+samples, with $K$ the largest node, and both $K$ and the default step grow with the order: on the nitrogen example \code{Central<6>} samples
 up to \SI{\valCpCentralSixStep}{\kelvin} times three on either side of $T_0$. A kink or a range break anywhere in
 that span gives a wrong value without any failure, and a higher order makes it worse, not better; \cref{sec:using-pitfalls}
-measures this on the thread's own range break. The third price is evaluations: $\aorder + \dorder - 1$ per call
+measures this on the nitrogen example's own range break. The third price is evaluations: $\aorder + \dorder - 1$ per call
 (\cref{tab:stencils-nodes}), which inside an iteration is the whole cost of the derivative.
 
 \begin{sidebar}[label=sb:richardson-disguise]{\code{Central<4>} is Richardson extrapolation in disguise}
@@ -230,7 +231,7 @@ $x$ (\cref{fig:stencil-nodes}). Both include $x$ itself, so they also serve at t
 \centering
 \input{figures/04-stencils-one-sided}
 \caption{\code{Forward<2>} against \code{Central<2>} and \code{Forward<4>} against \code{Central<4>}: the same
-slopes, higher floors (a larger $\ampl$). Data \code{data/step-error-exp.csv}.\label{fig:one-sided}}
+slopes, higher floors (a larger $\ampl$).\label{fig:one-sided}}
 \end{marginfigure}
 
 Each point buys one order. \code{Forward<P>} has $\aorder + 1$ weights and no symmetry to help, so the
@@ -249,7 +250,7 @@ the rounding branch shifted up. At the default step on $\mathrm{e}^x$, \code{For
 (\cref{fig:default-step-accuracy}). The one-sided rules stop at order 6, a design decision discussed with the
 central cap in \cref{sec:stencils-choosing}.
 
-The thread shows why the edge matters. Its Shomate fit is valid from \SI{500}{\kelvin} to \SI{2000}{\kelvin}, but
+The nitrogen example shows why the edge matters. Its Shomate fit is valid from \SI{500}{\kelvin} to \SI{2000}{\kelvin}, but
 the formula, a polynomial plus a $1/T$ term, evaluates without complaint at \SI{499}{\kelvin} and returns a
 plausible number that describes nothing: evaluable is not valid. A central rule at \SI{500}{\kelvin} samples
 below the range and returns a derivative of the extrapolated formula, with no sign that anything is wrong. The
@@ -275,9 +276,9 @@ step; \code{Central<6>} and above only for wide types, where $\epsmach$ is small
 their mirrors, exactly at an edge and nowhere else, since their constants are larger. For a value to report with
 an error estimate, use Ridders. The caps are design decisions recorded in the design record of the repository
 (\code{docs/PHASE2_API.md}), not measured limits. The central rules stop at order 10: by the model's exponent
-alone, a rule of order 12 would gain about \num{\valCapGainCentralTwelveFirstDouble} digit for $f'$ in double and
-\num{\valCapGainCentralTwelveFirstMultiprecision} in a 50-digit type (\num{\valCapGainCentralTwelveFourthDouble} and
-\num{\valCapGainCentralTwelveFourthMultiprecision} for the fourth derivative), and the library stops there. The
+alone, a rule of order 12 would cut the error of $f'$ by a factor of about \num{\valCapGainFactorCentralTwelveFirstDouble} in double and
+\num{\valCapGainFactorCentralTwelveFirstMultiprecision} in a 50-digit type (\num{\valCapGainFactorCentralTwelveFourthDouble} and
+\num{\valCapGainFactorCentralTwelveFourthMultiprecision} for the fourth derivative), and the library stops there. The
 one-sided rules stop at order 6, where the amplification, already \num{\valAmplForwardSix} for $f'$, grows about
 as fast as the exponent pays (\cref{sec:guarantees-limits}). The decision table by situation is
 \cref{tab:method-choice}, and every rule's nodes, weights and constants are in \cref{ch:tables}.

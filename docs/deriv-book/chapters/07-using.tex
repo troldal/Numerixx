@@ -98,7 +98,7 @@ evaluations for $f'$ (median) against two to six for the stencils, about three m
 
 \begin{table*}
 \caption{Choosing a method. Relative errors in double: the model $\epsmach^{P/(P+N)}$ of \cref{ch:stencils} where
-named, then measured values, medians for $\mathrm{e}^x$ (\cref{tab:accuracy-matrix}) or the thread's $\cp$ and this
+named, then measured values, medians for $\mathrm{e}^x$ (\cref{tab:accuracy-matrix}) or the nitrogen $\cp$ and this
 chapter's examples. Evaluations of $f'$ unless the row says otherwise; for Ridders' method the study's median and
 the cap (\cref{tab:cost}). $w$ is the scale on which $f$ varies, $\noise$ its relative accuracy.\label{tab:method-choice}}
 \centering\footnotesize
@@ -126,7 +126,7 @@ $f$ is the output of an iterative solver, accurate to $\noise$ only (noisy) & \c
   Ridders' estimate is optimistic & \cref{fig:noise}, \cref{sec:using-solver}\\
 A second derivative & \code{Central<2>} or \code{Ridders}, with $N = 2$ & default & 3, or
   \num{\valRiddersEvalsMedianSecond} & model $\epsmach^{1/2} = \num{\valModelCentralTwoSecondDouble}$, measured
-  \num{\valCpSecondRelError}; Ridders \num{\valCpRiddersSecondRelError} (thread) & \cref{fig:v-curve-orders}\\
+  \num{\valCpSecondRelError}; Ridders \num{\valCpRiddersSecondRelError} (nitrogen) & \cref{fig:v-curve-orders}\\
 A third or fourth derivative & \code{Ridders}, or \code{Central<4>}; never float & default & 4 per level, or 6 to 7 &
   $f''''$: Ridders \num{\valDoubleFourthRiddersRelError}, \code{Central<2>} \num{\valDoubleFourthCentralRelError};
   \code{Central<4>} in \cref{tab:accuracy-matrix} & \cref{fig:order-accuracy}\\
@@ -146,7 +146,7 @@ A kink or a range break within a step of $x$ & none: differentiate one side, wit
 
 An energy balance often gives the enthalpy of a stream and asks for its temperature: solve $\enth(T) = H^\ast$ for
 $T$. Newton's method needs the slope $\deriv{\enth}{T} = \cp$, which \code{derivative} supplies. This is the classic
-use of a derivative inside an iteration, so the method is the default \code{Central<2>}, applied to the thread's
+use of a derivative inside an iteration, so the method is the default \code{Central<2>}, applied to the nitrogen
 enthalpy \code{H(T)}. A failed slope and a failure to converge are both returned as errors, so a caller cannot take an
 unconverged temperature for a solution:
 \snippet{07-using-newton}{newton}
@@ -164,8 +164,7 @@ iteration can use.
 \centering
 \input{figures/07-using-newton}
 \caption{Newton's residual $\abs{\enth(T) - H^\ast}$ against the iteration, with the slope from \code{Central<2>}:
-the correct digits double at each step until the residual reaches the rounding of $\enth$. Data
-\code{data/newton.csv}.\label{fig:newton}}
+the correct digits double at each step until the residual reaches the rounding of $\enth$.\label{fig:newton}}
 \end{marginfigure}
 
 \subsection{Parameter sensitivities and a Jacobian}\label{sec:using-sensitivity}
@@ -203,12 +202,11 @@ Here that is \num{\valJacobianBalanceHandEvals} model calls, with steps of \SI{\
 \SI{\valJacobianBalanceStepN}{mol}, and every entry is within \num{\valJacobianBalanceHandMaxRelError} of the closed
 forms $n \cp$, $\enth$, $n \Rgas / V$ and $\Rgas T / V$ (measured; \num{\valJacobianBalanceCallMaxRelError} by the
 calls). The loop is the formula without the library's checks: it neither detects a non-finite residual nor divides
-by the distance actually evaluated, so test the residuals it returns. Several outputs from shared evaluations remain
-a deferred feature (\cref{sec:using-not}).
+by the distance actually evaluated, so test the residuals it returns.
 
 \subsection{A function with no formula: a friction factor}\label{sec:using-solver}
 
-The thread's enthalpy has a closed-form derivative; most functions in practice do not. The Darcy friction factor
+The nitrogen enthalpy has a closed-form derivative; most functions in practice do not. The Darcy friction factor
 $\lambda$ of turbulent flow in a rough pipe follows from the Colebrook equation, in its common
 form,\cite{colebrook1939}
 \begin{equation}
@@ -244,8 +242,8 @@ below the accuracy you want of the derivative, or differentiate the converged eq
 \section{Is my derivative good enough?}\label{sec:using-check}
 
 A stencil returns no error estimate. Four checks, in increasing cost, tell you whether to trust it. The first three
-use the thread's $\cp$ at $T_0 = \SI{1000}{K}$ and count the decimal digits on which two values agree,
-$-\log_{10}(\abs{a - b} / \abs{b})$, with a helper \code{digits(a, b)}.
+use the nitrogen $\cp$ at $T_0 = \SI{1000}{K}$ and count the whole decimal digits on which two values agree, the
+integer part of $-\log_{10}(\abs{a - b} / \abs{b})$, with a helper \code{digits(a, b)}.
 
 \paragraph{Repeat with $2h$ and $h/2$.} While truncation dominates, halving the step quarters the error of
 \code{Central<2>}; while rounding dominates, it doubles it. Values that agree to many digits at $h$, $2h$ and $h/2$ are
@@ -322,12 +320,12 @@ exact results in binary arithmetic, which makes the truncation error of \cref{ch
 \snippet{07-using-constexpr}{constexpr}
 Comparing the result with a value, as in \code{derivative(cube, 2.0, 0.25) == 12.0625}, compares \code{value} only,
 through the conversion, and is false when the result is a failure; the same idiom with \code{!=} would pass on a
-failure. Failures are values at compile time too: the thread's fit, written to return NaN below its validity range,
+failure. Failures are values at compile time too: the nitrogen fit, written to return NaN below its validity range,
 gives \code{error::non_finite} for \code{Central<2>} at \SI{500}{K} and a value for \code{Forward<2>}, both checked by
 \code{static_assert} in \code{code/07-using-constexpr.cpp}. The one exception is an overflow of the final quotient,
 for example a fourth derivative with a tiny step: at run time it is \code{non_finite}, but GCC rejects it at compile
 time. Most of \code{<cmath>}, \code{exp} and \code{log} among them, is not \code{constexpr} in C++23, so such an
-\code{fn} is written with arithmetic only; the thread's enthalpy is. GCC evaluates some of them in constant
+\code{fn} is written with arithmetic only; the nitrogen enthalpy is. GCC evaluates some of them in constant
 expressions as an extension, which Clang and MSVC reject: test compile-time derivatives on every toolchain you ship.
 
 The compiler and the processor compute the same value, provided the compiler neither contracts \code{a * b + c} into
@@ -372,7 +370,7 @@ of the break, $J$ the jump in $\enth$: $J/(2h)$ for \code{Central<2>} (\num{\val
 $h = \SI{\valKinkCentralStep}{K}$); $7J/(12h)$ for \code{Central<4>} while the break lies within $h$ of $x$
 (\num{\valKinkInsideCentralFourRelError}, $h = \SI{\valKinkCentralFourStep}{K}$) and $-J/(12h)$ between $h$ and $2h$,
 the two levels the figure shows. So it falls as $1/h$ across the rules, whatever their order. No rule fails; only
-Ridders' estimate (dashed) shows a jump. Data \code{data/kink.csv}.\label{fig:kink}}
+Ridders' estimate (dashed) shows a jump.\label{fig:kink}}
 \end{marginfigure}
 All three calls succeed. \code{Central<2>} is \num{\valKinkInsideCentralRelError} off, relative (the jump over $2h$),
 and \code{Central<4>} \num{\valKinkInsideCentralFourRelError}: a higher order does not cure a function that is not
@@ -435,9 +433,4 @@ As a rule of thumb, the inner error, about $\epsmach^{2/3}$, is the noise level 
 $\epsmach^{2/9} \max(\abs{V}, 1)$ and expect about $\epsmach^{4/9}$, roughly $10^{-7}$ in double. Cache an
 expensive call's last argument and outputs so that its outputs share the evaluations.
 
-
-\paragraph{Deferred features.} Gradients, Jacobians and Hessians (the loops of \cref{sec:using-sensitivity}
-meanwhile); several outputs or orders from shared evaluations; a tolerance for Ridders' method; orders above four;
-user stencils; a noise-aware step;\cite{more2012,gill1983} the complex step and automatic differentiation, which need
-more of $f$ than a black box (\cref{sb:alternatives}); their status is in \cref{sec:guarantees-deferred}.
 

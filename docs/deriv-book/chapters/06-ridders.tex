@@ -12,7 +12,7 @@ stencil cannot give: an estimate of its own error. It evaluates the central diff
 and again, extrapolating the sequence to the limit of zero step until rounding stops the improvement; the size of
 the last improvement is the estimate. The library offers it as one more method tag,
 \code{derivative<Ridders>(fn, x)}, for every derivative order. This chapter explains the extrapolation, shows the
-tableau on the thread, says how to read \code{abs_error} and when not to trust it, and what it all costs.
+tableau on the nitrogen example, says how to read \code{abs_error} and when not to trust it, and what it all costs.
 
 \section{Richardson's idea}\label{sec:ridders-richardson}
 
@@ -65,13 +65,12 @@ and the library computes, for reasons given in \cref{sb:difference-form}; the tw
 \begin{table*}
 \caption{Ridders' tableau for $\cp$ at $T_0$ from $h_0 = T_0 / 32$: the \num{\valTableauLevelsUsed} levels the method
 used, the entries $\Aij{i}{j}$ above and their relative errors with the rounding floor $r_i$ below; the entry
-Ridders returned (level \num{\valTableauBestLevel}, column \num{\valTableauBestColumn}) in the accent colour. Generated bodies
-\code{data/table-ridders-tableau.tex} and \code{data/table-ridders-tableau-errors.tex}.\label{tab:ridders-tableau}}
+Ridders returned (level \num{\valTableauBestLevel}, column \num{\valTableauBestColumn}) in the accent colour.\label{tab:ridders-tableau}}
 \centering
 \input{figures/06-ridders-tableau}
 \end{table*}
 
-\Cref{tab:ridders-tableau} is the tableau for the thread, $\cp = \dd \enth / \dd T$ at $T_0$, from the default
+\Cref{tab:ridders-tableau} is the tableau for the nitrogen example, $\cp = \dd \enth / \dd T$ at $T_0$, from the default
 initial step $h_0 = T_0 / 32$, about \SI{\valCpRiddersInitialStep}{\kelvin}. Read it by columns. Column 0 is the
 plain central difference, which at a step of thirty kelvin is \num{\valTableauBaseFirstRelError} off and gains a
 factor 4 per level, as \cref{ch:taylor} said it would. Column 1 is already \code{Central<4>} in disguise and is
@@ -87,7 +86,7 @@ up with it.
 rounding floor $r_i$ dashed: column 0 descends slowly while each higher column reaches the floor within a few
 levels; the floor doubles per level, so the entries then drift up. Ridders' stop and its returned entry are
 marked. The extrapolation reaches in a few levels what the base difference would need a dozen for; after that,
-more levels only add rounding. Data \code{data/ridders-tableau.csv}.\label{fig:ridders-convergence}}
+more levels only add rounding.\label{fig:ridders-convergence}}
 \centering
 \input{figures/06-ridders-convergence}
 \end{figure}
@@ -121,10 +120,10 @@ difference, $(\epsmach \abs{f(x - h_i)} + \epsmach \abs{f(x + h_i)})$ divided by
 points, under the assumption that each value of \code{fn} is accurate to about $\epsmach$.
 
 The method keeps the entry with the smallest estimate, and stops when two further levels produce no smaller one,
-because each level doubles the floor, so more levels only add rounding (on the thread, the last two levels of
+because each level doubles the floor, so more levels only add rounding (on the nitrogen example, the last two levels of
 \cref{tab:ridders-tableau}). The returned \code{abs_error} is that smallest estimate, raised if necessary to the
 distance between the returned entry and the latest diagonal entry $\Aij{i}{i}$, which catches an entry that only
-looked good. On the thread the estimate is \SI{\valCpRiddersEstimate}{\joule\per\mole\per\kelvin} against an
+looked good. On the nitrogen example the estimate is \SI{\valCpRiddersEstimate}{\joule\per\mole\per\kelvin} against an
 actual error of \SI{\valCpRiddersActual}{\joule\per\mole\per\kelvin}; note that the entries of the last level are
 more accurate than the one returned, but their estimates, pinned at a larger floor, cannot say so, and the
 method reports what it can vouch for rather than what happens to be best. The exact stopping rules, the restart
@@ -140,8 +139,7 @@ zero below $x = 0.25$, the restarts of \cref{sb:floor-coverage}), the diagonal d
 \SI{\valRiddersCoverageFirst}{\percent} of the \num{\valRiddersCases} cases for $\dorder = 1$ and
 \SI{\valRiddersCoverageSecond}{\percent} for $\dorder = 2$. Every third case is drawn (\num{\valRiddersPlotCases} per
 order; all enter the statistics). An actual error of exactly 0 (\num{\valRiddersZeroErrorFirst} and
-\num{\valRiddersZeroErrorSecond} cases) is clipped to $\epsmach \abs{f^{(\dorder)}}$. Data
-\code{data/ridders-coverage-plot-N1.csv}, \code{-N2.csv}.\label{fig:ridders-coverage}}
+\num{\valRiddersZeroErrorSecond} cases) is clipped to $\epsmach \abs{f^{(\dorder)}}$.\label{fig:ridders-coverage}}
 \end{figure*}
 
 How good is the estimate? \Cref{fig:ridders-coverage} plots it against the actual error over the book's own
@@ -188,8 +186,7 @@ than by $x$, the small-$\abs{x}$ case of \cref{sec:rounding-scale}, which Ridder
 \caption{Evaluations and relative error of Ridders for $\log x$ at $x = 2^{-k}$ against $k$: each halving of $x$
 costs about two evaluations until the budget is used up at $k = \num{\valRiddersEdgeCapExponent}$; ten correct
 digits hold to $k = \num{\valRiddersEdgeTenDigitsExponent}$, digits are lost from there, a value is returned to
-$k = \num{\valRiddersEdgeLimitExponent}$ and the result is non-finite beyond. Data
-\code{data/ridders-edge.csv}.\label{fig:ridders-edge}}
+$k = \num{\valRiddersEdgeLimitExponent}$ and the result is non-finite beyond.\label{fig:ridders-edge}}
 \end{marginfigure}
 
 \paragraph{A pole between the samples, or aliasing.} The samples can be finite and still lie: a pole of $f$
@@ -208,7 +205,7 @@ points of $\mathrm{e}^x$ with the values perturbed by $\noise = 10^{-8}$, the co
 \paragraph{A jump or a kink inside the span.} A range break within $h_0$ of $x$ does not produce a non-finite
 value, and Ridders returns a value for the wrong function. Where $f$ itself jumps, it also returns a large
 estimate, since the base differences then converge like $\order(h)$ rather than $\order(h^2)$ and the entries keep
-changing: on the thread's own range break the stencils return errors of order one in silence, while Ridders'
+changing: on the nitrogen example's own range break the stencils return errors of order one in silence, while Ridders'
 relative estimate is \num{\valKinkInsideRiddersRelEstimate}, ten orders of magnitude above the
 \num{\valKinkOutsideRiddersRelEstimate} it reports \SI{\valKinkOutsideDelta}{\kelvin} from the break
 (\cref{sec:using-pitfalls}, \cref{fig:kink}). The estimate flags a jump; the stencil does not. A kink, a jump in
@@ -224,8 +221,7 @@ know the branch boundaries and differentiate the branch you mean (\cref{sec:usin
 \input{figures/06-ridders-cost}
 \caption{Evaluations of \code{fn} per call over the random study: $\dorder = 1$ dark, $\dorder = 2$ muted. The
 tail of $\dorder = 2$ is the slower convergence of several functions, not the restarts, which are a small part of
-its last bar (\cref{sec:ridders-cost}). Data \code{data/ridders-coverage-N1.csv},
-\code{-N2.csv}.\label{fig:ridders-cost}}
+its last bar (\cref{sec:ridders-cost}).\label{fig:ridders-cost}}
 \end{marginfigure}
 
 A level costs 2 evaluations of \code{fn} for $f'$ and $f''$ and 4 for $f'''$ and $f''''$, plus $f(x)$ once per

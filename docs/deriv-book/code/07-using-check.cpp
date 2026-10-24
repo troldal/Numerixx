@@ -1,7 +1,7 @@
 // E18 (Chapter 7, section 7.5): is a stencil's result good enough when it comes without an error estimate? Four
-// checks on the thread's cp at T0 = 1000 K: the same rule at h, 2h and h/2; a rule of higher order; Ridders as an
+// checks on the nitrogen cp at T0 = 1000 K: the same rule at h, 2h and h/2; a rule of higher order; Ridders as an
 // independent estimate; and, where f' is near 0, the absolute rather than the relative error (sin x at pi/2, since
-// the thread's derivatives have no zero in its range). The closed form is the answer key.
+// the nitrogen example's derivatives have no zero in its range). The closed form is the answer key.
 
 #include <numerixx/deriv.hpp>
 
@@ -24,11 +24,12 @@ namespace {
 
 // clang-format off
 // <check-digits>
-// The number of decimal digits on which a and b agree.
+// The whole decimal digits on which a and b agree.
 double digits(double a, double b)
 {
     if (a == b) return 16.0;
-    return -std::log10(std::abs(a - b) / std::abs(b));
+    double const rel = std::abs(a - b) / std::abs(b);
+    return std::floor(-std::log10(rel));
 }
 // </check-digits>
 // clang-format on
@@ -36,7 +37,7 @@ double digits(double a, double b)
 int main()
 {
     bool ok = true;
-    double const T0 = book::thread_T0;
+    double const T0 = book::nitrogen_T0;
     double const exact = book::shomate_cp(book::nitrogen, T0);
 
     // clang-format off
@@ -50,13 +51,13 @@ if (!d || !d2 || !d0) return 1;
 double const agree = std::min(
     digits(d2->value, d->value),
     digits(d0->value, d->value));
-std::println("h, 2h, h/2 agree to {:.1f} digits", agree);
+std::println("h, 2h, h/2 agree to {:.0f} digits", agree);
 // A physical check: a heat capacity is positive.
 if (d->value <= 0) std::println("cp <= 0: wrong");
 // </check-by-steps>
     // clang-format on
     std::println("  d = {:.12f}, 2h {:.12f}, h/2 {:.12f}, exact {:.12f}", d->value, d2->value, d0->value, exact);
-    std::println("  agreement with the closed form: {:.1f} digits", digits(*d, exact));
+    std::println("  agreement with the closed form: {:.0f} digits", digits(*d, exact));
     // The text claims at least 8 agreeing digits, among the three values and with the closed form: the model gives
     // about 4e-11 relative at h (eps^(2/3)), up to about 1e-10 at h/2, where rounding doubles (DS1).
     ok = ok && agree >= 8 && digits(*d, exact) >= 8 && digits(*d2, exact) >= 8 && digits(*d0, exact) >= 8;
@@ -67,7 +68,7 @@ if (d->value <= 0) std::println("cp <= 0: wrong");
 // A rule of higher order, with its own default step
 auto const c4 = derivative<Central<4>>(H, T0);
 if (c4) {
-    std::println("Central<4> agrees to {:.1f} digits",
+    std::println("Central<4> agrees to {:.0f} digits",
         digits(d->value, c4->value));
 }
 // </check-by-order>
@@ -116,8 +117,8 @@ double const spread = std::max(std::abs(*s2 - *s),
 double const of_f1 = -std::log10(spread / std::abs(*s));
 double const scale = std::abs(sine(x)) / x;
 double const of_scale = -std::log10(spread / scale);
-std::println("digits: {:.1f} of f', {:.1f} of the scale",
-    of_f1, of_scale);
+std::println("digits: {:.0f} of f', {:.0f} of the scale",
+    std::floor(of_f1), std::floor(of_scale));
 // </check-absolute>
     // clang-format on
     double const cos_x = std::cos(x);

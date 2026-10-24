@@ -30,7 +30,7 @@ What the book says about the library must be true of the library. In order of pr
 3. `docs/design.md`, `docs/PHASE2_API.md`, `docs/PHASE3_API.md`, `docs/PHASE4_API.md` (decisions and their evidence);
 4. `docs/DERIV_TUTORIAL.md`, `docs/DERIV_TECHNIQUES.md`, `README.md`.
 Where they disagree, the higher one wins; report the disagreement to the author instead of choosing silently. The book
-describes the library as it is; it does not promise features (the deferred ones may be named as such).
+describes the library as it is; it does not promise features, and does not mention features the library lacks.
 
 ## Evidence rules (what makes the book withstand scrutiny)
 
