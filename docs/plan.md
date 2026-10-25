@@ -65,6 +65,39 @@ API approved: `docs/PHASE5_API.md`.
 - Gradients and Jacobians, until a module needs them.
 - A derivative as a callable (`derivative_of(fn)`), until there is a use for it.
 
+Customization (reviewed 2026-10-25 with a usage sketch and a simplicity review; every item can be added without
+breaking the API, so none needs a hook now):
+- An open method protocol, so that a user's method works in `derivative<M>`: method objects with a const member
+  template, which also carry parameters. Until a library algorithm is generic in the method (gradients, Jacobians,
+  `derivatives<M, N>`) and a user needs a method of their own in it. A spike compiled it in constant expressions on
+  GCC, Clang and MSVC.
+- fn's noise level (fn accurate to eta rather than eps), attached to fn, e.g. `with_noise(fn, 1e-10)`, for every
+  method: Ridders' floor and the stencils' default step. The only item with a numerical case: at relative noise 1e-8
+  Ridders' estimate covered the error in 90.7% of the book's cases, against 100% on clean fn, and a caller cannot fix
+  that from outside. Until a caller needs a reliable estimate on noisy fn; a prototype study first (coverage, and the
+  untrusted test that a larger floor weakens, on the pole set).
+- Ridders' cost and tolerance (an evaluation cap, an early stop at a tolerance), returning the best estimate so far
+  rather than an error. Until a measured need that a passed step cannot meet.
+- Stencils from arbitrary nodes (`Stencil<-1, 0, 1, 2>`), from the existing generator. Until a node set no built-in
+  family gives; the accuracy order of symmetric sets is not nodes - N, which the default step must account for.
+- Not planned: a scale parameter (pass `default_step<M, N>(x) / max(|x|, 1) * w` for fn's scale w), exposing
+  Ridders' tuned constants, observers (wrap fn), non-uniform points (run-time weights).
+
+Complex numbers (2026-10-25; `docs/DERIV_TECHNIQUES.md` 2.5 and 2.7):
+- A complex value for a real argument (f: R -> C): the same algorithms, with a value type separate from the argument
+  type, the modulus in the floors and estimates, and overflow guards per component. Until a caller differentiates a
+  complex-valued fn.
+- A complex argument for an analytic fn: the same stencils and Ridders along a real step, and the Cauchy contour
+  method, which gives every order to near machine precision from one set of samples. Needs a generic fn and a complex
+  type; until a module needs derivatives of analytic functions (a root finder for analytic, non-polynomial fn, or
+  Taylor coefficients).
+- Non-analytic fn of a complex argument (Wirtinger derivatives, the 2x2 real Jacobian): with gradients and Jacobians.
+- The complex step (one evaluation, about eps for f'): needs fn written for complex arguments; Boost.Math has
+  `complex_step_derivative`. With the contour method, if ever.
+- Polynomials (planned) get exact derivatives from Horner's scheme and synthetic division, not from `nxx::deriv`. Their
+  complex type (a concept for real and multiprecision types, with `abs` and `isfinite`) is the foundation the items
+  above would reuse.
+
 ## History
 
 - 2026-10-20: the first rewrite was abandoned; master went back to the 1.x code (`v1.1.0-legacy`) and Numerixx 2
