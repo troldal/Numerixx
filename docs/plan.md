@@ -62,15 +62,26 @@ API approved: `docs/deriv/PHASE5_API.md`.
 
 ## Milestone 2: roots of a real function of one variable (`nxx::roots`)
 
-Design first: an architecture brief (`docs/roots/BRIEF.md`) from a survey of the Numerixx 1.x root finders; the phases
-follow from it, each with its API approved before it is written (`docs/roots/PHASE<n>_API.md`), as in Milestone 1.
+Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its API approved before it is written
+(`docs/roots/PHASE<n>_API.md`), as in Milestone 1.
+
+- Phase 1: bracketing core, `Bracket`, `Root`, `error`, `Criteria`, `root<M>(fn, Bracket[, criteria])`; `Bisection`
+  and `Brent`.
+- Phase 2: open methods and derivatives (fn returning a tuple-like, or separate derivative callables); `Newton` and
+  `Halley` on a guess or a bracket, `Secant`.
+- Phase 3: numerical derivatives, `nxx::deriv::derivative_of<M, N>(fn)`, and derivative callables returning
+  `std::expected`.
+- Phase 4: `Toms748`, `AndersonBjorck`.
+- Phase 5: searching, `expand(fn, x0)`.
+- Phase 6, at the user's choice: `Ridders`, `RegulaFalsi`, `Illinois`, `Steffensen`.
 
 ## Deferred
 
 ### Derivatives (`nxx::deriv`)
 
 - Gradients and Jacobians, until a module needs them.
-- A derivative as a callable (`derivative_of(fn)`), until there is a use for it.
+- A derivative as a callable (`derivative_of(fn)`): planned, Milestone 2 Phase 3 (its use: numerical derivatives for
+  Newton and Halley).
 
 Customization (reviewed 2026-10-25 with a usage sketch and a simplicity review; every item can be added without
 breaking the API, so none needs a hook now):
