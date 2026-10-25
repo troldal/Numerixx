@@ -337,6 +337,18 @@ From numerics-reviewer:
   without a default constructor and one whose `numeric_limits` is written member by member, and with the
   `exact_weights` constraint on a 2-digit type (f''' accepted, f'''' rejected, as for `Ridders`).
 
+## Independent review (OpenAI Codex, f20696f)
+
+No Phase 5 defect. It confirmed the column factors, the propagated floor (indexing, saturation, no stale entries
+after a restart), the forward levels and their floors, the reach and resolution checks, the mirror (signed zero, the
+sign of odd orders, the unchanged estimate), the restart rule, the callables and the warning's overload selection.
+
+One inherited limitation, reproduced: a final difference quotient that overflows is formed before it is checked, so
+GCC rejects the constant evaluation, where at run time the level counts as non-finite and the method restarts below
+it. `derivative<ForwardRidders>` of (max t)(64 t) at 0 returns 0 at run time but does not compile as a constant
+expression. It predates Phase 5 and is documented (the header, `design.md`). Left as it is (user decision): closing
+it needs a conservative check that would turn stencil results between about max / 2 and max into non_finite.
+
 ## Not adopted
 
 - **The propagated floor for `Ridders`:** it raised coverage slightly (f' from 99.0% to 99.3%; the worst f'' case
