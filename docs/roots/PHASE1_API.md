@@ -248,7 +248,8 @@ digits. Every result is within `abs_error` of the reference, and `abs_error <= 2
   nowhere), and the primary sources.
 - `README.md`: a three-line `nxx::roots` example.
 - `docs/plan.md`: Phase 1's checkboxes.
-- No demo yet: it would repeat the README; it comes when the module has more methods.
+- No demo in the phase itself: it would have repeated the README. Added after the phase at the user's request:
+  `demo/roots_demo.cpp` (`numerixx_roots_demo`), with the CMake setup of both demos in one function.
 
 ## Decisions by the user (2026-10-25)
 
@@ -348,4 +349,3 @@ headroom; the stop test on the width; the conditioning budgets and the libm-free
   becoming a result; `non_finite`'s documentation says it may happen.
 - The overflow guard's cases in constant evaluation (a guard that never fires there is not tested).
 - fn(lower) and fn(upper) supplied with the bracket; the residual or the evaluation count in `Root` (BRIEF.md 6).
-- A demo program.

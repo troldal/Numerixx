@@ -74,6 +74,8 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
   - [x] CI passes on all five toolchains (02fffe5: run 40192833145)
   - [x] The independent review (Codex) and its adopted findings: five, all reproduced and fixed
     (`docs/roots/PHASE1_API.md`)
+  - [x] A demo, `numerixx_roots_demo`: Bisection against Brent, Kepler's equation, tolerances, a bracket around 0,
+    types, compile time, failures and composition (added after the review, at the user's request)
 - Phase 2: open methods and derivatives (fn returning a tuple-like, or separate derivative callables); `Newton` and
   `Halley` on a guess or a bracket, `Secant`.
 - Phase 3: numerical derivatives, `nxx::deriv::derivative_of<M, N>(fn)`, and derivative callables returning
