@@ -66,7 +66,7 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
 (`docs/roots/PHASE<n>_API.md`), as in Milestone 1.
 
 - Phase 1: bracketing core, `Bracket`, `Root`, `error`, `Criteria`, `root<M>(fn, Bracket[, criteria])`; `Bisection`
-  and `Brent`.
+  and `Brent`. API approved: `docs/roots/PHASE1_API.md`.
 - Phase 2: open methods and derivatives (fn returning a tuple-like, or separate derivative callables); `Newton` and
   `Halley` on a guess or a bracket, `Secant`.
 - Phase 3: numerical derivatives, `nxx::deriv::derivative_of<M, N>(fn)`, and derivative callables returning
