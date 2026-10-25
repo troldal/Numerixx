@@ -386,19 +386,6 @@ namespace nxx::deriv {
             conditional_t<std::same_as<M, Ridders>, Central<2>, std::conditional_t<extrapolation<M>, Forward<1>, M>>;
 
         /**
-         * @brief A function derivative() can differentiate at a T.
-         *
-         * F & in the constraint, because fn is called as a named reference, an lvalue, through std::invoke with a T
-         * const lvalue: member pointers work, and so does a callable that rejects rvalues.
-         *
-         * @tparam F The callable type.
-         * @tparam T The real type.
-         */
-        template<typename F, typename T>
-        concept callable =
-            std::invocable<F &, T const &> && std::convertible_to<std::invoke_result_t<F &, T const &>, T>;
-
-        /**
          * @brief The weights of a stencil for the N-th derivative:
          * f^(N)(x) ~= sum_k numerators[k] * fn(x + nodes[k] * h) / (denominator * h^N).
          *
@@ -1750,7 +1737,7 @@ namespace nxx::deriv {
     // h is a non-deduced context (type_identity_t), so T comes from x alone and a double step converts to a
     // multiprecision T instead of making deduction fail. N is auto, because the scoped order does not convert to int.
     template<typename M = Central<2>, auto N = 1, real T, typename F>
-    requires detail::method<M> && detail::valid_order<N> && detail::callable<F, T>
+    requires detail::method<M> && detail::valid_order<N> && nxx::detail::callable<F, T>
              && detail::exact_weights<M, N, T>
     [[nodiscard]] constexpr std::expected<Estimate<T>, error>
         derivative(F &&fn, T const &x, std::type_identity_t<T> const &h)
@@ -1781,7 +1768,7 @@ namespace nxx::deriv {
      *         error::non_finite.
      */
     template<typename M = Central<2>, auto N = 1, real T, typename F>
-    requires detail::method<M> && detail::valid_order<N> && detail::callable<F, T>
+    requires detail::method<M> && detail::valid_order<N> && nxx::detail::callable<F, T>
              && detail::exact_weights<M, N, T>
     [[nodiscard]] constexpr std::expected<Estimate<T>, error> derivative(F &&fn, T const &x)
     { return detail::derivative_default<M, static_cast<int>(N)>(fn, x); }
@@ -1804,7 +1791,7 @@ namespace nxx::deriv {
      * @return As for the general overload.
      */
     template<typename M = Central<2>, auto N = 1, real T, typename F>
-    requires detail::method<M> && detail::valid_order<N> && detail::callable<F, T>
+    requires detail::method<M> && detail::valid_order<N> && nxx::detail::callable<F, T>
              && detail::exact_weights<M, N, T> && detail::noisy<N, T>
     [[deprecated(
         "derivatives above the first in a type with 7 or fewer significant digits keep few correct digits: "
@@ -1825,7 +1812,7 @@ namespace nxx::deriv {
      * @return As for the general overload.
      */
     template<typename M = Central<2>, auto N = 1, real T, typename F>
-    requires detail::method<M> && detail::valid_order<N> && detail::callable<F, T>
+    requires detail::method<M> && detail::valid_order<N> && nxx::detail::callable<F, T>
              && detail::exact_weights<M, N, T> && detail::noisy<N, T>
     [[deprecated(
         "derivatives above the first in a type with 7 or fewer significant digits keep few correct digits: "

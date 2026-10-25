@@ -10,6 +10,7 @@
 
 #include <concepts>
 #include <limits>
+#include <type_traits>
 
 /** @brief Numerixx: numerical algorithms for built-in and user-defined real types. */
 namespace nxx {
@@ -47,6 +48,27 @@ namespace nxx {
                           { a / b } -> std::convertible_to<T>;
                           { -a } -> std::convertible_to<T>;
                       };
+
+    /** @cond INTERNAL */
+    namespace detail {
+
+        /**
+         * @brief A function the algorithms can evaluate at a T: invocable with a T const lvalue, with a result
+         * convertible to T.
+         *
+         * F & in the constraint, because fn is called as a named reference, an lvalue, through std::invoke with a T
+         * const lvalue: member pointers work, and so does a callable that rejects rvalues. Spelled
+         * nxx::detail::callable in the modules, whose own detail namespaces would otherwise hide it.
+         *
+         * @tparam F The callable type.
+         * @tparam T The real type.
+         */
+        template<typename F, typename T>
+        concept callable =
+            std::invocable<F &, T const &> && std::convertible_to<std::invoke_result_t<F &, T const &>, T>;
+
+    } // namespace detail
+    /** @endcond */
 
     /** @brief Constexpr helpers for any nxx::real, built from comparisons and + - * / only. */
     namespace math {

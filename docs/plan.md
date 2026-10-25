@@ -67,6 +67,12 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
 
 - Phase 1: bracketing core, `Bracket`, `Root`, `error`, `Criteria`, `root<M>(fn, Bracket[, criteria])`; `Bisection`
   and `Brent`. API approved: `docs/roots/PHASE1_API.md`.
+  - [x] `roots.hpp` with `root<Bisection>` and `root<Brent>`, constexpr, the validation, zero first and the defaults
+    of the specification; `nxx::detail::callable` shared from `math.hpp`
+  - [x] Tests on float, double, long double and Boost.Multiprecision (`cpp_bin_float_50` with and without expression
+    templates, `cpp_dec_float_50`), with the prototype's evaluation counts reproduced exactly in double
+  - [ ] CI passes on all five toolchains
+  - [ ] The independent review (Codex) and its adopted findings
 - Phase 2: open methods and derivatives (fn returning a tuple-like, or separate derivative callables); `Newton` and
   `Halley` on a guess or a bracket, `Secant`.
 - Phase 3: numerical derivatives, `nxx::deriv::derivative_of<M, N>(fn)`, and derivative callables returning

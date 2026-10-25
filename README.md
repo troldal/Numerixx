@@ -7,7 +7,8 @@ unchanged.
 
 Numerixx 2 is in development on the `dev` branch and currently provides numerical derivatives: central and one-sided
 finite differences of orders up to 10, and Ridders' extrapolation with an error estimate, central or one-sided, for
-the first to the fourth derivative. Numerixx 1.x is at the tag `v1.1.0-legacy`.
+the first to the fourth derivative; and roots of a function of one variable in a bracket, by bisection or Brent's
+method. Numerixx 1.x is at the tag `v1.1.0-legacy`.
 
 ```cpp
 #include <numerixx/deriv.hpp>
@@ -28,6 +29,19 @@ auto d3 = nxx::deriv::derivative<Central<2>, nxx::deriv::order::third>([](double
 
 static_assert(*nxx::deriv::derivative([](double x) { return x * x; }, 3.0, 0.5) == 6.0);
 ```
+
+```cpp
+#include <numerixx/roots.hpp>
+
+namespace rt = nxx::roots;
+auto r = rt::root<rt::Brent>([](double x) { return x * x - 2.0; }, rt::Bracket{1.0, 2.0});
+if (r) { /* r->value is sqrt(2) to about 1e-16; r->abs_error bounds its distance to fn's sign change */ }
+```
+
+The default tolerances give the full precision of the type at every magnitude: a root at 1e-12 keeps its digits, with
+no tolerance to set. A sign change near 0 that fn does not evaluate to exactly 0 is approached down to the type's
+smallest numbers, so set `abs_tol` there (`{.abs_tol = 1e-12}`). `abs_error` bounds the distance to a sign change of
+fn as evaluated; how far that is from the exact root depends on fn's own rounding.
 
 ## Using it
 

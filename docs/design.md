@@ -7,10 +7,13 @@ decisions are in `docs/<module>/design.md` (`docs/deriv/design.md`).
 
 - Header-only: the CMake target `numerixx::numerixx` is an INTERFACE library with no dependencies. The tests fetch
   doctest and Boost.Multiprecision with CPM.
-- One header per module (`deriv.hpp`), plus `math.hpp` for what the modules share. A shared core grows only when a
-  second module needs something.
+- One header per module (`deriv.hpp`, `roots.hpp`), plus `math.hpp` for what the modules share. A shared core grows
+  only when a second module needs something.
 - Numerixx never throws and never catches: an exception thrown by fn or by T's operations passes through unchanged.
   Catching would break builds without exceptions, such as Emscripten's default.
+- fn is constrained by `nxx::detail::callable<F, T>` in `math.hpp` (invocable with a `T const` lvalue, its result
+  convertible to T), shared by the modules since `nxx::roots` was the second to need it; spelled with `nxx::` in the
+  modules, whose own `detail` namespaces would otherwise hide it.
 
 ## Real types (`math.hpp`)
 
