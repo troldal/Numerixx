@@ -1,8 +1,8 @@
 # `nxx::roots`: architecture brief
 
 Status: approved by the user on 2026-10-25, D1 to D9 as recommended. Not a phase API: it fixes the architecture that
-the phase specifications (`PHASE<n>_API.md`) will refine. One review round (usage-sketcher, simplicity-critic) is folded in
-(section 8), and the user's first decisions (2026-10-25): Steffensen, Illinois and regula falsi are deferred, not
+the phase specifications (`PHASE<n>_API.md`) will refine. One review round (usage-sketcher, simplicity-critic) is folded
+in (section 8), and the user's first decisions (2026-10-25): Steffensen, Illinois and regula falsi are deferred, not
 dropped (teaching examples); numerical derivatives must be possible, from a separate derivative callable, such as
 `nxx::deriv::derivative_of` (3.4). The decisions are listed at the end.
 
@@ -63,7 +63,7 @@ namespace nxx::roots {
 
     // Searching: a bracket around a point. A bracket is not a root, so it is its own function.
     template<real T, typename F>
-    constexpr std::expected<Bracket<T>, error> expand(F &&fn, T const &x0 /* , parameters: Phase 4 */);
+    constexpr std::expected<Bracket<T>, error> expand(F &&fn, T const &x0 /* , parameters: Phase 5 */);
 }
 ```
 
@@ -267,11 +267,43 @@ All of it is constexpr: `static_assert` tests run `root<Brent>` on a polynomial.
 auto const b = nxx::roots::expand(fn, 300.0); // grows [x0 - h, x0 + h] geometrically until the signs differ
 ```
 
-- Phase 4 specifies it: in both directions or one (a domain edge such as x > 0), stopping at a non-finite value, with
-  a step and a factor from T and x0, from the textbooks and first principles, not from NR's `zbrac`. The bracket it
-  returns need not contain the root nearest x0; the documentation says so.
-- The scan of an interval for every sign change, which returns several brackets, is deferred; when it comes, it
-  returns a `std::vector<Bracket<T>>`, which composes with `std::views::transform` like any range.
+**One bracket from a guess (`expand`, Phase 5).** For a black-box fn nothing tells where a root is before fn is
+evaluated, so no general algorithm beats an outward search with growing steps; the canonical methods differ only in
+their details:
+- MATLAB's `fzero` from a scalar start: a first step of about |x0| / 50, grown by about sqrt(2), alternating sides
+  until the signs differ;
+- R's `uniroot` with `extendInt`: extends a given interval, with one-direction modes for monotone fn;
+- Boost.Math's `bracket_and_solve_root`: multiplicative growth in a direction the caller states, for monotone fn.
+
+Phase 5 specifies the details, from these descriptions and first principles, not from NR's `zbrac`:
+- both sides or one (a domain edge such as x > 0, or fn known to rise), and both ends at once or alternating;
+- the first step, scaled by max(|x0|, 1), and the growth factor, from T and x0;
+- a non-finite value of fn ends the search on that side (the domain's edge), not the search.
+
+What any outward search misses, and the documentation says: a root of even multiplicity (no sign change), two roots
+within one step, and a pole, which brackets like a root (tan, 1/x). The bracket it returns need not contain the root
+nearest x0.
+
+**Every root in an interval (deferred).** The canonical simple method samples fn on a grid and returns each sign
+change: cheap, with the same blind spots as above at the grid's spacing. When it comes, it returns a
+`std::vector<Bracket<T>>`, which composes with `std::views::transform` like any range. Better methods, and where they
+fit:
+- **Chebyshev proxy root-finding** (Boyd 2002, SIAM Review; Chebfun, Battles and Trefethen 2004): an adaptive
+  Chebyshev interpolant of fn on the interval, subdivided as needed, whose roots (from an eigenvalue problem, or
+  polynomial root-finding in the Chebyshev basis) are then polished by a method of this module. It finds close pairs
+  that a grid misses, and roots of even multiplicity to about half the precision; for smooth fn it is the practical
+  state of the art. It needs the polynomial module's root-finding, so it comes after that module, as the preferred
+  all-roots search, with the grid scan beside it or instead of it as the cheap, unreliable option.
+- **Interval methods** (interval Newton, Krawczyk; Moore 1966, Kearfott 1996): the only rigorous ones, proving that
+  every root is enclosed or that there is none. They need fn evaluated in interval arithmetic, so fn generic over an
+  interval type, which is not totally ordered and so not an `nxx::real`: a module of their own, if ever, not an option
+  of this one.
+- **Lipschitz exclusion** (discard a subinterval where |f| exceeds L times the distance to its nearest sample):
+  rigorous, but only with a known Lipschitz constant L, which callers rarely have. Not planned.
+- **Counting first:** Sturm sequences for polynomials (the polynomial module); the argument principle for analytic fn
+  (Delves and Lyness 1967), which needs fn on complex arguments (with the complex items deferred in `docs/plan.md`).
+
+The sources above are checked against the works when their phase is specified.
 
 ### 3.10 Shared rules this module follows
 
@@ -339,7 +371,9 @@ Non-breaking to add later unless marked:
 - A derivative callable that returns f' and f'' together, or a tuple fn mixed with separate callables (3.4).
 - `derivative_of` with a fixed step (the default step depends on x, so a fixed one is rarely what a caller wants).
 - `bracket<M>(fn, x0)` with a method, when a second single-bracket search exists; `expand` stays.
-- The scan for every sign change, returning `std::vector<Bracket<T>>`.
+- Every root in an interval (3.9): Chebyshev proxy root-finding after the polynomial module, the preferred method; a
+  grid scan for sign changes beside it or instead of it, returning `std::vector<Bracket<T>>`. Interval methods,
+  Lipschitz exclusion and root counting are not planned here (3.9).
 - A public step interface, and through it a failure that carries the state. Changing `root`'s error type instead
   would be breaking; the rule in 3.6 rules it out.
 - `Root`'s extra members (3.5) and its conversion to T; `Criteria::max_iterations`.
@@ -382,6 +416,8 @@ From the user (2026-10-25), on the first draft:
   a separate callable passed as an argument computes the derivative, for which `derivative_of` is useful (3.4,
   Phase 3). The first draft's recommendation against numerical derivatives is withdrawn; their cost is documented
   instead.
+- After approval: the searching section (3.9) records the canonical bracket searches and the better all-roots
+  methods, with Chebyshev proxy root-finding as the preferred all-roots search after the polynomial module.
 
 From the usage sketch (6 client snippets and 8 misuses):
 - Swapped bracket ends were reported as `no_sign_change`, the wrong cause: now normalised (3.3).
