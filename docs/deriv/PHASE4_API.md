@@ -162,7 +162,7 @@ from Taylor series.
     exact in float.
   - A `static_assert` in the generator checks every value against 2^24 before it is narrowed to `int`.
 - **It replaces the three Phase 2 closed forms** (`make_table`). The `Table` size parameter is renamed, since N now
-  means the order. `docs/design.md` ("Fornberg's algorithm is not needed for three fixed families") is updated.
+  means the order. `docs/deriv/design.md` ("Fornberg's algorithm is not needed for three fixed families") is updated.
 - **Phase 2 tables:** a constexpr spike reproduces every one of them exactly. The implementation step checks all of
   them once and records the result in the commit, so no second implementation is kept in the tests.
 - **Test references** for every table:
@@ -207,7 +207,7 @@ from Taylor series.
     dropped.
   - That costs more as N grows. At the model optimum, the default step's error is 1.1 times the optimum for
     `Central<2>` with N = 1, 3.5 times with N = 2, 2.5 with N = 3, 11 with N = 4, and 15 for `Central<4>` with N = 4.
-    `docs/design.md` ("at most 1.64") is updated with this.
+    `docs/deriv/design.md` ("at most 1.64") is updated with this.
   - The constant is still left out. On nine test functions, half the default step was better for every order, N = 1
     included: by 1.2 to 1.8 times for `Central<2>`, up to 200 times for `Central<8>`. These functions vary faster
     than the assumed scale max(|x|, 1), and the model's larger step would make them worse.
@@ -420,4 +420,4 @@ From an independent review by another model (OpenAI Codex), each reproduced firs
   `derivatives<M, N>` returning all orders up to N. Nothing here blocks it.
 - **Orders above 4:** the constraint and the enum widen without a break.
 - **A default-step constant**, or a scale parameter for fn, for all N at once.
-- **Mixed partials and Hessians**, with gradients and Jacobians (`plan.md`).
+- **Mixed partials and Hessians**, with gradients and Jacobians (`docs/plan.md`).

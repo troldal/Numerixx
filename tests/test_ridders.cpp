@@ -1,11 +1,11 @@
 // Ridders' extrapolation (derivative<Ridders>) and the Estimate type every method returns.
 //
-// Accuracy bounds (docs/PHASE3_API.md, "Tests"): the actual error must be within 6 times the estimate (the Python
+// Accuracy bounds (docs/deriv/PHASE3_API.md, "Tests"): the actual error must be within 6 times the estimate (the Python
 // prototype's worst over 5,400 random cases was 3.6) and within 4 times the prototype's actual error for the same case
 // (4 eps where that was 0); the estimate within twice the prototype's; the evaluations at most the prototype's plus 4
 // (libm implementations round fn's values differently, which can move a stall by a level). The prototype is an
-// independent implementation; its values are in the table of docs/PHASE3_API.md. For the multiprecision types, which
-// the prototype does not model, the estimate is bounded by twice its value in the first C++ run.
+// independent implementation; its values are in the table of docs/deriv/PHASE3_API.md. For the multiprecision types,
+// which the prototype does not model, the estimate is bounded by twice its value in the first C++ run.
 
 #include <numerixx/deriv.hpp>
 
@@ -220,7 +220,7 @@ TEST_CASE("ridders: polynomials, the uniform type and the conversion at run time
 
 TEST_CASE("ridders: accuracy against closed forms, double and float")
 {
-    // The prototype's values for the same cases, with the default initial step (docs/PHASE3_API.md).
+    // The prototype's values for the same cases, with the default initial step (docs/deriv/PHASE3_API.md).
     auto const check = []<typename T>(T, Reference exp_ref, Reference sin_ref, Reference runge_ref, Reference log_ref) {
         using std::cos, std::exp, std::log, std::sin;
         CHECK(accurate([](T x) { return T(exp(x)); }, T(1), T(exp(T(1))), exp_ref));

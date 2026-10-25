@@ -4,24 +4,36 @@ Numerixx 2 is a header-only C++23 numerical library (MIT) for programs that need
 user-defined real types. It is inspired by the composability of GSL: small algorithms and building blocks that combine,
 as in the STL. Numerixx 1.x is at the tag `v1.1.0-legacy`.
 
-## Goal and success criteria
+## Modules and milestones
 
-Current milestone: numerical derivatives of a scalar function (`nxx::deriv`). Its phases and checkboxes are in
-`docs/plan.md`; a phase is done when its `static_assert` and run-time tests pass on every toolchain below, locally and
-in CI.
+One module per namespace and header. `docs/plan.md` holds a milestone per module with its phases and checkboxes, and
+the deferred features; a phase is done when its `static_assert` and run-time tests pass on every toolchain below,
+locally and in CI.
+
+| Module | Header | Documents | Test cases | Status |
+|---|---|---|---|---|
+| `nxx::deriv`: derivatives of a scalar function | `deriv.hpp` | `docs/deriv/` | `deriv:*`, `orders:*`, `ridders:*`, `onesided:*` | Milestone 1, done |
+| `nxx::roots`: roots of a real function of one variable | `roots.hpp` | `docs/roots/` | `roots:*` | Milestone 2, current |
+
+A module's folder holds its design record (`design.md`: the decisions in force for the module, its primary sources
+and its test rules), its phase specifications (`PHASE<n>_API.md`) and its briefs and surveys. Read the module's
+`design.md` and the current phase document before working on it; `docs/design.md` holds what applies to every module.
+A module may use another module's public API, never its `detail`.
 
 ## Layout
 
-- `include/numerixx/` public headers; the library is header-only, so there is no `src/`
-- `tests/` doctest, with standalone Boost.Multiprecision for the multiprecision cases
-- `demo/` small demo programs (`NUMERIXX_BUILD_DEMOS`, on when top level), e.g. `build/<preset>/demo/numerixx_deriv_demo`
+- `include/numerixx/` public headers: one per module, plus `math.hpp` for what the modules share. Header-only, no
+  `src/`
+- `tests/` one doctest executable (`numerixx_tests`), with standalone Boost.Multiprecision for the multiprecision
+  cases; a new module's test files and test cases carry its prefix (`test_roots_*.cpp`, `roots:*`)
+- `demo/` one demo program per module (`NUMERIXX_BUILD_DEMOS`, on when top level), e.g.
+  `build/<preset>/demo/numerixx_deriv_demo`
 - `cmake/CPM.cmake` fetches the test dependencies; the library itself has none
 - `CMakePresets.json` one preset per toolchain, used locally and in CI (`.github/workflows/ci.yml`)
+- `docs/plan.md` the plan; `docs/design.md` the decisions for every module; `docs/<module>/` per module (above)
 - `docs/Doxyfile` the API documentation settings, used by the docs targets in `docs/CMakeLists.txt`
 - `docs/deriv-book/` the book on `nxx::deriv` (LaTeX): its own `CLAUDE.md` holds its rules, roles and process; its
   examples build as tests (`NUMERIXX_BUILD_BOOK`), its PDF is the target `numerixx_book`
-- `docs/plan.md` current plan; `docs/design.md` design decisions; also a technique survey, a tutorial and API
-  proposals (`docs/PHASE2_API.md`)
 
 ## Build and test
 
@@ -29,7 +41,7 @@ Run from the project root, with `CPM_SOURCE_CACHE=C:/cpm` in the environment (a 
 Presets: `clang-cl`, `cl`, `gcc`, `clang`, `emscripten`; each builds Debug into `build/<preset>`.
 - Configure: `cmake --preset <preset>`
 - Build: `cmake --build --preset <preset>`
-- Run affected tests: `build/<preset>/tests/numerixx_tests --test-case="deriv:*"` (one doctest executable)
+- Run affected tests: `build/<preset>/tests/numerixx_tests --test-case="roots:*"` (the module's prefixes, above)
 - Full suite: `ctest --preset <preset>`
 - Docs: `cmake --build --preset <preset> --target numerixx_docs` (or `numerixx_docs_internal`, which adds the `detail`
   namespaces) writes `build/<preset>/docs/public/html`; a Doxygen warning fails it. The targets exist when Doxygen
@@ -49,15 +61,18 @@ Presets: `clang-cl`, `cl`, `gcc`, `clang`, `emscripten`; each builds Debug into 
 
 - **Workflow.** Work happens on `dev`. Claude commits and pushes to `dev` after each step the user approves; a PR to
   `master` is opened only when the user asks. One small step at a time, and the user decides the next one. Since the
-  library is header-only, every step changes the public API: propose its API before writing it. Before pushing, build
-  and test on all five toolchains; after pushing, check CI (`gh run list --workflow ci.yml --branch dev`).
+  library is header-only, every step changes the public API: propose its API before writing it, as
+  `docs/<module>/PHASE<n>_API.md`, reviewed by `numerics-reviewer`, `simplicity-critic` and `usage-sketcher` before it
+  goes to the user. Before pushing, build and test on all five toolchains; after pushing, check CI
+  (`gh run list --workflow ci.yml --branch dev`).
 - **Independent review at the end of each phase.** After the phase's implementation is committed and CI passes, run a
   second-opinion review by another model with the OpenAI Codex CLI, read-only, on the phase's commit:
   `codex exec -s read-only --ephemeral --color never -o <scratchpad>/codex_review.md "<prompt>"` from the project
-  root, with a prompt that names the commit, the spec (`docs/PHASE<n>_API.md`), `docs/design.md` and the rules here,
-  and asks for ranked findings, each with a file, line, counterexample or derivation, plus what was found correct.
-  Reproduce every finding before acting on it, propose the fixes to `include/` to the user before making them, and
-  record the adopted ones in the phase's API document. (Phase 4: three edge cases our own reviews had missed.)
+  root, with a prompt that names the commit, the spec (`docs/<module>/PHASE<n>_API.md`), `docs/design.md`, the
+  module's `design.md` and the rules here, and asks for ranked findings, each with a file, line, counterexample or
+  derivation, plus what was found correct. Reproduce every finding before acting on it, propose the fixes to
+  `include/` to the user before making them, and record the adopted ones in the phase's API document. (deriv Phase 4:
+  three edge cases our own reviews had missed.)
 - **Licensing.** Code may come only from Numerixx 1.x and Boost.Math (BSL-1.0; keep its notice). Never use GSL or
   other GPL, LGPL or AGPL code, Numerical Recipes listings, or code without a licence. Implement algorithms from the
   papers and textbooks, and do not read GSL source.
@@ -70,7 +85,8 @@ Presets: `clang-cl`, `cl`, `gcc`, `clang`, `emscripten`; each builds Debug into 
   `error::non_finite`). Classes and class templates, meaning types that can have member functions, are PascalCase
   (`Central<P>`, `Estimate<T>`). No digits in a class name where a template parameter belongs (`Central<4>`, not
   `Central4`).
-- **Callbacks** are named `fn`. Qualify internal calls (`nxx::deriv::...`) so user types cannot hijack them by ADL.
+- **Callbacks** are named `fn`. Qualify internal calls (`nxx::math::...`, `nxx::deriv::...`, `nxx::roots::...`) so
+  user types cannot hijack them by ADL.
 - **Tests.** Reference values come from closed forms or independent high-precision sources, never from Numerixx
   itself; each tolerance is justified by an error estimate in a comment. One exception: a bound on the quality of a
   result for which no independent value exists, such as Ridders' error estimate in a multiprecision type whose guard

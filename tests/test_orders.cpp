@@ -1,7 +1,7 @@
 // Derivatives of order 1 to 4 (Phase 4): the order argument, the generated tables, exactness on polynomials, overflow
 // before the final quotient, and Ridders for f'' to f''''. References are closed forms, published tables (Fornberg
 // 1988, Chapra ch. 23) and the moment conditions computed here; Ridders' per-case values come from the independent
-// Python prototype (docs/PHASE4_API.md), which the C++ results for double match exactly.
+// Python prototype (docs/deriv/PHASE4_API.md), which the C++ results for double match exactly.
 
 #include <numerixx/deriv.hpp>
 

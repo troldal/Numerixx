@@ -1,4 +1,4 @@
-// The one-sided extrapolation methods, ForwardRidders and BackwardRidders (Phase 5, docs/PHASE5_API.md).
+// The one-sided extrapolation methods, ForwardRidders and BackwardRidders (Phase 5, docs/deriv/PHASE5_API.md).
 //
 // References are closed forms, and the independent Python prototype .scratch/onesided/ridders5.py (numpy, written
 // from the textbook rules), which reproduces the C++ results for double exactly on 28,000 cases: values, estimates

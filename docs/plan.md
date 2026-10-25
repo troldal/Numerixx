@@ -15,7 +15,7 @@ phase's `static_assert` and run-time tests pass on GCC, Clang, MSVC, clang-cl an
 
 ### Phase 2: stencils
 
-API approved: `docs/PHASE2_API.md`.
+API approved: `docs/deriv/PHASE2_API.md`.
 
 - [x] Higher-order central stencils, `Central<P>` for even P up to 10 (56cffb1)
 - [x] Forward and backward stencils, `Forward<P>` and `Backward<P>` for P up to 6, for points where fn can be evaluated
@@ -25,7 +25,7 @@ API approved: `docs/PHASE2_API.md`.
 
 ### Phase 3: Ridders' extrapolation
 
-API approved: `docs/PHASE3_API.md`.
+API approved: `docs/deriv/PHASE3_API.md`.
 
 - [x] `derivative<Ridders>` with an error estimate, restarting below failing or untrusted steps (1023248)
 - [x] One return type for every method, `std::expected<Estimate<T>, error>`, implicitly convertible to T (1023248)
@@ -33,7 +33,7 @@ API approved: `docs/PHASE3_API.md`.
 
 ### Phase 4: derivatives of order 1 to 4
 
-API approved: `docs/PHASE4_API.md`.
+API approved: `docs/deriv/PHASE4_API.md`.
 
 - [x] `derivative<M, N>` for N = 1 to 4, as an integer or an `enum class order`, with every method (d39e31b)
 - [x] One Lagrange-formula generator for every table; Phase 2 tables reproduced bit for bit (d39e31b)
@@ -46,7 +46,7 @@ API approved: `docs/PHASE4_API.md`.
 
 ### Phase 5: one-sided Ridders, and the float warning from f''
 
-API approved: `docs/PHASE5_API.md`.
+API approved: `docs/deriv/PHASE5_API.md`.
 
 - [x] `derivative<ForwardRidders, N>` and `derivative<BackwardRidders, N>` for N = 1 to 4, on a `Forward<1>` base with
   the rounding floor carried through the tableau, and `BackwardRidders` as the forward method on the mirrored function
@@ -60,7 +60,14 @@ API approved: `docs/PHASE5_API.md`.
   test references (`.scratch/onesided/ridders5.py`, 28,000 cases)
 - [x] CI passes on all five toolchains (run 40138064893)
 
+## Milestone 2: roots of a real function of one variable (`nxx::roots`)
+
+Design first: an architecture brief (`docs/roots/BRIEF.md`) from a survey of the Numerixx 1.x root finders; the phases
+follow from it, each with its API approved before it is written (`docs/roots/PHASE<n>_API.md`), as in Milestone 1.
+
 ## Deferred
+
+### Derivatives (`nxx::deriv`)
 
 - Gradients and Jacobians, until a module needs them.
 - A derivative as a callable (`derivative_of(fn)`), until there is a use for it.
@@ -83,7 +90,7 @@ breaking the API, so none needs a hook now):
 - Not planned: a scale parameter (pass `default_step<M, N>(x) / max(|x|, 1) * w` for fn's scale w), exposing
   Ridders' tuned constants, observers (wrap fn), non-uniform points (run-time weights).
 
-Complex numbers (2026-10-25; `docs/DERIV_TECHNIQUES.md` 2.5 and 2.7):
+Complex numbers (2026-10-25; `docs/deriv/DERIV_TECHNIQUES.md` 2.5 and 2.7):
 - A complex value for a real argument (f: R -> C): the same algorithms, with a value type separate from the argument
   type, the modulus in the floors and estimates, and overflow guards per component. Until a caller differentiates a
   complex-valued fn.

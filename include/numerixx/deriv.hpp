@@ -1267,10 +1267,10 @@ namespace nxx::deriv {
         /**
          * @brief The divisor of the one-sided methods' default initial step max(|x|, 1) / divisor, for every order.
          *
-         * Their rules reach N h. In the prototype (docs/PHASE5_API.md) s/32 was, for f' to f''', the more accurate of
-         * the two starts without a gross error (s/64 lost 1.4 to 2 times; s/16 had one for f'' and f''', s/4 five), and
-         * for f'''' it had the fewest gross errors (5 of 2,700, against 9 at s/16 and 34 at s/64) and a worst case of
-         * 1.8 times the estimate, against 12 at s/16.
+         * Their rules reach N h. In the prototype (docs/deriv/PHASE5_API.md) s/32 was, for f' to f''', the more
+         * accurate of the two starts without a gross error (s/64 lost 1.4 to 2 times; s/16 had one for f'' and f''',
+         * s/4 five), and for f'''' it had the fewest gross errors (5 of 2,700, against 9 at s/16 and 34 at s/64) and a
+         * worst case of 1.8 times the estimate, against 12 at s/16.
          */
         inline constexpr int one_sided_divisor = 32;
 
@@ -1398,8 +1398,8 @@ namespace nxx::deriv {
          *
          * From Ridders (1982) and Richardson extrapolation with its a posteriori error estimate (Burden et al.,
          * Numerical Analysis; Sidi, Practical Extrapolation Methods, 2003). The constants are our own, chosen with a
-         * prototype (docs/PHASE3_API.md, docs/PHASE4_API.md, docs/PHASE5_API.md): ratio 2, two levels of stall, the
-         * rounding floor, the untrusted-result test; the same for every order and base.
+         * prototype (docs/deriv/PHASE3_API.md, docs/deriv/PHASE4_API.md, docs/deriv/PHASE5_API.md): ratio 2, two
+         * levels of stall, the rounding floor, the untrusted-result test; the same for every order and base.
          *
          * Level i is the base rule D_i at h_i = h_start / 2^i. The central rule's error expansion has even powers of h
          * only, so column j of the tableau removes the h^(2j) term, with r = 4^j; the forward rule's has every power,

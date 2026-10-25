@@ -261,12 +261,12 @@ reproduce the C++ results for double exactly, as Phase 4's did.
 ## Documentation
 
 - The header's Doxygen for the two tags, `default_step`, the overloads and the warning.
-- `docs/design.md`:
+- `docs/deriv/design.md`:
   - the one-sided method and how it differs from `Ridders`;
   - the warning from f'';
   - fast descent, with the edge limit now valid for finite poles, and the one-sided reach;
   - the passing of a step on fn's scale near an edge (for example `derivative<ForwardRidders, 4>(fn, x, x / 8)`).
-- `docs/DERIV_TUTORIAL.md`, the README and the demo: one example each of `ForwardRidders` at a domain edge.
+- `docs/deriv/DERIV_TUTORIAL.md`, the README and the demo: one example each of `ForwardRidders` at a domain edge.
 - `docs/plan.md`: Phase 5 with its checkboxes.
 - Then the independent Codex review, with its adopted findings recorded here.
 - The book is a separate step, after the library change is committed:
