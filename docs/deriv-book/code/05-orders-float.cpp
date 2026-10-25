@@ -1,8 +1,9 @@
 // E8 (Chapter 5, quoted in Chapter 8): a fourth derivative in float. The call selects a deprecated overload of
-// derivative(), whose warning says that the result is mostly rounding noise; this file builds with warnings as
-// errors, so the warning must be silenced at the call (the pragma), or for the whole build with
-// NUMERIXX_NO_PRECISION_WARNING. The function is exp(x) at x = 1 (every derivative of exp is exp), the same call
-// the data generator makes for the \valFloatFourth...AtOne macros of DS6, so the printed numbers are the book's.
+// derivative(), whose warning (every derivative above the first in float) says that the result keeps few correct
+// digits; this file builds with warnings as errors, so the warning must be silenced at the call (the pragma), or
+// for the whole build with NUMERIXX_NO_PRECISION_WARNING. The function is exp(x) at x = 1 (every derivative of exp is exp), the same call
+// the data generator makes for the single-point macros \valFloatFourth...AtOne of DS6, which the book no longer
+// quotes (8.6 points to the medians of 5.4).
 // The example only asserts that a value comes back. Quoted with \snippet{05-orders-float}{float-fourth}.
 
 #include <numerixx/deriv.hpp>
@@ -17,8 +18,8 @@ int main()
 // <float-fourth>
 auto const f = [](float x) { return std::exp(x); };
 // f'''' in float selects a deprecated overload: its warning
-// says the result is mostly rounding noise. Silence it at
-// the call, as here, or for the whole build by defining
+// says it keeps few correct digits. Silence it at the
+// call, as here, or for the whole build by defining
 // NUMERIXX_NO_PRECISION_WARNING.
 #if defined(_MSC_VER) && !defined(__clang__)
 #pragma warning(push)

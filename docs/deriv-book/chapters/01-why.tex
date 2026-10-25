@@ -86,9 +86,10 @@ need. That is the case the other tools do not cover.
 \code{nxx::deriv} is the numerical-derivatives module of \nxx, a header-only C++23 library. Everything goes
 through one function, \code{derivative}, with these choices.
 \begin{itemize}
-  \item \emph{Four methods.} \code{Central<P>}, the default, samples $f$ on both sides of $x$; \code{Forward<P>}
+  \item \emph{Six methods.} \code{Central<P>}, the default, samples $f$ on both sides of $x$; \code{Forward<P>}
     and \code{Backward<P>} sample on one side only, for a function defined on one side; \code{Ridders} adapts its
-    step and also estimates its own error. The first three are \emph{stencils}:\mnote{A \emph{stencil} samples $f$
+    step and also estimates its own error, and its one-sided forms \code{ForwardRidders} and
+    \code{BackwardRidders} do the same on one side of $x$ (\cref{sec:ridders-onesided}). The first three are \emph{stencils}:\mnote{A \emph{stencil} samples $f$
     at a fixed pattern of points around $x$ and combines the samples with fixed weights. Ridders' method decides
     its points as it goes.} \code{P} is the accuracy order of \cref{ch:taylor}.
   \item \emph{Derivatives of order 1 to 4}, $f'$ to $f^{(4)}$.

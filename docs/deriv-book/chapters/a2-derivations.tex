@@ -140,6 +140,15 @@ converged column are the limit plus independent rounding of about the size of th
 smallest of several such differences underestimates the error. This is why \cref{eq:ridders-estimate} takes the
 larger of the change and the floor, and why Ridders' method stops once two levels bring no smaller estimate.
 
+The one-sided forms of \cref{sec:ridders-onesided} extrapolate the \code{Forward<1>} rule of order $\dorder$,
+whose nodes $0, \ldots, \dorder$ have no symmetry: its expansion $f^{(\dorder)} + b_1 h + b_2 h^2 + \cdots$ has
+every power of $h$. The same induction with $\Aij{i}{j-1} = f^{(\dorder)} + c\, h_i^{j} + \order(h_i^{j+1})$ and the
+parent $f^{(\dorder)} + c\, 2^j h_i^{j} + \cdots$ shows that $(2^j \Aij{i}{j-1} - \Aij{i-1}{j-1}) / (2^j - 1)$
+cancels the term in $h^j$ and leaves $\order(h_i^{j+1})$: the divisor is $2^j - 1$, and each column gains one
+order (Burden et al.,\cite{burden2016} Section 4.2). Unrolled, an entry is a combination $\sum_k \gamma_k D_k$ of
+the base values, so it inherits at most $\sum_k \abs{\gamma_k} r_k$ of rounding, to first order; as the $\gamma_k$
+alternate in sign, the recursion $r_{i,j} = (2^j r_{i,j-1} + r_{i-1,j-1}) / (2^j - 1)$ computes that sum exactly.
+
 \section{The error model and the best step}\label{sec:derivations-model}
 
 The error model of \cref{eq:orders-model} is the sum of the leading truncation term and the rounding term of
@@ -181,10 +190,10 @@ for \code{Central<2>} and $f'$ it is \num{\valStepCostCentralTwoFirst}. For the 
 \code{Central<2>}, and the cost by \cref{eq:derivations-cost} is \num{\valStepCostCentralTwoSecond} and
 \num{\valStepCostCentralTwoFourth}; for \code{Central<4>} and $f''''$ it is \num{\valStepCostCentralFourFourth}, the
 largest of the four rules the design record quotes. These agree with the design record's figures of 3.5, 11 and 15
-(\code{docs/PHASE4_API.md}); the library's documentation gives the bound for $f'$ as about 1.6, and \num{\valStepCostCentralTenFirst} for
+(\code{docs/deriv/PHASE4_API.md}); the library's documentation gives the bound for $f'$ as about 1.6, and \num{\valStepCostCentralTenFirst} for
 \code{Central<10>}.
 They are model figures for a function that varies on the scale $\scale$ exactly. The design record's prototype
-(\code{docs/PHASE4_API.md}) reports the opposite experience on nine test functions that vary faster than $\scale$:
+(\code{docs/deriv/PHASE4_API.md}) reports the opposite experience on nine test functions that vary faster than $\scale$:
 half the default step was better for every order, by a factor 1.2 to 1.8 for \code{Central<2>}, which is why the
 library keeps the plain convention of \cref{eq:orders-step} for every order and states its sensitivity instead
 (\cref{sb:step-constant}, \cref{sb:fourth-sensitivity}).

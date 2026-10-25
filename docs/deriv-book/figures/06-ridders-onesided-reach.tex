@@ -1,0 +1,46 @@
+% F19 fig:ridders-onesided-reach (Chapter 6, margin; Phase 5). The reach of ForwardRidders from its default initial
+% step s/32 = 1/32: log x at x = 2^-k against k (DS23, data/forward-ridders-reach.csv). Relative error (solid) and
+% the estimate over the value returned (dashed, abs_error / |value|, the quantity the flag compares with 1/4; the
+% thin line at 1/4, R3-numerics-04, R3-evidence-03) for f' (ink) and f'''' (accent), and central Ridders' relative
+% error for f' (muted,
+% dotted; its samples cross 0, where log is NaN, and its restarts follow that NaN; no value beyond
+% k = \valRiddersEdgeLimitExponent, the nan rows break the curve). Beyond its reach the one-sided result tends to 0,
+% so the error tends to 1 and the estimate over the value rises above the line at 1/4: the result is flagged. The
+% thin muted vertical line is the first k
+% at which f' spends all its evaluations (\valForwardRiddersReachCapExponentFirst); the open circle is the one
+% distance where f' is neither covered nor flagged (k = \valForwardRiddersReachSilentExponentFirst, D-18). The x axis
+% carries k and, below it, the order of magnitude of x = 2^-k, as in F15.
+\begin{tikzpicture}
+\begin{axis}[eqtufte, width=38mm, height=56mm, ymode=log, log basis y=10,
+  xmin=2, xmax=45, xtick={10,20,30,40},
+  xticklabels={10\\$\approx 10^{-3}$, 20\\$\approx 10^{-6}$, 30\\$\approx 10^{-9}$, 40\\$\approx 10^{-12}$},
+  xticklabel style={align=center, font=\sffamily\tiny},
+  ymin=1e-16, ymax=10, ytick={1e-15,1e-10,1e-5,1},
+  xlabel={$k$, and $x = 2^{-k}$}, ylabel={relative error, estimate}, unbounded coords=jump]
+  \draw[muted, thin] (axis cs:\valForwardRiddersReachCapExponentFirst, 1e-16)
+    -- (axis cs:\valForwardRiddersReachCapExponentFirst, 10);
+  % central Ridders, f'
+  \addplot[muted, densely dotted, thick]
+    table[col sep=comma, comment chars={\#}, x=k, y=rid1_error] {data/forward-ridders-reach.csv};
+  % ForwardRidders, f' and f''''
+  \addplot[black!80]
+    table[col sep=comma, comment chars={\#}, x=k, y=fr1_error] {data/forward-ridders-reach.csv};
+  \addplot[black!80, dashed]
+    table[col sep=comma, comment chars={\#}, x=k, y=fr1_estimate_value] {data/forward-ridders-reach.csv};
+  \addplot[accent]
+    table[col sep=comma, comment chars={\#}, x=k, y=fr4_error] {data/forward-ridders-reach.csv};
+  \addplot[accent, dashed]
+    table[col sep=comma, comment chars={\#}, x=k, y=fr4_estimate_value] {data/forward-ridders-reach.csv};
+  % the flag: an estimate of at least a quarter of the value returned
+  \draw[muted, thin] (axis cs:2, 0.25) -- (axis cs:45, 0.25);
+  \node[muted, font=\tiny, anchor=south west, inner sep=1pt] at (axis cs:3, 0.25) {$1/4$};
+  % the one f' result neither covered nor flagged
+  \draw[black!80, thin] (axis cs:\valForwardRiddersReachSilentExponentFirst, \valForwardRiddersReachSilentRelErrorFirst)
+    circle[radius=1.6pt];
+  \node[font=\tiny, anchor=north west, inner sep=1pt] at (axis cs:3, 1e-12) {$f'$};
+  \node[accent, font=\tiny, anchor=south west, inner sep=1pt] at (axis cs:3, 1e-4) {$f''''$};
+  \node[muted, font=\tiny, anchor=north west, inner sep=1pt, align=left] at (axis cs:3, 1e-15) {central $f'$};
+  \node[muted, font=\tiny, anchor=north east, inner sep=1pt, align=right]
+    at (axis cs:\valForwardRiddersReachCapExponentFirst, 5) {levels\\used up};
+\end{axis}
+\end{tikzpicture}

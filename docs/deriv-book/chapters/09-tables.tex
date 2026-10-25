@@ -45,7 +45,7 @@ It is not tabulated.
 \Cref{tab:weights-central-first,tab:weights-central-second,tab:weights-central-third,tab:weights-central-fourth}
 give \code{Central<P>} for $\dorder = 1$ to 4 and $\aorder = 2$ to 10. Each pair of nodes adds two orders; $\errc$
 falls quickly with $\aorder$ and $\ampl$ grows slowly, which is why the central rules of high order pay off in wide
-types (\cref{tab:accuracy-matrix}). The cap at $\aorder = 10$ is a design decision (\code{docs/PHASE2_API.md}): by
+types (\cref{tab:accuracy-matrix}). The cap at $\aorder = 10$ is a design decision (\code{docs/deriv/PHASE2_API.md}): by
 the model's exponent alone, a \code{Central<12>} would cut the error of $f'$ by a factor of about \num{\valCapGainFactorCentralTwelveFirstDouble} in double and
 \num{\valCapGainFactorCentralTwelveFirstMultiprecision} in a 50-digit type (for $f''''$,
 \num{\valCapGainFactorCentralTwelveFourthDouble} and \num{\valCapGainFactorCentralTwelveFourthMultiprecision}), over a stencil on
@@ -88,7 +88,7 @@ exact in \code{float}.\label{tab:weights-central-fourth}}
 give \code{Forward<P>} for $\dorder = 1$ to 4 and $\aorder = 1$ to 6. A one-sided rule gains one order per node, and
 both its constants are larger than those of the central rule of the same order: $\ampl$ grows to
 \num{\valAmplForwardSix} for $f'$ with $\aorder = 6$ and to \num{\valAmplForwardSixFourth} for $f''''$. The cap at
-$\aorder = 6$ is a design decision (\code{docs/PHASE2_API.md}): beyond it the amplification grows about as fast as the
+$\aorder = 6$ is a design decision (\code{docs/deriv/PHASE2_API.md}): beyond it the amplification grows about as fast as the
 higher order pays, by the model, so the library stops there.
 
 \begin{table*}
@@ -148,22 +148,26 @@ Method & $P$ & $N$ & Exponent & Step & Model error & Evaluations\\
 
 \section{Ridders' constants}\label{sec:tables-ridders}
 
-\Cref{tab:ridders-constants} collects the constants of Ridders' method, the same for every derivative order except
-where the value depends on $\dorder$; \cref{ch:ridders} and \cref{sb:floor-coverage} explain them, and the design
-record in the repository (\code{docs/PHASE3_API.md}, \code{docs/PHASE4_API.md}) gives the evidence for each choice.
-The level cap and the initial-step divisors are read from the library; the ratio, the stall and the two factors of
-the untrusted-result test are literals of its code, transcribed by the generator.
+\Cref{tab:ridders-constants} collects the constants of Ridders' method and of its one-sided forms, the same for
+every derivative order except where the value depends on $\dorder$; \cref{ch:ridders} and \cref{sb:floor-coverage}
+explain them, and the design record in the repository (\code{docs/deriv/PHASE3_API.md} to \code{docs/deriv/PHASE5_API.md})
+gives the evidence for each choice. The level cap, the initial-step divisors and the one-sided evaluations per level
+are read from the library; the ratio, the stall and the two factors of the untrusted-result test are literals of its
+code, transcribed by the generator.
 
-The level cap counts every level attempted, restarts included; with two or four evaluations per level it gives the
-maximum evaluations of the last row.
+The level cap counts every level attempted, restarts included; with the evaluations per level it gives the maximum
+evaluations of the last row.
 
-\begin{table}
-\sidecaption{The constants of Ridders' method. Where a value depends on the derivative order, it is given for $f'$,
-$f''$, $f'''$ and $f''''$ in turn.\label{tab:ridders-constants}}
+\begin{table}[!htb]
+\sidecaption{The constants of Ridders' method and, in the last column, of its one-sided forms
+(\cref{sec:ridders-onesided}; \code{BackwardRidders} is \code{ForwardRidders} mirrored). They differ in the column
+divisor, since the error of the forward difference has every power of $h$, not only the even ones, and in the
+rounding floor, which the one-sided forms carry through the tableau. Where a value depends on the derivative order,
+it is given for $f'$, $f''$, $f'''$ and $f''''$ in turn. The rows for the column divisor, the floor and the restart transcribe the header's documented rules.\label{tab:ridders-constants}}
 \centering\footnotesize
-\begin{tabular}{@{}>{\raggedright}p{68mm}>{\raggedright\arraybackslash}p{40mm}@{}}
+\begin{tabular}{@{}>{\raggedright}p{49mm}>{\raggedright}p{28mm}>{\raggedright\arraybackslash}p{28mm}@{}}
 \toprule
-Constant & Value\\
+Constant & \code{Ridders} & \code{ForwardRidders}, \code{BackwardRidders}\\
 \midrule
 \tablebody{ridders-constants}
 \bottomrule

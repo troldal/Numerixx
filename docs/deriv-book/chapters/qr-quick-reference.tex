@@ -23,7 +23,7 @@ target \code{numerixx::numerixx} (\cref{sec:api-synopsis}).
 \code{fn} takes a \code{T}; \code{x} fixes \code{T}, any \code{nxx::real} type.
 
 \qrhead{The result.} A \code{std::expected<Estimate<T>, error>}: \code{d->value} is the estimate,
-\code{*d->abs_error} Ridders' error estimate (empty for the stencils), \code{d.error()} the reason for a failure.
+\code{*d->abs_error} the error estimate of the three Ridders methods (empty for the stencils), \code{d.error()} the reason for a failure.
 \code{d.value()} is \code{std::expected}'s accessor and throws on a failure: test, then read \code{d->value}.
 
 \qrhead{Two checks} (\cref{sec:using-result}). \emph{Did it work?} \code{if (d)}. \emph{Is it right?} A wrong step
@@ -34,7 +34,7 @@ test. Inside an iteration no check is needed.
 
 \qrhead{Failures.} \code{non_finite}: \code{x} not finite; \code{fn} infinite or NaN at a sample; an overflow; a step
 below the resolution of \code{x}; a step that is not positive and finite. A float
-fourth derivative warns at compile time.
+derivative above the first warns at compile time, by every method.
 
 \qrhead{Methods} (relative accuracy in double at the default step).
 \begin{itemize}\setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}
@@ -45,9 +45,15 @@ fourth derivative warns at compile time.
   \item \code{Ridders}: a median of \num{\valRiddersEvalsMedianFirst} evaluations for $f'$, at most
     \num{\valRiddersMaxEvalsFirst}, \num{\valRiddersMaxEvalsSecond}, \num{\valRiddersMaxEvalsThird} and
     \num{\valRiddersMaxEvalsFourth} for $f'$ to $f''''$; about \num{\valHeadlineRiddersFirstDigits} digits for $f'$;
-    an error estimate. Near a bad point it returns a value down to
-    $2^{-\num{\valRiddersEdgeLimitExponent}} \max(\abs{x}, 1)$ away, ten digits only down to
-    $2^{-\num{\valRiddersEdgeTenDigitsExponent}} \max(\abs{x}, 1)$.
+    an error estimate. Near a NaN it returns a value down to
+    $2^{-\num{\valRiddersEdgeLimitExponent}} \max(\abs{x}, 1)$ away (ten digits down to
+    $2^{-\num{\valRiddersEdgeTenDigitsExponent}} \max(\abs{x}, 1)$), then \code{non_finite}; closer to a pole,
+    a wrong value whose estimate flags it.
+  \item \code{ForwardRidders}, \code{BackwardRidders}: Ridders on one side of $x$ only, for an edge, with an error
+    estimate; a median of \num{\valForwardRiddersEvalsMedianFirst} evaluations for $f'$, at most
+    \num{\valForwardRiddersMaxEvalsFirst}, \num{\valForwardRiddersMaxEvalsSecond},
+    \num{\valForwardRiddersMaxEvalsThird} and \num{\valForwardRiddersMaxEvalsFourth}; about
+    \num{\valExpForwardRiddersFirstRelError} for $f'$.
 \end{itemize}
 
 \columnbreak
@@ -75,9 +81,10 @@ Check the sign against the physics.
   \item \emph{The step's scale is in your units.} The default step assumes that $f$ varies on the scale
     $\max(\abs{x}, 1)$; at a large $\abs{x}$ with a narrow feature, or at $\abs{x} \ll 1$, pass $h$.
   \item \emph{Evaluable is not valid.} A fit sampled outside its range returns numbers: make it return NaN there,
-    and use \code{Forward<P>} or \code{Backward<P>} at the edge.
+    and use \code{Forward<P>} or \code{Backward<P>} at the edge, or \code{ForwardRidders} or
+    \code{BackwardRidders} for an error estimate.
   \item \emph{Evaluable is not smooth.} A kink or a range break within a step of $x$ gives a wrong value from every
-    method, without failing; Ridders' estimate flags a jump, nothing flags a kink at $x$: differentiate the branch
+    method that samples across it, without failing; Ridders' estimate flags a jump, nothing flags a kink at $x$: differentiate the branch
     you mean.
   \item \emph{\code{auto} and \code{.value()}.} \code{auto e = *d} is an \code{Estimate}, and \code{d.value()}
     throws on a failure; write \code{d->value}.

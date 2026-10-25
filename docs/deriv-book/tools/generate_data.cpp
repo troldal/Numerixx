@@ -3,7 +3,8 @@
 // data/table-<name>.tex (the body rows of a tabular, read with \input). Run through the CMake target
 // numerixx_book_data, which passes the data/ directory. Never edit the outputs by hand.
 //
-// The data sets are DS1 to DS21 of PLAN.md section 4.3, in its conventions: double unless stated; steps h = 10^(k/4)
+// The data sets are those of PLAN.md sections 4.3 and 4.4 (DS1 to DS23, E6, E22, E24 and the Phase 5 additions of
+// 4.4), in its conventions: double unless stated; steps h = 10^(k/4)
 // (four per decade); a result that is not finite is written as "nan" (pgfplots skips it); every reference value comes
 // from a closed form coded here or in the shared headers in code/ (the Shomate derivatives, exp, the closed forms of
 // tests/test_orders.cpp), never from Numerixx; the random study uses std::mt19937 with the fixed seed written into the
@@ -58,6 +59,7 @@ namespace {
     using nxx::deriv::derivative;
     using nxx::deriv::Estimate;
     using nxx::deriv::Forward;
+    using nxx::deriv::ForwardRidders;
     using nxx::deriv::Ridders;
 
     using Result = std::expected<Estimate<double>, nxx::deriv::error>;
@@ -268,9 +270,12 @@ namespace {
         }
     };
 
-    // Whether Ridders restarted: a non-finite value always restarts the tableau; an untrusted result restarts it from
-    // half the previous initial step, so the sequence of level steps, which otherwise halves at every level, goes
-    // back up. Even orders evaluate fn(x) first, once; the levels then take 2 (N <= 2) or 4 (N >= 3) evaluations each.
+    // Whether Ridders restarted after a non-finite value: such a value always restarts the tableau. Until Phase 5 an
+    // untrusted result restarted it from half the previous initial step, so the sequence of level steps, which
+    // otherwise halves at every level, went back up, and the second test below caught it; since Phase 5 that restart
+    // starts below the smallest step tried, the steps keep halving, and the call log cannot show it (DS9's double
+    // data were identical before and after Phase 5, so the study had none). Even orders evaluate fn(x) first, once;
+    // the levels then take 2 (N <= 2) or 4 (N >= 3) evaluations each.
     bool restarted(Log const &log, int N, double x)
     {
         if (log.non_finite) return true;
@@ -527,15 +532,19 @@ namespace {
         value(o, "CpSecondRelativeFactor", sig(H0 / (T0 * T0 * std::abs(cp2))));
     }
 
+    // The nitrogen enthalpy with the wrapper of code/04-stencils-edge.cpp, which returns NaN outside the fit's range
+    // [500, 2000] K: "evaluable" and "valid" are then the same thing (E6, E24).
+    constexpr auto edge_H = [](double T) {
+        using book::nitrogen;
+        if (T < nitrogen.T_min || T > nitrogen.T_max) return not_a_number;
+        return book::shomate_H(nitrogen, T);
+    };
+
     // E6 (section 4.4): the one-sided rules at the lower end of the fit's range, 500 K, with the wrapper that returns
     // NaN outside the range, as code/04-stencils-edge.cpp has it; Central<2> must fail there.
     void e6_validity_edge(Output &o)
     {
-        auto const wrapped = [](double T) {
-            using book::nitrogen;
-            if (T < nitrogen.T_min || T > nitrogen.T_max) return not_a_number;
-            return book::shomate_H(nitrogen, T);
-        };
+        auto const wrapped = edge_H;
         double const T_edge = book::nitrogen.T_min;
         double const cp = book::shomate_cp(book::nitrogen, T_edge);
         if (derivative<Central<2>>(wrapped, T_edge)) o.fail("E6: Central<2> did not fail at the edge");
@@ -554,6 +563,25 @@ namespace {
         value(o, "EdgeRiddersStatus", r ? "finite" : "non-finite");
         value(o, "EdgeRiddersEvals", integer(calls));
         if (r) value(o, "EdgeRiddersRelError", sig(*rel_error(r, cp)));
+    }
+
+    // E24 (Phase 5; Chapter 6, code/06-ridders-onesided.cpp): Ridders' one-sided form at the same edge, with the same
+    // wrapper, the default initial step 500 K / 32, f' and f'' against the closed form of the range's lower end. The
+    // central method's failure there is E6's computation, quoted as \valEdgeRiddersStatus and \valEdgeRiddersEvals.
+    void e24_onesided_edge(Output &o)
+    {
+        double const T_edge = book::nitrogen.T_min;
+        double const cp = book::shomate_cp(book::nitrogen, T_edge);
+        double const cp2 = book::shomate_derivative(book::nitrogen, T_edge, 2);
+        value(o, "EdgeCpExact", sig(cp, 5));
+        value(o, "EdgeCpSecondExact", sig(cp2, 4));
+        value(o, "EdgeForwardRiddersInitialStep", sig(nxx::deriv::default_step<ForwardRidders>(T_edge)));
+        int calls = 0;
+        auto const r1 = derivative<ForwardRidders>(Counted{ edge_H, &calls }, T_edge);
+        ridders_values(o, "EdgeForwardRidders", r1, cp, calls);
+        calls = 0;
+        auto const r2 = derivative<ForwardRidders, 2>(Counted{ edge_H, &calls }, T_edge);
+        ridders_values(o, "EdgeForwardRiddersSecond", r2, cp2, calls);
     }
 
     // ------------------------------------------------------------------------------------------------ DS2, DS3, DS5
@@ -708,7 +736,8 @@ namespace {
         long long evaluations;
     };
 
-    template<int N>
+    // M is Ridders or one of its one-sided forms.
+    template<typename M, int N>
     RiddersTypical ridders_typical_double()
     {
         std::vector<double> errors;
@@ -716,7 +745,7 @@ namespace {
         std::vector<double> calls;
         for (double const x : typical_points) {
             int n = 0;
-            auto const r = derivative<Ridders, N>(Counted{ exp_fn, &n }, x);
+            auto const r = derivative<M, N>(Counted{ exp_fn, &n }, x);
             if (!r) continue;
             errors.push_back(std::abs(r->value - std::exp(x)) / std::exp(x));
             estimates.push_back(*r->abs_error / std::exp(x));
@@ -726,7 +755,7 @@ namespace {
         return { median(errors), median(estimates), calls.empty() ? 0 : static_cast<long long>(calls[calls.size() / 2]) };
     }
 
-    template<int N>
+    template<typename M, int N>
     RiddersTypical ridders_typical_float()
     {
         auto const expf_fn = [](float t) { return std::exp(t); };
@@ -736,7 +765,7 @@ namespace {
         for (double const x : typical_points) {
             int n = 0;
             float const xf = static_cast<float>(x);
-            auto const r = float_default<Ridders, N>(Counted{ expf_fn, &n }, xf);
+            auto const r = float_default<M, N>(Counted{ expf_fn, &n }, xf);
             if (!r) continue;
             double const exact = static_cast<double>(std::exp(xf));
             errors.push_back(std::abs(static_cast<double>(r->value) - exact) / exact);
@@ -750,20 +779,26 @@ namespace {
     void ds6_order_accuracy(Output &o)
     {
         auto out = csv(o, "order-accuracy",
-            "N,c2_double,c4_double,rid_double,rid_est_double,rid_evals_double,c2_float,c4_float,rid_float,rid_est_float,rid_evals_float",
+            "N,c2_double,c4_double,rid_double,rid_est_double,rid_evals_double,c2_float,c4_float,rid_float,rid_est_float,rid_evals_float,"
+            "frid_double,frid_est_double,frid_evals_double,frid_float,frid_est_float,frid_evals_float",
             "exp(x), default steps, N = 1 to 4: the median over 11 points in [0.5, 1] of the relative error (stencils), and "
-            "of Ridders' relative error, relative estimate and evaluations; float f'''' under the silencing pragma");
+            "of the relative error, relative estimate and evaluations of Ridders (rid) and ForwardRidders (frid); float "
+            "f'' to f'''' under the silencing pragma");
+        char const *const words[] = { "", "First", "Second", "Third", "Fourth" };
         for_each(derivative_orders{}, [&](auto n) {
             constexpr int N = decltype(n)::value;
             auto const c2 = spread(exp_default_double<Central<2>, N>).median;
             auto const c4 = spread(exp_default_double<Central<4>, N>).median;
-            RiddersTypical const r = ridders_typical_double<N>();
+            RiddersTypical const r = ridders_typical_double<Ridders, N>();
             auto const c2f = spread(exp_default_float<Central<2>, N>).median;
             auto const c4f = spread(exp_default_float<Central<4>, N>).median;
-            RiddersTypical const rf = ridders_typical_float<N>();
+            RiddersTypical const rf = ridders_typical_float<Ridders, N>();
+            RiddersTypical const fr = ridders_typical_double<ForwardRidders, N>();
+            RiddersTypical const frf = ridders_typical_float<ForwardRidders, N>();
             out << N << ',' << cell(c2) << ',' << cell(c4) << ',' << cell(r.error) << ',' << cell(r.estimate) << ','
                 << r.evaluations << ',' << cell(c2f) << ',' << cell(c4f) << ',' << cell(rf.error) << ',' << cell(rf.estimate)
-                << ',' << rf.evaluations << '\n';
+                << ',' << rf.evaluations << ',' << cell(fr.error) << ',' << cell(fr.estimate) << ',' << fr.evaluations << ','
+                << cell(frf.error) << ',' << cell(frf.estimate) << ',' << frf.evaluations << '\n';
             if constexpr (N == 3) value(o, "FloatThirdRiddersRelError", sig(*rf.error));
             if constexpr (N == 4) {
                 value(o, "FloatFourthCentralRelError", sig(*c2f));
@@ -774,6 +809,14 @@ namespace {
                 value(o, "DoubleFourthRiddersRelError", sig(*r.error));
                 value(o, "DoubleFourthRiddersRelEstimate", sig(*r.estimate));
             }
+            // Phase 5: the float warning covers f'' to f'''' of every method, so the text may quote the float medians
+            // of every order (5.4, 8.6); the macros that existed before are not repeated.
+            std::string const w = words[N];
+            if constexpr (N <= 3) value(o, "Float" + w + "CentralRelError", sig(*c2f));
+            if constexpr (N <= 2) value(o, "Float" + w + "RiddersRelError", sig(*rf.error));
+            if constexpr (N == 2 || N == 3) value(o, "Float" + w + "RiddersRelEstimate", sig(*rf.estimate));
+            value(o, "Float" + w + "ForwardRiddersRelError", sig(*frf.error));
+            if constexpr (N >= 2) value(o, "Float" + w + "ForwardRiddersRelEstimate", sig(*frf.estimate));
         });
         // The single point x = 1 of the float fourth derivative, for the text that walks through one call (E8).
         auto const expf_fn = [](float t) { return std::exp(t); };
@@ -1034,11 +1077,39 @@ namespace {
         double worst_ratio = 0;
         std::vector<double> ratios;
         std::vector<double> evaluations;
+        std::vector<double> rel_errors; // |value - exact| / |exact|
         std::vector<Case> records;
     };
 
+    // The random study's points for function f: 300 draws from std::mt19937 seeded with seed + f, the same for every
+    // order and every method.
+    std::vector<double> study_points(std::size_t f)
+    {
+        std::mt19937 gen(seed + static_cast<std::uint32_t>(f));
+        std::vector<double> xs;
+        for (int k = 0; k < points_per_function; ++k) xs.push_back(0.2 + 2.8 * (static_cast<double>(gen()) / 4294967296.0));
+        return xs;
+    }
+
+    // The evaluation counts of a study, sorted.
+    std::vector<double> sorted_evaluations(Statistics const &st)
+    {
+        std::vector<double> ev = st.evaluations;
+        std::sort(ev.begin(), ev.end());
+        return ev;
+    }
+
     // Coverage in percent to one decimal, as the style decision says, except where one decimal would read 100.0
     // while a case is uncovered: then two (R1-numerics-17e).
+    // A worst ratio of error to estimate: two significant digits, but more where two would print 1.0 for a ratio above
+    // 1, an uncovered case that "1.0" would hide (R3-evidence-08).
+    std::string ratio_text(double r)
+    {
+        std::string s = sig(r);
+        for (int d = 3; r > 1 && std::stod(s) <= 1 && d <= 6; ++d) s = sig(r, d);
+        return s;
+    }
+
     std::string coverage_percent(int covered, int cases)
     {
         std::string const s = percent(static_cast<double>(covered) / cases);
@@ -1082,9 +1153,7 @@ namespace {
                 + "rd case of ridders-coverage-N" + std::to_string(N) + ".csv (a TeX memory limit, not a selection), "
                   "actual = |value - exact| clipped to eps |exact| where it is exactly 0, estimate = abs_error");
         for (std::size_t f = 0; f < std::size(study); ++f) {
-            std::mt19937 gen(seed + static_cast<std::uint32_t>(f));
-            for (int k = 0; k < points_per_function; ++k) {
-                double const x = 0.2 + 2.8 * (static_cast<double>(gen()) / 4294967296.0);
+            for (double const x : study_points(f)) {
                 double const exact = study[f].exact(N, x);
                 Log log;
                 auto const r = derivative<Ridders, N>(Logged{ study[f].fn, &log }, x);
@@ -1105,6 +1174,7 @@ namespace {
                 st.ratios.push_back(ratio);
                 st.worst_ratio = std::max(st.worst_ratio, ratio);
                 st.evaluations.push_back(static_cast<double>(log.xs.size()));
+                st.rel_errors.push_back(actual / std::abs(exact));
                 st.records.push_back({ f, x, static_cast<double>(log.xs.size()), actual <= estimate, actual == 0, was_restarted });
                 out << f << ',' << study[f].name << ',' << cell(x) << ',' << cell(exact) << ',' << cell(actual) << ','
                     << cell(estimate) << ',' << cell(actual / std::abs(exact)) << ',' << cell(estimate / std::abs(exact)) << ','
@@ -1116,6 +1186,31 @@ namespace {
             }
         }
         return st;
+    }
+
+    // The uncovered cases of a study: the function that holds most of them, its count and range of x, and the others
+    // (R1-numerics-12). Written only where a case is uncovered.
+    void uncovered_values(Output &o, Statistics const &st, std::string const &method, std::string const &suffix)
+    {
+        std::vector<Case> uncovered;
+        for (Case const &c : st.records)
+            if (!c.covered) uncovered.push_back(c);
+        if (uncovered.empty()) return;
+        std::array<int, std::size(study)> count{};
+        for (Case const &c : uncovered) ++count[c.fn];
+        std::size_t const main_fn = static_cast<std::size_t>(std::max_element(count.begin(), count.end()) - count.begin());
+        double x_min = std::numeric_limits<double>::infinity();
+        double x_max = 0;
+        for (Case const &c : uncovered)
+            if (c.fn == main_fn) {
+                x_min = std::min(x_min, c.x);
+                x_max = std::max(x_max, c.x);
+            }
+        value(o, method + "UncoveredMainFunction" + suffix, study_latex[main_fn]);
+        value(o, method + "UncoveredMainCount" + suffix, integer(count[main_fn]));
+        value(o, method + "UncoveredMainMinX" + suffix, sig(x_min));
+        value(o, method + "UncoveredMainMaxX" + suffix, sig(x_max));
+        value(o, method + "UncoveredOthers" + suffix, functions_with_counts(uncovered, main_fn));
     }
 
     std::array<Statistics, 5> ds9_ridders_coverage(Output &o)
@@ -1130,7 +1225,7 @@ namespace {
             value(o, "RiddersCoverage" + suffix, coverage_percent(st.covered, st.cases));
             value(o, "RiddersUncovered" + suffix, integer(st.cases - st.covered));
             value(o, "RiddersMedianRatio" + suffix, sig(median(st.ratios)));
-            value(o, "RiddersWorstRatio" + suffix, sig(st.worst_ratio));
+            value(o, "RiddersWorstRatio" + suffix, ratio_text(st.worst_ratio));
             std::vector<double> ev = st.evaluations;
             std::sort(ev.begin(), ev.end());
             double const median_evals = ev[ev.size() / 2];
@@ -1171,28 +1266,9 @@ namespace {
             value(o, "RiddersZeroOnQuintic" + suffix, integer(on_quintic));
             value(o, "RiddersZeroFunctions" + suffix, integer(static_cast<long long>(std::count(seen.begin(), seen.end(), true))));
 
-            // The uncovered cases: the function that holds most of them, its count and range of x, and the others
-            // (R1-numerics-12).
-            std::vector<Case> uncovered;
-            for (Case const &c : st.records)
-                if (!c.covered) uncovered.push_back(c);
-            if (!uncovered.empty()) {
-                std::array<int, std::size(study)> count{};
-                for (Case const &c : uncovered) ++count[c.fn];
-                std::size_t const main_fn = static_cast<std::size_t>(std::max_element(count.begin(), count.end()) - count.begin());
-                double x_min = std::numeric_limits<double>::infinity();
-                double x_max = 0;
-                for (Case const &c : uncovered)
-                    if (c.fn == main_fn) {
-                        x_min = std::min(x_min, c.x);
-                        x_max = std::max(x_max, c.x);
-                    }
-                value(o, "RiddersUncoveredMainFunction" + suffix, study_latex[main_fn]);
-                value(o, "RiddersUncoveredMainCount" + suffix, integer(count[main_fn]));
-                value(o, "RiddersUncoveredMainMinX" + suffix, sig(x_min));
-                value(o, "RiddersUncoveredMainMaxX" + suffix, sig(x_max));
-                value(o, "RiddersUncoveredOthers" + suffix, functions_with_counts(uncovered, main_fn));
-            }
+            uncovered_values(o, st, "Ridders", suffix);
+            // The median relative error, for the comparison with the one-sided form (Phase 5).
+            value(o, "RiddersMedianRelError" + suffix, sig(median(st.rel_errors)));
         });
         // A smaller initial step usually restores the margin (R2-numerics-03): every uncovered case of the study,
         // all four orders, rerun with a quarter and a sixty-fourth of the default initial step (max(|x|, 1) over
@@ -1223,6 +1299,80 @@ namespace {
         value(o, "RiddersPlotCases", integer(all[1].plotted));
         value(o, "RiddersFunctions", integer(static_cast<long long>(std::size(study))));
         value(o, "RiddersPointsPerFunction", integer(points_per_function));
+        return all;
+    }
+
+    // DS9, one-sided (Phase 5): ForwardRidders on the same nine functions at the same 300 points, N = 1 to 4, double,
+    // default initial step max(|x|, 1) / 32. Macros only (no per-case file, no figure). Restarts are not counted: the
+    // functions are finite above every x of the study, so a restart could only follow an untrusted result, which the
+    // call log cannot show (see restarted()).
+    template<int N>
+    Statistics ds9_forward_order()
+    {
+        Statistics st;
+        for (std::size_t f = 0; f < std::size(study); ++f) {
+            for (double const x : study_points(f)) {
+                double const exact = study[f].exact(N, x);
+                int calls = 0;
+                auto const r = derivative<ForwardRidders, N>(Counted{ study[f].fn, &calls }, x);
+                ++st.cases;
+                if (!r || !r->abs_error) {
+                    ++st.failed;
+                    continue;
+                }
+                double const actual = std::abs(r->value - exact);
+                double const estimate = *r->abs_error;
+                st.covered += actual <= estimate ? 1 : 0;
+                st.exact += actual == 0 ? 1 : 0;
+                double const ratio = estimate > 0 ? actual / estimate : (actual == 0 ? 0 : std::numeric_limits<double>::infinity());
+                st.ratios.push_back(ratio);
+                st.worst_ratio = std::max(st.worst_ratio, ratio);
+                st.evaluations.push_back(static_cast<double>(calls));
+                st.rel_errors.push_back(actual / std::abs(exact));
+                st.records.push_back({ f, x, static_cast<double>(calls), actual <= estimate, actual == 0, false });
+            }
+        }
+        return st;
+    }
+
+    std::array<Statistics, 5> ds9_forward_ridders(Output &o, std::array<Statistics, 5> const &central)
+    {
+        std::array<Statistics, 5> all{};
+        char const *const names[] = { "", "First", "Second", "Third", "Fourth" };
+        for_each(derivative_orders{}, [&](auto n) {
+            constexpr int N = decltype(n)::value;
+            Statistics const st = ds9_forward_order<N>();
+            all[N] = st;
+            std::string const suffix = names[N];
+            value(o, "ForwardRiddersCoverage" + suffix, coverage_percent(st.covered, st.cases));
+            value(o, "ForwardRiddersUncovered" + suffix, integer(st.cases - st.covered));
+            value(o, "ForwardRiddersMedianRatio" + suffix, sig(median(st.ratios)));
+            value(o, "ForwardRiddersWorstRatio" + suffix, ratio_text(st.worst_ratio));
+            std::vector<double> const ev = sorted_evaluations(st);
+            value(o, "ForwardRiddersEvalsMin" + suffix, integer(static_cast<long long>(ev.front())));
+            value(o, "ForwardRiddersEvalsMedian" + suffix, integer(static_cast<long long>(ev[ev.size() / 2])));
+            value(o, "ForwardRiddersEvalsMax" + suffix, integer(static_cast<long long>(ev.back())));
+            value(o, "ForwardRiddersZeroError" + suffix, integer(st.exact));
+            value(o, "ForwardRiddersFailed" + suffix, integer(st.failed));
+            double const median_error = median(st.rel_errors);
+            value(o, "ForwardRiddersMedianRelError" + suffix, sig(median_error));
+            // How much less accurate than Ridders on the same cases: the ratio of the two median relative errors.
+            value(o, "ForwardRiddersAccuracyFactor" + suffix, sig(median_error / median(central[N].rel_errors)));
+            uncovered_values(o, st, "ForwardRidders", suffix);
+        });
+        // The extremes over the four orders, so that a sentence that quotes a range stays true after a regeneration
+        // (6.7): the lowest and highest coverage and the largest worst ratio.
+        std::size_t low = 1;
+        std::size_t high = 1;
+        double worst = 0;
+        for (std::size_t N = 1; N <= 4; ++N) {
+            if (all[N].covered * all[low].cases < all[low].covered * all[N].cases) low = N;
+            if (all[N].covered * all[high].cases > all[high].covered * all[N].cases) high = N;
+            worst = std::max(worst, all[N].worst_ratio);
+        }
+        value(o, "ForwardRiddersCoverageMin", coverage_percent(all[low].covered, all[low].cases));
+        value(o, "ForwardRiddersCoverageMax", coverage_percent(all[high].covered, all[high].cases));
+        value(o, "ForwardRiddersWorstRatioMax", ratio_text(worst));
         return all;
     }
 
@@ -1279,6 +1429,377 @@ namespace {
         value(o, "RiddersEdgeEvalsAtOneHundredth", integer(calls));
         auto const d = derivative<Central<2>>(log_fn, 0.01);
         value(o, "EdgeCentralAtOneHundredthRelError", sig(*rel_error(d, 100.0)));
+    }
+
+    // ------------------------------------------------------------------------------------------------ DS23
+
+    // The reach of the one-sided form (Phase 5; the reach figure of Chapter 6): log x at x = 2^-k, k = 2 to 45,
+    // ForwardRidders for N = 1 to 4 and Ridders for f', all with their default initial steps. log is defined above x
+    // up to the edge at 0, so the one-sided method never sees a NaN: it restarts after untrusted results only, and
+    // runs out of levels when x is far below its initial step max(|x|, 1) / 32. The exact derivatives are
+    // (-1)^(N+1) (N-1)! / x^N. Per row and method: the relative error, the relative estimate, the evaluations, and
+    // for ForwardRidders whether the result is flagged by its own estimate, 4 abs_error >= |value|.
+    void ds23_forward_reach(Output &o)
+    {
+        constexpr int k_first = 2;
+        constexpr int k_last = 45;
+        auto const log_fn = [](double x) { return std::log(x); };
+        auto out = csv(o, "forward-ridders-reach",
+            "k,x,fr1_error,fr1_estimate,fr1_evals,fr1_flagged,fr2_error,fr2_estimate,fr2_evals,fr2_flagged,"
+            "fr3_error,fr3_estimate,fr3_evals,fr3_flagged,fr4_error,fr4_estimate,fr4_evals,fr4_flagged,"
+            "rid1_error,rid1_estimate,rid1_evals,fr1_estimate_value,fr2_estimate_value,fr3_estimate_value,"
+            "fr4_estimate_value",
+            "log x at x = 2^-k: ForwardRidders N = 1 to 4 (fr<N>) and Ridders N = 1 (rid1), default initial steps; error and "
+            "estimate relative to the exact derivative, nan where no value was returned; evals = evaluations of fn; "
+            "flagged = 1 if 4 abs_error >= |value| (the library's untrusted test without its floor clause); "
+            "estimate_value = abs_error / |value|, the quantity the flag compares with 1/4 (F19 plots it)");
+
+        // One run: the cells of the row and what the macros need.
+        struct Run
+        {
+            bool ok = false;
+            bool covered = false;
+            bool flagged = false;
+            std::optional<double> error;
+            std::optional<double> estimate;
+            std::optional<double> estimate_value;
+            int calls = 0;
+        };
+        auto const run = [&]<typename M, int N>(double x) {
+            Run u;
+            auto const r = derivative<M, N>(Counted{ log_fn, &u.calls }, x);
+            if (!r || !r->abs_error) return u;
+            double const exact = log_n(N, x);
+            u.ok = true;
+            u.error = std::abs(r->value - exact) / std::abs(exact);
+            u.estimate = *r->abs_error / std::abs(exact);
+            u.covered = std::abs(r->value - exact) <= *r->abs_error;
+            u.flagged = 4 * *r->abs_error >= std::abs(r->value);
+            if (r->value != 0) u.estimate_value = *r->abs_error / std::abs(r->value);
+            return u;
+        };
+
+        std::array<std::vector<Run>, 5> rows{}; // rows[N][k - k_first]
+        for (int k = k_first; k <= k_last; ++k) {
+            double const x = std::ldexp(1.0, -k);
+            out << k << ',' << cell(x);
+            for_each(derivative_orders{}, [&](auto n) {
+                constexpr int N = decltype(n)::value;
+                Run const u = run.template operator()<ForwardRidders, N>(x);
+                rows[N].push_back(u);
+                out << ',' << cell(u.error) << ',' << cell(u.estimate) << ',' << u.calls << ',' << (u.flagged ? 1 : 0);
+            });
+            Run const c = run.template operator()<Ridders, 1>(x);
+            out << ',' << cell(c.error) << ',' << cell(c.estimate) << ',' << c.calls;
+            for (std::size_t N = 1; N <= 4; ++N) out << ',' << cell(rows[N].back().estimate_value);
+            out << '\n';
+        }
+        value(o, "ForwardRiddersReachFirstK", integer(k_first));
+        value(o, "ForwardRiddersReachLastK", integer(k_last));
+
+        // The readings, per N: the first k at which all 1 + 32 N evaluations are used; the last k of the unbroken run
+        // of covered results from k = 2; the first k at which the result is flagged, and the last k of the unbroken
+        // flagged run from there; the k at which a result is neither covered nor flagged (wrong and not flagged);
+        // the error and estimate at k = 30, the header's stated reach 2^-30 max(|x|, 1); for f' also the last k
+        // with ten correct digits (covered and a relative error below 1e-10, DS10's definition; for N >= 2 the
+        // interior accuracy is below ten digits, so there is no such reading).
+        char const *const names[] = { "", "First", "Second", "Third", "Fourth" };
+        int flagged_through_min = k_last; // the smallest end of the flagged runs over the orders (6.7, 10.4)
+        for (int N = 1; N <= 4; ++N) {
+            std::string const suffix = names[N];
+            std::vector<Run> const &v = rows[static_cast<std::size_t>(N)];
+            auto const k_of = [](std::size_t i) { return k_first + static_cast<int>(i); };
+            int const cap = 1 + N * nxx::deriv::detail::ridders_levels;
+            std::optional<int> cap_k;
+            std::optional<int> covered_k;
+            std::optional<std::size_t> flagged_i;
+            std::optional<int> ten_k;
+            std::vector<std::size_t> silent;
+            bool run_covered = true;
+            for (std::size_t i = 0; i < v.size(); ++i) {
+                if (!cap_k && v[i].calls >= cap) cap_k = k_of(i);
+                run_covered = run_covered && v[i].covered;
+                if (run_covered) covered_k = k_of(i);
+                if (!flagged_i && v[i].flagged) flagged_i = i;
+                if (v[i].ok && !v[i].covered && !v[i].flagged) silent.push_back(i);
+                if (N == 1 && v[i].covered && v[i].error && *v[i].error < 1e-10) ten_k = k_of(i);
+            }
+            if (!cap_k || !covered_k || !flagged_i) {
+                o.fail("DS23: a reach reading was not found for N = " + std::to_string(N));
+                continue;
+            }
+            std::size_t through = *flagged_i;
+            while (through + 1 < v.size() && v[through + 1].flagged) ++through;
+            std::optional<int> const flagged_k = k_of(*flagged_i);
+            std::optional<int> const flagged_through = k_of(through);
+            value(o, "ForwardRiddersReachCapExponent" + suffix, integer(*cap_k));
+            value(o, "ForwardRiddersReachCoveredExponent" + suffix, integer(*covered_k));
+            value(o, "ForwardRiddersReachFlaggedExponent" + suffix, integer(*flagged_k));
+            value(o, "ForwardRiddersReachFlaggedThrough" + suffix, integer(*flagged_through));
+            flagged_through_min = std::min(flagged_through_min, *flagged_through);
+            value(o, "ForwardRiddersReachSilent" + suffix, integer(static_cast<long long>(silent.size())));
+            if (!silent.empty()) {
+                // The worst of them (largest error), for the text that must not call the region beyond the reach
+                // flagged without exception.
+                std::size_t worst = silent.front();
+                for (std::size_t const i : silent)
+                    if (*v[i].error > *v[worst].error) worst = i;
+                value(o, "ForwardRiddersReachSilentExponent" + suffix, integer(k_of(worst)));
+                value(o, "ForwardRiddersReachSilentRelError" + suffix, sig(*v[worst].error));
+                value(o, "ForwardRiddersReachSilentRelEstimate" + suffix, sig(*v[worst].estimate));
+            }
+            std::size_t const thirty = static_cast<std::size_t>(30 - k_first);
+            if (!v[thirty].ok) {
+                o.fail("DS23: no value at k = 30 for N = " + std::to_string(N));
+                continue;
+            }
+            value(o, "ForwardRiddersReachRelErrorAtThirty" + suffix, sig(*v[thirty].error));
+            value(o, "ForwardRiddersReachRelEstimateAtThirty" + suffix, sig(*v[thirty].estimate));
+            if (N == 1) {
+                if (ten_k) value(o, "ForwardRiddersReachTenDigitsExponentFirst", integer(*ten_k));
+                else o.fail("DS23: no ten-digit result for f'");
+            }
+        }
+        value(o, "ForwardRiddersReachFlaggedThroughMin", integer(flagged_through_min));
+        if (flagged_through_min != k_last)
+            o.fail("DS23: a flagged run ends before the end of the study; 6.7, F19 and 10.4 say it does not");
+    }
+
+    // ------------------------------------------------------------------------------------------------ S12, poles
+
+    // Sidebar 6.3: sin(64 pi x) at 0, Ridders for f' with the default initial step 1/32, whose first two levels
+    // sample only zeros; the untrusted-result test restarts the method (Phase 5: below the smallest step tried). The
+    // exact derivative is 64 pi.
+    void s12_aliasing(Output &o)
+    {
+        double const omega = 64 * std::numbers::pi;
+        auto const f = [omega](double x) { return std::sin(omega * x); };
+        int calls = 0;
+        auto const r = derivative<Ridders>(Counted{ f, &calls }, 0.0);
+        ridders_values(o, "Aliasing", r, omega, calls);
+        // The result in words (R3-numerics-10): the reference omega is 64 times the double nearest pi, which is the
+        // double nearest 64 pi, so a relative error of 0 means exactly that double.
+        if (r) value(o, "AliasingResult", r->value == omega ? "the double nearest to $64\\pi$" : sig(*rel_error(r, omega)) + " off");
+    }
+
+    // Item C of Phase 5 (6.4, 10.4): Ridders at poles close to x, where fn is finite on both sides, 1/(t - a) at 0
+    // for the two cases of the library's tests, a pole 1e-3 ahead of x (a = 1e-3) and 1e-4 behind it (a = -1e-4).
+    // The n-th derivative of 1/(t - a) at 0 is -n! / a^(n+1). f'' in full for each pole, and over f' to f'''' at both
+    // poles the number covered and the ranges of the relative error and the evaluations.
+    void item_c_poles(Output &o)
+    {
+        struct Pole
+        {
+            double a;
+            char const *name;
+        };
+        Pole const poles[] = { { 1e-3, "PoleAhead" }, { -1e-4, "PoleBehind" } };
+        int cases = 0;
+        int covered = 0;
+        double error_min = std::numeric_limits<double>::infinity();
+        double error_max = 0;
+        int evals_min = std::numeric_limits<int>::max();
+        int evals_max = 0;
+        for (Pole const &p : poles) {
+            auto const f = [a = p.a](double t) { return 1.0 / (t - a); };
+            for_each(derivative_orders{}, [&](auto n) {
+                constexpr int N = decltype(n)::value;
+                double const exact = -static_cast<double>(factorial(N)) / ipow(p.a, N + 1);
+                int calls = 0;
+                auto const r = derivative<Ridders, N>(Counted{ f, &calls }, 0.0);
+                ++cases;
+                if (!r || !r->abs_error) {
+                    o.fail(std::string("item C: Ridders failed at ") + p.name + " for N = " + std::to_string(N));
+                    return;
+                }
+                double const actual = std::abs(r->value - exact);
+                covered += actual <= *r->abs_error ? 1 : 0;
+                error_min = std::min(error_min, actual / std::abs(exact));
+                error_max = std::max(error_max, actual / std::abs(exact));
+                evals_min = std::min(evals_min, calls);
+                evals_max = std::max(evals_max, calls);
+                if constexpr (N == 2) ridders_values(o, std::string(p.name) + "RiddersSecond", r, exact, calls);
+            });
+        }
+        value(o, "PoleCases", integer(cases));
+        value(o, "PoleCovered", integer(covered));
+        value(o, "PoleRelErrorMin", sig(error_min));
+        value(o, "PoleRelErrorMax", sig(error_max));
+        value(o, "PoleEvalsMin", integer(evals_min));
+        value(o, "PoleEvalsMax", integer(evals_max));
+    }
+
+    // ------------------------------------------------------------------------------------------------ round 3
+
+    // The edge limit of Ridders for f'' to f'''' (R3-numerics-02): log x at x = 2^-k for k = 28 to 36 in half steps,
+    // default initial step s/4; the largest k up to which every x returns a value. The f''' and f'''' rules reach 2h,
+    // so their limit is a halving short of f'''s, which reaches h.
+    void r3_edge_orders(Output &o)
+    {
+        auto const log_fn = [](double x) { return std::log(x); };
+        char const *const names[] = { "", "First", "Second", "Third", "Fourth" };
+        for_each(std::integer_sequence<int, 2, 3, 4>{}, [&](auto n) {
+            constexpr int N = decltype(n)::value;
+            std::optional<int> last; // in half steps
+            for (int k2 = 56; k2 <= 72; ++k2) {
+                double const x = k2 % 2 == 0 ? std::ldexp(1.0, -k2 / 2) : std::ldexp(std::sqrt(0.5), -(k2 - 1) / 2);
+                if (!derivative<Ridders, N>(log_fn, x)) break;
+                last = k2;
+            }
+            if (!last || *last == 72) {
+                o.fail("R3: the edge limit for N = " + std::to_string(N) + " is outside k = 28 to 36");
+                return;
+            }
+            value(o, std::string("RiddersEdgeLimitExponent") + names[N],
+                *last % 2 == 0 ? integer(*last / 2) : fixed(*last / 2.0, 1));
+        });
+    }
+
+    // Poles near x (R3-numerics-01, -02, R3-evidence-02, R3-codex-01): 1/(t - a) at 0, the n-th derivative -n!/a^(n+1).
+    // (a) Ridders, N = 1 to 4, a = +-c 2^-k for c = 1.25, 1.5, 1.75 and k = 4 to 100: never a sample point (the samples
+    // at 0 are +-2^-m and +-2 2^-m), so the pole always lies between samples. Per N the last k up to which every
+    // result is covered; over all, how many results are uncovered, how many of those are flagged (4 abs_error >=
+    // |value|) and how many are non_finite. (b) ForwardRidders, N = 1 to 4, a pole ahead of x and the same pole behind
+    // it: a = (1 + u) 2^-e with e uniform in 4 ... 30 and u uniform in [0, 1), from std::mt19937 (seed + 100), 4000
+    // draws per N; per N the uncovered results, those neither covered nor flagged, and the worst error over estimate.
+    void r3_poles(Output &o)
+    {
+        char const *const names[] = { "", "First", "Second", "Third", "Fourth" };
+        auto const exact_at_zero = [](int n, double a) { return -static_cast<double>(factorial(n)) / ipow(a, n + 1); };
+        {
+            int cases = 0, covered = 0, flagged = 0, non_finite = 0;
+            for_each(derivative_orders{}, [&](auto n) {
+                constexpr int N = decltype(n)::value;
+                std::optional<int> covered_k;
+                bool run = true;
+                for (int k = 4; k <= 100; ++k) {
+                    bool all = true;
+                    for (double const c : { 1.25, 1.5, 1.75 })
+                        for (double const sign : { 1.0, -1.0 }) {
+                            double const a = sign * std::ldexp(c, -k);
+                            auto const f = [a](double t) { return 1.0 / (t - a); };
+                            auto const r = derivative<Ridders, N>(f, 0.0);
+                            ++cases;
+                            if (!r || !r->abs_error) {
+                                ++non_finite;
+                                all = false;
+                                continue;
+                            }
+                            double const exact = exact_at_zero(N, a);
+                            bool const ok = std::abs(r->value - exact) <= *r->abs_error;
+                            covered += ok ? 1 : 0;
+                            flagged += !ok && 4 * *r->abs_error >= std::abs(r->value) ? 1 : 0;
+                            all = all && ok;
+                        }
+                    run = run && all;
+                    if (run) covered_k = k;
+                }
+                value(o, std::string("PoleSweepCoveredExponent") + names[N], covered_k ? integer(*covered_k) : "none");
+            });
+            value(o, "PoleSweepCases", integer(cases));
+            value(o, "PoleSweepUncovered", integer(cases - covered - non_finite));
+            value(o, "PoleSweepUncoveredFlagged", integer(flagged));
+            value(o, "PoleSweepNonFinite", integer(non_finite));
+            value(o, "PoleSweepFirstK", integer(4));
+            value(o, "PoleSweepLastK", integer(100));
+        }
+        {
+            constexpr int draws = 4000;
+            int behind_uncovered = 0;
+            int behind_silent = 0;
+            for_each(derivative_orders{}, [&](auto n) {
+                constexpr int N = decltype(n)::value;
+                std::mt19937 gen(seed + 100);
+                int uncovered = 0, silent = 0;
+                double worst = 0;
+                double silent_min = std::numeric_limits<double>::infinity();
+                double silent_max = 0;
+                for (int d = 0; d < draws; ++d) {
+                    int const e = 4 + static_cast<int>(gen() % 27);
+                    double const a = std::ldexp(1.0 + static_cast<double>(gen()) / 4294967296.0, -e);
+                    for (double const sign : { 1.0, -1.0 }) {
+                        double const p = sign * a; // ahead of x = 0 for sign 1, behind for -1
+                        auto const f = [p](double t) { return 1.0 / (t - p); };
+                        auto const r = derivative<ForwardRidders, N>(f, 0.0);
+                        if (!r || !r->abs_error) {
+                            o.fail("R3: ForwardRidders returned no value at a pole");
+                            continue;
+                        }
+                        double const exact = exact_at_zero(N, p);
+                        double const actual = std::abs(r->value - exact);
+                        bool const ok = actual <= *r->abs_error;
+                        bool const flag = 4 * *r->abs_error >= std::abs(r->value);
+                        if (sign < 0) {
+                            behind_uncovered += ok ? 0 : 1;
+                            behind_silent += !ok && !flag ? 1 : 0;
+                            continue;
+                        }
+                        uncovered += ok ? 0 : 1;
+                        if (!ok) worst = std::max(worst, actual / *r->abs_error);
+                        if (!ok && !flag) {
+                            ++silent;
+                            silent_min = std::min(silent_min, actual / std::abs(exact));
+                            silent_max = std::max(silent_max, actual / std::abs(exact));
+                        }
+                    }
+                }
+                std::string const suffix = names[N];
+                value(o, "PoleAheadUncovered" + suffix, integer(uncovered));
+                value(o, "PoleAheadSilent" + suffix, integer(silent));
+                value(o, "PoleAheadWorstRatio" + suffix, uncovered > 0 ? ratio_text(worst) : "none");
+                if (silent > 0) {
+                    value(o, "PoleAheadSilentRelErrorMin" + suffix, sig(silent_min));
+                    value(o, "PoleAheadSilentRelErrorMax" + suffix, sig(silent_max));
+                }
+            });
+            value(o, "PoleAheadCases", integer(draws));
+            value(o, "PoleAheadClosestExponent", integer(30));
+            value(o, "PoleAheadFarthestExponent", integer(3));
+            value(o, "PoleBehindUncovered", integer(behind_uncovered));
+            value(o, "PoleBehindSilent", integer(behind_silent));
+        }
+    }
+
+    // The band between "covered" and "flagged" beyond the one-sided reach (R3-numerics-03): ForwardRidders f' on
+    // log x, sqrt x and the cube root at x = c 2^-k, c = 1, 1.25, 1.5, 1.75, k = 2 to 45; the results neither covered
+    // nor flagged, their functions and the worst error over estimate among them.
+    void r3_band(Output &o)
+    {
+        struct Fn
+        {
+            char const *latex;
+            double (*f)(double);
+            double (*d)(double);
+        };
+        Fn const fns[] = {
+            { "$\\log x$", [](double x) { return std::log(x); }, [](double x) { return 1 / x; } },
+            { "$\\sqrt{x}$", [](double x) { return std::sqrt(x); }, [](double x) { return 0.5 / std::sqrt(x); } },
+            { "$\\sqrt[3]{x}$", [](double x) { return std::cbrt(x); },
+              [](double x) { return 1 / (3 * std::cbrt(x) * std::cbrt(x)); } },
+        };
+        int cases = 0, silent = 0;
+        double worst = 0;
+        std::string text;
+        for (Fn const &fn : fns) {
+            int count = 0;
+            for (int k = 2; k <= 45; ++k)
+                for (double const c : { 1.0, 1.25, 1.5, 1.75 }) {
+                    double const x = std::ldexp(c, -k);
+                    auto const r = derivative<ForwardRidders>(fn.f, x);
+                    ++cases;
+                    if (!r || !r->abs_error) continue;
+                    double const actual = std::abs(r->value - fn.d(x));
+                    if (actual <= *r->abs_error || 4 * *r->abs_error >= std::abs(r->value)) continue;
+                    ++count;
+                    worst = std::max(worst, actual / *r->abs_error);
+                }
+            silent += count;
+            if (count > 0) text += (text.empty() ? "" : ", ") + std::string(fn.latex) + " (" + std::to_string(count) + ")";
+        }
+        value(o, "ForwardRiddersBandCases", integer(cases));
+        value(o, "ForwardRiddersBandSilent", integer(silent));
+        value(o, "ForwardRiddersBandFunctions", text.empty() ? "none" : text);
+        if (silent > 0) value(o, "ForwardRiddersBandWorstRatio", ratio_text(worst));
     }
 
     // ------------------------------------------------------------------------------------------------ DS11
@@ -1578,16 +2099,6 @@ namespace {
         auto const &div = nxx::deriv::detail::ridders_divisors;
         if (div[1] != div[2] || div[2] != div[3]) o.fail("DS14: the divisors of f'' to f'''' differ");
         constexpr int cap = nxx::deriv::detail::ridders_levels;
-        auto tab = table(o, "ridders-constants", "columns: constant, value (f', f'', f''', f'''' where it depends on N)");
-        tab << "Ratio of the steps of consecutive levels & 2 \\\\\n";
-        tab << "Initial step, divisor of $\\max(\\lvert x \\rvert, 1)$ & " << div[0] << " (\\(f'\\)), " << div[1]
-            << " (\\(f''\\) to \\(f''''\\)) \\\\\n";
-        tab << "Levels without improvement before the stop & 2 \\\\\n";
-        tab << "Untrusted result: estimate at least $\\lvert A \\rvert / 4$ and more than 64 times the floor & 4, 64 \\\\\n";
-        tab << "Level cap (restarts included) & " << cap << " \\\\\n";
-        tab << "Evaluations per level & 2, 2, 4, 4 \\\\\n";
-        tab << "Evaluations of $f(x)$, once & 0, 1, 0, 1 \\\\\n";
-        tab << "Maximum evaluations & " << 2 * cap << ", " << 2 * cap + 1 << ", " << 4 * cap << ", " << 4 * cap + 1 << " \\\\\n";
         value(o, "RiddersLevelCap", integer(cap));
         value(o, "RiddersDivisorFirst", integer(div[0]));
         value(o, "RiddersDivisorHigher", integer(div[1]));
@@ -1595,6 +2106,61 @@ namespace {
         value(o, "RiddersMaxEvalsSecond", integer(2 * cap + 1));
         value(o, "RiddersMaxEvalsThird", integer(4 * cap));
         value(o, "RiddersMaxEvalsFourth", integer(4 * cap + 1));
+
+        // The one-sided forms (Phase 5): the divisor read from the library; per level the Forward<1> rule of order N,
+        // whose table has the nodes 0 ... N, node 0 being f(x), evaluated once per call; so at most 1 + N cap. That
+        // maximum is reached, all evaluations made, by log beyond the method's reach, at 1e-12 (as the library's
+        // test has it), which the generator checks; a fn finite at x only costs less for N = 3 and 4, since such a
+        // level stops at its first non-finite value (the f'' level evaluates both of its points first).
+        constexpr int one_sided = nxx::deriv::detail::one_sided_divisor;
+        std::array<int, 5> per_level{};
+        std::array<int, 5> at_most{};
+        std::array<int, 5> only_at_x{};
+        auto const log_fn = [](double x) { return std::log(x); };
+        auto const only_at_one = [](double x) { return x == 1.0 ? 1.0 : not_a_number; };
+        char const *const names[] = { "", "First", "Second", "Third", "Fourth" };
+        for_each(derivative_orders{}, [&](auto n) {
+            constexpr int N = decltype(n)::value;
+            constexpr auto t = nxx::deriv::detail::make_table<N>(Forward<1>{});
+            per_level[N] = static_cast<int>(t.nodes.size()) - 1;
+            at_most[N] = 1 + per_level[N] * cap;
+            int beyond = 0;
+            auto const beyond_r = derivative<ForwardRidders, N>(Counted{ log_fn, &beyond }, 1e-12);
+            if (!beyond_r || beyond != at_most[N])
+                o.fail("DS14: ForwardRidders on log at 1e-12 used " + std::to_string(beyond) + " evaluations, not "
+                       + std::to_string(at_most[N]) + ", for N = " + std::to_string(N));
+            int calls_x = 0;
+            if (derivative<ForwardRidders, N>(Counted{ only_at_one, &calls_x }, 1.0))
+                o.fail("DS14: ForwardRidders returned a value for fn finite at x only");
+            only_at_x[N] = calls_x;
+            value(o, std::string("ForwardRiddersMaxEvals") + names[N], integer(at_most[N]));
+            value(o, std::string("ForwardRiddersOnlyAtXEvals") + names[N], integer(only_at_x[N]));
+        });
+        value(o, "ForwardRiddersDivisor", integer(one_sided));
+        auto const four = [](std::array<int, 5> const &a) {
+            return std::to_string(a[1]) + ", " + std::to_string(a[2]) + ", " + std::to_string(a[3]) + ", " + std::to_string(a[4]);
+        };
+
+        // Three columns (Phase 5): the constant, its value for Ridders, and for ForwardRidders and BackwardRidders.
+        // The column divisor and the floor of an entry are the two choices the base makes (the header's ridders()
+        // documentation); the restart rule is the same for all three methods since Phase 5.
+        auto tab = table(o, "ridders-constants",
+            "columns: constant; value for Ridders; value for ForwardRidders and BackwardRidders (f', f'', f''', f'''' where "
+            "it depends on N)");
+        std::string const central_max = four({ 0, 2 * cap, 2 * cap + 1, 4 * cap, 4 * cap + 1 });
+        tab << "Ratio of the steps of consecutive levels & 2 & 2 \\\\\n";
+        tab << "Initial step, divisor of $\\max(\\lvert x \\rvert, 1)$ & " << div[0] << " (\\(f'\\)), " << div[1]
+            << " (\\(f''\\) to \\(f''''\\)) & " << one_sided << " \\\\\n";
+        tab << "Column divisor of the tableau, column $j$ & $4^j - 1$ & $2^j - 1$ \\\\\n";
+        tab << "Rounding floor of an entry & that of its level & carried through the tableau \\\\\n";
+        tab << "Levels without improvement before the stop & 2 & 2 \\\\\n";
+        tab << "Untrusted result: estimate at least $\\lvert A \\rvert / 4$ and more than 64 times the floor & 4, 64 & "
+               "4, 64 \\\\\n";
+        tab << "Restart after a failed level or an untrusted result & at half the smallest step tried & the same \\\\\n";
+        tab << "Level cap (restarts included) & " << cap << " & " << cap << " \\\\\n";
+        tab << "Evaluations per level & 2, 2, 4, 4 & " << four(per_level) << " \\\\\n";
+        tab << "Evaluations of $f(x)$, once & 0, 1, 0, 1 & 1, 1, 1, 1 \\\\\n";
+        tab << "Maximum evaluations & " << central_max << " & " << four(at_most) << " \\\\\n";
     }
 
     // ------------------------------------------------------------------------------------------------ DS15, DS16
@@ -1648,18 +2214,19 @@ namespace {
         rows.push_back(matrix_row<Forward<2>>("Forward<2>"));
         rows.push_back(matrix_row<Forward<4>>("Forward<4>"));
         rows.push_back(matrix_row<Ridders>("Ridders"));
+        rows.push_back(matrix_row<ForwardRidders>("ForwardRidders")); // Phase 5; BackwardRidders is its mirror
         auto out = csv(o, "accuracy-matrix", "method,type,N,median,min,max",
             "exp(x), default steps, relative error over 11 points in [0.5, 1]: median, smallest, largest; type float, "
-            "double or cpp_bin_float_50 (nan if Boost was absent); float N = 4 under the silencing pragma");
+            "double or cpp_bin_float_50 (nan if Boost was absent); float N = 2 to 4 under the silencing pragma");
         auto tab = table(o, "accuracy-matrix",
             "columns: method, then the median relative error over 11 points in [0.5, 1] for N = 1 to 4 in float, in double "
-            "and in cpp_bin_float_50; the float fourth derivative (marked *) was computed with the low-precision warning "
-            "silenced");
+            "and in cpp_bin_float_50; the float derivatives above the first (marked *) were computed with the "
+            "low-precision warning silenced, which covers them for every method since Phase 5");
         auto const write = [&](MatrixRow const &row, std::array<Spread, 5> const &s, char const *type) {
             for (std::size_t N = 1; N <= 4; ++N) {
                 out << row.name << ',' << type << ',' << N << ',' << cell(s[N].median) << ',' << cell(s[N].min) << ','
                     << cell(s[N].max) << '\n';
-                tab << " & " << num(s[N].median) << (N == 4 && std::string_view(type) == "float" ? "$^{\\ast}$" : "");
+                tab << " & " << num(s[N].median) << (N >= 2 && std::string_view(type) == "float" ? "$^{\\ast}$" : "");
             }
         };
         for (auto const &row : rows) {
@@ -1682,6 +2249,8 @@ namespace {
         value(o, "HeadlineRiddersFourthDigits", digits(rows[5].dbl[4].median));
         // Ridders' median relative error for f' in double, the companion of \valExpCentral...RelError (6.5, 6.6, 7.3).
         value(o, "ExpRiddersFirstRelError", sig(*rows[5].dbl[1].median));
+        // The same for the one-sided form (Phase 5; the method summary T0 and 6.x).
+        value(o, "ExpForwardRiddersFirstRelError", sig(*rows[6].dbl[1].median));
         // The measured medians against the model eps^(P/(P+N)) in double (R1-numerics-05, R1-evidence-11): the
         // central rules lie below the model for f' to f''' and above it for f''''; the one-sided rules above it by
         // up to their amplification.
@@ -1705,11 +2274,11 @@ namespace {
         return rows;
     }
 
-    void ds16_cost(Output &o, std::array<Statistics, 5> const &st)
+    void ds16_cost(Output &o, std::array<Statistics, 5> const &st, std::array<Statistics, 5> const &forward)
     {
         auto tab = table(o, "cost",
-            "columns: method, evaluations of fn for N = 1 to 4; for Ridders the median with the minimum and maximum of the "
-            "random study (DS9), then its caps");
+            "columns: method, evaluations of fn for N = 1 to 4; for Ridders and ForwardRidders the median with the minimum "
+            "and maximum of the random study (DS9), then their caps");
         auto const stencil = [&]<typename S>(std::string const &name) {
             tab << "\\code{" << name << "}";
             for_each(derivative_orders{}, [&](auto n) {
@@ -1733,6 +2302,17 @@ namespace {
         tab << " \\\\\n";
         constexpr int cap = nxx::deriv::detail::ridders_levels;
         tab << "\\code{Ridders}, at most & " << 2 * cap << " & " << 2 * cap + 1 << " & " << 4 * cap << " & " << 4 * cap + 1 << " \\\\\n";
+        // Phase 5: the one-sided form (BackwardRidders costs the same); its caps 1 + N cap, checked in DS14.
+        tab << "\\code{ForwardRidders}, measured (median, range)";
+        for (std::size_t N = 1; N <= 4; ++N) {
+            std::vector<double> const ev = sorted_evaluations(forward[N]);
+            tab << " & " << static_cast<long long>(ev[ev.size() / 2]) << " (" << static_cast<long long>(ev.front()) << "--"
+                << static_cast<long long>(ev.back()) << ")";
+        }
+        tab << " \\\\\n";
+        tab << "\\code{ForwardRidders}, at most";
+        for (int N = 1; N <= 4; ++N) tab << " & " << 1 + N * cap;
+        tab << " \\\\\n";
     }
 
     // ------------------------------------------------------------------------------------------------ DS17
@@ -2117,6 +2697,7 @@ int main(int argc, char **argv)
     hand_tables(o);
     ds1_step_error_cp(o);
     e6_validity_edge(o);
+    e24_onesided_edge(o);
     ds2_step_error_exp(o);
     ds3_step_error_float(o);
     ds4_step_scale(o);
@@ -2126,14 +2707,21 @@ int main(int argc, char **argv)
     ds7_default_step_accuracy(o);
     ds8_ridders_tableau(o);
     auto const statistics = ds9_ridders_coverage(o);
+    auto const forward_statistics = ds9_forward_ridders(o, statistics);
     ds10_ridders_edge(o);
+    ds23_forward_reach(o);
+    s12_aliasing(o);
+    item_c_poles(o);
+    r3_edge_orders(o);
+    r3_poles(o);
+    r3_band(o);
     ds11_newton(o);
     e18_check(o);
     ds12_weight_tables(o);
     ds13_default_steps(o);
     ds14_ridders_constants(o);
     ds15_accuracy_matrix(o);
-    ds16_cost(o, statistics);
+    ds16_cost(o, statistics, forward_statistics);
     ds17_numeric_limits(o);
     ds18_examples(o);
     ds19_noise(o);

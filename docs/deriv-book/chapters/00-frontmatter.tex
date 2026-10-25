@@ -18,7 +18,7 @@ Part~I teaches. Its seven chapters build the methods up from one idea, Taylor's 
 order: where derivatives arise and what the library offers (\cref{ch:why}); the forward and the central difference
 and their errors (\cref{ch:taylor}); why a smaller step is not always better, and how the step is chosen
 (\cref{ch:rounding}); more points and one-sided rules (\cref{ch:stencils}); second to fourth derivatives
-(\cref{ch:orders}); Ridders' extrapolation, the one method that estimates its own error (\cref{ch:ridders}); and the
+(\cref{ch:orders}); Ridders' extrapolation and its one-sided forms, the methods that estimate their own error (\cref{ch:ridders}); and the
 library in use, with worked engineering examples and the pitfalls (\cref{ch:using}). One example runs through Part~I,
 the heat capacity of nitrogen from its enthalpy, whose derivative is known, so that every error quoted could be
 measured.
@@ -55,7 +55,8 @@ truth: where this book and the code disagree, the book has the bug.
 
 This document was prepared with the use of AI, under the direction of its author, who approved every stage and
 is responsible for its content. Anthropic's Claude drafted and reviewed it in named authoring and reviewing
-roles; OpenAI Codex and Cline with DeepSeek V4.1 Flash reviewed the result independently. What makes it
+roles; OpenAI Codex and Cline with DeepSeek V4.1 Flash reviewed the result independently. It was updated for the
+library's Phase 5 in the same way, drafted and reviewed by Claude, with an independent review by OpenAI Codex. What makes it
 trustworthy is checked by the build, not taken on a model's word: every number, plot and table was computed by
 running the library, every code listing is compiled and run as a test, and every reference was checked against
 the work or a library catalogue.

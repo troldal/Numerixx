@@ -74,7 +74,7 @@ $\epsmach^{1/3}$: \num{\valModelCentralTwoFirstDouble}, \num{\valModelCentralTwo
 \cref{fig:order-accuracy}, follow the model within its usual factor: \num{\valDoubleFourthCentralRelError}
 for the fourth derivative against \num{\valExpCentralTwoRelError} for the first. These are the
 \num{\valHeadlineFourthDigits} and \num{\valHeadlineFirstDigits} digits that \cref{ch:why} promised. What is lost to each
-order, and why float cannot afford a fourth derivative at all, is quantified in \cref{sb:fourth-sensitivity}.
+order, and why float cannot afford a derivative above the first, is quantified in \cref{sb:fourth-sensitivity}.
 
 One caution about the word \emph{relative}. The model's rounding term is an absolute error,
 $\ampl \epsmach \abs{f} / h^{\dorder}$, and dividing it by $\abs{f^{(\dorder)}}$ at the default step gives the
@@ -103,8 +103,10 @@ In float, $\epsmach$ is \num{\valEpsFloat} and the same exponents leave much les
 $f''''$, two digits by the model. Measured on $\mathrm{e}^x$, the median error of \code{Central<2>} for the fourth
 derivative in float is \num{\valFloatFourthCentralRelError}, and Ridders reaches \num{\valFloatFourthRiddersRelError}
 with a relative estimate of \num{\valFloatFourthRiddersRelEstimate}: the estimate reports the noise honestly. The
-third derivative is still usable, \num{\valFloatThirdRiddersRelError} with Ridders, which is why only the fourth
-carries the warning of \cref{sec:orders-float}.
+second and third derivatives keep more, \num{\valFloatSecondCentralRelError} and
+\num{\valFloatThirdCentralRelError} with \code{Central<2>}, but far less than the
+\num{\valFloatFirstCentralRelError} of $f'$, which is why every derivative above the first carries the warning of
+\cref{sec:orders-float}.
 
 The step sensitivity grows the same way. The rounding term is proportional to $h^{-\dorder}$ and the truncation
 term to $h^{\aorder}$: a step a factor 2 below the right one multiplies the rounding term by $2^{\dorder}$, and a
@@ -121,7 +123,7 @@ the scale at all.
 \sidecaption{Relative error at the default step against $\dorder$ for \code{Central<2>}, \code{Central<4>} and
 Ridders, double and float, $\mathrm{e}^x$ (medians over eleven points); the model
 $\epsmach^{\aorder/(\aorder + \dorder)}$ of \code{Central<2>} as a dotted guide line for each type; the float
-$f''''$ points marked as the warning case.\label{fig:order-accuracy}}
+points for $f''$ to $f''''$ boxed as the cases that warn.\label{fig:order-accuracy}}
 \centering
 \input{figures/05-orders-order-accuracy}
 \end{figure}
@@ -156,16 +158,22 @@ rather than pass one $h$ for every order.
 
 \section{The float warning}\label{sec:orders-float}
 
-A fourth derivative in float is mostly rounding noise: \num{\valFloatFourthCentralRelError} relative with
-\code{Central<2>} on $\mathrm{e}^x$, measured as a median, against \num{\valDoubleFourthCentralRelError} in
-double (\cref{fig:order-accuracy}, \cref{sb:fourth-sensitivity}). The library says so at compile time: a call
-with $\dorder = 4$ and a type whose epsilon is above $10^{-7}$, which is float, decimal32 or bfloat16 but not
-double, selects a deprecated overload of \code{derivative}, and the compiler reports the deprecation at the
-caller's line, with a message that names the remedy. The cure is to use double. Where a float fourth derivative is
-wanted all the same, the warning can be silenced for one call or for the whole build, and the result is the same
-with or without it (\cref{sec:api-warning}, which quotes the call and its numbers); what one gets is a value with
-about two correct digits and, from Ridders, an estimate of \num{\valFloatFourthRiddersRelEstimate} relative that
-says so (\cref{fig:order-accuracy}).
+In float, every derivative above the first keeps few correct digits. Measured as medians on $\mathrm{e}^x$,
+\code{Central<2>} is \num{\valFloatFirstCentralRelError} off for $f'$ but \num{\valFloatSecondCentralRelError},
+\num{\valFloatThirdCentralRelError} and \num{\valFloatFourthCentralRelError} for $f''$ to $f''''$, against
+\num{\valDoubleFourthCentralRelError} for $f''''$ in double (\cref{fig:order-accuracy},
+\cref{sb:fourth-sensitivity}); Ridders does better, \num{\valFloatSecondRiddersRelError} for $f''$ to
+\num{\valFloatFourthRiddersRelError} for $f''''$, and its one-sided form of \cref{sec:ridders-onesided} worse,
+\num{\valFloatSecondForwardRiddersRelError} for $f''$ to \num{\valFloatFourthForwardRiddersRelError}, more than
+the value itself, for $f''''$. The library says so at compile time: a call for a derivative above the first, by
+any method, in a type whose epsilon is above $10^{-7}$, which is float, decimal32 or bfloat16 but not double,
+selects a deprecated overload of \code{derivative}, and the compiler reports at the caller's line: ``derivatives
+above the first in a type with 7 or fewer significant digits keep few correct digits: use double, or silence this
+warning at the call or with NUMERIXX\_NO\_PRECISION\_WARNING''. The cure is to use double. Where a float
+result is wanted all the same, the warning can be silenced for one call or for the whole build, and the result is
+the same with or without it (\cref{sec:api-warning}, which quotes the call and its numbers); Ridders' estimate then
+says how little it is worth, \num{\valFloatSecondRiddersRelEstimate} relative for $f''$ and
+\num{\valFloatFourthRiddersRelEstimate} for $f''''$.
 
 \section{Ridders for higher orders}\label{sec:orders-ridders}
 
@@ -209,7 +217,7 @@ exact by the same lemma, so $x_- = x - h$ and the offset $h_-$ is $h$, a represe
 $h = \abs{x}$, while $x_+$ stays within a factor 2 of $x$ as before. With exact offsets the formula is exact for every quadratic whatever the rounding of the points, and the
 point-rounding term that a nominal-step formula carries, about $\epsmach \abs{x f'} / h^2$, drops out. This
 mattered most for Ridders in float, whose second-derivative levels use the same form: in the prototype of the design
-record (\code{docs/PHASE4_API.md}) the nominal step gave a worst case of 8.7 times the estimate, the actual offsets
+record (\code{docs/deriv/PHASE4_API.md}) the nominal step gave a worst case of 8.7 times the estimate, the actual offsets
 1.4. The form also never computes $h^2$, which underflows in double for $h$ below about $10^{-154}$; every rule
 with more nodes divides by $\den h$ and then by $h$ again, $\dorder - 1$ times, in the order that avoids a
 spurious underflow or overflow (by $h$ first when $\den h > 1 > h$), for the same reason. Only

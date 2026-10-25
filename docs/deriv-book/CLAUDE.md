@@ -27,8 +27,9 @@ holds the outline, the targets and the ownership, and wins over `BRIEF.md` once 
 What the book says about the library must be true of the library. In order of precedence:
 1. `include/numerixx/deriv.hpp` and `include/numerixx/math.hpp` (the code and its comments);
 2. the tests in `tests/` (what is verified, and with which references and tolerances);
-3. `docs/design.md`, `docs/PHASE2_API.md`, `docs/PHASE3_API.md`, `docs/PHASE4_API.md` (decisions and their evidence);
-4. `docs/DERIV_TUTORIAL.md`, `docs/DERIV_TECHNIQUES.md`, `README.md`.
+3. `docs/deriv/design.md`, `docs/deriv/PHASE2_API.md` to `docs/deriv/PHASE5_API.md` (decisions and their evidence), and
+   `docs/design.md` (the rules for every module);
+4. `docs/deriv/DERIV_TUTORIAL.md`, `docs/deriv/DERIV_TECHNIQUES.md`, `README.md`.
 Where they disagree, the higher one wins; report the disagreement to the author instead of choosing silently. The book
 describes the library as it is; it does not promise features, and does not mention features the library lacks.
 

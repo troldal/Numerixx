@@ -26,7 +26,8 @@ Name & Kind & Section\\
 \code{order} & scoped enumeration over \code{int}: \code{first} to \code{fourth} & \ref{sec:api-error-order}\\
 \code{Central<P>}, \code{Forward<P>}, \code{Backward<P>} & class templates, empty method tags &
   \ref{sec:api-methods}\\
-\code{Ridders} & class, an empty method tag & \ref{sec:api-methods}\\
+\code{Ridders}, \code{ForwardRidders}, \code{BackwardRidders} & classes, empty method tags &
+  \ref{sec:api-methods}\\
 \code{NUMERIXX_NO_PRECISION_WARNING} & macro, defined by the user & \ref{sec:api-warning}\\
 \code{nxx::real} & concept & \ref{sec:api-real}\\
 \code{nxx::math::abs}, \code{isfinite} & function templates & \ref{sec:api-real}\\
@@ -66,8 +67,9 @@ Each has a twin with the additional constraint \code{detail::noisy<N, T>}, marke
 \begingroup\raggedright
 \begin{itemize}
   \item \code{M}, the method: \code{Central<P>} (by default \code{Central<2>}), \code{Forward<P>},
-    \code{Backward<P>} or \code{Ridders}. \code{detail::method<M>} accepts these with an accepted order, and nothing
-    else: users cannot add a method.
+    \code{Backward<P>} (the stencils), or \code{Ridders}, \code{ForwardRidders} or \code{BackwardRidders} (the
+    extrapolation methods). \code{detail::method<M>} accepts these, the stencils with an accepted order, and nothing
+    else.
   \item \code{N}, the derivative order: 1 (the default) to 4, as a value of any integer type except \code{bool}, or as
     an \code{order}. \code{detail::valid_order<N>} compares an integer in its own type, so a value beyond the range of
     \code{int} is not wrapped into 1 to 4.
@@ -86,7 +88,7 @@ Each has a twin with the additional constraint \code{detail::noisy<N, T>}, marke
 \endgroup
 
 \paragraph{Parameters.} \code{fn}, the function to differentiate. \code{x}, the point. \code{h}, the step of a
-stencil, or the initial step of Ridders' method.
+stencil, or the initial step of an extrapolation method.
 
 \paragraph{The step.} A step that is not positive and finite (zero, negative, NaN or infinite) returns
 \code{non_finite} before \code{fn} is called, in every build and in constant expressions. For a stencil, \code{h}
@@ -96,7 +98,8 @@ and returns a finite value that is mostly rounding.
 
 \paragraph{Default steps.} For a stencil of accuracy order P, $h = \epsmach^{1/(P+N)} \max(\abs{x}, 1)$, computed as
 \code{root_epsilon<P + N, T>()} times the scale. For Ridders' method the initial step is
-$\max(\abs{x}, 1)/32$ for $f'$ and $\max(\abs{x}, 1)/4$ for $f''$ to $f''''$. \code{default_step} returns the step,
+$\max(\abs{x}, 1)/32$ for $f'$ and $\max(\abs{x}, 1)/4$ for $f''$ to $f''''$; for \code{ForwardRidders} and
+\code{BackwardRidders} it is $\max(\abs{x}, 1)/32$ for every order. \code{default_step} returns the step,
 so that \code{derivative<M, N>(fn, x)} and \code{derivative<M, N>(fn, x, default_step<M, N>(x))} give the same
 result for every \code{x} (for a non-finite \code{x}, \code{non_finite} from both):
 \begin{signature}
@@ -108,25 +111,28 @@ Pass a step when \code{fn} varies faster
 than $\max(\abs{x}, 1)$, or when the derivative is much smaller than the error $\epsmach^{P/(P+N)}$; use the overload
 without a step in generic code that varies N (\cref{tab:default-steps}).
 
-\paragraph{Result.} An \code{Estimate<T>} (\cref{sec:api-estimate}) whose \code{abs_error} is filled by Ridders'
-method and empty for the stencils, or \code{error::non_finite}.
+\paragraph{Result.} An \code{Estimate<T>} (\cref{sec:api-estimate}) whose \code{abs_error} is filled by the three
+extrapolation methods and empty for the stencils, or \code{error::non_finite}.
 
 \paragraph{Failures.} \code{error::non_finite} when no finite estimate exists: \code{x} is not finite; \code{fn}
 returned an infinite or NaN value; a difference, term, sum or quotient would overflow; a point $x + k h$ would
 overflow; or \code{h} is below the resolution of \code{x}: the points of a two-node rule coincide, or, for a rule with
-more nodes, $x + h$ or $x - h$ rounds to $x$ or neighbouring points round to the same value. For Ridders' method,
-specifically: \code{fn(x)} is not finite for an even N (after one evaluation), or no tableau reached two finite
-levels. A level at which \code{fn} is not finite makes the method restart below that step. An untrusted result, one
-whose \code{abs_error} is at least a quarter of $\abs{\text{value}}$ and far above rounding, makes it restart too; it
-is nevertheless returned, as a value with its large \code{abs_error} and not as a failure, when the step reaches the
+more nodes, $x + h$ or $x - h$ rounds to $x$ or neighbouring points round to the same value. For the extrapolation
+methods, specifically: \code{fn(x)} is not finite where it is needed (an even N with \code{Ridders}, every N with
+the one-sided forms; after one evaluation), or no tableau reached two finite levels. A level at which
+\code{fn} is not finite makes the method restart at half that step. An untrusted result, one whose \code{abs_error}
+is at least a quarter of $\abs{\text{value}}$ and far above rounding, makes it restart too, at half the smallest step
+it tried; it is nevertheless returned, as a value with its large \code{abs_error} and not as a failure, when the step reaches the
 resolution of $x$ or the levels run out during the restarts. Test \code{abs_error} before relying on such a value
 (\cref{sec:using-result}).
 
 \paragraph{Cost.} A stencil calls \code{fn} once per node: $P + N - 1$ times for \code{Central<P>}, $P + N$ for
 \code{Forward<P>} and \code{Backward<P>}. Ridders' method calls it 2 times per level for $f'$ and $f''$, 4 times for
 $f'''$ and $f''''$, plus \code{fn(x)} once for $f''$ and $f''''$: at most \num{\valRiddersMaxEvalsFirst},
-\num{\valRiddersMaxEvalsSecond}, \num{\valRiddersMaxEvalsThird} and \num{\valRiddersMaxEvalsFourth} times
-(\cref{tab:cost}). \code{fn} is called only at finite points. No memory is allocated.
+\num{\valRiddersMaxEvalsSecond}, \num{\valRiddersMaxEvalsThird} and \num{\valRiddersMaxEvalsFourth} times.
+The one-sided forms call it at $x$ once and N times per level, never on the other side of $x$: at most \num{\valForwardRiddersMaxEvalsFirst}, \num{\valForwardRiddersMaxEvalsSecond},
+\num{\valForwardRiddersMaxEvalsThird} and \num{\valForwardRiddersMaxEvalsFourth} times (\cref{tab:cost}). \code{fn}
+is called only at finite points. No memory is allocated.
 
 \paragraph{Exceptions and constant evaluation.} Numerixx throws nothing and catches nothing; an exception thrown by
 \code{fn} or by the operations of \code{T} passes through unchanged, and neither overload is \code{noexcept}. Both
@@ -149,9 +155,10 @@ except an overflow of a final quotient, which GCC rejects at compile time (\cref
 \texttt{\};}
 \end{signature}
 \code{value} is the estimate of the derivative. \code{abs_error} is an estimate of $\abs{\text{value} -
-\text{exact}}$, not a guaranteed bound; it is empty for the stencils. For Ridders' method it is the change of the best
-tableau entry from its parent, but at least the rounding error of the difference it came from and at least its distance
-to the latest diagonal entry (\cref{sb:floor-coverage}). It saturates at \code{max()} where the estimate would
+\text{exact}}$, not a guaranteed bound; it is empty for the stencils. For the extrapolation methods it is the change of the
+best tableau entry from its parent, but at least the rounding error of the difference it came from (for the one-sided
+forms, that rounding as the tableau amplifies it) and at least its distance to the latest diagonal entry
+(\cref{sb:floor-coverage}). It saturates at \code{max()} where the estimate would
 overflow (a large \code{fn} over a tiny step), and then says only that the method could not estimate its error.
 
 \code{Estimate} is an aggregate (designated initialisers, structured bindings: \code{auto const [v, e] = *r}). It
@@ -185,15 +192,17 @@ specification of a string, so \code{std::format("{:>12}", e)} gives \code{"  non
 \code{template<int P> struct Central;}\hfill\code{// even P, 2 <= P <= 10}\\
 \code{template<int P> struct Forward;}\hfill\code{// 1 <= P <= 6}\\
 \code{template<int P> struct Backward;}\hfill\code{// 1 <= P <= 6}\\
-\code{struct Ridders {};}
+\code{struct Ridders {};}\\
+\code{struct ForwardRidders {};}\\
+\code{struct BackwardRidders {};}
 \end{signature}
 % Placed here, [h], so that it does not float into 8.6 and split a sentence there (R2-library-06).
 \begin{table}[h]
 \sidecaption{The methods for the N-th derivative: nodes in units of $h$, evaluations of \code{fn}, default step
 and error estimate, as \code{deriv.hpp} documents them. $s = \max(\abs{x}, 1)$. The weights are in
 \cref{ch:tables}.\label{tab:api-methods}}
-\centering\footnotesize
-\begin{tabular}{@{}>{\raggedright}p{17mm}>{\raggedright}p{30mm}>{\raggedright}p{19mm}>{\raggedright}p{14mm}%
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}>{\raggedright}p{26.5mm}>{\raggedright}p{29mm}>{\raggedright}p{21mm}>{\raggedright}p{14mm}%
 >{\raggedright\arraybackslash}p{12mm}@{}}
 \toprule
 Method & Nodes & Evaluations & Default step & Estimate\\
@@ -206,6 +215,11 @@ Method & Nodes & Evaluations & Default step & Estimate\\
   3$, and $x$ for even N & 2 per level ($N \le 2$), 4 ($N \ge 3$), plus $f(x)$ once for even N; at most
   \num{\valRiddersMaxEvalsFirst}, \num{\valRiddersMaxEvalsSecond}, \num{\valRiddersMaxEvalsThird},
   \num{\valRiddersMaxEvalsFourth} & $s/32$ ($N = 1$), $s/4$ ($N \ge 2$) & yes\\
+\code{ForwardRidders} &\code{Forward<1>} of order N at $h_i = h/2^i$: $x + k h_i$, $k = 0, \ldots, N$ &
+  $f(x)$ once, plus N per level; at most \num{\valForwardRiddersMaxEvalsFirst},
+  \num{\valForwardRiddersMaxEvalsSecond}, \num{\valForwardRiddersMaxEvalsThird},
+  \num{\valForwardRiddersMaxEvalsFourth} & $s/32$ & yes\\
+\code{BackwardRidders} & mirrored: $x - k h_i$; value negated for odd N & the same & $s/32$ & yes\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -215,31 +229,29 @@ range is rejected by the constraint of \code{derivative}; completing the type it
 (``\code{Central<P> needs an even order P from 2 to 10}'', ``\code{Forward<P> needs an order P from 1 to 6}''). A
 rule whose integer weights the type \code{T} cannot hold exactly is rejected by the constraint
 \code{detail::exact_weights<M, N, T>}, which a \code{requires}-expression sees; every type with 24 significant bits
-or more holds them all, and Ridders' method is checked against the weights of \code{Central<2>} it uses. A
+or more holds them all. The extrapolation methods are checked against the table they extrapolate
+(\cref{tab:api-methods}). A
 half-precision type accepts \code{Central<4>}, for one, but not \code{Central<10>}.
-\Cref{tab:api-methods} gives the nodes, the cost and the default step of each.
 
 The two-node rules divide by the distance between the points actually evaluated, \code{Central<2>} for $f''$ by its
-actual offsets (\cref{sb:actual-distance,sb:actual-offsets}), the other rules by $\den h$ and then $N - 1$ times by
-$h$, in the order that avoids a spurious underflow or overflow (by $h$ first when $\den h > 1 > h$). \code{Ridders} extrapolates the \code{Central<2>} rule of order N in a Richardson tableau; its constants are in
-\cref{tab:ridders-constants}.
+actual offsets (\cref{sb:actual-distance,sb:actual-offsets}), as do the $f'$ and $f''$ levels of the one-sided
+Ridders forms, the other rules by $\den h$ and then $N - 1$ times by
+$h$, in the order that avoids a spurious underflow or overflow (by $h$ first when $\den h > 1 > h$). The constants of
+Ridders' methods are in \cref{tab:ridders-constants}.
 
 \section{The precision warning}\label{sec:api-warning}
 
-A fourth derivative in a type whose machine epsilon is above $10^{-7}$, tested with integers as
-$\beta^{\text{digits} - 1} < 10^7$ ($\beta$ the radix: \code{float}, \code{decimal32}, \code{bfloat16}, not
-\code{double}), selects the deprecated twin of \code{derivative}, whose warning reads
- ``the 4th derivative in a type with 7 or fewer significant digits is mostly rounding noise: use double,
-or silence this warning at the call or with NUMERIXX\_NO\_PRECISION\_WARNING''. The warning is reported at the
+A derivative above the first, by any method, in a type whose machine epsilon is above $10^{-7}$, tested with
+integers as $\beta^{\text{digits} - 1} < 10^7$ ($\beta$ the radix: \code{float}, \code{decimal32}, \code{bfloat16},
+not \code{double}), selects the deprecated twin of \code{derivative}, whose warning reads ``derivatives above the
+first in a type with 7 or fewer significant digits keep few correct digits: use double, or silence this warning at
+the call or with NUMERIXX\_NO\_PRECISION\_WARNING''. The warning is reported at the
 caller's line, so a pragma there silences it (\code{-Wdeprecated-declarations} on GCC and Clang, C4996 on MSVC), and a
 system-header include does not hide it. Defining \code{NUMERIXX_NO_PRECISION_WARNING} turns it off everywhere; it must
 be defined alike in every translation unit, best on the command line, since overload resolution would otherwise differ
 between them. The pragma at the call, for both compiler families:
 \snippet{05-orders-float}{float-fourth}
-The result is the same with or without the warning. On $\mathrm{e}^x$ at 1, \code{Central<2>} is
-\num{\valFloatFourthCentralAtOneRelError} off and Ridders' method \num{\valFloatFourthRiddersAtOneRelError}, with a
-relative estimate of \num{\valFloatFourthRiddersAtOneRelEstimate} that says the result is rough (measured;
-\cref{sec:orders-float}).
+The result is the same with or without the warning (accuracy: \cref{sec:orders-float}).
 
 \section{\texorpdfstring{\code{nxx::real}}{nxx::real} and \texorpdfstring{\code{nxx::math}}{nxx::math}}\label{sec:api-real}
 
@@ -282,5 +294,4 @@ way (\cref{sec:api-methods}).
 A type given explicitly as the second template argument, as in
 \code{derivative<Ridders, double>(fn, x)}, does not compile either, because that argument is the order; \code{T} is
 deduced from \code{x}, never from \code{h}, unless it is given as the third template argument. A callable that cannot
-
 be called with a \code{T const} lvalue, or whose result does not convert to \code{T}, fails \code{detail::callable}.

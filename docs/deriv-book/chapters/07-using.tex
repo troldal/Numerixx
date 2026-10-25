@@ -22,10 +22,10 @@ minimum versions.
 one function, \code{derivative}, in two forms:
 \begin{itemize}
   \item \code{derivative<M, N>(fn, x)} uses the method's default step;
-  \item \code{derivative<M, N>(fn, x, h)} uses the step \code{h} you pass (for Ridders' method, the initial step).
+  \item \code{derivative<M, N>(fn, x, h)} uses the step \code{h} you pass (for the Ridders methods, the initial step).
 \end{itemize}
-The method \code{M} is a template argument: \code{Central<P>}, \code{Forward<P>}, \code{Backward<P>} or
-\code{Ridders}, and \code{Central<2>} when it is left out. The derivative order N is 1 by default; it is an integer
+The method \code{M} is a template argument: \code{Central<P>}, \code{Forward<P>}, \code{Backward<P>},
+\code{Ridders}, \code{ForwardRidders} or \code{BackwardRidders}, and \code{Central<2>} when it is left out. The derivative order N is 1 by default; it is an integer
 from 1 to 4 or a value of the enumeration \code{order}, such as \code{order::second}. The number type T is deduced
 from \code{x}, and a step of another type converts to it, so \code{0.01} is a valid step for a 50-digit \code{x}; for
 a \code{float} \code{x} write \code{1e-3f}, since a \code{double} step is diagnosed under \code{-Wconversion} unless
@@ -45,7 +45,7 @@ Ridders' method costs two or four per level, with a median of \num{\valRiddersEv
 The library itself throws nothing: a failure is a value. An exception thrown by \code{fn} or by the operations of T
 passes through unchanged, and \code{derivative} is not \code{noexcept}. The result holds either an estimate or the
 reason there is none, as a \code{std::expected<Estimate<T>, error>}. An \code{Estimate<T>} has two members,
-\code{value} and \code{abs_error}, a \code{std::optional<T>} filled by Ridders' method only. The one reason so far is
+\code{value} and \code{abs_error}, a \code{std::optional<T>} filled only by Ridders' method and its one-sided forms. The one reason so far is
 \code{error::non_finite}. Test the result, then read it:
 
 \snippet{07-using-expected}{expected-basics}
@@ -100,7 +100,8 @@ evaluations for $f'$ (median) against two to six for the stencils, about three m
 \caption{Choosing a method. Relative errors in double: the model $\epsmach^{P/(P+N)}$ of \cref{ch:stencils} where
 named, then measured values, medians for $\mathrm{e}^x$ (\cref{tab:accuracy-matrix}) or the nitrogen $\cp$ and this
 chapter's examples. Evaluations of $f'$ unless the row says otherwise; for Ridders' method the study's median and
-the cap (\cref{tab:cost}). $w$ is the scale on which $f$ varies, $\noise$ its relative accuracy.\label{tab:method-choice}}
+the cap (\cref{tab:cost}). $w$ is the scale on which $f$ varies, $\noise$ its relative accuracy. Above $f'$, \code{float} warns
+(\cref{sec:api-warning}).\label{tab:method-choice}}
 \centering\footnotesize
 \begin{tabular}{@{}>{\raggedright}p{31mm}>{\raggedright}p{27mm}>{\raggedright}p{21mm}>{\raggedright}p{15mm}%
 >{\raggedright}p{39mm}>{\raggedright\arraybackslash}p{19mm}@{}}
@@ -114,8 +115,11 @@ A value to report, with an error estimate & \code{Ridders} & default initial ste
   at most \num{\valRiddersMaxEvalsFirst} & about \num{\valHeadlineRiddersFirstDigits} digits; estimate covers in
   \SI{\valRiddersCoverageFirst}{\percent} of the study & \cref{fig:ridders-coverage}\\
 $f$ defined on one side of $x$ only (an edge of its domain or its validity range) & \code{Forward<P>} or
-  \code{Backward<P>}, P = 2 or 4 & default & 3, or 5 & \num{\valExpForwardTwoRelError} (P = 2) &
-  \cref{fig:one-sided}, \cref{sec:stencils-one-sided}\\
+  \code{Backward<P>}, P = 2 or 4; with an error estimate, \code{ForwardRidders} or \code{BackwardRidders} & default
+  & 3, or 5; with the estimate \num{\valForwardRiddersEvalsMedianFirst}, at most
+  \num{\valForwardRiddersMaxEvalsFirst} & \num{\valExpForwardTwoRelError} (P = 2); with the estimate
+  \num{\valExpForwardRiddersFirstRelError}, which covers in \SI{\valForwardRiddersCoverageFirst}{\percent} of the
+  study & \cref{fig:one-sided}, \cref{sec:stencils-one-sided,sec:ridders-onesided}\\
 $f$ varies on a scale $w$ much smaller than $\abs{x}$, or $\abs{x} \ll 1$ in your units & \code{Central<2>}, or
   \code{Ridders} from $h = w/4$ & $\epsmach^{1/3} w$ & 2, or Ridders' \num{\valRiddersEvalsMedianFirst} &
   \num{\valScaleFitRelError}, against
@@ -124,7 +128,7 @@ $f$ is the output of an iterative solver, accurate to $\noise$ only (noisy) & \c
   \max(\abs{x}, 1)$ & 2 & model $\noise^{2/3} = \num{\valSolverModelFitRelError}$, measured
   \num{\valSolverFitRelError} for $\noise = 10^{-10}$, against \num{\valSolverDefaultRelError} with the default step;
   Ridders' estimate is optimistic & \cref{fig:noise}, \cref{sec:using-solver}\\
-A second derivative & \code{Central<2>} or \code{Ridders}, with $N = 2$ & default & 3, or
+A second derivative & \code{Central<2>} or \code{Ridders}, with $N = 2$; never float & default & 3, or
   \num{\valRiddersEvalsMedianSecond} & model $\epsmach^{1/2} = \num{\valModelCentralTwoSecondDouble}$, measured
   \num{\valCpSecondRelError}; Ridders \num{\valCpRiddersSecondRelError} (nitrogen) & \cref{fig:v-curve-orders}\\
 A third or fourth derivative & \code{Ridders}, or \code{Central<4>}; never float & default & 4 per level, or 6 to 7 &
@@ -133,8 +137,8 @@ A third or fourth derivative & \code{Ridders}, or \code{Central<4>}; never float
 A wide type (50 digits) & \code{Central<6>} or \code{Ridders} & default & 6, or \num{\valMpRiddersEvals} &
   \num{\valMpCentralSixRelError}; Ridders \num{\valMpRiddersRelError} & \cref{sec:using-types}\\
 A kink or a range break within a step of $x$ & none: differentiate one side, with \code{Forward<P>} or
-  \code{Backward<P>} & default & as above & any method returns a wrong value; only Ridders' estimate shows a jump,
-  nothing shows a kink at $x$ &
+  \code{Backward<P>}, or with an estimate \code{ForwardRidders} or \code{BackwardRidders} & default & as above & any
+  method across the break returns a wrong value; only Ridders' estimate shows a jump, nothing shows a kink at $x$ &
   \cref{fig:kink}\\
 \bottomrule
 \end{tabular}
@@ -382,13 +386,14 @@ disagree. At \SI{\valKinkOutsideDelta}{K} from the break, outside every span, al
 \num{\valKinkOutsideCentralRelError} (measured, \cref{fig:kink}). Evaluable is not smooth. \emph{Symptom:} a large
 estimate from Ridders' method, or stencil values that change with the step; a kink at $x$ shows no symptom at all:
 central rules return the mean of the two slopes (\cref{sec:ridders-trust}). \emph{Cure:} know the branch
-boundaries, and differentiate the branch you mean, with \code{Forward<P>} above a break or \code{Backward<P>} below
-it, or the branch's own function.
+boundaries, and differentiate the branch you mean: above a break with \code{Forward<P>}, or \code{ForwardRidders} for
+an error estimate; below it with \code{Backward<P>} or \code{BackwardRidders}; or call the branch's own function. At
+the break itself they return that side's derivative if $f(x)$ belongs to it.
 
 \paragraph{A Ridders result that is a value but poor.} Near a bad point or at the resolution of $x$, Ridders'
 method can return a value whose own estimate is a large fraction of it. \emph{Symptom:} \code{*r->abs_error} far
-above the accuracy you need. \emph{Cure:} the check of \cref{sec:using-result}; a smaller initial step, or a
-one-sided rule at an edge.
+above the accuracy you need. \emph{Cure:} the check of \cref{sec:using-result}; a smaller initial step, or
+\code{ForwardRidders} or \code{BackwardRidders} at an edge.
 
 
 \paragraph{Aliasing.} A function that oscillates on a scale far below $\max(\abs{x}, 1)$ can lie about its slope
@@ -402,14 +407,17 @@ to the next, is accurate to $\noise$, not to $\epsmach$.
 \emph{Cure:} the step $\noise^{1/3} s$ (\cref{sec:using-solver}, \cref{sec:rounding-noise}).
 
 \paragraph{A domain edge.} Ridders' method restarts below a step at which $f$ is not finite, but needs the nearest
-bad point a minimum distance away. For $\log x$ with the default step for $f'$, a value is returned down to
-$x = 2^{-\num{\valRiddersEdgeLimitExponent}}$, with an estimate grown to flag the loss; ten correct digits hold
-only down to $x = 2^{-\num{\valRiddersEdgeTenDigitsExponent}}$ (measured, \cref{fig:ridders-edge}). Exactly at an
-edge, use \code{Forward<P>} or \code{Backward<P>}. A fit evaluated outside its range: wrap it to return NaN there,
-as \cref{sec:stencils-one-sided} does, so that a sample outside it fails loudly.
+bad point a minimum distance away. For $\log x$ with the default step for $f'$, a value is returned
+down to $x = 2^{-\num{\valRiddersEdgeLimitExponent}}$, with an estimate grown to flag the loss; ten correct digits
+hold only down to $x = 2^{-\num{\valRiddersEdgeTenDigitsExponent}}$ (measured, \cref{fig:ridders-edge}); closer,
+a NaN gives \code{non_finite}, a pole a flagged wrong value (\cref{sec:ridders-trust}). Exactly at
+an edge, use \code{ForwardRidders} or \code{BackwardRidders}
+(\cref{sec:ridders-onesided}), or \code{Forward<P>} or \code{Backward<P>} inside an iteration. A fit evaluated outside
+its range: wrap it to return NaN there, as \cref{sec:stencils-one-sided} does, so that such a sample fails
+loudly.
 
-\paragraph{The fourth derivative in float.} Mostly rounding noise, \num{\valFloatFourthCentralRelError} for
-\code{Central<2>} on $\mathrm{e}^x$ (median, \cref{fig:order-accuracy}); the compiler warns (\cref{sec:api-warning}).
+\paragraph{Derivatives above the first in float.} Few correct digits, and a compile-time warning by every method
+(\cref{sec:orders-float,sec:api-warning}).
 \emph{Cure:} double.
 
 

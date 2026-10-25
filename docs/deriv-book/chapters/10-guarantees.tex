@@ -9,7 +9,8 @@ how all of it is tested. Each statement is marked as measured, derived or a rule
 
 \section{Accuracy}\label{sec:guarantees-accuracy}
 
-\Cref{tab:accuracy-matrix} gives the measured relative error of six methods at their default steps, for the first to
+\Cref{tab:accuracy-matrix} gives the measured relative error of seven methods at their default steps
+(\code{BackwardRidders} is the mirror of \code{ForwardRidders}), for the first to
 the fourth derivative, in three types. The function is $\mathrm{e}^x$, whose derivatives all equal the function, so
 that the orders compare; each cell is the median over \num{\valAccuracyMatrixPoints} points $x = 0.5, 0.55, \ldots,
 1$, which share the scale $s = 1$ and so the step. The median matters: the rounding part of the error at a single point
@@ -19,9 +20,10 @@ at $x = 1$ against a median of \num{\valExpCentralTwoRelError} (measured).
 \begin{table*}
 \caption{Measured accuracy: the median relative error of the derivative of $\mathrm{e}^x$ over
 \num{\valAccuracyMatrixPoints} points in $[0.5, 1]$, at the default steps, by method, derivative order N and type.
-$^{\ast}$\,Computed with the low-precision warning silenced (\cref{sec:api-warning}). 1.4e$-$5 stands for $1.4 \times 10^{-5}$.\label{tab:accuracy-matrix}}
-\centering\footnotesize\setlength{\tabcolsep}{3pt}\sisetup{output-exponent-marker=\ensuremath{\mathrm{e}}}
-\begin{tabular}{@{}lcccc@{\hspace{9pt}}cccc@{\hspace{9pt}}cccc@{}}
+$^{\ast}$\,Every float derivative above the first warns; these were computed with the warning silenced
+(\cref{sec:api-warning}). 1.4e$-$5 stands for $1.4 \times 10^{-5}$.\label{tab:accuracy-matrix}}
+\centering\footnotesize\setlength{\tabcolsep}{2pt}\sisetup{output-exponent-marker=\ensuremath{\mathrm{e}}}
+\begin{tabular}{@{}lcccc@{\hspace{6pt}}cccc@{\hspace{6pt}}cccc@{}}
 \toprule
  & \multicolumn{4}{c}{\code{float}} & \multicolumn{4}{c}{\code{double}} & \multicolumn{4}{c}{\code{cpp_bin_float_50}}\\
 \cmidrule(lr){2-5}\cmidrule(lr){6-9}\cmidrule(l){10-13}
@@ -40,8 +42,12 @@ below the model by up to a factor of \num{\valModelRatioCentralBelowMax} for $f'
 \num{\valModelRatioForwardFourFourth} times above it for $f'''$ and $f''''$, by its larger amplification $\ampl$,
 which the model drops (measured). In round numbers, \code{Central<2>} in double gives \num{\valHeadlineFirstDigits} correct
 digits for $f'$ and \num{\valHeadlineFourthDigits} for $f''''$; Ridders' method \num{\valHeadlineRiddersFirstDigits}
-and \num{\valHeadlineRiddersFourthDigits}. Higher orders pay most in the wide type, where the
-step can grow far before truncation matters; the float column shows why the fourth derivative in float warns.
+and \num{\valHeadlineRiddersFourthDigits}. \code{ForwardRidders}, whose columns gain one order rather than two,
+loses more with each order: on the random study of \cref{sec:guarantees-ridders} its median error is
+\num{\valForwardRiddersAccuracyFactorFirst}, \num{\valForwardRiddersAccuracyFactorSecond},
+\num{\valForwardRiddersAccuracyFactorThird} and \num{\valForwardRiddersAccuracyFactorFourth} times Ridders' (measured) for $f'$
+to $f''''$. Higher orders pay most in the wide type, where the step can grow far before
+truncation matters; the float columns show why every float derivative above the first warns, whatever the method.
 
 Two caveats apply to every figure. First, the model gives an absolute error, $\epsmach \abs{f} / h^N$ in its rounding
 part, and the relative figures presuppose $\abs{f} \sim s^N \abs{f^{(N)}}$: true for $\mathrm{e}^x$ on $[0.5, 1]$, and
@@ -65,7 +71,8 @@ estimate, so a ratio below 1 is covered.
 
 \begin{table}
 \sidecaption{Ridders' method on the random study: \num{\valRiddersCases} cases per derivative order, measured.
-Restarts are counted from a log of the calls.\label{tab:ridders-statistics}}
+Restarts are those after a value of $f$ that is not finite, counted from a log of the calls; one after an untrusted
+result continues the halving of the step and cannot be told apart.\label{tab:ridders-statistics}}
 \centering\footnotesize
 \begin{tabular}{@{}lcccccc@{}}
 \toprule
@@ -90,13 +97,33 @@ $f''''$ & \num{\valRiddersCoverageFourth} & \num{\valRiddersUncoveredFourth} & \
 \end{table}
 
 The estimate is built so that it errs on the safe side: an extrapolated entry's estimate is its change from its parent
-in the tableau, but never less than the rounding floor of its level; the result's \code{abs_error} is also at least its
-distance to the latest diagonal entry. The method stops when an entry equals its parent, after two levels that
-improve nothing, or at the resolution of $x$; it restarts below a step at which $f$ is not finite, and below one whose
-result is untrusted, meaning an estimate of at least a quarter of the value and more than 64 times the rounding
-floor; and it attempts at most \num{\valRiddersLevelCap} levels in all (\cref{tab:ridders-constants},
+in the tableau, but never less than the rounding floor of its level (for the one-sided forms, the floor carried
+through the tableau); the result's \code{abs_error} is also at least its distance to the latest diagonal entry. The
+method stops when an entry equals its parent, after two levels that improve nothing, or at the resolution of $x$; it
+restarts at half the smallest step it tried after a step at which $f$ is not finite and after an untrusted result,
+meaning an estimate of at least a quarter of the value and more than 64 times the rounding floor; and it attempts at
+most \num{\valRiddersLevelCap} levels in all (\cref{tab:ridders-constants},
 \cref{sb:floor-coverage}). The library's tests accept a result whose actual error is at most six times its estimate,
 and whose estimate is within twice that of an independent prototype for the same case.
+
+The one-sided \code{ForwardRidders} was measured on the same cases, with its default initial step $s/32$: its
+estimate covered \SI{\valForwardRiddersCoverageFirst}{\percent},
+\SI{\valForwardRiddersCoverageSecond}{\percent}, \SI{\valForwardRiddersCoverageThird}{\percent} and
+\SI{\valForwardRiddersCoverageFourth}{\percent} of them for $f'$ to $f''''$, with worst ratios of
+\num{\valForwardRiddersWorstRatioFirst}, \num{\valForwardRiddersWorstRatioSecond},
+\num{\valForwardRiddersWorstRatioThird} and \num{\valForwardRiddersWorstRatioFourth}, and median errors of
+\num{\valForwardRiddersMedianRelErrorFirst}, \num{\valForwardRiddersMedianRelErrorSecond},
+\num{\valForwardRiddersMedianRelErrorThird} and \num{\valForwardRiddersMedianRelErrorFourth} (measured;
+\cref{sec:ridders-onesided}). A pole ahead of $x$, inside the span the forward rule samples, lies outside
+that study. On $1/(t - a)$ at 0, with \num{\valPoleAheadCases} poles from
+$2^{-\num{\valPoleAheadClosestExponent}}$ to $2^{-\num{\valPoleAheadFarthestExponent}}$ ahead, $f'$ and $f''$
+were always covered, $f'''$ missed \num{\valPoleAheadUncoveredThird} times (at worst
+\num{\valPoleAheadWorstRatioThird} times the estimate), and $f''''$ \num{\valPoleAheadUncoveredFourth} times,
+\num{\valPoleAheadSilentFourth} of them neither covered nor flagged: \num{\valPoleAheadSilentRelErrorMinFourth}
+to \num{\valPoleAheadSilentRelErrorMaxFourth} times off, with an error up to \num{\valPoleAheadWorstRatioFourth}
+times the estimate, within the tests' factor of six. The same poles behind $x$ gave
+\num{\valPoleBehindUncovered} uncovered results (measured). Near a known singularity ahead of $x$, repeat a
+one-sided $f''''$ at a second initial step.
 
 The estimate assumes that $f$ is accurate to about $\epsmach$. With a relative noise of $10^{-10}$ and $10^{-8}$ on
 $\mathrm{e}^x$, the coverage over \num{\valNoiseRiddersCases} points fell to
@@ -109,16 +136,18 @@ all (\cref{sec:ridders-trust}).
 
 The cost of a derivative is counted in evaluations of $f$, which dominate whenever $f$ is more than a few arithmetic
 operations; the library's own work is one weighted sum per stencil and one tableau row per level of Ridders' method.
-\Cref{tab:cost} gives the counts. For a stencil they are exact: one evaluation per node. For Ridders' method they
-depend on $f$ and $x$; the table gives the median and the range of the random study and the cap, which no call
-exceeds. For $f'$ in double, Ridders' \num{\valRiddersEvalsMedianFirst} evaluations (median) against a stencil's
+\Cref{tab:cost} gives the counts. For a stencil they are exact: one evaluation per node. For Ridders' method and
+\code{ForwardRidders} they depend on $f$ and $x$; the table gives the median and the range of the random study and
+the cap, which no call exceeds. \code{BackwardRidders} costs what \code{ForwardRidders} costs on the mirrored
+function. For $f'$ in double, Ridders' \num{\valRiddersEvalsMedianFirst} evaluations (median) against a stencil's
 2 to 6 buy about three more digits than \code{Central<2>} (\num{\valHeadlineRiddersFirstDigits} against
 \num{\valHeadlineFirstDigits}), as many as \code{Central<4>}, none over \code{Central<6>} (\cref{tab:accuracy-matrix}),
 and an estimate of the error.
 
 \begin{table}
-\sidecaption{Evaluations of $f$ per derivative, by method and derivative order N. Stencils: exact. Ridders: measured
-on the random study (median, with the range), and the cap.\label{tab:cost}}
+\sidecaption{Evaluations of $f$ per derivative, by method and derivative order N. Stencils: exact.
+\code{Ridders} and \code{ForwardRidders}: measured on the random study (median, with the range), and the cap;
+\code{BackwardRidders} as \code{ForwardRidders}.\label{tab:cost}}
 \centering\footnotesize
 \begin{tabular}{@{}>{\raggedright}p{36mm}cccc@{}}
 \toprule
@@ -131,7 +160,7 @@ Method & $N = 1$ & 2 & 3 & 4\\
 
 \section{Limits}\label{sec:guarantees-limits}
 
-\paragraph{Orders.} The derivative order is 1 to 4. The caps on P are design decisions (\code{docs/PHASE2_API.md}).
+\paragraph{Orders.} The derivative order is 1 to 4. The caps on P are design decisions (\code{docs/deriv/PHASE2_API.md}).
 \code{Central<P>} stops at $P = 10$: by the model's exponent, a \code{Central<12>} would cut the error of $f'$ by a factor of about \num{\valCapGainFactorCentralTwelveFirstDouble} in double and
 \num{\valCapGainFactorCentralTwelveFirstMultiprecision}
 in a 50-digit type (\num{\valCapGainFactorCentralTwelveFourthDouble} and \num{\valCapGainFactorCentralTwelveFourthMultiprecision}
@@ -140,8 +169,8 @@ is already \num{\valAmplForwardSix} for $f'$ and \num{\valAmplForwardSixFourth} 
 (\cref{tab:weights-forward-first,tab:weights-forward-fourth}) and grows about as fast as a higher order pays.
 
 \paragraph{Types.} The integer weights must be exact in \code{T}, which every type with 24 significant bits or more
-satisfies; a narrower type is rejected at the call by a constraint. A fourth derivative in a type with an epsilon above $10^{-7}$
-is mostly rounding noise and warns (\cref{sec:api-warning}).
+satisfies; a narrower type is rejected at the call by a constraint. A derivative above the first in a type with an epsilon above
+$10^{-7}$ keeps few correct digits, by every method, and warns at compile time (\cref{sec:api-warning}).
 
 \paragraph{The scale.} The default steps assume that $f$ varies on the scale $\max(\abs{x}, 1)$ in the units of $x$.
 That is a rule of thumb, not a property of $f$; \cref{sec:using-pitfalls} shows the symptoms when it fails and the cure.
@@ -153,15 +182,45 @@ with an estimate grown to flag the loss, but ten correct digits only down to
 $k = \num{\valRiddersEdgeTenDigitsExponent}$; it used its whole budget from $k = \num{\valRiddersEdgeCapExponent}$
 (measured, \cref{fig:ridders-edge}). For ten digits, keep the nearest bad point at least
 $2^{-\num{\valRiddersEdgeTenDigitsExponent}} \max(\abs{x}, 1)$ away. The design record derives the first limit,
-$2^{-34} \max(\abs{x}, 1)$, from the initial step $s/32$ and the cap, and $2^{-31} \max(\abs{x}, 1)$ for $f''$ to
-$f''''$, whose initial step is $s/4$; the second is derived, not measured. Exactly at an edge, the one-sided rules
-apply.
+$2^{-34} \max(\abs{x}, 1)$, from the initial step $s/32$ and the cap. The same derivation gives
+$2^{-31} \max(\abs{x}, 1)$ for $f''$, whose rule reaches $h$ from the initial step $s/4$, and
+$2^{-30} \max(\abs{x}, 1)$ for $f'''$ and $f''''$, whose rules reach $2h$; the record's $2^{-31}$ for these two
+is a halving too close. On $\log x$, in half halvings, a value was returned down to
+$2^{-\num{\valRiddersEdgeLimitExponentSecond}}$ for $f''$ and $2^{-\num{\valRiddersEdgeLimitExponentThird}}$ and
+$2^{-\num{\valRiddersEdgeLimitExponentFourth}}$ for $f'''$ and $f''''$ (measured).
+
+A pole, where $f$ is finite on both sides, behaves otherwise. The restart after an untrusted result now
+descends as after a non-finite value, so a pole close to $x$ is resolved: at the library's test poles,
+$10^{-3}$ ahead of $x$ and $10^{-4}$ behind it, far inside the limits above, \num{\valPoleCovered} of
+\num{\valPoleCases} results for $f'$ to $f''''$ were covered, with errors from \num{\valPoleRelErrorMin} to
+\num{\valPoleRelErrorMax} (measured). Closer, a pole does not make the method fail: it returns a wrong value.
+Over \num{\valPoleSweepCases} poles $1.25$ to $1.75$ times $2^{-k}$ from $x$, $k = \num{\valPoleSweepFirstK}$
+to \num{\valPoleSweepLastK}, ahead and behind, $f'$ to $f''''$, none was \code{non_finite} and every one of the
+\num{\valPoleSweepUncovered} uncovered results was flagged, its estimate at least a quarter of its value
+(measured). Near a pole, test \code{abs_error}.
+
+Exactly at an edge, the one-sided methods apply: \code{Forward<P>} and \code{Backward<P>}, or with an error
+estimate \code{ForwardRidders} and \code{BackwardRidders} (\cref{sec:ridders-onesided}). They have a reach of their own: for $\log x$ at $x = 2^{-k}$,
+the estimate of \code{ForwardRidders} covered its error up to $k = \num{\valForwardRiddersReachCoveredExponentFirst}$,
+\num{\valForwardRiddersReachCoveredExponentSecond}, \num{\valForwardRiddersReachCoveredExponentThird} and
+\num{\valForwardRiddersReachCoveredExponentFourth} for $f'$ to $f''''$, and flagged the result, at least a quarter
+of its value, from $k = \num{\valForwardRiddersReachFlaggedExponentFirst}$,
+\num{\valForwardRiddersReachFlaggedExponentSecond}, \num{\valForwardRiddersReachFlaggedExponentThird} and
+\num{\valForwardRiddersReachFlaggedExponentFourth} to the end of the study, $k = \num{\valForwardRiddersReachLastK}$;
+between them, $f'$ at $k = \num{\valForwardRiddersReachSilentExponentFirst}$ was
+\num{\valForwardRiddersReachSilentRelErrorFirst} off with an estimate of
+\num{\valForwardRiddersReachSilentRelEstimateFirst}, relative. The band between the two is narrow but not
+always a single point: on $\log x$, $\sqrt{x}$ and $\sqrt[3]{x}$ at four points per halving, \num{\valForwardRiddersBandSilent}
+of \num{\valForwardRiddersBandCases} results for $f'$ were neither covered nor flagged
+(\valForwardRiddersBandFunctions), each within \num{\valForwardRiddersBandWorstRatio} times its estimate
+(measured).
 
 \paragraph{Aliasing.} A function that oscillates on a scale far below the step can lie at every sample; samples that
 happen to lie on a polynomial fool every sampling method, Ridders' included (\cref{sb:aliasing}).
 
 \paragraph{Noise and kinks.} A function less accurate than $\epsmach$ needs a larger step (\cref{sec:rounding-noise});
-a kink or a jump within a step of $x$ gives a wrong value from every method (\cref{sec:using-pitfalls}).
+a kink or a jump within a step of $x$ gives a wrong value from every method that samples across it
+(\cref{sec:using-pitfalls}).
 
 \paragraph{Overflow.} A final quotient that overflows, such as a fourth derivative with a tiny step, is
 \code{non_finite} at run time and a compile error under GCC in a constant expression (\cref{sb:constexpr-overflow}).
@@ -177,7 +236,10 @@ Each guarantee below is stated with the hypothesis it rests on and with how it i
     A stencil calls \code{fn} once per node, \code{Forward<P>} never below $x$ and \code{Backward<P>} never
     above; a step that is not positive and finite returns \code{non_finite} before any call. Ridders' method
     calls it at most \num{\valRiddersMaxEvalsFirst}, \num{\valRiddersMaxEvalsSecond}, \num{\valRiddersMaxEvalsThird}
-    and \num{\valRiddersMaxEvalsFourth} times for $f'$ to $f''''$. Verified by tests that count and log the calls.
+    and \num{\valRiddersMaxEvalsFourth} times for $f'$ to $f''''$; \code{ForwardRidders} never below $x$ and
+    \code{BackwardRidders} never above, restarts included, at most \num{\valForwardRiddersMaxEvalsFirst},
+    \num{\valForwardRiddersMaxEvalsSecond}, \num{\valForwardRiddersMaxEvalsThird} and
+    \num{\valForwardRiddersMaxEvalsFourth} times. Verified by tests that count and log the calls.
   \item \emph{No shared state.} The headers hold no global, static or thread-local variable other than compile-time
     constants, and \code{fn} is called on the calling thread, one call at a time. Concurrent calls of
     \code{derivative} are therefore as safe as the concurrent calls of \code{fn} they make. Verified by inspection.
@@ -201,26 +263,26 @@ Each guarantee below is stated with the hypothesis it rests on and with how it i
     digits for selected N from 2 to 2000 in \code{float} and \code{double}, and for the multiprecision types against
     60-digit references.
   \item \emph{Types.} \code{derivative} is tested on \code{float}, \code{double}, \code{cpp_bin_float_50} with and
-    without expression templates, and \code{cpp_dec_float_50}; \code{long double} satisfies the concept and is tested
-    in \code{root_epsilon} only.
+    without expression templates, and \code{cpp_dec_float_50}, the \code{float} derivatives above the first with the
+    warning silenced at the call; \code{long double} satisfies the concept and is tested in \code{root_epsilon} only.
 \end{itemize}
 Not guaranteed: the accuracy, which is a model and a measurement (\cref{sec:guarantees-accuracy}); Ridders' error
 estimate, which is an estimate (\cref{sec:guarantees-ridders}); and the default step, which is a rule of thumb.
 
 \section{How it is verified}\label{sec:guarantees-verification}
 
-The library's tests are one doctest executable and three build tests, listed in \cref{tab:tests}. Their reference
+The library's tests are one doctest executable and four build tests, listed in \cref{tab:tests}. Their reference
 values for the derivatives come from closed forms, from the published tables of Fornberg\cite{fornberg1988} and
 Chapra (Chapter 23)\cite{chapra2015} or from an independent
 prototype, never from \nxx{} itself; the ceilings on \code{abs_error} for the multiprecision types are twice the
-estimates of the first run, regression baselines that \code{docs/design.md} records as such, not independent
+estimates of the first run, regression baselines that \code{docs/deriv/design.md} records as such, not independent
 references. Each tolerance is justified by an error estimate in a comment. The stencils,
 for example, are held to $(\errc + 2\ampl)\,\epsmach^{P/(P+N)}$ relative on $\mathrm{e}^x$, truncation plus the
 rounding of the samples and of the points, for a selection of rules and orders, two-node rules included; the tests'
 comment calls it an estimate, not a bound, and reports measured errors 4 to 16 times below it on its three points.
 They run on the five toolchains of the continuous integration with warnings as errors. Each phase was reviewed by
-specialised review agents, Phase~4 also by another vendor's model (OpenAI Codex); the findings and decisions are
-recorded in the design record (\code{docs/PHASE3_API.md}, \code{docs/PHASE4_API.md}, \code{docs/design.md}). The book's own examples build and run
+specialised review agents, Phases~4 and~5 also by another vendor's model (OpenAI Codex); the findings and decisions
+are recorded in the design record (\code{docs/deriv/PHASE3_API.md} to \code{docs/deriv/PHASE5_API.md}, \code{docs/deriv/design.md}). The book's own examples build and run
 as tests, and its data generator checks every table against its moment conditions and the nitrogen function against
 an independent exact evaluation each time it runs.
 
@@ -243,8 +305,13 @@ File & What it checks\\
 \code{test_ridders.cpp} & exact results on polynomials with the floor as the estimate; accuracy and coverage
   against closed forms and the prototype; restarts; failures, untrusted results and the level cap; multiprecision\\
 \code{test_orders.cpp} & orders 1 to 4: the generated tables against the moment conditions and published rows;
-  exactness on polynomials; steps outside the range of $h^N$; overflow; Ridders' evaluations and accuracy\\
-\code{precision_warning.cpp} & three builds: a float $f''''$ warns, and a pragma or the macro silences it\\
+  exactness on polynomials; steps outside the range of $h^N$; overflow; Ridders' evaluations and accuracy, poles
+  close to $x$\\
+\code{test_onesided.cpp} & \code{ForwardRidders} and \code{BackwardRidders}: exact on polynomials; accuracy and
+  coverage against closed forms and the prototype; domain edges, a pole behind $x$, a kink at $x$; \code{fn} called on
+  one side only, restarts included; the mirror; failures and cost; multiprecision\\
+\code{precision_warning.cpp} & four builds: a float $f''$ warns through each overload, and a pragma or the macro
+  silences it\\
 \bottomrule
 \end{tabular}
 \end{table}

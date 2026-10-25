@@ -192,7 +192,7 @@ $f^{(4)}$) and so is the cost (\cref{ch:orders}, \cref{sec:derivations-model}).
 Why leave $k$ out at all? Because it only matters when the guess $w = \scale$ holds, and the guess is the weaker
 link: a step off by a factor 2 either way costs up to a factor \num{\valMisjudgeCostCentralTwoFirst} for the
 central difference, more than leaving out $k$ costs, and a function that varies faster than $\scale$ wants a smaller step anyway.
-On the nine test functions of the library's design record (\code{docs/PHASE4_API.md}), which vary faster than
+On the nine test functions of the library's design record (\code{docs/deriv/PHASE4_API.md}), which vary faster than
 $\max(\abs{x}, 1)$, half the default step did better for every order, $f'$ included. So the library keeps one
 convention, $\epsmach^{1/(\aorder + \dorder)} \scale$, for every rule and order, and leaves the scale to the caller
 (\cref{sec:rounding-scale}). The derivation in full is in \cref{ch:derivations}.

@@ -6,8 +6,10 @@ Inside an iteration; $f$ smooth and cheap & \code{Central<2>}, the default step 
 A value to report, with an error estimate & \code{Ridders}, the default initial step & typically
   \num{\valRiddersEvalsMedianFirst}, at most \num{\valRiddersMaxEvalsFirst}; about
   \num{\valHeadlineRiddersFirstDigits} digits\\ \addlinespace[2pt]
-$f$ defined on one side of $x$ only & \code{Forward<2>} or \code{Backward<2>}, the default step & 3 evaluations;
-  about \num{\valExpForwardTwoRelError} relative on $\mathrm{e}^x$\\ \addlinespace[2pt]
+$f$ defined on one side of $x$ only & \code{Forward<2>} or \code{Backward<2>}, the default step; with an error
+  estimate, \code{ForwardRidders} or \code{BackwardRidders} & 3 evaluations; about \num{\valExpForwardTwoRelError}
+  relative on $\mathrm{e}^x$. With the estimate: typically \num{\valForwardRiddersEvalsMedianFirst}, at most
+  \num{\valForwardRiddersMaxEvalsFirst}; about \num{\valExpForwardRiddersFirstRelError}\\ \addlinespace[2pt]
 $f$ varies on a scale $w$ far from $\scale = \max(\abs{x}, 1)$ & \code{Central<2>}, $h = \epsmach^{1/3} w$ &
   2 evaluations; as in the first row\\ \addlinespace[2pt]
 $f$ accurate to $\noise > \epsmach$ only (a solver output) & \code{Central<2>}, $h = \noise^{1/3} \scale$ &

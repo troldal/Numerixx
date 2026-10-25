@@ -264,7 +264,8 @@ Measured, \code{Forward<2>} is \num{\valEdgeForwardTwoRelError} off the closed f
 (\cref{ch:ridders}), does not help exactly at an edge: with the same wrapper at \SI{500}{\kelvin} every level
 samples below the range, each restart halves the step in vain, and the result is \valEdgeRiddersStatus{} after
 \num{\valEdgeRiddersEvals} evaluations, the level cap; near such an edge rather than at it, as for $\log x$ close
-to 0, it recovers (\cref{sec:ridders-trust}). Below \SI{500}{\kelvin} the published enthalpy of nitrogen is a
+to 0, it recovers (\cref{sec:ridders-trust}). Its one-sided form \code{ForwardRidders} samples at \SI{500}{\kelvin}
+and above only, and returns the derivative there with an error estimate (\cref{sec:ridders-onesided}). Below \SI{500}{\kelvin} the published enthalpy of nitrogen is a
 different fit, and the two do not meet, which makes the junction the range break of \cref{sec:using-pitfalls}.
 
 \section{Choosing P}\label{sec:stencils-choosing}
@@ -274,8 +275,8 @@ a relative error of about \num{\valExpCentralTwoRelError} or \num{\valExpCentral
 step; \code{Central<6>} and above only for wide types, where $\epsmach$ is small enough for the order to pay
 (\cref{sec:using-types} uses \code{Central<6>} with fifty digits); \code{Forward<2>} or \code{Forward<4>}, or
 their mirrors, exactly at an edge and nowhere else, since their constants are larger. For a value to report with
-an error estimate, use Ridders. The caps are design decisions recorded in the design record of the repository
-(\code{docs/PHASE2_API.md}), not measured limits. The central rules stop at order 10: by the model's exponent
+an error estimate, use Ridders, or at an edge its one-sided forms. The caps are design decisions recorded in the design record of the repository
+(\code{docs/deriv/PHASE2_API.md}), not measured limits. The central rules stop at order 10: by the model's exponent
 alone, a rule of order 12 would cut the error of $f'$ by a factor of about \num{\valCapGainFactorCentralTwelveFirstDouble} in double and
 \num{\valCapGainFactorCentralTwelveFirstMultiprecision} in a 50-digit type (\num{\valCapGainFactorCentralTwelveFourthDouble} and
 \num{\valCapGainFactorCentralTwelveFourthMultiprecision} for the fourth derivative), and the library stops there. The
