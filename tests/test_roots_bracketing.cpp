@@ -66,6 +66,11 @@ namespace {
     bool brackets(std::expected<rt::Root<double>, rt::error> const &r, double ref, double c)
     { return r.has_value() && brackets(r, ref, c, 2.0 * default_tol(r->value)); }
 
+    // The same check in cpp_bin_float_50, which holds every double and the difference of any two exactly: for
+    // references and distances that double cannot represent (2.5 denorm_min; 2^53 + 0.5).
+    bool brackets_exactly(std::expected<rt::Root<double>, rt::error> const &r, bin50 const &ref)
+    { return r.has_value() && bin50(abs(bin50(bin50(r->value) - ref))) <= bin50(r->abs_error); }
+
     // fn wrapped to count its evaluations.
     template<typename F>
     struct Counted
@@ -108,6 +113,19 @@ static_assert(
     nxx::math::abs(rt::root<rt::Brent>([](long double x) { return x * x - 2.0L; }, rt::Bracket{ 1.0L, 2.0L })->value
                    - 1.41421356237309504880L)
     <= 1e-15L);
+
+// The independent review's overflow cases (Phase 1, 02fffe5) evaluate in constant expressions, with abs_error
+// saturated at max: a tolerance sum at the edge of overflow, and a distance between ends of opposite signs whose
+// overflow-free test had rounded (zero first skipped, since fn is NaN at 0).
+static_assert(rt::root<rt::Brent>([](double) { return 0.0; },
+                  rt::Bracket{ 0x1.8p1023, 0x1.8p1023 },
+                  { .abs_tol = 0x1.ffffffffffffep1021, .rel_tol = 1.0 })
+              == rt::Root<double>{ 0x1.8p1023, dmax });
+static_assert(rt::root<rt::Brent>([](double x) { return x == 0.0 ? dnan : (x < 0.0 ? -1.0 : 2.0); },
+                  rt::Bracket{ -0x1.0000000000003p1022, 0x1.7fffffffffffep1023 },
+                  { .abs_tol = dmax / 4.0, .rel_tol = 1.0 })
+                  ->abs_error
+              == dmax);
 
 // Failures are values in constant expressions too.
 static_assert(
@@ -272,6 +290,17 @@ TEST_CASE("roots: criteria")
         CHECK((r && r->value >= 1.0 && r->value <= 2.0 && r->abs_error <= 1.0));
     }
 
+    // Loose tolerances stop with ends far apart, where their difference rounds: abs_error must still bound the distance
+    // (the independent review's cases, 02fffe5, where it fell short by 0.5 and 0.25). The sign changes are at -0.5,
+    // with fn NaN at 0 so that zero first is skipped, and at 1.75; the distances are checked exactly, in bin50.
+    auto const at_minus_half = [](double x) { return x == 0.0 ? dnan : (x < -0.5 ? -2.0 : 1.0); };
+    auto const at_175 = [](double x) { return x < 1.75 ? -1.0 : 1.0; };
+    rt::Criteria<double> const loosest{ .rel_tol = 1.0 };
+    CHECK(brackets_exactly(rt::root<rt::Bisection>(at_minus_half, rt::Bracket{ -1.0, 0x1p54 }, loosest), bin50(-0.5)));
+    CHECK(brackets_exactly(rt::root<rt::Brent>(at_minus_half, rt::Bracket{ -1.0, 0x1p54 }, loosest), bin50(-0.5)));
+    CHECK(brackets_exactly(rt::root<rt::Bisection>(at_175, rt::Bracket{ 1.5, 0x1.8p54 }, loosest), bin50(1.75)));
+    CHECK(brackets_exactly(rt::root<rt::Brent>(at_175, rt::Bracket{ 1.5, 0x1.8p54 }, loosest), bin50(1.75)));
+
     // abs_tol near 0: a root at 1e-300 to an absolute 1e-12 in a few halvings rather than 1047.
     auto const [near0, n_near0] =
         counted<rt::Bisection>([](double x) { return x - 1e-300; }, { 0.0, 1.0 }, { .abs_tol = 1e-12 });
@@ -284,8 +313,10 @@ TEST_CASE("roots: edges of T")
     // Among the subnormals, where half the bracket rounds: 2x - 5 denorm_min on [0, 3 denorm_min], root 2.5
     // denorm_min. Every operation is exact, so the sign change is the root: c = 0.
     auto const sub = [](double x) { return 2.0 * x - 5.0 * dmin; };
-    CHECK(brackets(rt::root<rt::Bisection>(sub, rt::Bracket{ 0.0, 3.0 * dmin }), 2.5 * dmin, 0.0, 2.0 * dmin));
-    CHECK(brackets(rt::root<rt::Brent>(sub, rt::Bracket{ 0.0, 3.0 * dmin }), 2.5 * dmin, 0.0, 2.0 * dmin));
+    // 2.5 denorm_min is not a double (it rounds to 2 denorm_min), so the distance is checked exactly, in bin50.
+    bin50 const sub_root = bin50(bin50(dmin) * bin50(5) / bin50(2));
+    CHECK(brackets_exactly(rt::root<rt::Bisection>(sub, rt::Bracket{ 0.0, 3.0 * dmin }), sub_root));
+    CHECK(brackets_exactly(rt::root<rt::Brent>(sub, rt::Bracket{ 0.0, 3.0 * dmin }), sub_root));
 
     // The widest brackets: [-max, max] (zero first gives [0, max]) and [0, max]; x - 1 is exact near 1, c = 0.
     CHECK(brackets(rt::root<rt::Bisection>(minus_1, rt::Bracket{ -dmax, dmax }), 1.0, 0.0));
@@ -389,6 +420,21 @@ TEST_CASE("roots: multiprecision types")
     check(dec50{});
 
     // Brent's counts for the Wallis cubic at 50 digits are not asserted: no independent model rounds like these types.
+
+    // cpp_bin_float has no subnormals: a difference below its smallest number t flushes to 0, which must not become an
+    // abs_error of 0 (the independent review's case, 02fffe5). fn = x / t - q changes sign at t q, between ends
+    // t and t (1 + 4 eps) whose difference flushes; x / t is exact (t is a power of 2), so the distance is checked as
+    // |value / t - q| <= abs_error / t.
+    bin50 const t = std::numeric_limits<bin50>::denorm_min();
+    bin50 const e = std::numeric_limits<bin50>::epsilon();
+    bin50 const q = bin50(bin50(1) + bin50(2) * e);
+    auto const scaled = [&t, &q](bin50 const &x) { return bin50(bin50(x / t) - q); };
+    rt::Bracket<bin50> const smallest{ t, bin50(t * bin50(bin50(1) + bin50(4) * e)) };
+    for (auto const &r : { rt::root<rt::Bisection>(scaled, smallest), rt::root<rt::Brent>(scaled, smallest) }) {
+        REQUIRE(r.has_value());
+        CHECK(r->abs_error > bin50(0));
+        CHECK(bin50(abs(bin50(bin50(r->value / t) - q))) <= bin50(r->abs_error / t));
+    }
 }
 
 // Emscripten's default build compiles throw but aborts on it rather than unwinding to a catch, so the test runs

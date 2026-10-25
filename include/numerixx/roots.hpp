@@ -76,7 +76,8 @@ namespace nxx::roots {
      * @brief A root, and a bound on its distance to a sign change of fn.
      *
      * abs_error bounds the distance from value to a point where fn, as evaluated, changes sign, and is at most
-     * 2 tol(value) (see Criteria). The root of the exact function may differ by fn's own rounding error divided by
+     * 2 tol(value) (see Criteria). It saturates at max where that distance exceeds what T holds (only with tolerances
+     * near max). The root of the exact function may differ by fn's own rounding error divided by
      * |f'|, which no method can see. Where fn evaluates to exactly 0, abs_error is the requested tolerance tol(value),
      * not 0: such a point is only as good as fn's evaluation (`(x + 1e10) - (1e10 + 1.0 / 3)` is 0 on an interval
      * about 2e-6 wide). Read the members by name: members may be added in a later version, which would break a
@@ -189,8 +190,10 @@ namespace nxx::roots {
              */
             constexpr T at(T const &x) const
             {
-                T const scaled = T(relative * math::abs(x)); // at most |x|, since relative <= 1
-                if (scaled > T(detail::largest<T>() - absolute)) return detail::largest<T>();
+                // scaled is at most |x|, since relative <= 1. Above max / 2 it saturates: max - absolute would round,
+                // and could admit a sum that overflows; below it the sum is at most 3/4 max, since absolute <= max / 4.
+                T const scaled = T(relative * math::abs(x));
+                if (scaled > T(detail::largest<T>() / T(2))) return detail::largest<T>();
                 return T(absolute + scaled);
             }
         };
@@ -249,21 +252,56 @@ namespace nxx::roots {
         { return (a < T(0)) == (b < T(0)); }
 
         /**
-         * @brief Whether |u - v| <= w, decided without forming a difference that could overflow.
+         * @brief An upper bound on |u - v|, never below it, formed without overflow: every abs_error, stop test and
+         * guard uses it.
+         *
+         * - Exact where the difference is: ends of one sign (0 counts as positive) whose computed difference is below
+         *   the smaller magnitude, so that the true one is too and Sterbenz's lemma applies (in radix 2 also at its
+         *   boundary, one end twice the other), and with one end 0. This is every stop with the default tolerances.
+         * - Otherwise the computed distance d raised by max(d eps, denorm_min), at least one unit of T's spacing at d,
+         *   which covers its rounding (loose tolerances stop with ends far apart, where the difference rounds).
+         * - denorm_min where ends that differ give a difference of 0: a type without subnormals, such as
+         *   cpp_bin_float, flushes a difference below its smallest number to 0.
+         * - max where the distance may exceed what T holds: ends of opposite signs, one of them above max / 4.
+         *
          * @param u A finite point.
          * @param v A finite point.
-         * @param w A non-negative bound.
-         * @return true if the distance between u and v is at most w.
+         * @return A bound on the distance, saturated at max.
          */
         template<real T>
-        constexpr bool within(T const &u, T const &v, T const &w)
+        constexpr T distance_bound(T const &u, T const &v)
         {
-            // Of one sign (0 counts as positive), u - v is at most max(|u|, |v|): finite. Of opposite signs the
-            // distance is |u| + |v|, compared as |u| <= w - |v|, which cannot overflow either.
-            if ((u < T(0)) == (v < T(0))) return math::abs(T(u - v)) <= w;
+            if (u == v) return T(0);
+            T const max = detail::largest<T>();
+            T const tiny = T(std::numeric_limits<T>::denorm_min());
             T const au = math::abs(u);
             T const av = math::abs(v);
-            return av <= w && au <= T(w - av);
+            if (au == T(0)) return av; // a distance from 0 is exact
+            if (av == T(0)) return au;
+            T distance = T(0);
+            if ((u < T(0)) == (v < T(0))) {
+                // Of one sign, |u - v| <= max(|u|, |v|): finite.
+                distance = math::abs(T(u - v));
+                if (distance == T(0)) return tiny;
+                T const smaller = au < av ? au : av;
+                if (distance < smaller) return distance;
+                // The boundary case of Sterbenz's lemma, the larger end exactly twice the smaller, is exact too. It is
+                // recognised in radix 2 only, where doubling is exact; in radix 10 it is raised, conservatively.
+                if constexpr (std::numeric_limits<T>::radix == 2) {
+                    T const larger = au < av ? av : au;
+                    if (distance == smaller && (smaller > T(max / T(2)) || larger <= T(T(2) * smaller)))
+                        return distance;
+                }
+            } else {
+                // Of opposite signs the distance is |u| + |v|, finite (at most max / 2) when both are at most max / 4.
+                T const quarter = T(max / T(4));
+                if (au > quarter || av > quarter) return max;
+                distance = T(au + av);
+            }
+            T raise = T(distance * T(std::numeric_limits<T>::epsilon()));
+            if (raise < tiny) raise = tiny;
+            if (raise >= T(max - distance)) return max; // max - distance is exact above max / 2 (Sterbenz)
+            return T(distance + raise);
         }
 
         /**
@@ -279,7 +317,8 @@ namespace nxx::roots {
         template<real T>
         constexpr T bounded_difference(T const &u, T const &v, T const &limit)
         {
-            if (!detail::within(u, v, limit)) return detail::largest<T>();
+            // A bound at most limit (at most max / 16) means the true distance is too: u - v is finite.
+            if (detail::distance_bound(u, v) > limit) return detail::largest<T>();
             return T(u - v);
         }
 
@@ -395,10 +434,10 @@ namespace nxx::roots {
             T b = s.upper;
             while (true) {
                 T const m = detail::midpoint(a, b);
-                // m - a and b - m are exact (Sterbenz) and finite; their maximum is a true bound even where half the
-                // width rounds, as among the subnormals. A midpoint not strictly inside means T's resolution.
-                T const left = T(m - a);
-                T const right = T(b - m);
+                // The larger of the distances to the ends is a true bound even where half the width rounds, as among
+                // the subnormals or with ends far apart. A midpoint not strictly inside means T's resolution.
+                T const left = detail::distance_bound(m, a);
+                T const right = detail::distance_bound(b, m);
                 T const half = right < left ? left : right;
                 if (!(a < m && m < b) || half <= tolerance.at(m)) return Root<T>{ m, half };
                 T const fm = detail::evaluate(fn, m);
@@ -417,10 +456,10 @@ namespace nxx::roots {
          * @brief Brent's procedure zero (Brent 1973, ch. 4, section 6) on a validated bracket.
          *
          * Implemented from the book, with three changes: the tolerance is the caller's tol(b) rather than
-         * 2 macheps |b| + t; the stop test is |c - b| <= 2 tol(b) rather than |c - b| / 2 <= tol(b), since c - b is
-         * exact there while its half may round in radix 10; and a step is a bisection step whenever |c - b|, |b - a|
-         * or |e| exceeds max / 16, so that no product of the interpolation overflows (3 m q reaches 12 |c - b|, 2 p
-         * 4 (|c - b| + |b - a|)). The quotients cannot overflow: in the interpolation |fb| < |fa| <= |fc|.
+         * 2 macheps |b| + t; the stop test is distance_bound(c, b) <= 2 tol(b) rather than |c - b| / 2 <= tol(b),
+         * since the bound is exact there while the half may round in radix 10; and a step is a bisection step whenever
+         * |c - b|, |b - a| or |e| exceeds max / 16, so that no product of the interpolation overflows (3 m q reaches 12
+         * |c - b|, 2 p 4 (|c - b| + |b - a|)). The quotients cannot overflow: in the interpolation |fb| < |fa| <= |fc|.
          *
          * @param fn The function.
          * @param s The start: a bracket in order with a sign change and no root found.
@@ -457,9 +496,10 @@ namespace nxx::roots {
                     fc = fa;
                 }
                 T const tol = tolerance.at(b);
-                if (detail::within(c, b, detail::twice(tol))) return Root<T>{ b, math::abs(T(c - b)) };
+                T const width = detail::distance_bound(c, b);
+                if (width <= detail::twice(tol)) return Root<T>{ b, width };
 
-                bool const wide = !detail::within(c, b, big) || !detail::within(b, a, big) || math::abs(e) > big;
+                bool const wide = width > big || detail::distance_bound(b, a) > big || math::abs(e) > big;
                 // Half the bracket, towards c: exact Brent below big, the overflow-free midpoint above it.
                 T const m = wide ? T(detail::midpoint(b, c) - b) : T(T(c - b) / T(2));
                 if (wide || math::abs(e) < tol || math::abs(fa) <= math::abs(fb)) {

@@ -71,8 +71,9 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
     of the specification; `nxx::detail::callable` shared from `math.hpp`
   - [x] Tests on float, double, long double and Boost.Multiprecision (`cpp_bin_float_50` with and without expression
     templates, `cpp_dec_float_50`), with the prototype's evaluation counts reproduced exactly in double
-  - [ ] CI passes on all five toolchains
-  - [ ] The independent review (Codex) and its adopted findings
+  - [x] CI passes on all five toolchains (02fffe5: run 40192833145)
+  - [x] The independent review (Codex) and its adopted findings: five, all reproduced and fixed
+    (`docs/roots/PHASE1_API.md`)
 - Phase 2: open methods and derivatives (fn returning a tuple-like, or separate derivative callables); `Newton` and
   `Halley` on a guess or a bracket, `Secant`.
 - Phase 3: numerical derivatives, `nxx::deriv::derivative_of<M, N>(fn)`, and derivative callables returning

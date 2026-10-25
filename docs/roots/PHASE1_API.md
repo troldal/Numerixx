@@ -302,6 +302,41 @@ From the usage sketch (5 snippets, 7 misuses):
   in the brief.
 - Asked for: the evaluation count, a bracket search, fn(lower) and fn(upper) supplied: deferred (BRIEF.md 6).
 
+## Independent review (OpenAI Codex, 02fffe5)
+
+After the implementation (02fffe5, CI run 40192833145), a read-only review by OpenAI Codex. Every finding was
+reproduced before it was acted on (`.scratch/roots1/dbg/codex.cpp`, `codex_ce.cpp`); the user approved the fixes.
+
+1. **A tolerance sum could overflow.** `tol(x)` tested `relative |x| > max - absolute`, and `max - absolute` rounds
+   up: with `abs_tol = 0x1.ffffffffffffep1021`, `rel_tol = 1` and |x| = 0x1.8p1023 the sum overflowed (`abs_error`
+   infinite at run time, a compile error in constant evaluation). Fixed: tol saturates at max once `relative |x|`
+   exceeds max / 2; with `absolute <= max / 4` the sum below that is finite.
+2. **The overflow-free distance test rounded.** `within(u, v, w)` tested |u| <= w - |v| for ends of opposite signs,
+   and `w - |v|` rounds up: on [-0x1.0000000000003p1022, 0x1.7fffffffffffep1023] with huge tolerances and fn NaN at 0,
+   Brent formed an infinite |c - b|. Fixed by `distance_bound` (below), which sums opposite-sign magnitudes only when
+   both are at most max / 4 and otherwise saturates.
+3. **A zero bound at a non-root in `cpp_bin_float_50`.** That type has no subnormals: between ends t and
+   t (1 + 4 eps), t its smallest number, the difference flushes to 0, and both methods returned `abs_error = 0` at a
+   point 2 eps t from the sign change. Fixed: a difference of 0 between ends that differ is bounded by denorm_min.
+4. **abs_error fell short with loose tolerances.** With `rel_tol = 1` a method stops while its ends are far apart,
+   where their difference rounds down: a sign change at -0.5 from [-1, 2^54] gave Bisection 2^53 with a bound of 2^53
+   (distance 2^53 + 0.5) and Brent 2^54 with 2^54; one at 1.75 from [1.5, 1.5 2^54] fell short by 0.25. Fixed by
+   `distance_bound`: exact only where the difference provably is (Sterbenz), otherwise the computed distance raised
+   by one unit. Bisection now continues where the raised bound exceeds the tolerance: it returns -0.75 with a bound of
+   0.25 for the first case.
+5. **A test too weak to see a zero bound.** The subnormal case's reference, 2.5 denorm_min, rounds to 2 denorm_min.
+   Fixed: that case, and the loose-tolerance cases, are checked exactly in `cpp_bin_float_50`.
+
+`detail::distance_bound` replaces `detail::within`: every abs_error, stop test and guard uses it, so abs_error is
+always a true bound and at most 2 tol(value). With the default tolerances every stop is in its exact range: every
+earlier result and evaluation count is unchanged (the radix-2 boundary case of Sterbenz's lemma and a distance from 0
+are recognised as exact, for that reason). The regression tests (two `static_assert`s for findings 1 and 2, the
+loose-tolerance and flush cases) fail on 02fffe5, 7 of them at run time and the two at compile time.
+
+Codex also checked and found correct: the API, the validation order, zero first and the exact-zero tolerance against
+the specification; the move of `callable`; the user-type rules; Brent's quotient bounds and the max / 16 guard's
+headroom; the stop test on the width; the conditioning budgets and the libm-free counts.
+
 ## Deferred
 
 - An iteration cap and `not_converged`: Phase 2, with the open methods.

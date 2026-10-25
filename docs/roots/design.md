@@ -34,21 +34,29 @@ the phases in `docs/plan.md`, and each phase's specification and evidence in `PH
 - **Zero first:** a bracket containing 0 in its interior is split at 0 after evaluating fn(0), so a root at 0 costs
   one evaluation and the rest sees one sign; skipped where fn(0) is not finite (removable singularities: sin(x)/x,
   x/(e^x - 1)). User decision P2.
-- **The stop test:** the bracket at most 2 tol(x) wide, tol(x) = abs_tol + rel_tol |x| (saturated at max), or fn
-  exactly 0. The defaults, also the minimum, are `abs_tol = denorm_min` and `rel_tol = 2 eps`: full precision at
-  every magnitude, no scale assumed (MATLAB and SciPy assume 1, and a root at 1e-12 loses its digits there). User
-  decision P1. Brent's own tolerance is 2 macheps |b| + t with macheps half of epsilon for rounded arithmetic, so his
-  relative term is eps |b|; ours is twice it, and he advises against less.
+- **The stop test:** the bracket at most 2 tol(x) wide, tol(x) = abs_tol + rel_tol |x| (saturated at max once
+  rel_tol |x| exceeds max / 2, so that the sum cannot overflow), or fn exactly 0. The defaults, also the minimum, are
+  `abs_tol = denorm_min` and `rel_tol = 2 eps`: full precision at every magnitude, no scale assumed (MATLAB and SciPy
+  assume 1, and a root at 1e-12 loses its digits there). User decision P1. Brent's own tolerance is 2 macheps |b| + t
+  with macheps half of epsilon for rounded arithmetic, so his relative term is eps |b|; ours is twice it, and he
+  advises against less.
 - **The walk to 0** (documented, user decision P6): a sign change near 0 that fn does not evaluate to exactly 0 (a
   root fn misses at 0, a tiny root, a jump at 0) is approached down to T's smallest numbers, about 1100 halvings in
   double and about 2e9 in `cpp_bin_float_50`. The remedy is `abs_tol`; a fast descent toward 0 is deferred.
+- **Distances:** every abs_error, stop test and guard uses `detail::distance_bound(u, v)`, an upper bound on
+  |u - v| formed without overflow: exact where the difference is (ends of one sign whose computed difference is below
+  the smaller magnitude, Sterbenz's lemma; in radix 2 also its boundary case; an end at 0), which is every stop with
+  the default tolerances; otherwise the computed distance raised by one unit, `d + max(d eps, denorm_min)`;
+  denorm_min where ends that differ give a difference of 0 (a type without subnormals flushes it); max where the
+  distance may exceed what T holds. Added after the independent review (below).
 - **Bisection:** midpoints `a + (b - a) / 2` (one sign) or `(a + b) / 2` (opposite signs), neither overflowing;
-  `abs_error = max(m - a, b - m)`, exact and a true bound even where half the width rounds among the subnormals.
-- **Brent:** the procedure `zero`, with the caller's tolerance, the stop test on the exact |c - b| <= 2 tol(b), and a
-  bisection step whenever |c - b|, |b - a| or |e| exceeds max / 16, so that no product of the interpolation overflows
-  (3 m q reaches 12 |c - b|; an infinite one would accept a step rather than reject it). The quotients cannot overflow:
-  |fb| < |fa| <= |fc| in the interpolation. `abs_error = |c - b|`.
-- **The result:** `abs_error` bounds the distance to a sign change of fn as evaluated and is at most 2 tol(value);
+  `abs_error` the larger of the bounds on the distances to the ends, a true bound even where half the width rounds.
+- **Brent:** the procedure `zero`, with the caller's tolerance, the stop test on a bound on |c - b| against 2 tol(b),
+  and a bisection step whenever that bound, the bound on |b - a| or |e| exceeds max / 16, so that no product of the
+  interpolation overflows (3 m q reaches 12 |c - b|; an infinite one would accept a step rather than reject it). The
+  quotients cannot overflow: |fb| < |fa| <= |fc| in the interpolation. `abs_error` is the bound on |c - b|.
+- **The result:** `abs_error` bounds the distance to a sign change of fn as evaluated and is at most 2 tol(value),
+  saturating at max where the distance exceeds what T holds (only with tolerances near max);
   where fn is exactly 0 it is tol(value), not 0 (user decision P4; e^x - 2 is exactly 0 at a point 2.3e-17 from ln 2).
   The conditioning of the root, fn's rounding over |f'|, is the caller's.
 - **Poles** are returned as roots, as GSL, Boost and SciPy do, and documented (user decision P3). The rule first
