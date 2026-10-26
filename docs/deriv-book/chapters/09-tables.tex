@@ -7,50 +7,52 @@
 % Four weight tables may stack at the top of a page (main.tex restores the default of 3 after this chapter).
 \setcounter{topnumber}{4}
 
-The tables of this chapter are the single source of the weights and constants that Part~I quotes. Every body was
-written by the book's data generator from the library itself, from the same internal tables that
-\code{derivative} uses (the few constants that are literals of the library's code are transcribed, as
-\cref{sec:tables-ridders} says), and the generator checks each rule against its moment conditions before writing it;
-the library's tests compare the rules with the published tables of Fornberg\cite{fornberg1988} and
-Chapra (Chapter 23).\cite{chapra2015}
+The tables of this chapter are the single source of the weights and constants that Part~I quotes. The book's data
+generator wrote the body of every table from the library itself, from the same internal tables that
+\code{derivative} uses. The few constants that are literals of the library's code are transcribed instead, as
+\cref{sec:tables-ridders} says. Before it writes a rule, the generator checks the rule against its moment conditions.
+The library's tests compare the rules with the published tables of Fornberg\cite{fornberg1988} and Chapra
+(Chapter 23).\cite{chapra2015}
 
 \section{How to read the tables}\label{sec:tables-reading}
 
-A rule of accuracy order $\aorder$ for the derivative of order $\dorder$ samples $f$ at the nodes $x + n_k h$ and
-combines the samples with integer numerators $c_k$ over one denominator $\den$:
+A rule of accuracy order $\aorder$ for the derivative of order $\dorder$ samples $f$ at the nodes $x + n_k h$. It
+combines the samples with integer numerators $c_k$ over one common denominator $\den$:
 \begin{equation}
   f^{(\dorder)}(x) \approx \frac{1}{\den\, h^{\dorder}} \sum_k c_k\, f(x + n_k h).
   \label{eq:tables-rule}
 \end{equation}
 The weights of \cref{ch:taylor,ch:stencils} are $w_k = c_k / \den$. They are fixed by the moment conditions
-(\cref{sb:moments}): with $\mom{j} = \sum_k c_k n_k^j$,
+(\cref{sb:moments}). With the moments $\mom{j} = \sum_k c_k n_k^j$, the conditions read
 \begin{equation}
   \mom{\dorder} = \dorder!\, \den, \qquad \mom{j} = 0 \quad \text{for } j \ne \dorder,\ 0 \le j < \dorder + \aorder.
   \label{eq:tables-moments}
 \end{equation}
-The first moment that does not vanish gives the leading error term: the rule's value minus $f^{(\dorder)}(x)$ is about
-$\pm \errc h^{\aorder} f^{(\dorder+\aorder)}(x)$, with the error constant $\errc = \abs{\mom{\dorder+\aorder}} /
-((\dorder+\aorder)!\, \den)$ and the sign given in the last column. The amplification $\ampl = \sum_k \abs{c_k} /
-\den$ multiplies the rounding of the samples: their rounding error reaches the result as about $\ampl \epsmach
-\abs{f} / h^{\dorder}$. Both enter the error model of \cref{ch:stencils}.
+The first moment that does not vanish gives the leading error term. The rule's value minus $f^{(\dorder)}(x)$ is
+about $\pm \errc h^{\aorder} f^{(\dorder+\aorder)}(x)$, with the error constant $\errc = \abs{\mom{\dorder+\aorder}} /
+((\dorder+\aorder)!\, \den)$. The last column of each table gives the sign. The amplification $\ampl = \sum_k
+\abs{c_k} / \den$ multiplies the rounding of the samples: their rounding error reaches the result as about $\ampl
+\epsmach \abs{f} / h^{\dorder}$. Both constants enter the error model of \cref{ch:stencils}.
 
-The central rules use the $\aorder + \dorder - 1$ integers around 0, without 0 for odd $\dorder$, whose weight would
-be zero. The forward rules use $0, 1, \ldots, \aorder + \dorder - 1$. \code{Backward<P>} is \code{Forward<P>}
-mirrored: its nodes are those of \code{Forward<P>} negated, and its numerators those of \code{Forward<P>} times
-$(-1)^{\dorder}$, with the same $\den$, $\ampl$ and $\errc$; the sign of its leading term changes for odd $\aorder$.
-It is not tabulated.
+The central rules use the $\aorder + \dorder - 1$ integers around 0. For odd $\dorder$ they leave out 0, whose weight
+would be zero. The forward rules use $0, 1, \ldots, \aorder + \dorder - 1$. \code{Backward<P>} is \code{Forward<P>}
+mirrored. Its nodes are those of \code{Forward<P>} negated, and its numerators are those of \code{Forward<P>} times
+$(-1)^{\dorder}$. It has the same $\den$, $\ampl$ and $\errc$, and the sign of its leading term changes for odd
+$\aorder$. It is not tabulated.
 
 \section{Central rules}\label{sec:tables-central}
 
 \Cref{tab:weights-central-first,tab:weights-central-second,tab:weights-central-third,tab:weights-central-fourth}
-give \code{Central<P>} for $\dorder = 1$ to 4 and $\aorder = 2$ to 10. Each pair of nodes adds two orders; $\errc$
-falls quickly with $\aorder$ and $\ampl$ grows slowly, which is why the central rules of high order pay off in wide
-types (\cref{tab:accuracy-matrix}). The cap at $\aorder = 10$ is a design decision (\code{docs/deriv/PHASE2_API.md}): by
-the model's exponent alone, a \code{Central<12>} would cut the error of $f'$ by a factor of about \num{\valCapGainFactorCentralTwelveFirstDouble} in double and
+give \code{Central<P>} for $\dorder = 1$ to 4 and $\aorder = 2$ to 10. Each pair of nodes adds two orders. $\errc$
+falls quickly with $\aorder$, and $\ampl$ grows slowly. That is why the central rules of high order pay off in wide
+types (\cref{tab:accuracy-matrix}). The cap at $\aorder = 10$ is a design decision
+(\code{docs/deriv/PHASE2_API.md}). By the model's exponent alone, a \code{Central<12>} would cut the error of $f'$ by a
+factor of about \num{\valCapGainFactorCentralTwelveFirstDouble} in double, and
 \num{\valCapGainFactorCentralTwelveFirstMultiprecision} in a 50-digit type (for $f''''$,
-\num{\valCapGainFactorCentralTwelveFourthDouble} and \num{\valCapGainFactorCentralTwelveFourthMultiprecision}), over a stencil on
-which $f$ must be smooth that much wider, and the library stops there. The rules with $\aorder = 2$ are the textbook formulas: the central difference,
-the three-point second difference, the four-point rule for $f'''$ and the five-point rule for $f''''$.
+\num{\valCapGainFactorCentralTwelveFourthDouble} and \num{\valCapGainFactorCentralTwelveFourthMultiprecision}). But
+its stencil would be that much wider, and $f$ must be smooth over all of it, so the library stops there. The rules
+with $\aorder = 2$ are the textbook formulas: the central difference, the three-point second difference, the
+four-point rule for $f'''$ and the five-point rule for $f''''$.
 
 \begin{table*}
 \caption{\code{Central<P>} for the first derivative, $f'$.\label{tab:weights-central-first}}
@@ -75,8 +77,8 @@ the three-point second difference, the four-point rule for $f'''$ and the five-p
 
 \begin{table*}
 \caption{\code{Central<P>} for the fourth derivative, $f^{(4)}$. The largest numerator of all the tables,
-6,222,216, is the centre weight of \code{Central<10>}; every numerator fits in 24 bits, so every rule's integer weights are
-exact in \code{float}.\label{tab:weights-central-fourth}}
+6,222,216, is the centre weight of \code{Central<10>}. Every numerator fits in 24 bits, so the integer weights of every
+rule are exact in \code{float}.\label{tab:weights-central-fourth}}
 \weighttablestart
 \tablebody{weights-central-N4}
 \weighttableend
@@ -85,39 +87,39 @@ exact in \code{float}.\label{tab:weights-central-fourth}}
 \section{Forward rules}\label{sec:tables-forward}
 
 \Cref{tab:weights-forward-first,tab:weights-forward-second,tab:weights-forward-third,tab:weights-forward-fourth}
-give \code{Forward<P>} for $\dorder = 1$ to 4 and $\aorder = 1$ to 6. A one-sided rule gains one order per node, and
-both its constants are larger than those of the central rule of the same order: $\ampl$ grows to
-\num{\valAmplForwardSix} for $f'$ with $\aorder = 6$ and to \num{\valAmplForwardSixFourth} for $f''''$. The cap at
-$\aorder = 6$ is a design decision (\code{docs/deriv/PHASE2_API.md}): beyond it the amplification grows about as fast as the
-higher order pays, by the model, so the library stops there.
+give \code{Forward<P>} for $\dorder = 1$ to 4 and $\aorder = 1$ to 6. A one-sided rule gains one order per node. Both
+its constants are larger than those of the central rule of the same order: $\ampl$ grows to \num{\valAmplForwardSix}
+for $f'$ with $\aorder = 6$, and to \num{\valAmplForwardSixFourth} for $f''''$. The cap at $\aorder = 6$ is a design
+decision (\code{docs/deriv/PHASE2_API.md}). Beyond it, by the model, the amplification grows about as fast as the
+higher order pays, so the library stops there.
 
 \begin{table*}
-\caption{\code{Forward<P>} for the first derivative, $f'$. \code{Backward<P>}: nodes negated, the same
-numerators times $-1$.\label{tab:weights-forward-first}}
+\caption{\code{Forward<P>} for the first derivative, $f'$. For \code{Backward<P>}, negate the nodes and
+multiply the numerators by $-1$.\label{tab:weights-forward-first}}
 \weighttablestart
 \tablebody{weights-forward-N1}
 \weighttableend
 \end{table*}
 
 \begin{table*}
-\caption{\code{Forward<P>} for the second derivative, $f''$. \code{Backward<P>}: nodes negated, the same
-numerators.\label{tab:weights-forward-second}}
+\caption{\code{Forward<P>} for the second derivative, $f''$. For \code{Backward<P>}, negate the nodes and
+keep the numerators.\label{tab:weights-forward-second}}
 \weighttablestart
 \tablebody{weights-forward-N2}
 \weighttableend
 \end{table*}
 
 \begin{table*}
-\caption{\code{Forward<P>} for the third derivative, $f'''$. \code{Backward<P>}: nodes negated, the same
-numerators times $-1$.\label{tab:weights-forward-third}}
+\caption{\code{Forward<P>} for the third derivative, $f'''$. For \code{Backward<P>}, negate the nodes and
+multiply the numerators by $-1$.\label{tab:weights-forward-third}}
 \weighttablestart
 \tablebody{weights-forward-N3}
 \weighttableend
 \end{table*}
 
 \begin{table*}
-\caption{\code{Forward<P>} for the fourth derivative, $f^{(4)}$. \code{Backward<P>}: nodes negated, the same
-numerators.\label{tab:weights-forward-fourth}}
+\caption{\code{Forward<P>} for the fourth derivative, $f^{(4)}$. For \code{Backward<P>}, negate the nodes and
+keep the numerators.\label{tab:weights-forward-fourth}}
 \weighttablestart
 \tablebody{weights-forward-N4}
 \weighttableend
@@ -126,16 +128,17 @@ numerators.\label{tab:weights-forward-fourth}}
 \section{Default steps and model accuracy}\label{sec:tables-steps}
 
 \Cref{tab:default-steps} gives, for every stencil and order, the exponent of the default step
-$h = \epsmach^{1/(\aorder+\dorder)} \max(\abs{x}, 1)$, the step itself for \code{double} at $\abs{x} \le 1$ (for a
-larger $\abs{x}$, multiply by $\abs{x}$), the model's relative error $\epsmach^{\aorder/(\aorder+\dorder)}$ at that
-step, and the number of evaluations. The steps are \code{nxx::math::root_epsilon<P + N, double>()};
-\code{default_step<M, N>(x)} returns them times the scale. The model error drops the constants $\errc$ and $\ampl$ and assumes that $f$ varies on the scale
-$\max(\abs{x}, 1)$, $\abs{f} \sim s^{\dorder} \abs{f^{(\dorder)}}$; it is a rule of thumb, and the measured
-accuracies are in \cref{tab:accuracy-matrix}.
+$h = \epsmach^{1/(\aorder+\dorder)} \max(\abs{x}, 1)$ and the step itself for \code{double} at $\abs{x} \le 1$. For a
+larger $\abs{x}$, multiply the step by $\abs{x}$. The table also gives the model's relative error
+$\epsmach^{\aorder/(\aorder+\dorder)}$ at that step, and the number of evaluations. The steps are
+\code{nxx::math::root_epsilon<P + N, double>()}, and \code{default_step<M, N>(x)} returns them times the scale. The
+model error drops the constants $\errc$ and $\ampl$, and assumes that $f$ varies on the scale $\max(\abs{x}, 1)$,
+that is, $\abs{f} \sim s^{\dorder} \abs{f^{(\dorder)}}$. It is a rule of thumb; the measured accuracies are in
+\cref{tab:accuracy-matrix}.
 
 \begin{table}
-\sidecaption{Default steps, model accuracy and cost per stencil and derivative order, for \code{double}. Step at
-$\abs{x} \le 1$; the model error is relative.\label{tab:default-steps}}
+\sidecaption{Default steps, model accuracy and cost, per stencil and derivative order, for \code{double}. The step is
+the one at $\abs{x} \le 1$, and the model error is relative.\label{tab:default-steps}}
 \centering\footnotesize
 \begin{tabular}{@{}lrrcccr@{}}
 \toprule
@@ -148,22 +151,23 @@ Method & $P$ & $N$ & Exponent & Step & Model error & Evaluations\\
 
 \section{Ridders' constants}\label{sec:tables-ridders}
 
-\Cref{tab:ridders-constants} collects the constants of Ridders' method and of its one-sided forms, the same for
-every derivative order except where the value depends on $\dorder$; \cref{ch:ridders} and \cref{sb:floor-coverage}
-explain them, and the design record in the repository (\code{docs/deriv/PHASE3_API.md} to \code{docs/deriv/PHASE5_API.md})
-gives the evidence for each choice. The level cap, the initial-step divisors and the one-sided evaluations per level
-are read from the library; the ratio, the stall and the two factors of the untrusted-result test are literals of its
-code, transcribed by the generator.
+\Cref{tab:ridders-constants} collects the constants of Ridders' method and of its one-sided forms. They are the same
+for every derivative order, except where the value depends on $\dorder$. \Cref{ch:ridders} and \cref{sb:floor-coverage}
+explain them, and the design record in the repository (\code{docs/deriv/PHASE3_API.md} to
+\code{docs/deriv/PHASE5_API.md}) gives the evidence for each choice. The level cap, the initial-step divisors and the
+one-sided evaluations per level are read from the library. The ratio, the stall and the two factors of the
+untrusted-result test are literals of its code, transcribed by the generator.
 
-The level cap counts every level attempted, restarts included; with the evaluations per level it gives the maximum
-evaluations of the last row.
+The level cap counts every level attempted, restarts included. With the evaluations per level, it gives the maximum
+evaluations in the last row.
 
 \begin{table}[!htb]
 \sidecaption{The constants of Ridders' method and, in the last column, of its one-sided forms
-(\cref{sec:ridders-onesided}; \code{BackwardRidders} is \code{ForwardRidders} mirrored). They differ in the column
-divisor, since the error of the forward difference has every power of $h$, not only the even ones, and in the
-rounding floor, which the one-sided forms carry through the tableau. Where a value depends on the derivative order,
-it is given for $f'$, $f''$, $f'''$ and $f''''$ in turn. The rows for the column divisor, the floor and the restart transcribe the header's documented rules.\label{tab:ridders-constants}}
+(\cref{sec:ridders-onesided}; \code{BackwardRidders} is \code{ForwardRidders} mirrored). The two differ in the column
+divisor, since the error of the forward difference has every power of $h$, not only the even ones. They also differ in
+the rounding floor, which the one-sided forms carry through the tableau. Where a value depends on the derivative
+order, it is given for $f'$, $f''$, $f'''$ and $f''''$ in turn. The rows for the column divisor, the floor and the
+restart transcribe the rules that the header documents.\label{tab:ridders-constants}}
 \centering\footnotesize
 \begin{tabular}{@{}>{\raggedright}p{49mm}>{\raggedright}p{28mm}>{\raggedright\arraybackslash}p{28mm}@{}}
 \toprule

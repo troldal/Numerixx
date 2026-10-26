@@ -9,50 +9,51 @@
 \begin{multicols}{2}
 \raggedright
 
-\qrhead{Include.} \texttt{\#include <numerixx/deriv.hpp>}, namespace \code{nxx::deriv}; header-only, C++23; CMake
-target \code{numerixx::numerixx} (\cref{sec:api-synopsis}).
+\qrhead{Include.} \texttt{\#include <numerixx/deriv.hpp>}, in the namespace \code{nxx::deriv}. Header-only, C++23;
+the CMake target is \code{numerixx::numerixx} (\cref{sec:api-synopsis}).
 
 \qrhead{The call} (\cref{sec:api-derivative}).
 \begin{itemize}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
   \item \code{derivative(fn, x)}: \code{Central<2>}, $f'$, default step;
-  \item \code{derivative(fn, x, h)}: your step, \code{h > 0};
+  \item \code{derivative(fn, x, h)}: your own step, \code{h > 0};
   \item \code{derivative<M>(fn, x)}: the method \code{M};
-  \item \code{derivative<M, N>(fn, x)}, with or without \code{h}: the derivative order \code{N}, 1 to 4 or
+  \item \code{derivative<M, N>(fn, x)}, with or without \code{h}: the derivative order \code{N}, from 1 to 4, or
     \code{order::second} and so on.
 \end{itemize}
-\code{fn} takes a \code{T}; \code{x} fixes \code{T}, any \code{nxx::real} type.
+\code{fn} takes a \code{T}. \code{x} fixes \code{T}, which can be any \code{nxx::real} type.
 
-\qrhead{The result.} A \code{std::expected<Estimate<T>, error>}: \code{d->value} is the estimate,
-\code{*d->abs_error} the error estimate of the three Ridders methods (empty for the stencils), \code{d.error()} the reason for a failure.
-\code{d.value()} is \code{std::expected}'s accessor and throws on a failure: test, then read \code{d->value}.
+\qrhead{The result.} A \code{std::expected<Estimate<T>, error>}. \code{d->value} is the estimate.
+\code{*d->abs_error} is the error estimate of the three Ridders methods (empty for the stencils). \code{d.error()} is
+the reason for a failure. \code{d.value()} is the accessor of \code{std::expected}, and it throws on a failure: test
+first, then read \code{d->value}.
 
-\qrhead{Two checks} (\cref{sec:using-result}). \emph{Did it work?} \code{if (d)}. \emph{Is it right?} A wrong step
-scale, a noisy $f$ or a break near $x$ return a wrong value without failing: if in doubt, repeat at $2h$ and $h/2$.
-For Ridders, also require \code{r->abs_error && *r->abs_error <= atol + rtol * std::abs(r->value)}: \code{rtol}
-$= 10^{-n}$ for $n$ figures, \code{atol} in the derivative's units decides near $f' = 0$; a stencil has no estimate to
-test. Inside an iteration no check is needed.
+\qrhead{Two checks} (\cref{sec:using-result}). \emph{Did it work?} Test \code{if (d)}. \emph{Is it right?} A wrong
+step scale, a noisy $f$ or a break near $x$ returns a wrong value without failing. If in doubt, repeat at $2h$ and
+$h/2$. For Ridders, also require \code{r->abs_error && *r->abs_error <= atol + rtol * std::abs(r->value)}. Here
+\code{rtol} $= 10^{-n}$ for $n$ significant figures, and \code{atol}, in the derivative's units, decides near
+$f' = 0$. A stencil has no estimate to test. Inside an iteration, no check is needed.
 
-\qrhead{Failures.} \code{non_finite}: \code{x} not finite; \code{fn} infinite or NaN at a sample; an overflow; a step
-below the resolution of \code{x}; a step that is not positive and finite. A float
+\qrhead{Failures.} \code{non_finite} when \code{x} is not finite; when \code{fn} is infinite or NaN at a sample; on an
+overflow; when the step is below the resolution of \code{x}; and when the step is not positive and finite. A float
 derivative above the first warns at compile time, by every method.
 
 \qrhead{Methods} (relative accuracy in double at the default step).
 \begin{itemize}\setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}
-  \item \code{Central<P>}, P = 2, 4, \ldots, 10: $P + N - 1$ evaluations; about $\epsmach^{P/(P+N)}$; with P = 2
-    about \num{\valHeadlineFirstDigits} digits for $f'$ and \num{\valHeadlineFourthDigits} for $f''''$.
-  \item \code{Forward<P>}, \code{Backward<P>}, P = 1 to 6: $P + N$ evaluations, never below (above) $x$; larger
-    errors than \code{Central<P>}.
-  \item \code{Ridders}: a median of \num{\valRiddersEvalsMedianFirst} evaluations for $f'$, at most
+  \item \code{Central<P>}, P = 2, 4, \ldots, 10: $P + N - 1$ evaluations; an error of about $\epsmach^{P/(P+N)}$.
+    With P = 2, about \num{\valHeadlineFirstDigits} digits for $f'$ and \num{\valHeadlineFourthDigits} for $f''''$.
+  \item \code{Forward<P>}, \code{Backward<P>}, P = 1 to 6: $P + N$ evaluations, never below $x$ (\code{Forward})
+    or above it (\code{Backward}); larger errors than \code{Central<P>}.
+  \item \code{Ridders}: a median of \num{\valRiddersEvalsMedianFirst} evaluations for $f'$, and at most
     \num{\valRiddersMaxEvalsFirst}, \num{\valRiddersMaxEvalsSecond}, \num{\valRiddersMaxEvalsThird} and
     \num{\valRiddersMaxEvalsFourth} for $f'$ to $f''''$; about \num{\valHeadlineRiddersFirstDigits} digits for $f'$;
-    an error estimate. Near a NaN it returns a value down to
+    an error estimate. Near a NaN, it returns a value down to
     $2^{-\num{\valRiddersEdgeLimitExponent}} \max(\abs{x}, 1)$ away (ten digits down to
-    $2^{-\num{\valRiddersEdgeTenDigitsExponent}} \max(\abs{x}, 1)$), then \code{non_finite}; closer to a pole,
-    a wrong value whose estimate flags it.
+    $2^{-\num{\valRiddersEdgeTenDigitsExponent}} \max(\abs{x}, 1)$), and then \code{non_finite}. Closer to a pole,
+    it returns a wrong value, whose estimate flags it.
   \item \code{ForwardRidders}, \code{BackwardRidders}: Ridders on one side of $x$ only, for an edge, with an error
-    estimate; a median of \num{\valForwardRiddersEvalsMedianFirst} evaluations for $f'$, at most
+    estimate. A median of \num{\valForwardRiddersEvalsMedianFirst} evaluations for $f'$, at most
     \num{\valForwardRiddersMaxEvalsFirst}, \num{\valForwardRiddersMaxEvalsSecond},
-    \num{\valForwardRiddersMaxEvalsThird} and \num{\valForwardRiddersMaxEvalsFourth}; about
+    \num{\valForwardRiddersMaxEvalsThird} and \num{\valForwardRiddersMaxEvalsFourth}; a relative error of about
     \num{\valExpForwardRiddersFirstRelError} for $f'$.
 \end{itemize}
 
@@ -67,27 +68,27 @@ Situation & Method and step & Cost and accuracy\\
 \bottomrule
 \end{tabular}}
 
-\qrhead{Your own step.} \code{default_step<M, N>(x)} is the one \code{derivative} uses;
-\code{h = nxx::math::root_epsilon<3, double>() * w;} for $\epsmach^{1/3} w$
-(\code{Central<2>}, $f'$; in general \code{root_epsilon<P + N, T>()}), and
-\code{h = std::cbrt(eta) * std::max(std::abs(x), 1.0);} for a noisy $f$.
+\qrhead{Your own step.} \code{default_step<M, N>(x)} is the step that \code{derivative} uses. For
+$\epsmach^{1/3} w$, write \code{h = nxx::math::root_epsilon<3, double>() * w;} (\code{Central<2>}, $f'$; in general
+\code{root_epsilon<P + N, T>()}). For a noisy $f$, write
+\code{h = std::cbrt(eta) * std::max(std::abs(x), 1.0);}.
 
-\qrhead{No error estimate? Check it} (\cref{sec:using-check}). Repeat at $2h$ and $h/2$ and count the agreeing
-digits, or compare with \code{Central<4>} or with Ridders' method. Where $f' \approx 0$, judge the absolute error.
+\qrhead{No error estimate? Check it} (\cref{sec:using-check}). Repeat at $2h$ and $h/2$, and count the digits that
+agree. Or compare with \code{Central<4>}, or with Ridders' method. Where $f' \approx 0$, judge the absolute error.
 Check the sign against the physics.
 
 \qrhead{The pitfalls that matter most} (\cref{sec:using-pitfalls}).
 \begin{itemize}\setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}
   \item \emph{The step's scale is in your units.} The default step assumes that $f$ varies on the scale
-    $\max(\abs{x}, 1)$; at a large $\abs{x}$ with a narrow feature, or at $\abs{x} \ll 1$, pass $h$.
-  \item \emph{Evaluable is not valid.} A fit sampled outside its range returns numbers: make it return NaN there,
-    and use \code{Forward<P>} or \code{Backward<P>} at the edge, or \code{ForwardRidders} or
+    $\max(\abs{x}, 1)$. At a large $\abs{x}$ with a narrow feature, or at $\abs{x} \ll 1$, pass $h$.
+  \item \emph{Evaluable is not valid.} A fit sampled outside its range still returns numbers. Make it return NaN
+    there. Then use \code{Forward<P>} or \code{Backward<P>} at the edge, or \code{ForwardRidders} or
     \code{BackwardRidders} for an error estimate.
-  \item \emph{Evaluable is not smooth.} A kink or a range break within a step of $x$ gives a wrong value from every
-    method that samples across it, without failing; Ridders' estimate flags a jump, nothing flags a kink at $x$: differentiate the branch
-    you mean.
-  \item \emph{\code{auto} and \code{.value()}.} \code{auto e = *d} is an \code{Estimate}, and \code{d.value()}
-    throws on a failure; write \code{d->value}.
+  \item \emph{Evaluable is not smooth.} A kink or a range break within a step of $x$ gives a wrong value, without
+    failing, from every method that samples across it. Ridders' estimate flags a jump; nothing flags a kink at $x$.
+    Differentiate the branch you mean.
+  \item \emph{\code{auto} and \code{.value()}.} \code{auto e = *d} is an \code{Estimate}, and
+    \code{d.value()} throws on a failure. Write \code{d->value}.
 
 \end{itemize}
 

@@ -10,10 +10,10 @@ holds the outline, the targets and the ownership, and wins over `BRIEF.md` once 
 - **Author:** Kenneth Troldal Balslev, the only listed author. The front matter states that the document was prepared
   with the use of AI (`chapters/00-frontmatter.tex`, "How this document was prepared"): factual, short, approved by
   the author, kept true to how the work was actually done (models, roles, review rounds).
-- **Audience:** readers comfortable with calculus but not specialists in numerical computation, such as practising
-  engineers. Part I teaches; Part II is a reference. The fundamentals must be easy to follow; topics a user does not
+- **Audience:** undergraduates and graduate students who know calculus but not numerical analysis or floating point.
+  The voice is a tutorial: short sentences, signposting, and the steps of an argument spelled out. Part I teaches;
+  Part II is a reference in the same plain prose. The fundamentals must be easy to follow; topics a user does not
   need go in sidebars, which the surrounding text must not depend on.
-- **Length:** 60 to 90 pages in the book's layout, front and back matter included.
 - **Language:** British English with -ise spellings throughout: behaviour, centre, modelling, analyse, organise,
   generalise.
 - **Structure:** chapters in two parts (Part I Fundamentals, Part II Reference), appendices, sidebars.

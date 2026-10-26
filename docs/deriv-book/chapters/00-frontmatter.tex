@@ -1,62 +1,70 @@
 % Front matter: "About this document" (preface, how to read, the version statement, the AI statement). Owner: the
 % editor. The statement on the use of AI is required (the author's decision) and must stay accurate: the editor
 % updates it at every stage, and makes it current at release together with the version statement.
+% Language pass for students (PLAN.md section 12.9): the audience and the AI statement updated; otherwise the wording
+% only, content and order as at 3192e8a.
 \chapter*{About this document}
 \addcontentsline{toc}{chapter}{About this document}
 
-This document is a textbook and a reference for \code{nxx::deriv}, the numerical-derivatives module of \nxx{}, a
-header-only C++23 library of numerical algorithms. The module computes the first to the fourth derivative of a
-function that a program can evaluate but cannot differentiate: a property model, the output of a solver or a
-simulation, a correlation in someone else's code. It is written for engineers and scientists who are comfortable
-with calculus and with C++ but are not specialists in numerical computation. The fundamentals are meant to be easy
-to follow; the topics a user does not need to know, such as proofs, floating-point detail and the library's
-implementation decisions, are in numbered sidebars that the surrounding text never depends on.
+This document is a textbook and a reference for \code{nxx::deriv}, the numerical-derivatives module of \nxx{}.
+\nxx{} is a header-only C++23 library of numerical algorithms. The module computes the first to the fourth
+derivative of a function that a program can evaluate but cannot differentiate: a property model, the output of a
+solver or a simulation, or a correlation in someone else's code. The book is written for undergraduate and graduate
+students who know calculus and can read C++, but have not studied numerical analysis or floating point. It is meant
+to read as a tutorial, one step at a time. The fundamentals are meant to be easy to follow. The topics that a user
+does not need, such as proofs, floating-point detail and the library's implementation decisions, are in numbered
+sidebars, and the surrounding text never depends on them.
 
 \section*{How to read it}
 
 Part~I teaches. Its seven chapters build the methods up from one idea, Taylor's theorem, and are meant to be read in
-order: where derivatives arise and what the library offers (\cref{ch:why}); the forward and the central difference
-and their errors (\cref{ch:taylor}); why a smaller step is not always better, and how the step is chosen
-(\cref{ch:rounding}); more points and one-sided rules (\cref{ch:stencils}); second to fourth derivatives
-(\cref{ch:orders}); Ridders' extrapolation and its one-sided forms, the methods that estimate their own error (\cref{ch:ridders}); and the
-library in use, with worked engineering examples and the pitfalls (\cref{ch:using}). One example runs through Part~I,
-the heat capacity of nitrogen from its enthalpy, whose derivative is known, so that every error quoted could be
-measured.
+order. \Cref{ch:why} shows where derivatives arise and what the library offers. \Cref{ch:taylor} derives the forward
+and the central difference and their errors. \Cref{ch:rounding} explains why a smaller step is not always better,
+and how the step is chosen. \Cref{ch:stencils} adds more points and one-sided rules, and \cref{ch:orders} treats the
+second to fourth derivatives. \Cref{ch:ridders} presents Ridders' extrapolation and its one-sided forms, the methods
+that estimate their own error. \Cref{ch:using} shows the library in use, with worked engineering examples and the
+pitfalls. One example runs through Part~I: the heat capacity of nitrogen, computed from its enthalpy. Its derivative
+is known, so that every error quoted could be measured.
 
-Part~II is the reference: every public name (\cref{ch:api}), every weight and constant (\cref{ch:tables}), and what
-accuracy and cost to expect, where the methods stop working, and what the library guarantees (\cref{ch:guarantees}).
-The appendices hold the floating-point facts and the derivations the sidebars cite; a notation table and a glossary
-follow them.
+Part~II is the reference. \Cref{ch:api} lists every public name, and \cref{ch:tables} every weight and constant.
+\Cref{ch:guarantees} says what accuracy and cost to expect, where the methods stop working, and what the library
+guarantees. The appendices hold the floating-point facts and the derivations that the sidebars cite. A notation table
+and a glossary follow them.
 
-A reader in a hurry has two shortcuts. \Cref{sec:why-summary}, ``If you read nothing else'', chooses a method for
-the five situations that cover most uses and gives the two checks every call needs. And the
+A reader in a hurry has two shortcuts. \Cref{sec:why-summary}, ``If you read nothing else'', chooses a method for the
+five situations that cover most uses, and gives the two checks that every call needs. The
 \hyperref[ch:quick-reference]{quick-reference page} (page \pageref{ch:quick-reference}) is the interface on one
 sheet: the calls, the result, the failures, the method choice, the checks and the pitfalls that matter most.
 
 \section*{The evidence}
 
-Every number in this book that comes from a computation was produced by the library itself, apart from a few
-attributed figures of its design record and tests: a generator program in the book's sources runs \code{nxx::deriv} and writes the values, the data behind every plot and the
-bodies of the tables, and the text quotes them by name; at every run it also checks the weight tables and the
-nitrogen example against independent evaluations. Every code listing is quoted from a
-compiled program that runs as a test of the library and checks what the text claims about it, with two exceptions:
-the declarations of \cref{ch:api} are transcribed from the library's header and checked against it at every build,
-and the CMake snippet of \cref{sec:using-call} is quoted from a file the book's build does not configure. The
-data behind every plot and table, and the program that computes them, are in the repository under
-\code{docs/deriv-book/data} and \code{docs/deriv-book/tools}.
+Every number in this book that comes from a computation was produced by the library itself. The only exceptions are
+a few figures of its design record and its tests, which are attributed where they appear. A generator program in the
+book's sources runs \code{nxx::deriv}. It writes the values, the data behind every plot and the bodies of the tables,
+and the text quotes them by name. At every run it also checks the weight tables and the nitrogen example against
+independent evaluations.
+
+Every code listing is quoted from a compiled program, which runs as a test of the library and checks what the text
+claims about it. There are two exceptions. The declarations of \cref{ch:api} are transcribed from the library's
+header, and every build checks them against it. The CMake snippet of \cref{sec:using-call} is quoted from a file that
+the book's build does not configure. The data behind every plot and table, and the program that computes them, are
+in the repository, under \code{docs/deriv-book/data} and \code{docs/deriv-book/tools}.
 
 \section*{The version}
 
-This document describes \code{nxx::deriv} as of commit \code{90d83378863c} (in full in the snippet of Section~7.1) of the
-\nxx{} repository, branch \code{dev}. The library's public headers, its tests and its design record are the ground
-truth: where this book and the code disagree, the book has the bug.
+This document describes \code{nxx::deriv} as of commit \code{90d83378863c} of the \nxx{} repository, branch
+\code{dev}; the full hash is in the snippet of Section~7.1. The library's public headers, its tests and its design
+record are the ground truth. Where this book and the code disagree, the book has the bug.
 
 \section*{How this document was prepared}
 
-This document was prepared with the use of AI, under the direction of its author, who approved every stage and
-is responsible for its content. Anthropic's Claude drafted and reviewed it in named authoring and reviewing
-roles; OpenAI Codex and Cline with DeepSeek V4.1 Flash reviewed the result independently. It was updated for the
-library's Phase 5 in the same way, drafted and reviewed by Claude, with an independent review by OpenAI Codex. What makes it
-trustworthy is checked by the build, not taken on a model's word: every number, plot and table was computed by
-running the library, every code listing is compiled and run as a test, and every reference was checked against
-the work or a library catalogue.
+This document was prepared with the use of AI, under the direction of its author, who approved every stage and is
+responsible for its content. Anthropic's Claude drafted and reviewed it, in named authoring and reviewing roles.
+OpenAI Codex, and Cline with DeepSeek V4.1 Flash, reviewed the result independently. The book was updated for the
+library's Phase 5 in the same way: Claude drafted and reviewed the update, and OpenAI Codex reviewed it
+independently. Later, with the author's approval, Claude (the chapter authors and the editor, on Opus) rewrote the
+wording for readability, for students. That rewrite changed no content: a script checked that every equation,
+generated number, listing, citation and cross-reference stayed the same, and OpenAI Codex compared the old and new
+wording for changes of meaning. What makes the book trustworthy is checked
+by the build, not taken on a model's word. Every number, plot and table was computed by running the library, every
+code listing is compiled and run as a test, and every reference was checked against the work or a library catalogue.

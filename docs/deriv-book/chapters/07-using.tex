@@ -3,105 +3,115 @@
 % Examples: E11, E12, E13, E14, E15, E18, E19, E20, E22, E23 (code/07-using-*.cpp); the CMake file of 7.1.
 \chapter{Using the library}\label{ch:using}
 
-This chapter is for the reader with a problem: a function, a point and a derivative to compute. It covers getting
-and calling the library, reading and checking the result, choosing a method, three engineering examples, other number
-types, compile-time use and the pitfalls. \Cref{ch:api} is the exact reference; \cref{ch:tables} holds the tables.
+This chapter is for the reader with a problem: you have a function and a point, and you need a derivative. It shows
+how to get the library and call it, and how to read and check the result. It then helps you choose a method, and works
+through three engineering examples. The last sections cover other number types, use at compile time, and the
+pitfalls. \Cref{ch:api} is the exact reference, and \cref{ch:tables} holds the tables.
 
 \section{The call}\label{sec:using-call}
 
 \paragraph{Getting the library.} \nxx{} is header-only and has no dependencies. It ships no install rule and no
-\code{find_package} configuration, so a CMake project adds it as a subdirectory, with \code{add_subdirectory}, CPM or
-\code{FetchContent}; the target \code{numerixx::numerixx} adds the include path and requires C++23. With
+\code{find_package} configuration. So a CMake project adds it as a subdirectory, with \code{add_subdirectory}, CPM or
+\code{FetchContent}. The target \code{numerixx::numerixx} adds the include path and requires C++23. Here it is with
 \code{FetchContent}, at a pinned commit or tag:
 \cmakefile{getting-started}
-The library's tests and this book's examples run, in the continuous integration, on GCC~16, on Clang~22 with
-libc++, on MSVC and clang-cl of Visual Studio~2026, and on Emscripten~6.0.10. These are the toolchains tested, not
-minimum versions.
+The library's tests and this book's examples run in the continuous integration\mnote{\emph{Continuous integration}:
+a service that builds and tests the code automatically after every change.} on GCC~16, on Clang~22 with libc++, on
+MSVC and clang-cl of Visual Studio~2026, and on Emscripten~6.0.10. These are the toolchains that are tested. They are
+not minimum versions.
 
-\paragraph{One function.} Everything is in \code{<numerixx/deriv.hpp>}, in the namespace \code{nxx::deriv}. There is
-one function, \code{derivative}, in two forms:
+\paragraph{One function.} Everything is in the header \code{<numerixx/deriv.hpp>}, in the namespace
+\code{nxx::deriv}. There is one function, \code{derivative}, and it comes in two forms:
 \begin{itemize}
   \item \code{derivative<M, N>(fn, x)} uses the method's default step;
-  \item \code{derivative<M, N>(fn, x, h)} uses the step \code{h} you pass (for the Ridders methods, the initial step).
+  \item \code{derivative<M, N>(fn, x, h)} uses the step \code{h} that you pass (for the Ridders methods, the initial
+    step).
 \end{itemize}
-The method \code{M} is a template argument: \code{Central<P>}, \code{Forward<P>}, \code{Backward<P>},
-\code{Ridders}, \code{ForwardRidders} or \code{BackwardRidders}, and \code{Central<2>} when it is left out. The derivative order N is 1 by default; it is an integer
-from 1 to 4 or a value of the enumeration \code{order}, such as \code{order::second}. The number type T is deduced
-from \code{x}, and a step of another type converts to it, so \code{0.01} is a valid step for a 50-digit \code{x}; for
-a \code{float} \code{x} write \code{1e-3f}, since a \code{double} step is diagnosed under \code{-Wconversion} unless
+The method \code{M} is a template argument. When you leave it out, it is \code{Central<2>}. Otherwise it is one of
+\code{Central<P>}, \code{Forward<P>}, \code{Backward<P>}, \code{Ridders}, \code{ForwardRidders} and
+\code{BackwardRidders}. The derivative order N is 1 by default. It is an integer from 1 to 4, or a value of the enumeration \code{order}, such as
+\code{order::second}. The number type T is deduced from \code{x}: the compiler takes it from the type of \code{x}. A
+step of another type converts to T, so \code{0.01} is a valid step for a 50-digit \code{x}. For a \code{float}
+\code{x}, write the step as \code{1e-3f}: a \code{double} step is diagnosed under \code{-Wconversion} unless
 \code{float} holds it exactly. \code{fn} is any callable\mnote{A \emph{callable} is anything \code{std::invoke} can
 call: a function, a lambda, a function object, or a pointer to a const member function of T itself. For a member
 function of your model, capture the object: \code{[&m](double t) { return m.H(t); }}.} that takes a T and returns
-something convertible
-to T. The call of \cref{ch:why}, \code{derivative(H, T0)}, is the shortest form: \code{Central<2>}, the first
-derivative, the default step. \Cref{sec:api-derivative} shows one call of each form, compiled.
+something convertible to T. The call of \cref{ch:why}, \code{derivative(H, T0)}, is the shortest form. It means
+\code{Central<2>}, the first derivative and the default step. \Cref{sec:api-derivative} shows one call of each form,
+compiled.
 
-A stencil calls \code{fn} once per node, so \code{Central<2>} costs two evaluations for $f'$ and three for $f''$;
-Ridders' method costs two or four per level, with a median of \num{\valRiddersEvalsMedianFirst} for $f'$ and
-\num{\valRiddersEvalsMedianThird} for $f'''$ in the random study of \cref{ch:ridders} (\cref{tab:cost}).
+A stencil calls \code{fn} once per node. So \code{Central<2>} costs two evaluations for $f'$, and three for $f''$.
+Ridders' method costs two or four evaluations per level, that is, for each step that it tries. In the random study
+of \cref{ch:ridders}, its median was \num{\valRiddersEvalsMedianFirst} evaluations for $f'$ and
+\num{\valRiddersEvalsMedianThird} for $f'''$ (\cref{tab:cost}).
 
 \section{The result}\label{sec:using-result}
 
-The library itself throws nothing: a failure is a value. An exception thrown by \code{fn} or by the operations of T
+The library itself throws nothing: a failure is a value. An exception thrown by \code{fn}, or by the operations of T,
 passes through unchanged, and \code{derivative} is not \code{noexcept}. The result holds either an estimate or the
-reason there is none, as a \code{std::expected<Estimate<T>, error>}. An \code{Estimate<T>} has two members,
-\code{value} and \code{abs_error}, a \code{std::optional<T>} filled only by Ridders' method and its one-sided forms. The one reason so far is
-\code{error::non_finite}. Test the result, then read it:
+reason why there is none. Its type is \code{std::expected<Estimate<T>, error>}. An \code{Estimate<T>} has two
+members. \code{value} is the estimate of the derivative. \code{abs_error} is a \code{std::optional<T>}, which only
+Ridders' method and its one-sided forms fill. So far there is one reason for a failure, \code{error::non_finite}.
+Test the result, then read it:
 
 \snippet{07-using-expected}{expected-basics}
 The central rule at $x = 0$ samples $\log(-h)$, which is NaN, so the first call fails. \code{error::non_finite}
 covers every case in which no finite estimate exists: \code{x} is not finite; \code{fn} returned an infinite or NaN
 value; a difference, term, sum or quotient would overflow; a point $x + k h$ would overflow; or $h$ is below the
-resolution of $x$ (\cref{sb:ulp}). \code{error} may gain values, so a \code{switch} on it needs a \code{default}. It
-is formattable: \code{std::println("{}", d.error())} writes the enumerator's name, \code{non_finite}. To find
-the cause, evaluate \code{fn} at $x \pm h$ yourself and compare $h$ with the spacing of the numbers at $x$.
+resolution of $x$, the spacing of the numbers near $x$ (\cref{sb:ulp}). \code{error} may gain values in a later
+version, so a \code{switch} on it needs a \code{default}. The error is formattable:
+\code{std::println("{}", d.error())} writes the name of its value, \code{non_finite}. To find the cause of a failure,
+evaluate \code{fn} at $x \pm h$ yourself, and compare $h$ with the spacing of the numbers at $x$.
 
 The member functions \code{transform} and \code{and_then} of \code{std::expected} apply a function only when there is
-a value, and pass a failure through; \code{and_then} chains a second call that can fail itself:
+a value. A failure they pass through unchanged. \code{and_then} chains a second call, which can itself fail:
 \needspace{13\baselineskip}% the listing in one piece (stage-6 layout: two comment lines were stranded)
 \snippet{07-using-expected}{expected-chain}
-Both lambdas take a \code{double}: an \code{Estimate<double>} converts to its value where a \code{double} is
-expected. The conversion is convenient and has its traps, shown in the next snippet:
+Both lambdas take a \code{double}. That works because an \code{Estimate<double>} converts to its value wherever a
+\code{double} is expected. The conversion is convenient, but it has traps, which the next snippet shows:
 \snippet{07-using-expected}{estimate-pitfalls}
-First, \code{auto} deduces \code{Estimate<double>}, and \code{std::println} does not apply the conversion: print
-\code{e.value}. Second, \code{if (*r)} tests the value against zero, not whether \code{r} holds a result: the
-derivative of $\cos x$ at 0 is exactly 0, a good result that tests false. Clang with \code{-Wconversion -Werror}
+First, \code{auto} deduces \code{Estimate<double>}, and \code{std::println} does not apply the conversion. Print
+\code{e.value} instead. Second, \code{if (*r)} tests the value against zero, not whether \code{r} holds a result. The
+derivative of $\cos x$ at 0 is exactly 0: a good result, and it tests false. Clang with \code{-Wconversion -Werror}
 rejects that line; GCC accepts it without a warning. Third, \code{r.value()} is the accessor of \code{std::expected},
-not the estimate's member: it compiles, converts to \code{double} and works until the first failure, where it throws
-\code{std::bad_expected_access} (or terminates a program built without exceptions). Read \code{r->value} after the
-test. Fourth, \code{r.value_or(0.0)} does not compile, since no \code{double} converts to an \code{Estimate<double>};
-\code{r->abs_error.value_or(0.0)} does. And \code{int n = *r} truncates, with a \code{-Wfloat-conversion} warning on
-GCC and Clang. The rest of the book reads a result as \code{d->value} and Ridders' estimate as \code{*r->abs_error}.
+not the member of the estimate. It compiles, converts to \code{double}, and works until the first failure. There it
+throws \code{std::bad_expected_access}, or terminates a program built without exceptions. Read \code{r->value} after
+the test. Fourth, \code{r.value_or(0.0)} does not compile, since no \code{double} converts to an
+\code{Estimate<double>}; \code{r->abs_error.value_or(0.0)} does. And \code{int n = *r} truncates the value, with a
+\code{-Wfloat-conversion} warning on GCC and Clang. The rest of the book reads a result as \code{d->value}, and
+Ridders' estimate as \code{*r->abs_error}.
 
-\paragraph{Did it work, and is it right?} \code{if (d)} answers the first question only. A step on the wrong scale
-(\cref{sec:rounding-scale}), a function less accurate than $\epsmach$ (\cref{sec:rounding-noise}) or a break within a
-step of $x$ (\cref{sec:using-pitfalls}) give a wrong value without a failure; \cref{sec:using-check} shows how to
-check one. Ridders' method also returns a value whose own estimate says it is poor, near a bad point or at the
-resolution of $x$. Before a Ridders result is used where it matters, compare its estimate with the error you can
-accept, in two tolerances:
+\paragraph{Did it work, and is it right?} \code{if (d)} answers the first question only. Each of these gives a wrong
+value without a failure: a step on the wrong scale (\cref{sec:rounding-scale}), a function less accurate than
+$\epsmach$ (\cref{sec:rounding-noise}), and a break within a step of $x$ (\cref{sec:using-pitfalls}).
+\Cref{sec:using-check} shows how to check such a value. Ridders' method can also return a value whose own estimate
+says that it is poor: near a bad point, or at the resolution of $x$. Before you use a Ridders result where it
+matters, compare its estimate with the error that you can accept. The check uses two tolerances:
 \needspace{15\baselineskip}% the listing in one piece (stage-6 layout: its last three lines were stranded)
 \snippet{07-using-expected}{ridders-check}
-For a value reported to $n$ significant figures, \code{rtol} is $10^{-n}$; \code{atol}, the error you can accept in
-the derivative's units, decides near a zero of $f'$ (\cref{sec:using-check}). Inside an iteration no check is needed
-(\cref{sec:using-newton}). The check says that the estimate is small, not that the value is right where the estimate
-is blind, as at a kink (\cref{sec:using-pitfalls}).
+For a value that you report to $n$ significant figures, \code{rtol} is $10^{-n}$. \code{atol} is the error that you can accept, in the derivative's units, and it is the one
+that decides near a zero of $f'$ (\cref{sec:using-check}). Inside an iteration, no check is needed
+(\cref{sec:using-newton}). A passed check says only that the estimate is small. It does not say that the value is
+right where the estimate is blind, as at a kink (\cref{sec:using-pitfalls}).
 
 \section{Choosing a method}\label{sec:using-choosing}
 
 \Cref{tab:method-choice} is the decision table: find the row that describes your situation. Two rules cover most
-cases. Inside an iteration, where an error estimate would not be read, use a stencil with the default step:
-\code{Central<2>}, or \code{Central<4>} (medians \num{\valExpCentralTwoRelError} and \num{\valExpCentralFourRelError}
-for $\mathrm{e}^x$). For a value that will be reported, use Ridders' method: \num{\valRiddersEvalsMedianFirst}
-evaluations for $f'$ (median) against two to six for the stencils, about three more digits than \code{Central<2>}
-(\num{\valHeadlineRiddersFirstDigits} against \num{\valHeadlineFirstDigits}), as many as \code{Central<4>}, none over
-\code{Central<6>} (\cref{tab:accuracy-matrix}), and an estimate of its error. The other rows are the exceptions.
+cases. Inside an iteration, an error estimate would not be read. There, use a stencil with the default step:
+\code{Central<2>} or \code{Central<4>}. Their median errors for $\mathrm{e}^x$ are \num{\valExpCentralTwoRelError}
+and \num{\valExpCentralFourRelError}. For a value that you will report, use Ridders' method. It costs
+\num{\valRiddersEvalsMedianFirst} evaluations for $f'$ (the median), against two to six for the stencils. In return
+it gives about three more digits than \code{Central<2>} (\num{\valHeadlineRiddersFirstDigits} against
+\num{\valHeadlineFirstDigits}). That is as many as \code{Central<4>} gives, and no more than \code{Central<6>}
+(\cref{tab:accuracy-matrix}). And it gives an estimate of its error. The other rows of the table are the exceptions.
 
 \begin{table*}
-\caption{Choosing a method. Relative errors in double: the model $\epsmach^{P/(P+N)}$ of \cref{ch:stencils} where
-named, then measured values, medians for $\mathrm{e}^x$ (\cref{tab:accuracy-matrix}) or the nitrogen $\cp$ and this
-chapter's examples. Evaluations of $f'$ unless the row says otherwise; for Ridders' method the study's median and
-the cap (\cref{tab:cost}). $w$ is the scale on which $f$ varies, $\noise$ its relative accuracy. Above $f'$, \code{float} warns
-(\cref{sec:api-warning}).\label{tab:method-choice}}
+\caption{Choosing a method. The accuracies are relative errors in double. Where a cell names the model, it is the
+model $\epsmach^{P/(P+N)}$ of \cref{ch:stencils}; the other values are measured. They are medians for
+$\mathrm{e}^x$ (\cref{tab:accuracy-matrix}), or values for the nitrogen $\cp$ and this chapter's examples. The
+evaluations are those for $f'$ unless the row says otherwise. For Ridders' method they are the study's median and the
+cap (\cref{tab:cost}). $w$ is the scale on which $f$ varies, and $\noise$ is its relative accuracy. Above $f'$,
+\code{float} warns (\cref{sec:api-warning}).\label{tab:method-choice}}
 \centering\footnotesize
 \begin{tabular}{@{}>{\raggedright}p{31mm}>{\raggedright}p{27mm}>{\raggedright}p{21mm}>{\raggedright}p{15mm}%
 >{\raggedright}p{39mm}>{\raggedright\arraybackslash}p{19mm}@{}}
@@ -112,19 +122,19 @@ Inside an iteration; $f$ smooth and cheap & \code{Central<2>}, or \code{Central<
   model $\epsmach^{2/3} = \num{\valModelCentralTwoFirstDouble}$, measured median \num{\valExpCentralTwoRelError};
   \code{Central<4>} \num{\valExpCentralFourRelError} & \cref{fig:default-step-accuracy}, \cref{tab:accuracy-matrix}\\
 A value to report, with an error estimate & \code{Ridders} & default initial step & \num{\valRiddersEvalsMedianFirst},
-  at most \num{\valRiddersMaxEvalsFirst} & about \num{\valHeadlineRiddersFirstDigits} digits; estimate covers in
-  \SI{\valRiddersCoverageFirst}{\percent} of the study & \cref{fig:ridders-coverage}\\
+  at most \num{\valRiddersMaxEvalsFirst} & about \num{\valHeadlineRiddersFirstDigits} digits; the estimate covers the error
+  in \SI{\valRiddersCoverageFirst}{\percent} of the study & \cref{fig:ridders-coverage}\\
 $f$ defined on one side of $x$ only (an edge of its domain or its validity range) & \code{Forward<P>} or
   \code{Backward<P>}, P = 2 or 4; with an error estimate, \code{ForwardRidders} or \code{BackwardRidders} & default
   & 3, or 5; with the estimate \num{\valForwardRiddersEvalsMedianFirst}, at most
   \num{\valForwardRiddersMaxEvalsFirst} & \num{\valExpForwardTwoRelError} (P = 2); with the estimate
-  \num{\valExpForwardRiddersFirstRelError}, which covers in \SI{\valForwardRiddersCoverageFirst}{\percent} of the
-  study & \cref{fig:one-sided}, \cref{sec:stencils-one-sided,sec:ridders-onesided}\\
+  \num{\valExpForwardRiddersFirstRelError}, whose estimate covers the error in
+  \SI{\valForwardRiddersCoverageFirst}{\percent} of the study & \cref{fig:one-sided}, \cref{sec:stencils-one-sided,sec:ridders-onesided}\\
 $f$ varies on a scale $w$ much smaller than $\abs{x}$, or $\abs{x} \ll 1$ in your units & \code{Central<2>}, or
   \code{Ridders} from $h = w/4$ & $\epsmach^{1/3} w$ & 2, or Ridders' \num{\valRiddersEvalsMedianFirst} &
   \num{\valScaleFitRelError}, against
   \num{\valScaleDefaultRelError} with the default step & \cref{fig:step-scale,fig:step-scale-small}\\
-$f$ is the output of an iterative solver, accurate to $\noise$ only (noisy) & \code{Central<2>} & $\noise^{1/3}
+$f$ is the output of an iterative solver, accurate only to $\noise$ (noisy) & \code{Central<2>} & $\noise^{1/3}
   \max(\abs{x}, 1)$ & 2 & model $\noise^{2/3} = \num{\valSolverModelFitRelError}$, measured
   \num{\valSolverFitRelError} for $\noise = 10^{-10}$, against \num{\valSolverDefaultRelError} with the default step;
   Ridders' estimate is optimistic & \cref{fig:noise}, \cref{sec:using-solver}\\
@@ -137,8 +147,9 @@ A third or fourth derivative & \code{Ridders}, or \code{Central<4>}; never float
 A wide type (50 digits) & \code{Central<6>} or \code{Ridders} & default & 6, or \num{\valMpRiddersEvals} &
   \num{\valMpCentralSixRelError}; Ridders \num{\valMpRiddersRelError} & \cref{sec:using-types}\\
 A kink or a range break within a step of $x$ & none: differentiate one side, with \code{Forward<P>} or
-  \code{Backward<P>}, or with an estimate \code{ForwardRidders} or \code{BackwardRidders} & default & as above & any
-  method across the break returns a wrong value; only Ridders' estimate shows a jump, nothing shows a kink at $x$ &
+  \code{Backward<P>}, or with an estimate \code{ForwardRidders} or \code{BackwardRidders} & default & as above & every
+  method that samples across the break returns a wrong value; only Ridders' estimate shows a jump, and nothing shows
+  a kink at $x$ &
   \cref{fig:kink}\\
 \bottomrule
 \end{tabular}
@@ -146,299 +157,339 @@ A kink or a range break within a step of $x$ & none: differentiate one side, wit
 
 \section{Worked examples}\label{sec:using-examples}
 
+This section works through three problems from engineering practice: a temperature found by Newton's method, the
+sensitivities of a rate constant together with the Jacobian of a set of balances, and the derivative of a function
+that a solver computes.
+
 \subsection{Newton's method for a temperature}\label{sec:using-newton}
 
-An energy balance often gives the enthalpy of a stream and asks for its temperature: solve $\enth(T) = H^\ast$ for
-$T$. Newton's method needs the slope $\deriv{\enth}{T} = \cp$, which \code{derivative} supplies. This is the classic
-use of a derivative inside an iteration, so the method is the default \code{Central<2>}, applied to the nitrogen
-enthalpy \code{H(T)}. A failed slope and a failure to converge are both returned as errors, so a caller cannot take an
-unconverged temperature for a solution:
+An energy balance often gives the enthalpy of a stream and asks for its temperature. We must then solve
+$\enth(T) = H^\ast$ for $T$. Newton's method needs the slope $\deriv{\enth}{T} = \cp$ at each iteration, and
+\code{derivative} supplies it. This is the classic use of a derivative inside an iteration, so the method is the
+default, \code{Central<2>}, applied to the nitrogen enthalpy \code{H(T)}. The solver returns two kinds of failure as
+errors: a failed slope, and a failure to converge. So a caller cannot mistake an unconverged temperature for a
+solution:
 \snippet{07-using-newton}{newton}
 Started at \SI{\valNewtonStart}{K} for the enthalpy of \SI{1000}{K}, it converges in \num{\valNewtonIterations}
-iterations to within \SI{\valNewtonFinalError}{K} (measured, \cref{fig:newton}); the final residual,
-\SI{\valNewtonFinalResidual}{\joule\per\mole}, is the rounding of $\enth$ itself. A slope that is off by a relative
-$\delta$ adds a term of about $\delta$ times the error to each step (Dennis and Schnabel,\cite{dennis1996}
-Chapter 5), and a $\delta$ near
-\num{\valCpDefaultRelError} is far too small to slow the convergence before rounding stops it. Each iteration costs
-three evaluations of $\enth$; Ridders' method would cost \num{\valCpRiddersEvals} per slope and buy nothing the
-iteration can use.
+iterations, to within \SI{\valNewtonFinalError}{K} (measured, \cref{fig:newton}). The final residual, the amount by
+which $\enth(T)$ misses $H^\ast$, is \SI{\valNewtonFinalResidual}{\joule\per\mole}: the rounding of $\enth$ itself.
+
+Why does a slope with an error do no harm? A slope that is off by a relative $\delta$ adds a term of about $\delta$
+times the error to each step (Dennis and Schnabel,\cite{dennis1996} Chapter 5). Here $\delta$ is near
+\num{\valCpDefaultRelError}, far too small to slow the convergence before rounding stops it. Each iteration costs
+three evaluations of $\enth$: two for the slope, and one for the residual. Ridders' method would cost
+\num{\valCpRiddersEvals} per slope, and buy nothing that the iteration can use.
 % The margin figure is anchored after the paragraph that cites it so that it does not share a page with the
 % full-width Table 7.1 (stage-7 layout check).
 \begin{marginfigure}
 \centering
 \input{figures/07-using-newton}
-\caption{Newton's residual $\abs{\enth(T) - H^\ast}$ against the iteration, with the slope from \code{Central<2>}:
-the correct digits double at each step until the residual reaches the rounding of $\enth$.\label{fig:newton}}
+\caption{Newton's residual $\abs{\enth(T) - H^\ast}$ against the iteration, with the slope from \code{Central<2>}.
+The number of correct digits doubles at each step, until the residual reaches the rounding of
+$\enth$.\label{fig:newton}}
 \end{marginfigure}
 
 \subsection{Parameter sensitivities and a Jacobian}\label{sec:using-sensitivity}
 
-A sensitivity is a derivative of a model output with respect to one input, the others held fixed. Take an Arrhenius
-rate constant, $k = A\,\mathrm{e}^{-E_a/(\Rgas T)}$, with the illustrative values $A = \SI{e10}{\per\second}$,
-$E_a = \SI{80}{\kilo\joule\per\mole}$ and $T = \SI{600}{K}$, as a function \code{rate(A, Ea, T)} of three
-arguments. \code{derivative} differentiates a function of one; a lambda that captures the other two makes one:
+A sensitivity is the derivative of a model output with respect to one input, with the other inputs held fixed. Take
+an Arrhenius rate constant, $k = A\,\mathrm{e}^{-E_a/(\Rgas T)}$, with the illustrative values
+$A = \SI{e10}{\per\second}$, $E_a = \SI{80}{\kilo\joule\per\mole}$ and $T = \SI{600}{K}$. We write it as a function
+\code{rate(A, Ea, T)} of three arguments. \code{derivative} differentiates a function of one argument. A lambda that
+captures the other two arguments makes one:
 \snippet{07-using-sensitivity}{sensitivity}
-These are values to report, so the method is Ridders'. Against the closed forms $\partial k/\partial T = k
-E_a/(\Rgas T^2)$ and $\partial k/\partial E_a = -k/(\Rgas T)$ the measured relative errors are
+These are values to report, so the method is Ridders'. The closed forms are $\partial k/\partial T = k
+E_a/(\Rgas T^2)$ and $\partial k/\partial E_a = -k/(\Rgas T)$. Against them, the measured relative errors are
 \num{\valSensitivityRateRelError} and \num{\valSensitivityEaRelError}, each below its estimate. Engineers usually
-report the scaled sensitivity $\deriv{\ln k}{\ln E_a} = (E_a/k)\,\partial k/\partial E_a$, the relative change of $k$
-per relative change of $E_a$, which is dimensionless; here it is \num{\valSensitivityScaled}, as the exact
-$-E_a/(\Rgas T)$: a small relative error in the activation energy reaches the rate magnified by that factor. The
-sensitivities to all the parameters are the same call in a loop, whose lambda replaces one parameter and keeps the
-rest:
+report the scaled sensitivity $\deriv{\ln k}{\ln E_a} = (E_a/k)\,\partial k/\partial E_a$ instead. It is the
+relative change of $k$ per relative change of $E_a$, and it is dimensionless. Here it is \num{\valSensitivityScaled},
+as is the exact $-E_a/(\Rgas T)$. So a small relative error in the activation energy reaches the rate magnified by
+that factor. The sensitivities to all the parameters are the same call in a loop. Its lambda replaces one parameter
+and keeps the rest:
 \snippet{07-using-sensitivity}{jacobian}
-The cost is the sum over the parameters: \num{\valJacobianEvals} evaluations, of which \num{\valJacobianEvalsA} for
-$A$ (the rate is linear in $A$, so the first extrapolated entry agrees exactly with its parent and the method stops)
-and \num{\valJacobianEvalsEa} for $E_a$.
+The cost is the sum over the parameters: \num{\valJacobianEvals} evaluations in all. Of these,
+\num{\valJacobianEvalsA} are for $A$. The rate is linear in $A$, so the first extrapolated entry agrees exactly with
+its parent, and the method stops. And \num{\valJacobianEvalsEa} are for $E_a$.
 
 \paragraph{The Jacobian of a set of balances.} Newton's method for several unknowns needs the Jacobian of several
-residuals, which a model usually returns from one call. Take an energy balance $r_1 = n\,\enth(T) - Q$ and an
-ideal-gas pressure $r_2 = n \Rgas T / V - P$ in the unknowns $T$ and $n$, at $T = \SI{1000}{K}$, $n = \SI{2}{mol}$,
-$V = \SI{1}{\metre\cubed}$, with $Q$ and $P$ such that both vanish there. The library differentiates a function of
-one argument with one value, so it supports one way today: one \code{derivative} call per entry, on a lambda that
-evaluates the whole model with one unknown varied, $m \times n$ calls each costing two model evaluations with
-\code{Central<2>}: \num{\valJacobianBalanceCallEvals} model evaluations here, against
-\num{\valJacobianBalanceHandEvals} by hand (snippet \code{jacobian-by-calls} in \code{code/07-using-jacobian.cpp}). For an expensive model, apply the central difference of \cref{ch:taylor} to the
-whole vector yourself, two model calls per unknown, as in the loop of \code{jacobian(r, x)} in the same file, which
-fills \code{J[i][j]} $= \partial r_i / \partial x_j$:
+residuals, and a model usually returns all its residuals from one call. Take an energy balance
+$r_1 = n\,\enth(T) - Q$ and an ideal-gas pressure $r_2 = n \Rgas T / V - P$, in the unknowns $T$ and $n$. We work at
+$T = \SI{1000}{K}$, $n = \SI{2}{mol}$ and $V = \SI{1}{\metre\cubed}$, with $Q$ and $P$ chosen so that both residuals
+vanish there. The library differentiates a function of one argument with one value. So today it supports one way:
+one \code{derivative} call per entry of the Jacobian, on a lambda that evaluates the whole model with one unknown
+varied. That makes $m \times n$ calls, each costing two model evaluations with \code{Central<2>}. Here that is
+\num{\valJacobianBalanceCallEvals} model evaluations, against \num{\valJacobianBalanceHandEvals} by hand (snippet
+\code{jacobian-by-calls} in \code{code/07-using-jacobian.cpp}). For an expensive model, apply the central difference
+of \cref{ch:taylor} to the whole vector of residuals yourself, at two model calls per unknown. The loop of
+\code{jacobian(r, x)} in the same file does this; it fills \code{J[i][j]} $= \partial r_i / \partial x_j$:
 \snippet{07-using-jacobian}{jacobian-balances}
 Here that is \num{\valJacobianBalanceHandEvals} model calls, with steps of \SI{\valJacobianBalanceStepT}{K} and
-\SI{\valJacobianBalanceStepN}{mol}, and every entry is within \num{\valJacobianBalanceHandMaxRelError} of the closed
-forms $n \cp$, $\enth$, $n \Rgas / V$ and $\Rgas T / V$ (measured; \num{\valJacobianBalanceCallMaxRelError} by the
-calls). The loop is the formula without the library's checks: it neither detects a non-finite residual nor divides
-by the distance actually evaluated, so test the residuals it returns.
+\SI{\valJacobianBalanceStepN}{mol}. Every entry is within \num{\valJacobianBalanceHandMaxRelError} of the closed
+forms $n \cp$, $\enth$, $n \Rgas / V$ and $\Rgas T / V$ (measured; the calls give
+\num{\valJacobianBalanceCallMaxRelError}). The loop is the bare formula, without the library's checks. It does not
+detect a non-finite residual, and it does not divide by the distance actually evaluated. So test the residuals that
+it returns.
 
 \subsection{A function with no formula: a friction factor}\label{sec:using-solver}
 
-The nitrogen enthalpy has a closed-form derivative; most functions in practice do not. The Darcy friction factor
-$\lambda$ of turbulent flow in a rough pipe follows from the Colebrook equation, in its common
-form,\cite{colebrook1939}
+The nitrogen enthalpy has a closed-form derivative, but most functions in practice do not. The Darcy friction factor
+$\lambda$ of turbulent flow in a rough pipe is an example. It follows from the Colebrook equation, which reads, in its
+common form,\cite{colebrook1939}
 \begin{equation}
   \frac{1}{\sqrt{\lambda}} = -2 \log_{10}\left(\frac{10^{-4}}{3.7} + \frac{2.51}{\mathit{Re}\,\sqrt{\lambda}}\right)
   \label{eq:using-colebrook}
 \end{equation}
-for a relative roughness of $10^{-4}$, with no closed form: $\lambda(\mathit{Re})$ is computed by an inner iteration,
-here bisection on $1/\sqrt{\lambda}$ to a relative tolerance $\noise$.
+for a relative roughness of $10^{-4}$. This equation has no closed-form solution for $\lambda$. Instead,
+$\lambda(\mathit{Re})$ is computed by an inner iteration: here, bisection on $1/\sqrt{\lambda}$ to a relative
+tolerance $\noise$.\mnote{\emph{Bisection} finds a root of an equation by halving, again and again, an interval
+that contains it.}
 \snippetheader{colebrook}{implicit-function}
-The output of such a solver is accurate to about its tolerance, not to machine epsilon: at
-$\mathit{Re} = 10^5$ with $\noise = 10^{-10}$ it is \num{\valSolverFrictionNoise}
-off, relative, and it changes in steps as $\mathit{Re}$ moves. That is the noisy function of \cref{sec:rounding-noise},
-and its cure applies: the step $\noise^{1/3} s$ instead of the default $\epsmach^{1/3} s$.
+The output of such a solver is accurate to about its tolerance, not to machine epsilon. At $\mathit{Re} = 10^5$ with
+$\noise = 10^{-10}$, it is \num{\valSolverFrictionNoise} off, relative. And it changes in steps as $\mathit{Re}$
+moves. That is the noisy function of \cref{sec:rounding-noise}, and the cure from there applies: the step
+$\noise^{1/3} s$ instead of the default $\epsmach^{1/3} s$.
 \snippet{07-using-solver}{implicit-derivative}
-The fitted step is the one to use; the default step and Ridders' estimate both assume $f$ accurate to $\epsmach$. The
-answer key is the implicit-function derivative of \cref{eq:using-colebrook} at its root, found to machine precision by
-Newton's method. With $h = \noise^{1/3}\,\mathit{Re}$, about \num{\valSolverFitStep}, the relative error is
-\num{\valSolverFitRelError}, inside the model's $\noise^{2/3} = \num{\valSolverModelFitRelError}$ (measured); with
-the default step, \num{\valSolverDefaultStep} in units of $\mathit{Re}$, it is \num{\valSolverDefaultRelError}, the
-rounding branch $\noise \abs{\lambda} / h$ at a step much too small. Ridders' estimate happened to cover its error of
-\num{\valSolverDerivRelError} here, but over \num{\valNoiseRiddersCases} random points of a function with relative
-noise $10^{-8}$ it covered only \SI{\valNoiseEightRiddersCoverage}{\percent} of the cases (\cref{sec:rounding-noise}).
-Here $\noise$ is known, because the tolerance is on the output itself. When a solver's test is on a residual
-instead, measure $\noise$ with the recipe of \cref{sec:rounding-noise}: on this solver it returns
-\num{\valNoiseEstimateFriction} relative (the actual deviation is \num{\valNoiseEstimateFrictionActual}) from
-\num{\valNoiseEstimateEvals} evaluations.
+The fitted step is the one to use, because the default step and Ridders' estimate both assume that $f$ is accurate to
+$\epsmach$. The answer key is the derivative that follows from differentiating \cref{eq:using-colebrook}
+implicitly, at its root, found to machine precision by Newton's method. With $h = \noise^{1/3}\,\mathit{Re}$, about
+\num{\valSolverFitStep}, the relative error is \num{\valSolverFitRelError}. That is inside the model's
+$\noise^{2/3} = \num{\valSolverModelFitRelError}$ (measured). With the default step, \num{\valSolverDefaultStep} in
+units of $\mathit{Re}$, the error is \num{\valSolverDefaultRelError}. That is the rounding branch
+$\noise \abs{\lambda} / h$ of the error, at a step much too small. Ridders' estimate happened to cover its error of
+\num{\valSolverDerivRelError} here. But over \num{\valNoiseRiddersCases} random points of a function with relative
+noise $10^{-8}$, it covered only \SI{\valNoiseEightRiddersCoverage}{\percent} of the cases
+(\cref{sec:rounding-noise}). Here $\noise$ is known, because the solver's tolerance is on the output itself. When a
+solver's test is on a residual instead, measure $\noise$ with the recipe of \cref{sec:rounding-noise}. On this
+solver, the recipe returns \num{\valNoiseEstimateFriction} relative (the actual deviation is
+\num{\valNoiseEstimateFrictionActual}), from \num{\valNoiseEstimateEvals} evaluations.
 
-A solver can also be smooth but wrong by its tolerance, and then no method and no estimate can see it: Ridders' method
-on a fixed-point iteration stopped at the same tolerance was \num{\valSolverFixedPointRiddersRelError} off with a
-relative estimate of only \num{\valSolverFixedPointRiddersRelEstimate} (measured). Converge the inner solver well
-below the accuracy you want of the derivative, or differentiate the converged equations implicitly.
+A solver can also be smooth but wrong by its tolerance. Then no method and no estimate can see the error. Ridders'
+method on a fixed-point iteration\mnote{A \emph{fixed-point iteration} solves $x = g(x)$ by repeating
+$x \leftarrow g(x)$.} stopped at the same tolerance was
+\num{\valSolverFixedPointRiddersRelError} off, with a relative estimate of only
+\num{\valSolverFixedPointRiddersRelEstimate} (measured). Converge the inner solver well below the accuracy that you
+want of the derivative, or differentiate the converged equations implicitly.
 
 \section{Is my derivative good enough?}\label{sec:using-check}
 
-A stencil returns no error estimate. Four checks, in increasing cost, tell you whether to trust it. The first three
-use the nitrogen $\cp$ at $T_0 = \SI{1000}{K}$ and count the whole decimal digits on which two values agree, the
-integer part of $-\log_{10}(\abs{a - b} / \abs{b})$, with a helper \code{digits(a, b)}.
+A stencil returns no error estimate. Four checks, in increasing order of cost, tell you whether to trust its value.
+The first three use the nitrogen $\cp$ at $T_0 = \SI{1000}{K}$. They count the whole decimal digits on which two
+values agree, that is, the integer part of $-\log_{10}(\abs{a - b} / \abs{b})$, with a helper \code{digits(a, b)}.
 
-\paragraph{Repeat with $2h$ and $h/2$.} While truncation dominates, halving the step quarters the error of
-\code{Central<2>}; while rounding dominates, it doubles it. Values that agree to many digits at $h$, $2h$ and $h/2$ are
-accurate to about that many. \code{default_step<M, N>(x)} returns the step that the call without one uses
-(\cref{sec:api-derivative}):
-\needspace{16\baselineskip}% the listing in one piece (stage-6 layout)
+\paragraph{Repeat with $2h$ and $h/2$.} While truncation dominates the error, halving the step quarters the error of
+\code{Central<2>}, whose truncation error is proportional to $h^2$. While rounding dominates, halving the step doubles
+the error, since the rounding error is proportional to $1/h$. So values that agree to many digits at $h$, $2h$ and
+$h/2$ are accurate to about that many digits. \code{default_step<M, N>(x)} returns the step that the call without a
+step uses (\cref{sec:api-derivative}):
+\needspace{4\baselineskip}% the lead-in with the listing (stage-6 layout); at 16 lines, after the language pass, the
+% guard moved the listing off a page that had room for it and left half the page blank
 \snippet{07-using-check}{check-by-steps}
-Here they agree to \num{\valCheckStepsDigits} digits, and the value agrees with the closed form to
-\num{\valCheckExactDigits} (measured). A jump inside the span does not survive this check: a jump $J$ adds $J / (2h)$
-to the central difference, which doubles as the step halves. A kink at $x$ does: every step returns the mean of the
-two slopes (\cref{sec:ridders-trust}).
+Here the three values agree to \num{\valCheckStepsDigits} digits, and the value agrees with the closed form to
+\num{\valCheckExactDigits} (measured). A jump inside the span, the interval that the stencil samples, does not survive
+this check. A jump $J$ adds $J / (2h)$ to the central difference, and this term doubles as the step halves, so the
+three values disagree. A kink at $x$ does survive the check: every step returns the mean of the two slopes
+(\cref{sec:ridders-trust}).
 
-\paragraph{Use a rule of higher order.} \code{Central<4>}, with its own default step and a much smaller error, agrees
-with \code{Central<2>} to \num{\valCheckOrderDigits} digits here, which measures the latter's error.
+\paragraph{Use a rule of higher order.} \code{Central<4>} has its own default step and a much smaller error. Here it
+agrees with \code{Central<2>} to \num{\valCheckOrderDigits} digits. Since its own error is much smaller, this
+agreement measures the error of \code{Central<2>}.
 
 
-\paragraph{Ask Ridders' method.} It gives an independent value with an estimate of its own error:
+\paragraph{Ask Ridders' method.} It gives an independent value, with an estimate of its own error:
 \snippet{07-using-check}{check-by-ridders}
 Its estimate, \SI{\valCheckRiddersEstimate}{\joule\per\mole\per\kelvin}, belongs to Ridders' value, not to the
-stencil's. But when it is small, the difference $\abs{d - r} = \SI{\valCheckRiddersDiff}{\joule\per\mole\per\kelvin}$
-is the stencil's error to within Ridders' own error, \SI{\valCpRiddersActual}{\joule\per\mole\per\kelvin} here, below
-its estimate; the stencil's actual error is \SI{\valCheckStencilActual}{\joule\per\mole\per\kelvin}.
+stencil's. But when the estimate is small, the difference
+$\abs{d - r} = \SI{\valCheckRiddersDiff}{\joule\per\mole\per\kelvin}$ is the stencil's error, to within Ridders' own
+error. Here Ridders' own error is \SI{\valCpRiddersActual}{\joule\per\mole\per\kelvin}, below its estimate. The
+stencil's actual error is \SI{\valCheckStencilActual}{\joule\per\mole\per\kelvin}.
 
-\paragraph{Where $f'$ is near zero, judge the absolute error.} Near a stationary point of $f$ few digits of $f'$ can
-agree although the derivative is accurate, because the error of the rule scales with $\abs{f}$, not with $\abs{f'}$.
-For $\sin x$ just above $\pi/2$, \code{Central<2>} gives $f' = \num{\valCheckSineDerivative}$ with an absolute error
-of only \num{\valCheckSineAbsError}, in units of $f$ per unit $x$, while the three values at $h$, $2h$ and $h/2$
-agree in only \num{\valCheckSineDigitsDerivative} digits of the small slope (measured, \code{check-absolute} in
-\code{code/07-using-check.cpp}). Compare the spread with $\abs{f} / \max(\abs{x}, 1)$, not with $f'$.
+\paragraph{Where $f'$ is near zero, judge the absolute error.} Near a stationary point of $f$, where $f' = 0$, few
+digits of $f'$ may agree although the derivative is accurate. The reason is that the error of the rule scales with
+$\abs{f}$, not with $\abs{f'}$. Take $\sin x$ just above $\pi/2$. There \code{Central<2>} gives
+$f' = \num{\valCheckSineDerivative}$, with an absolute error of only \num{\valCheckSineAbsError}, in units of $f$ per
+unit $x$. Yet the three values at $h$, $2h$ and $h/2$ agree in only \num{\valCheckSineDigitsDerivative} digits of the
+small slope (measured, \code{check-absolute} in \code{code/07-using-check.cpp}). So compare the spread of the values
+with $\abs{f} / \max(\abs{x}, 1)$, not with $f'$.
 
-Finally, a physical check costs nothing: a heat capacity is positive, a reaction rate grows with temperature; a
-derivative of the wrong sign is wrong whatever the digits say.
+Finally, a physical check costs nothing. A heat capacity is positive, and a reaction rate grows with temperature. A
+derivative of the wrong sign is wrong, whatever the digits say.
 
 \section{User-defined and multiprecision types}\label{sec:using-types}
 
-\code{derivative} works on any type that satisfies the concept \code{nxx::real}, which includes the
-\code{numeric_limits} members the library reads: the built-in floating-point types, Boost.Multiprecision's numbers,
-or a type of your own (\cref{sb:expression-templates}; \cref{sec:api-real} gives the list). The algorithms use only
-$+$, $-$, $\times$, $/$, comparisons and \code{numeric_limits}, so a 50-digit type gets 50-digit derivatives:
+\code{derivative} works on any type that satisfies the concept \code{nxx::real}.\mnote{A C++ \emph{concept} is a
+named set of requirements on a type, which the compiler checks.} The concept includes the members of
+\code{numeric_limits}, the standard description of a number type, that the library reads. The built-in
+floating-point types satisfy it, and so do Boost.Multiprecision's numbers, or a type of your own
+(\cref{sb:expression-templates}; \cref{sec:api-real} gives the list). The algorithms use only $+$, $-$, $\times$,
+$/$, comparisons and \code{numeric_limits}. So a 50-digit type gets 50-digit derivatives:
 \snippet{07-using-multiprecision}{multiprecision}
-With \code{cpp_bin_float_50}, whose machine epsilon is \num{\valEpsMultiprecision}, \code{Central<6>} at its default
-step is \num{\valMpCentralSixRelError} off, relative, and Ridders' method \num{\valMpRiddersRelError} with a relative
-estimate of \num{\valMpRiddersRelEstimate} after \num{\valMpRiddersEvals} evaluations (measured on $\mathrm{e}^x$ at
-1). \code{Central<2>} would stop at \num{\valMpCentralTwoRelError}: a wide type is where the higher orders pay
-(\cref{tab:accuracy-matrix}). Two rules apply with every Boost type. In arithmetic, write \code{mp50(*r)} or
-\code{r->value}: Boost's operators do not see the conversion of an \code{Estimate}. And give a lambda an explicit
-\code{-> mp50}: the library converts a result at once, so an expression
-over the parameter alone is safe, but one over the lambda's own locals would refer to destroyed values
-(\cref{sb:expression-templates}); the explicit type is always safe.
+Take \code{cpp_bin_float_50}, whose machine epsilon is \num{\valEpsMultiprecision}. With it, \code{Central<6>} at its
+default step is \num{\valMpCentralSixRelError} off, relative. Ridders' method is \num{\valMpRiddersRelError} off, with
+a relative estimate of \num{\valMpRiddersRelEstimate}, after \num{\valMpRiddersEvals} evaluations (measured on
+$\mathrm{e}^x$ at 1). \code{Central<2>} would stop at \num{\valMpCentralTwoRelError}. A wide type is where the higher
+orders pay (\cref{tab:accuracy-matrix}). Two rules apply with every Boost type. First, in arithmetic, write
+\code{mp50(*r)} or \code{r->value}, because Boost's operators do not see the conversion of an \code{Estimate}.
+Second, give a lambda an explicit return type, \code{-> mp50}. The library converts a result at once, so an
+expression over the parameter alone is safe. But an expression over the lambda's own locals would refer to destroyed
+values (\cref{sb:expression-templates}). The explicit type is always safe.
 
 \begin{sidebar}[label=sb:expression-templates]{Expression templates and user-defined real types}
-\code{nxx::real<T>} asks for \code{std::numeric_limits<T>} specialised as bounded, inexact and non-integer, with
-the \code{radix}, \code{digits}, \code{epsilon()}, \code{max()} and \code{denorm_min()} the algorithms read;
-construction from \code{int}, copying, a total order, and $+$, $-$, $\times$, $/$ and unary minus whose results
-\emph{convert} to T. A type that lacks one of these fails at the concept, at the call.
-\Cref{sec:api-real} quotes a minimal type that provides exactly these members. Exact types
-such as rationals are rejected, since \code{numeric_limits} marks them exact (and unbounded): their epsilon is 0 and
-they have no largest value, so neither the step nor the overflow checks would mean anything.
+\code{nxx::real<T>} asks for the following. \code{std::numeric_limits<T>} must be specialised as bounded, inexact and
+non-integer, with the members that the algorithms read: \code{radix}, \code{digits}, \code{epsilon()}, \code{max()}
+and \code{denorm_min()}. T must be constructible from \code{int}, copyable, and totally ordered, so that any two
+values compare. And $+$, $-$, $\times$, $/$ and unary minus must have results that \emph{convert} to T. A type that
+lacks one of these fails at the concept, at the call. \Cref{sec:api-real} quotes a minimal type that provides exactly
+these members. Exact types such as rationals are rejected, since \code{numeric_limits} marks them exact (and
+unbounded). Their epsilon is 0, and they have no largest value, so neither the step nor the overflow checks would mean
+anything.
 
-The results of the operators need not \emph{be} T: Boost.Multiprecision with expression templates (\code{et_on})
-returns from \code{a + b} an expression object that refers to its operands, which dangles once they are gone. The
-library never writes \code{auto} for an arithmetic result and converts the value of \code{fn} with
-\code{static_cast<T>} at once; \code{-> T} on a lambda does the same in user code. Boost's arithmetic operators are
-templates that do not consider the conversion of an \code{Estimate<T>}: \code{abs(*r - e)} does not compile, with or
-without expression templates, while \code{abs(T(*r) - e)} and \code{r->value - e} do.
+The results of the operators need not \emph{be} T. Boost.Multiprecision with expression templates (\code{et_on})
+returns from \code{a + b} an expression object, not a number. The object refers to its operands, and it dangles once
+they are gone: it then refers to values that no longer exist. The library never writes \code{auto} for an arithmetic
+result, and it converts the value of \code{fn} with \code{static_cast<T>} at once. In user code, \code{-> T} on a
+lambda does the same. Boost's arithmetic operators are templates that do not consider the conversion of an
+\code{Estimate<T>}. So \code{abs(*r - e)} does not compile, with or without expression templates, while
+\code{abs(T(*r) - e)} and \code{r->value - e} do.
 
 \end{sidebar}
 
 \section{At compile time}\label{sec:using-constexpr}
 
-\code{derivative} is \code{constexpr}: when \code{fn} can itself be evaluated at compile time, so can its derivative,
-and the result can feed a \code{static_assert} or a constant table. With a step that is a power of two, $x^3$ gives
-exact results in binary arithmetic, which makes the truncation error of \cref{ch:taylor} visible to the compiler:
+\code{derivative} is \code{constexpr}: the compiler can evaluate it.\mnote{A \code{constexpr} function can be
+evaluated by the compiler, when its arguments are known at compile time.} When \code{fn} can itself be evaluated at
+compile time, so can its derivative. The result can then feed a \code{static_assert}, a check that the compiler
+makes, or a constant table. With a step that is a power of two, $x^3$ gives exact results in binary arithmetic. That
+makes the truncation error of \cref{ch:taylor} visible to the compiler:
 \snippet{07-using-constexpr}{constexpr}
 Comparing the result with a value, as in \code{derivative(cube, 2.0, 0.25) == 12.0625}, compares \code{value} only,
-through the conversion, and is false when the result is a failure; the same idiom with \code{!=} would pass on a
-failure. Failures are values at compile time too: the nitrogen fit, written to return NaN below its validity range,
-gives \code{error::non_finite} for \code{Central<2>} at \SI{500}{K} and a value for \code{Forward<2>}, both checked by
-\code{static_assert} in \code{code/07-using-constexpr.cpp}. The one exception is an overflow of the final quotient,
-for example a fourth derivative with a tiny step: at run time it is \code{non_finite}, but GCC rejects it at compile
-time. Most of \code{<cmath>}, \code{exp} and \code{log} among them, is not \code{constexpr} in C++23, so such an
-\code{fn} is written with arithmetic only; the nitrogen enthalpy is. GCC evaluates some of them in constant
-expressions as an extension, which Clang and MSVC reject: test compile-time derivatives on every toolchain you ship.
+through the conversion. The comparison is false when the result is a failure. But the same idiom with \code{!=} would
+pass on a failure. Failures are values at compile time too. The nitrogen fit, written to return NaN below its
+validity range, gives \code{error::non_finite} for \code{Central<2>} at \SI{500}{K}, and a value for
+\code{Forward<2>}. Both results are checked by \code{static_assert} in \code{code/07-using-constexpr.cpp}. The one
+exception is an overflow of the final quotient, for example in a fourth derivative with a tiny step. At run time it
+gives \code{non_finite}, but GCC rejects it at compile time. Most of \code{<cmath>}, \code{exp} and \code{log} among
+them, is not \code{constexpr} in C++23. So such an \code{fn} must be written with arithmetic only, as the nitrogen
+enthalpy is. GCC evaluates some of these functions in constant expressions, as an extension, which Clang and MSVC
+reject. So test compile-time derivatives on every toolchain that you ship.
 
-The compiler and the processor compute the same value, provided the compiler neither contracts \code{a * b + c} into
-a fused multiply-add nor uses extended precision; the build pins neither, and the identity is verified on the five
-toolchains of the continuous integration (\cref{sec:guarantees-guarantees}). How the library avoids that arithmetic is
+The compiler and the processor compute the same value, provided that the compiler neither contracts
+\code{a * b + c} into a fused multiply-add nor uses extended precision.\mnote{A \emph{fused multiply-add} computes
+$ab + c$ with one rounding instead of two. \emph{Extended precision} keeps intermediate results with more digits than
+the type has.} The build pins neither: it sets no option for them. The identity is verified on the five toolchains of
+the continuous integration (\cref{sec:guarantees-guarantees}). How the library avoids the arithmetic that overflows is
 the subject of \cref{sb:constexpr-overflow}.
 
 \begin{sidebar}[label=sb:constexpr-overflow]{Overflow guards and constant evaluation}
-At run time an overflow gives an infinity and a failed check afterwards. In a constant expression it is worse: GCC
-rejects any floating-point overflow and any NaN, Clang a NaN and a division by zero, so a failure would become a
-compile error instead of an error value. The library therefore detects each failure before the arithmetic that would
-produce it: the input checks keep every point $x + k h$ at least about $K h$ below $\fmax$, with $K$ the largest
-node (a NaN $x$ fails them too); every difference and partial sum is tested before it is formed, by comparing
-$a/\beta + b/\beta$ with $\fmax/\beta$ ($\beta$ the radix), which is exact and cannot overflow, so the NaN of
-$\infty - \infty$ never arises; and the rounding floors of Ridders' method saturate at $\fmax$. The exception is the
-final quotient, with the repeated divisions by $h$ for $\dorder \ge 2$: guarding it exactly would need overflow tests
-accurate to the last unit, so it is checked afterwards, which GCC rejects in a constant expression.
+At run time, an overflow gives an infinity, and a check afterwards finds it. In a constant expression it is worse.
+GCC rejects any floating-point overflow and any NaN; Clang rejects a NaN and a division by zero. So a failure would
+become a compile error instead of an error value. The library therefore detects each failure before the arithmetic
+that would produce it. First, the input checks keep every point $x + k h$ at least about $K h$ below $\fmax$, the
+largest finite value of the type, with $K$ the largest node; a NaN $x$ fails them too. Second, every difference and
+partial sum is tested before it is formed. The test compares $a/\beta + b/\beta$ with $\fmax/\beta$, where $\beta$ is
+the radix, the base in which the type stores its numbers. This comparison is exact and cannot overflow, so the NaN of
+$\infty - \infty$ never arises. Third, the rounding floors of Ridders' method saturate at $\fmax$: they stop there
+instead of overflowing. The exception is the final quotient, with its repeated divisions by $h$ for $\dorder \ge 2$.
+Guarding it exactly would need overflow tests accurate to the last unit. So it is checked afterwards, which GCC
+rejects in a constant expression.
 \end{sidebar}
 
 \section{Pitfalls}\label{sec:using-pitfalls}
 
-Each pitfall below gives a wrong or missing result without a crash. Symptom first, then the cure.
+Each pitfall below gives a wrong or missing result without a crash. For each one we give the symptom first, then the
+cure.
 
 \paragraph{The step's scale.} The default step assumes that $f$ varies on the scale $\max(\abs{x}, 1)$ in your units.
 \emph{Symptom:} at a large $\abs{x}$ with a narrow feature, Ridders' method or a smaller step disagrees with the
-default; at a small $\abs{x}$ such as a mole fraction of $10^{-6}$, the step is larger than $x$ and the result is
+default. At a small $\abs{x}$, such as a mole fraction of $10^{-6}$, the step is larger than $x$, and the result is
 \code{non_finite} or crosses a physical bound. \emph{Cure:} pass $h = \epsmach^{1/3} w$, with $w$ the scale on which
 $f$ varies (\cref{fig:step-scale,fig:step-scale-small}).
 
-\paragraph{A kink or a range break inside the span.} A property model is often piecewise: two fits joined at a
-temperature, a phase boundary, an \code{if}. The published enthalpy of nitrogen uses one Shomate fit below
-\SI{\valKinkJunction}{K} and another above, and the two do not meet: $\enth$ jumps by
-\SI{\valKinkJumpEnthalpy}{\joule\per\mole} at \SI{\valKinkJunction}{K}.\cite{nist-webbook} Every method evaluates
-it without complaint \SI{1}{mK} above the break:
+\paragraph{A kink or a range break inside the span.} A property model is often piecewise, that is, made of pieces:
+two fits joined at a temperature, a phase boundary, an \code{if} in the code. The published enthalpy of nitrogen is
+an example. It uses one Shomate fit below \SI{\valKinkJunction}{K} and another above, and the two do not meet:
+$\enth$ jumps by \SI{\valKinkJumpEnthalpy}{\joule\per\mole} at \SI{\valKinkJunction}{K}.\cite{nist-webbook} Every
+method evaluates it without complaint \SI{1}{mK} above the break:
 \snippet{07-using-kink}{kink}
 \begin{marginfigure}
 \centering
 \input{figures/07-using-kink}
 \caption{Relative error of $\cp$ against the distance $\delta$ from the range break at \SI{\valKinkJunction}{K}.
-While the break lies inside a method's span, the error is a plateau of $J/h$ times the sum of the weights on one side
-of the break, $J$ the jump in $\enth$: $J/(2h)$ for \code{Central<2>} (\num{\valKinkInsideCentralRelError} relative,
-$h = \SI{\valKinkCentralStep}{K}$); $7J/(12h)$ for \code{Central<4>} while the break lies within $h$ of $x$
-(\num{\valKinkInsideCentralFourRelError}, $h = \SI{\valKinkCentralFourStep}{K}$) and $-J/(12h)$ between $h$ and $2h$,
-the two levels the figure shows. So it falls as $1/h$ across the rules, whatever their order. No rule fails; only
-Ridders' estimate (dashed) shows a jump.\label{fig:kink}}
+While the break lies inside a method's span, the error is a plateau. Its height is $J/h$ times the sum of the weights
+on one side of the break, where $J$ is the jump in $\enth$. For \code{Central<2>} it is $J/(2h)$
+(\num{\valKinkInsideCentralRelError} relative, $h = \SI{\valKinkCentralStep}{K}$). For \code{Central<4>} it is
+$7J/(12h)$ while the break lies within $h$ of $x$ (\num{\valKinkInsideCentralFourRelError},
+$h = \SI{\valKinkCentralFourStep}{K}$), and $-J/(12h)$ between $h$ and $2h$: the figure shows these two levels. So
+the error falls as $1/h$ across the rules, whatever their order. No rule fails; only Ridders' estimate (dashed) shows
+a jump.\label{fig:kink}}
 \end{marginfigure}
-All three calls succeed. \code{Central<2>} is \num{\valKinkInsideCentralRelError} off, relative (the jump over $2h$),
-and \code{Central<4>} \num{\valKinkInsideCentralFourRelError}: a higher order does not cure a function that is not
-smooth. Ridders' value is \num{\valKinkInsideRiddersRelError} off, but its estimate,
+All three calls succeed. \code{Central<2>} is \num{\valKinkInsideCentralRelError} off, relative: its error is the
+jump divided by $2h$. \code{Central<4>} is \num{\valKinkInsideCentralFourRelError} off. So a higher order does not
+cure a function that is not smooth. Ridders' value is \num{\valKinkInsideRiddersRelError} off. But its estimate,
 \SI{\valKinkInsideRiddersEstimate}{\joule\per\mole\per\kelvin} or \num{\valKinkInsideRiddersRelEstimate} of the
-value, is far above its usual size (\num{\valKinkOutsideRiddersRelEstimate} of the value away from the break): its
-extrapolation assumes an error expansion in even powers of $h$, which the break destroys, so the tableau's entries
-disagree. At \SI{\valKinkOutsideDelta}{K} from the break, outside every span, all three errors are at most
-\num{\valKinkOutsideCentralRelError} (measured, \cref{fig:kink}). Evaluable is not smooth. \emph{Symptom:} a large
-estimate from Ridders' method, or stencil values that change with the step; a kink at $x$ shows no symptom at all:
-central rules return the mean of the two slopes (\cref{sec:ridders-trust}). \emph{Cure:} know the branch
-boundaries, and differentiate the branch you mean: above a break with \code{Forward<P>}, or \code{ForwardRidders} for
-an error estimate; below it with \code{Backward<P>} or \code{BackwardRidders}; or call the branch's own function. At
-the break itself they return that side's derivative if $f(x)$ belongs to it.
+value, is far above its usual size, which is \num{\valKinkOutsideRiddersRelEstimate} of the value away from the
+break. The reason is that its extrapolation assumes an error expansion in even powers of $h$. The break destroys that
+expansion, so the entries of the tableau disagree. At \SI{\valKinkOutsideDelta}{K} from the break, outside every
+span, all three errors are at most \num{\valKinkOutsideCentralRelError} (measured, \cref{fig:kink}). Evaluable is not
+smooth: that a function can be evaluated does not make it smooth. \emph{Symptom:} a large estimate from Ridders'
+method, or stencil values that change with the step. A kink at $x$ shows no symptom at all, since central rules
+return the mean of the two slopes (\cref{sec:ridders-trust}). \emph{Cure:} know the branch boundaries, and
+differentiate the branch you mean. Above a break, use \code{Forward<P>}, or \code{ForwardRidders} for an error
+estimate. Below it, use \code{Backward<P>} or \code{BackwardRidders}. Or call the branch's own function. At the break
+itself, each of these returns the derivative of its own side, if $f(x)$ belongs to that side.
 
-\paragraph{A Ridders result that is a value but poor.} Near a bad point or at the resolution of $x$, Ridders'
-method can return a value whose own estimate is a large fraction of it. \emph{Symptom:} \code{*r->abs_error} far
-above the accuracy you need. \emph{Cure:} the check of \cref{sec:using-result}; a smaller initial step, or
+\paragraph{A Ridders result that is a value but poor.} Near a bad point, or at the resolution of $x$, Ridders'
+method can return a value whose own estimate is a large fraction of it. \emph{Symptom:} \code{*r->abs_error} is far
+above the accuracy that you need. \emph{Cure:} the check of \cref{sec:using-result}; a smaller initial step; or
 \code{ForwardRidders} or \code{BackwardRidders} at an edge.
 
 
 \paragraph{Aliasing.} A function that oscillates on a scale far below $\max(\abs{x}, 1)$ can lie about its slope
-at every sample: $\sin(64 \pi x)$ at $x = 0$, whose first levels sample only zeros (\cref{sb:aliasing}), or
-$\sin x$ at a large $\abs{x}$, where the default step spans many periods. \emph{Cure:} a step on the
-oscillation's scale.
+at every sample. One example is $\sin(64 \pi x)$ at $x = 0$, whose first levels sample only zeros
+(\cref{sb:aliasing}). Another is $\sin x$ at a large $\abs{x}$, where the default step spans many periods.
+\emph{Cure:} a step on the scale of the oscillation.
 
 \paragraph{A noisy function.} A solver's output, or any function whose error changes irregularly from one argument
 to the next, is accurate to $\noise$, not to $\epsmach$.
 \emph{Symptom:} the error with the default step is far above $\epsmach^{2/3}$, and Ridders' estimate is optimistic.
-\emph{Cure:} the step $\noise^{1/3} s$ (\cref{sec:using-solver}, \cref{sec:rounding-noise}).
+\emph{Cure:} the step $\noise^{1/3} s$
+(\cref{sec:using-solver}, \cref{sec:rounding-noise}).
 
-\paragraph{A domain edge.} Ridders' method restarts below a step at which $f$ is not finite, but needs the nearest
-bad point a minimum distance away. For $\log x$ with the default step for $f'$, a value is returned
-down to $x = 2^{-\num{\valRiddersEdgeLimitExponent}}$, with an estimate grown to flag the loss; ten correct digits
-hold only down to $x = 2^{-\num{\valRiddersEdgeTenDigitsExponent}}$ (measured, \cref{fig:ridders-edge}); closer,
-a NaN gives \code{non_finite}, a pole a flagged wrong value (\cref{sec:ridders-trust}). Exactly at
-an edge, use \code{ForwardRidders} or \code{BackwardRidders}
-(\cref{sec:ridders-onesided}), or \code{Forward<P>} or \code{Backward<P>} inside an iteration. A fit evaluated outside
-its range: wrap it to return NaN there, as \cref{sec:stencils-one-sided} does, so that such a sample fails
-loudly.
+\paragraph{A domain edge.} When $f$ is not finite at a step, Ridders' method restarts below that step. But it needs
+the nearest bad point to be a minimum distance away. Take $\log x$ with the default step for $f'$. A value is
+returned down to $x = 2^{-\num{\valRiddersEdgeLimitExponent}}$, with an estimate that has grown to flag the loss.
+Ten correct digits hold only down to $x = 2^{-\num{\valRiddersEdgeTenDigitsExponent}}$ (measured,
+\cref{fig:ridders-edge}). Closer to the edge, a NaN gives \code{non_finite}, and a pole, where $f$ grows without
+bound, gives a flagged wrong value (\cref{sec:ridders-trust}). Exactly at an edge, use \code{ForwardRidders} or
+\code{BackwardRidders} (\cref{sec:ridders-onesided}), or \code{Forward<P>} or \code{Backward<P>} inside an
+iteration. For a fit evaluated outside its range, wrap the fit so that it returns NaN there, as
+\cref{sec:stencils-one-sided} does. Then such a sample fails loudly.
 
-\paragraph{Derivatives above the first in float.} Few correct digits, and a compile-time warning by every method
-(\cref{sec:orders-float,sec:api-warning}).
-\emph{Cure:} double.
+\paragraph{Derivatives above the first in float.} They keep few correct digits, and every method gives a
+compile-time warning (\cref{sec:orders-float,sec:api-warning}).
+\emph{Cure:} use double.
 
 
-\paragraph{One step for several orders.} The default step differs per method and order, from $\epsmach^{1/3} s$ for
-$f'$ to $\epsmach^{1/6} s$ for $f''''$ with \code{Central<2>} (\cref{tab:default-steps}), since the rounding error
-grows as $\epsmach / h^N$; a step tuned for $f'$ leaves nothing of $f''''$. \emph{Cure:} in generic code that
-varies the order, pass no step.
+\paragraph{One step for several orders.} The default step differs per method and order. With \code{Central<2>}, it
+goes from $\epsmach^{1/3} s$ for $f'$ to $\epsmach^{1/6} s$ for $f''''$ (\cref{tab:default-steps}). It differs
+because the rounding error grows as $\epsmach / h^N$. So a step tuned for $f'$ leaves nothing of $f''''$.
+\emph{Cure:} in generic code that varies the order, pass no step.
 
 \section{What the library does not do}\label{sec:using-not}
 
-\code{nxx::deriv} differentiates a function, not a table. Tabulated data must be fitted or interpolated first, and the
-derivative is then the fit's: a linear interpolant has a piecewise-constant derivative and a kink at every node, so
-start from a smooth fit or a spline, and use the spline's own derivative when it offers one; numerically, keep the
-stencil within one interval, or accept the error of a kink (\cref{sec:using-pitfalls}).
+\code{nxx::deriv} differentiates a function, not a table. Tabulated data must first be fitted or interpolated, and
+the derivative is then that of the fit. A linear interpolant, which joins the points by straight lines, has a
+piecewise-constant derivative and a kink at every node. So start from a smooth fit or a spline,\mnote{A
+\emph{spline} is a chain of polynomials, joined smoothly at the nodes.} and use the spline's own derivative when it
+offers one. If you differentiate numerically, keep the stencil within one interval, or accept the error of a kink
+(\cref{sec:using-pitfalls}).
 
-\paragraph{Mixed partials and shared evaluations.} A mixed partial such as $\partial^2 A / \partial T \partial V$ is
-two nested calls, the outer one in $V$ on a lambda that calls the inner one in $T$, at the product of their costs.
-Let the lambda return the inner value, or a NaN when the inner call fails
-(\code{d ? d->value : std::numeric_limits<double>::quiet_NaN()}), so that the outer call reports \code{non_finite}.
-As a rule of thumb, the inner error, about $\epsmach^{2/3}$, is the noise level of the outer call: pass it the step
-$\epsmach^{2/9} \max(\abs{V}, 1)$ and expect about $\epsmach^{4/9}$, roughly $10^{-7}$ in double. Cache an
-expensive call's last argument and outputs so that its outputs share the evaluations.
+\paragraph{Mixed partials and shared evaluations.} A mixed partial derivative such as
+$\partial^2 A / \partial T \partial V$ takes two nested calls. The outer call is in $V$, on a lambda that calls the
+inner one in $T$. The cost is the product of their costs. Let the lambda return the inner value, or a NaN when the
+inner call fails (\code{d ? d->value : std::numeric_limits<double>::quiet_NaN()}). Then the outer call reports
+\code{non_finite}. As a rule of thumb, the inner error, about $\epsmach^{2/3}$, is the noise level of the outer call.
+The recipe for a noisy function then applies with $\noise = \epsmach^{2/3}$: pass the outer call the step
+$\epsmach^{2/9} \max(\abs{V}, 1)$, and expect an error of about $\epsmach^{4/9}$, roughly $10^{-7}$ in double.
+Finally, when an expensive call returns several outputs, cache its last argument and outputs, so that the outputs
+share the evaluations.
 
 

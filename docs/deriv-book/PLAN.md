@@ -30,6 +30,11 @@ the restart below the smallest step tried for every Ridders method, and the floa
 (`docs/PHASE5_API.md`, now in CLAUDE.md's ground truth). The author approved the update plan; section 12.8 records
 it with the editor's evidence step, and sections 1.1, 4.2 to 4.4, 5, 7 and 11 carry the additions.
 
+**Revision 6** (2026-10-26, the language pass, editor): the author asked for a tutorial voice for students who
+know calculus, with the structure and the content unchanged and no page limit; section 12.9 holds the rules, the
+checklist, the stage-A sample (Chapters 1 and 2) and the record of stage B (the whole book, the front matter and the
+integration read).
+
 How to read this plan: section 1 is what each author writes; sections 2 to 6 are the shared inventories (notation,
 sidebars, figures with their data sets, examples, references); section 7 says who owns what; section 8 fixes style
 beyond CLAUDE.md; section 9 is the schedule; section 10 resolves the brief's open questions and lists what the author
@@ -1146,3 +1151,199 @@ For the author: U-17, a library documentation note from D-18. `ForwardRidders`' 
 | P5-19 | Smaller items: B.3's wording (numerics-05); 10.1 "(measured)"; Figure 5.2's outline; Sidebar 6.3's "the double nearest to 64 pi" (generated); worst ratios that do not print 1.0 above 1; the AI statement's sentence on the update (Codex named, Cline not); Table 9.10's caption on the transcribed rules; 0.074 in E24's comment and section 5; E8's comment; the 16 paths `docs/...` of Chapters 3 to 6, 9, 10 and Appendix B now `docs/deriv/...` after the repository's reorganisation (1b4dda4) | `00-frontmatter.tex`, `05-orders.tex`, `figures/05-orders-order-accuracy.tex`, `09-tables.tex`, `code/06-ridders-onesided.cpp`, `code/05-orders-float.cpp`, the chapters named |
 
 D-21 (section 11 in brief): after 1b4dda4, `docs/deriv-book/CLAUDE.md` (the ground-truth list) and this plan's records name the deriv documents at their old paths (`docs/design.md`, `docs/PHASE2_API.md` to `docs/PHASE5_API.md`); the book's text now uses `docs/deriv/`. CLAUDE.md is for the author to update; the plan's historical records stay as written.
+
+### 12.9 Language pass for students (editor, 2026-10-26)
+
+**The request.** The author (2026-10-26): the book is good but heavy to read. Its wording should address
+undergraduates and graduate students who know calculus, in a tutorial style. The structure and the content stay; only
+the language changes. Length is no constraint ("Don't worry about the length of the book"): nothing is added or cut
+to manage length either way. CLAUDE.md was changed on the same day by the main session: its Audience line now names
+these students and the tutorial voice, and its Length line (60 to 90 pages) is gone, so the limits and the cut orders
+of section 1.1 no longer apply.
+
+**The reader.** A student who knows calculus (limits, derivatives, Taylor series with the Lagrange remainder, the
+intermediate value theorem) and can read C++, but has not studied numerical analysis or floating point. Part I reads
+like a good tutorial textbook. Part II stays a reference, in prose just as plain.
+
+**Process.** Stage A (this revision): this section, and Chapters 1 and 2 rewritten as the sample the author judges.
+Stage B, only after the author approves the sample: every other chapter, the appendices, the sidebars, the captions
+and the quick reference, by the same checklist; then the editor's files (the front matter's audience sentence, which
+still names practising engineers, and the AI statement, which must mention the pass; the glossary and notation stay
+as they are unless the author asks otherwise); then one integration read for one voice. Every file passes
+`tools/check_language_pass.py` against `3192e8a` and the full build before it is handed back.
+
+**Checklist.** Kept exactly (checked by `tools/check_language_pass.py <rev> <chapter files>`, which compares the
+sequences in order and fails on any difference; the editor reads its review lists):
+- [ ] the chapters, sections, sidebars, figures, tables and listings, in the same order, with the same labels and
+      the same titles (the contents and every cross-reference stay valid);
+- [ ] every displayed equation, character for character, its punctuation included: when a sentence is split around
+      a display, the text after it continues the sentence the display ends;
+- [ ] every `\val` macro, `\snippet` and `\snippetheader`, `\cite`, `\label`, `\cref` target, `\input`,
+      `\tablebody` and `\tablerows`, in the same order: no cross-reference is added, dropped or moved;
+- [ ] every claim, caveat and evidence tag (proven, measured, rule of thumb, style decision 7) and every hypothesis
+      of a guarantee (style decision 15); no claim, example, figure, data set, sidebar, table or listing is added,
+      none is dropped;
+- [ ] the notation of `macros.tex`, the terminology of style decision 4, British -ise spelling, ASCII sources.
+
+Changed, sentence by sentence:
+- [ ] one idea per sentence: break up stacked clauses, parentheticals and semicolon chains; a sentence that needs
+      a second reading is split;
+- [ ] signposting: a chapter or section opens by saying where it is going, and closes, where it helps, with what
+      we now know (one or two sentences, no new fact);
+- [ ] the step the reader would otherwise fill in is spelled out, in a phrase or a sentence, and only a step the
+      text already implies: the algebra between two displays, why a sign or a ratio follows, what an abstract rule
+      gives in the case at hand; such a step may add inline mathematics, which the script lists for review;
+- [ ] a term the text assumes is glossed at its first use: in the sentence, or with `\mnote` as the book already
+      does (a definition of one or two lines, the glossary's wording where it has one, no number and no claim about
+      the library); computing terms (exact to rounding, NaN, relative error, number type, correct digits), C++
+      terms (header-only, `noexcept`, `std::optional`, callable) and the domain terms an argument depends on
+      (Jacobian, kink, range break); where a margin float stands beside the sentence, the gloss goes in the text;
+- [ ] "we" walks through an argument, "you" makes the reader's choices; active voice; verbs instead of
+      nominalisations ("we measure every error", not "every error can be measured");
+- [ ] a compressed list of numbers in prose becomes sentences, every macro kept;
+- [ ] layout only where the new wording moves a page break: `\needspace` guards and float placement, recorded
+      in a comment; no change to the preamble.
+
+**Before and after** (the first three from the sample, the fourth from Chapter 10 to show the Part II voice; it is
+not yet applied):
+
+| Before | After |
+|---|---|
+| A finite difference needs only values of $f$ at real points. It works on any function the program can evaluate: a library call, a solver, legacy code. Its price is accuracy (about two thirds of the digits of the number type, `\cref{ch:rounding}`) and two or more evaluations of $f$. (1.2) | A finite difference needs only values of $f$ at real points. So it works on any function that the program can evaluate: a library call, a solver, legacy code. It has two prices. It is less accurate: it keeps about two thirds of the digits of the number type (`\cref{ch:rounding}`). And it needs two or more evaluations of $f$. (A margin note defines "number type".) |
+| This error is the truncation error: the error of the formula itself, with every number computed exactly, so called because it comes from truncating the Taylor series. (2.1) | This error is the truncation error. It is the error of the formula itself, even when every number is computed exactly. The name says where it comes from: we truncated the Taylor series. |
+| Take `rtol` $= 10^{-n}$ for a value reported to $n$ significant figures and `atol` as the error you can accept in the derivative's units, which is what decides near a zero of $f'$; inside an iteration no check is needed. (1.5) | Here `rtol` is a relative tolerance and `atol` an absolute one. Take `rtol` $= 10^{-n}$ for a value that you report to $n$ significant figures. Take `atol` as the error you can accept, in the derivative's units. Near a zero of $f'$ the relative part of the tolerance shrinks to almost nothing, so `atol` is what decides there. Inside an iteration, no such check is needed. |
+| The median matters: the rounding part of the error at a single point is a matter of luck by about a factor of ten, as `Central<2>` for $f'$ shows with `\valExpCentralTwoAtOneRelError` at $x = 1$ against a median of `\valExpCentralTwoRelError` (measured). (10.1) | The median matters. At a single point, the rounding part of the error is a matter of luck, by about a factor of ten. `Central<2>` for $f'$ shows it: at $x = 1$ its error is `\valExpCentralTwoAtOneRelError`, against a median of `\valExpCentralTwoRelError` (measured). |
+
+**Stage A, the sample** (2026-10-26). `chapters/01-why.tex` and `chapters/02-taylor.tex` rewritten.
+`tools/check_language_pass.py 3192e8a` reports identical sequences for both: headings 11 and 6, environments 16 and
+40, displayed equations 0 and 13, `\val` macros 15 and 1, snippets 4 and 1, citation keys 7 and 2, labels 9 and 13,
+cross-reference targets 35 and 26, inputs 2 and 2. A mutation test (an equation's comma, a dropped `\val`, a changed
+`\cref`, a dropped `\cite`, a section title) is caught by the strict sequences. Review lists, read by the editor:
+Chapter 1 gains nine margin glosses (Jacobian, exact to rounding, number type, header-only, `noexcept`, NaN,
+relative error, correct digits, kink and range break), and Chapter 2 none; the added inline mathematics are the
+spelled-out steps ($h \to 0$; $(h/2)^2 = h^2/4$; $3 f'(x)$; $\log \errc + \aorder \log h$; $\aorder = 2$ and
+$\dorder = 1$ give degree 2; the nodes and weights of `Forward<1>` giving back the forward difference); no number
+and no `\code` name was dropped. Layout: Chapter 1's guard before the `shomate-H` listing is now
+`\needspace{4\baselineskip}` (at 16 lines it left 60 % of a page blank in the new layout); Table 1.1 is placed
+`[htb]`, after the two checks, instead of at the foot of the chapter's last page below a gap; Chapter 2 gains a
+guard before the `forward-vs-central` listing, which the new layout otherwise split around Figure 2.1. The book is 92
+pages (title, vi, 85): Chapter 1 pages 2 to 8 (7 pages, was 6), Chapter 2 pages 9 to 14 (6, was 5); every later
+chapter starts two pages later.
+
+**Found at the stage-A build, outside the pass (for the author).** `tools/check.py` reports two errors, both in
+Chapter 8 and both present without the pass: roots Phase 1 (02fffe5) moved the concept `callable` from
+`nxx::deriv::detail` to `nxx::detail` in `math.hpp`, and the `derivative` overloads now require
+`nxx::detail::callable<F, T>`, while the signature blocks of 8.2 (`chapters/08-api.tex` lines 52 and 58) transcribe
+`detail::callable<F, T>`, and 8.2 and 8.8 (lines 82 and 297) name `detail::callable` in prose. A factual update of
+the book to the library (D-22), not language: the transcription and the two names become `nxx::detail::callable`,
+with the version references, as the library-update rule says. Not made here, since the pass touches no other
+chapter before the sample is approved.
+
+**Stage B, the whole book (2026-10-26).** The author approved the sample, the D-22 fix and stage B as proposed. The
+three authors rewrote their own files on Opus: `responses/L-fundamentals.md` (Chapter 3, Appendix A),
+`L-methods.md` (Chapters 4 to 6, Appendix B) and `L-practice.md` (Chapters 7 to 10, the quick reference, the rows of
+Table 1.1). The practice author also made the four D-22 changes in `08-api.tex`, which are the only content changes
+of the stage. The editor then read the whole book for one voice and rewrote the front matter, on Opus.
+
+What the integration read evened out (language only, under the rules above):
+- *A term is glossed once in Part I, at its first use.* Part II, which is read out of order, may repeat a short gloss
+  in the sentence (saturate, flagged, the ulp as the spacing at $x$), but no margin note repeats. Sidebars are
+  self-contained, so 3.1 and 5.2 both state Sterbenz's lemma, as before. Two second glosses in Part I were removed:
+  "optimistic, that is, smaller than the actual error" in the noisy-function pitfall of 7.8 (glossed in 3.6), and
+  "rtol is a relative tolerance and atol an absolute one" in 7.2 (glossed in 1.5). The 7.2 paragraph had become a
+  word-for-word copy of the one in 1.5; it now says the same things in its own words, without the repeated gloss.
+- *Repetition inside a paragraph.* In the caps paragraph of 4.5, "The central rules stop at order 10" and "The
+  library stops at order 10" were both there after the split; the second is gone.
+- *Order of sentences.* In 8.5, the half-precision example now follows the sentence about 24 significant bits that
+  it illustrates, before the sentence on the extrapolation methods. The single cross-reference is unchanged.
+- *Signposting density.* Every Part I chapter and most of its sections now open by saying where they are going.
+  Closing summaries stay where they help (2.2, 2.5); Chapters 3 to 6 close on a checklist, a choice or a sidebar
+  instead, which is enough. Part II keeps its chapter openers only, as a reference should. No change was needed.
+- *Front matter* (editor). The audience sentence now names the new reader. "How to read it" gives one sentence per
+  chapter instead of a semicolon list. "The evidence" and "The version" are in short sentences. The AI statement
+  gains the pass: "Later, with the author's approval, Claude (the chapter authors and the editor, on Opus) rewrote
+  the wording for readability, for students. That rewrite changed no content: a script checked that every equation,
+  generated number, listing, citation and cross-reference stayed the same."
+- Three source lines that the authors had broken in mid-sentence (6.7, 7.1, 8.7) were rejoined. The PDF is
+  unchanged by this.
+
+Layout of the full build (editor):
+- *The `\needspace` guards.* On pages that carry margin material, a guard can fire although the listing fits. This
+  was seen three times: Chapter 1 (stage A), the five-line `onesided-edge` listing of 6.7 (a 6-line guard left 30 %
+  of p. 46 blank), and `check-by-steps` of 7.5 (a 16-line guard left 45 % of p. 58 blank). The cause is not
+  established; an interaction with `marginfix` is suspected but not proven. The two guards are now 3 and 4 lines,
+  with comments, and both listings stay whole. The fundamentals author's two new guards in Chapter 3 behave: the
+  lead-ins of `narrow-feature` and `noise-estimate-use` end pp. 20 and 23, and the listings are whole on pp. 21 and
+  24.
+- *Style decision 19 holds.* In Chapter 6, the full-width Table 6.1 is on p. 40 and Figure 6.3 on p. 43. The margin
+  Figures 6.4, 6.5 and 6.6 are on pp. 44, 45 and 46. In Chapter 7, the full-width Table 7.1 is on p. 54, and the
+  margin Figures 7.1 and 7.2 are on pp. 55 and 62. No margin float shares a page with a full-width float.
+- *Table 10.4.* At the head of 10.6, as the practice author had placed it, it floated to the foot of p. 82 and split
+  the section's only paragraph in mid-sentence. It now stands `[htb]` between the paragraph on the tests and a new
+  paragraph on the reviews, which is the old paragraph's last four sentences. The order of environments, sentences
+  and references is unchanged. The table is whole on p. 82 below the first paragraph, and the second paragraph ends
+  the chapter on p. 83.
+- *Blank space.* Few pages are less than three quarters full. They are the last pages of Chapters 1 to 8 and 10,
+  of Appendices A and B and of the references; the part pages and the front matter; and p. 12, where Chapter 2's
+  guard keeps the `forward-vs-central` listing whole (stage A). Sidebar 6.3 alone fills a third of p. 49, the last page of Chapter 6.
+  At the release it shared a page with the end of Sidebar 6.2.
+
+Pages, release (3192e8a) against stage B, in the book's numbering:
+
+| Block | Release | Stage B |
+|---|---|---|
+| Front matter | title, i to vi | title, i to vi |
+| 1 Why numerical derivatives | 2 to 7 (6) | 2 to 8 (7) |
+| 2 Finite differences from Taylor's theorem | 8 to 12 (5) | 9 to 14 (6) |
+| 3 Rounding and the choice of step | 13 to 21 (9) | 15 to 25 (11) |
+| 4 Higher-order and one-sided stencils | 22 to 27 (6) | 26 to 32 (7) |
+| 5 Second to fourth derivatives | 28 to 32 (5) | 33 to 38 (6) |
+| 6 Ridders' extrapolation | 33 to 41 (9) | 39 to 49 (11) |
+| 7 Using the library | 42 to 54 (13) | 50 to 63 (14) |
+| Part II page | 55 | 64 |
+| 8 API reference | 56 to 62 (7) | 65 to 72 (8) |
+| 9 Tables | 63 to 66 (4) | 73 to 76 (4) |
+| 10 Accuracy, cost, limits and guarantees | 67 to 72 (6) | 77 to 83 (7) |
+| A Floating-point essentials | 73 to 74 (2) | 84 to 86 (3) |
+| B Derivations | 75 to 78 (4) | 87 to 91 (5) |
+| Notation and glossary | 79 to 81 (3) | 92 to 94 (3) |
+| References | 82 | 95 |
+| Quick reference | 83 | 96 |
+| **Total** | **90 (title, vi, 83)** | **103 (title, vi, 96)** |
+
+Checks at the close of stage B:
+- `numerixx_book` on the gcc preset: `check.py` reports 0 errors and 0 warnings, so the D-22 errors are gone. There
+  is no undefined reference and no overfull box, and `data/` regenerated without a diff.
+- `ctest --preset gcc -R numerixx_book`: 25 of 25 pass.
+- `tools/check_language_pass.py 3192e8a` on all 16 chapter files, front and back matter included: identical content
+  sequences in every file. The review lists were read. Apart from the D-22 names in Chapter 8, no number and no
+  `\code` name was dropped anywhere. The added inline mathematics are the spelled-out steps the authors list in their
+  responses. Margin notes went from 4 to 13 in Chapter 1, from 1 to 3 in Chapter 5, from 1 to 8 in Chapter 7, from 0
+  to 3 in Chapter 8 and from 0 to 1 in Appendix B.
+
+Open for the author (not changed, as instructed or because it is content):
+- (a) 3.5, "A small $\abs{x}$ in your units": a mole fraction of $10^{-6}$, a strain of $10^{-4}$ or a fast time
+  constant gets the default step $\epsmach^{1/3}$, "as large as the variable itself or larger". For $f'$ in double,
+  $\epsmach^{1/3} \approx 6 \cdot 10^{-6}$, which is smaller than a strain of $10^{-4}$, so the statement holds for
+  the mole fraction only. The released text says the same (3192e8a, `03-rounding.tex` lines 258 to 260). Possible
+  wordings: "comparable to the variable, or larger", or "a large fraction of the variable".
+- (b) Table 10.4 and the first sentence of 10.6 list "the library's tests" without `tests/test_roots_bracketing.cpp`,
+  which roots Phase 1 (02fffe5) added to the same doctest executable. Either list it, or say "the tests of
+  `nxx::deriv`". Also in the released text.
+- (c) The version references still name 90d8337: the front matter's "The version" and `GIT_TAG` in
+  `code/getting-started.cmake`. Since D-22, Chapter 8 transcribes the headers as of a8faeae, the last commit that
+  changed `include/`; between those two commits only the spelling of the `callable` constraint changed. As at the
+  Phase 5 release (3192e8a), the two references should point at the commit that carries this stage, in a follow-up
+  commit.
+- (d) `CLAUDE.md`'s roles table names Fable for the editor and the methods author. This pass ran on Opus, as the AI
+  statement says. The table is the author's to update, if wanted.
+
+The author's decisions (2026-10-26): (a) and (b) fixed by the main session. 3.5 now reads "a sizeable fraction of
+the variable, or larger than it"; 10.6 and the caption of Table 10.4 say "the tests of `nxx::deriv`" (the table lists
+its files, `test_math.cpp` for the shared helpers included). (c) at release, in two commits as before. (d) the roles
+table stays as it is. Before release, an independent review by OpenAI Codex of the pass's diff, for changed meaning
+only (`reviews/L-codex.md`).
+
+Codex's review (`reviews/L-codex.md`): five findings, all reproduced and accepted (two majors: the sentence split in
+3.3 made "smaller" unconditional, and the new kink gloss contradicted 6.4; three minors: Table 1.1's solver row, the
+$O(h^4)$ remainder in 2.4, the rvalue gloss in 8.2). The AI statement names the Codex check.

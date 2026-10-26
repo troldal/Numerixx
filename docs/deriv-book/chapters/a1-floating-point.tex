@@ -1,10 +1,13 @@
 % Appendix A: Floating-point essentials (fundamentals author). PLAN.md section 1.4.
 % Uses T16 (tab:fp-constants), typeset from the DS17 values of data/values.tex.
+% Language pass for students (PLAN.md section 12.9): the wording only; content, evidence and order as at 3192e8a.
 \chapter{Floating-point essentials}\label{ch:floating-point}
 
-This appendix collects the facts about floating-point arithmetic that \cref{ch:rounding} and the sidebars use. The
-standard references are Higham's book and Goldberg's survey;\cite{higham2002,goldberg1991} the formats and the
-rounding rule are fixed by IEEE~754.\cite{ieee754-2019}
+This appendix collects the facts about floating-point arithmetic that \cref{ch:rounding} and the sidebars use. We
+start with how a number is stored. Then we look at the spacing of the numbers and at rounding, at the two ends of the
+range, and at what rounding does to $x + h$ and to a difference. The appendix ends with other number types. The
+standard references are Higham's book and Goldberg's survey.\cite{higham2002,goldberg1991} The formats and the
+rounding rule are fixed by the IEEE~754 standard.\cite{ieee754-2019}
 
 \section{Representation}\label{sec:fp-representation}
 
@@ -12,17 +15,21 @@ A binary floating-point number is
 \begin{equation*}
   x = \pm m \cdot 2^{e}, \qquad 1 \le m < 2,
 \end{equation*}
-where the \emph{significand} $m$ has $p$ binary digits and the \emph{exponent} $e$ is an integer in a fixed range.
-For \code{float} $p = \num{\valDigitsFloat}$, for \code{double} $p = \num{\valDigitsDouble}$ (\cref{tab:fp-constants}). Every
-integer up to $2^{p}$ is exact, which is why the library's integer weights, all below $2^{24}$, are exact in every
-type with at least 24 significant bits. Between two powers of two the numbers are evenly spaced; at each power of two
-the spacing doubles.
+where the \emph{significand} $m$ has $p$ binary digits, and the \emph{exponent} $e$ is an integer in a fixed range.
+This is scientific notation in base 2: the significand holds the digits, and the exponent says where the binary point
+goes. For \code{float}, $p = \num{\valDigitsFloat}$; for \code{double}, $p = \num{\valDigitsDouble}$
+(\cref{tab:fp-constants}).
+
+Every integer up to $2^{p}$ is exact, that is, the type stores it without rounding. This is why the library's integer
+weights are exact in every type with at least 24 significant bits: they are all below $2^{24}$. Between two powers of
+two, the numbers are evenly spaced, because the significand always has the same $p$ digits and the exponent is
+fixed. At each power of two, the exponent goes up by one, and the spacing doubles.
 
 \begin{table}
-\sidecaption{The constants of \code{float} and \code{double}, from \code{std::numeric_limits} on the build machine
-(IEEE~754 formats). $\epsmach = 2^{1-p}$; decimal digits is \code{digits10}, the number of decimal digits that
-survive a round trip; below the smallest normal number the subnormals continue to the smallest
-subnormal.\label{tab:fp-constants}}
+\sidecaption{The constants of \code{float} and \code{double}, read from \code{std::numeric_limits} on the build
+machine (IEEE~754 formats). Here $\epsmach = 2^{1-p}$. The decimal digits are \code{digits10}, the number of decimal
+digits that survive a round trip, from decimal text to the type and back. Below the smallest normal number, the
+subnormal numbers continue down to the smallest subnormal.\label{tab:fp-constants}}
 \centering\small
 \begin{tabular}{@{}lll@{}}
 \toprule
@@ -40,63 +47,74 @@ smallest subnormal (\code{denorm_min}) & \num{\valDenormMinFloat} & \num{\valDen
 
 \section{Machine epsilon, the unit roundoff and the ulp}\label{sec:fp-epsilon}
 
-\emph{Machine epsilon} $\epsmach = 2^{1-p}$ is the distance from 1 to the next larger number: $2^{-52}$ for
-\code{double}. The spacing at a general $x$ is its \emph{unit in the last place}, $\ulp(x) = \epsmach \cdot 2^{e}$
-for $2^{e} \le \abs{x} < 2^{e+1}$. It is proportional to $\abs{x}$ within a factor of two: $\ulp(1) =
-\num{\valUlpAtOne}$, just below 1 the spacing is \num{\valUlpBelowOne}, and $\ulp(1000) = \num{\valUlpAtOneThousand}$.
+\emph{Machine epsilon} $\epsmach = 2^{1-p}$ is the distance from 1 to the next larger number. Just above 1 the
+exponent is 0, and the last of the $p$ binary digits of the significand is worth $2^{1-p}$. For \code{double} this is
+$2^{-52}$. The spacing at a general $x$ is called its \emph{unit in the last place}:
+$\ulp(x) = \epsmach \cdot 2^{e}$ for $2^{e} \le \abs{x} < 2^{e+1}$. It is the worth of the last digit, scaled by the
+exponent. So the spacing is proportional to $\abs{x}$, within a factor of two. For example, $\ulp(1) =
+\num{\valUlpAtOne}$; just below 1, the spacing is \num{\valUlpBelowOne}; and $\ulp(1000) = \num{\valUlpAtOneThousand}$.
 
 IEEE~754 arithmetic rounds the exact result of each operation $+$, $-$, $\times$, $/$ and $\sqrt{\phantom{x}}$ to the
-nearest representable number (ties to an even last digit). The error is at most half a spacing, so
+nearest representable number. A tie, a result exactly halfway between two numbers, goes to the one whose last digit
+is even. The error is at most half a spacing, so
 \begin{equation*}
   \fl(a \circ b) = (a \circ b)(1 + \delta), \qquad \abs{\delta} \le \epsmach / 2,
 \end{equation*}
-as long as the result is neither too large nor too small for the format. The bound $\epsmach / 2$ is the \emph{unit
-roundoff}, which many texts call $u$. This book speaks of $\epsmach$ only, and the library's rounding model uses it:
-a value of $f$ that is the result of many operations is rarely accurate to half an ulp, and $\epsmach \abs{f}$ is a
-more honest estimate of its error.
+as long as the result is neither too large nor too small for the format. Here $\circ$ stands for any of the
+operations, and $\fl$ for the rounded result. The bound $\epsmach / 2$ is called the \emph{unit roundoff}; many texts
+call it $u$. This book speaks of $\epsmach$ only, and the library's rounding model uses it too. The reason is that a
+value of $f$ that is the result of many operations is rarely accurate to half an ulp. So $\epsmach \abs{f}$ is a more
+honest estimate of its error.
 
 \section{The ends of the range}\label{sec:fp-range}
 
-The largest finite number is $\fmax$. A result beyond it rounds to infinity, and infinity minus infinity is NaN, not a
-number. The library checks what could overflow (before it is formed; the final quotient after) and reports
-\code{error::non_finite} instead; it never calls \code{fn} at a point that is not finite.
+The largest finite number is $\fmax$. A result beyond it overflows: it rounds to infinity. And infinity minus
+infinity is NaN, ``not a number''. The library checks every quantity that could overflow. It checks such a quantity
+before it is formed, except the final quotient, which it checks after. If a check fails, the library reports
+\code{error::non_finite} instead of a result. It never calls \code{fn} at a point that is not finite.
 
-At the other end, below the smallest normal number (\num{\valMinDouble} for \code{double}) the exponent can fall no
-further, and the numbers continue with a fixed spacing equal to the smallest subnormal, \num{\valDenormMinDouble}.
-These \emph{subnormal} numbers fill the gap to zero gradually, but their relative accuracy falls as they shrink:
-rounding there is absolute, not relative. The library's rounding model accounts for that: the rounding error of a
-nonzero value of $f$ is $\epsmach \abs{f}$, but never less than the smallest subnormal.
+The \emph{normal} numbers are those of the form above, with $1 \le m < 2$. At the other end of the range lies the
+smallest of them, \num{\valMinDouble} for \code{double}. Below it, the exponent can fall no further. The numbers continue down to zero with a fixed spacing,
+equal to the smallest subnormal, \num{\valDenormMinDouble}. These \emph{subnormal} numbers fill the gap to zero
+gradually. But their relative accuracy falls as they shrink, because a fixed spacing is a larger and larger fraction
+of a smaller and smaller number. So rounding there is absolute, not relative. The library's rounding model accounts
+for that. It takes the rounding error of a nonzero value of $f$ as $\epsmach \abs{f}$, but never less than the
+smallest subnormal.
 
 \section{Why $x + h$ is not $x + h$}\label{sec:fp-step}
 
-A finite difference evaluates $f$ at $x + h$, and that sum is rounded like any other. The function therefore sees
-$\fl(x + h)$, which differs from $x + h$ by up to half the spacing at the result: $\ulp(x) / 2$, or $\ulp(x)$ when
-$x + h$ crosses a power of two (the two-sided spacing of \cref{sb:ulp}). Two consequences follow, both met in
-\cref{ch:rounding}. A step below $\ulp(x) / 2$ does not move $x$. If neither $x + h$ nor $x - h$ moves, the library
-reports \code{error::non_finite}. If only one moves, as can happen near a power of two, a two-node rule for $f'$
-returns a finite value that is mostly rounding, and every other rule reports \code{non_finite}
-(\cref{sb:ulp,sec:api-derivative}). Hence the requirement: a step well above $\ulp(x)$. And for any step the distance
-between the two points of the central difference is not exactly $2h$, which is why the two-node rules divide by the
-distance actually evaluated (\cref{sb:actual-distance}).
+A finite difference evaluates $f$ at $x + h$, and that sum is rounded like any other. So the function sees
+$\fl(x + h)$. This differs from $x + h$ by up to half the spacing at the result. That is $\ulp(x) / 2$, or $\ulp(x)$
+when $x + h$ crosses a power of two, where the spacing doubles (the two-sided spacing of \cref{sb:ulp}).
+
+Two consequences follow, and \cref{ch:rounding} meets both. The first is that a step below $\ulp(x) / 2$ does not
+move $x$. If neither $x + h$ nor $x - h$ moves, the library reports \code{error::non_finite}. If only one of them
+moves, as can happen near a power of two, the outcome depends on the rule. A two-node rule for $f'$ returns a finite
+value that is mostly rounding. Every other rule reports \code{non_finite} (\cref{sb:ulp,sec:api-derivative}). Hence
+the requirement: a step well above $\ulp(x)$. The second consequence holds for any step. The distance between the two
+points of the central difference is not exactly $2h$. That is why the two-node rules divide by the distance actually
+evaluated (\cref{sb:actual-distance}).
 
 \section{Cancellation}\label{sec:fp-cancellation}
 
-The subtraction of two nearby numbers of the same sign is exact: if $a, b > 0$ and $a / 2 \le b \le 2a$, then
-$\fl(a - b) = a - b$ (Sterbenz's lemma, Theorem 4.3.1; likewise for $a, b < 0$).\cite{sterbenz1974} The danger is not in the subtraction but in its inputs.
-If $a$ and $b$ carry errors $\delta_a$ and $\delta_b$ from earlier rounding, the difference carries
-$\delta_a - \delta_b$, and its relative error is
+The subtraction of two nearby numbers of the same sign is exact. Precisely: if $a, b > 0$ and $a / 2 \le b \le 2a$,
+then $\fl(a - b) = a - b$. This is Sterbenz's lemma (Theorem 4.3.1), and the same holds for
+$a, b < 0$.\cite{sterbenz1974} So the danger is not in the subtraction but in its inputs. Suppose that $a$ and $b$
+carry errors $\delta_a$ and $\delta_b$ from earlier rounding. Then the difference carries $\delta_a - \delta_b$, and
+by the triangle inequality its relative error is
 \begin{equation*}
   \frac{\abs{\delta_a - \delta_b}}{\abs{a - b}} \le \frac{\abs{\delta_a} + \abs{\delta_b}}{\abs{a - b}},
 \end{equation*}
-which is large when $a$ and $b$ are close: an error that was small compared with $a$ and $b$ is large compared with
-their difference. This is \emph{cancellation}, and it is the whole reason for the rounding branch of the error model:
-the values $f(x + h)$ and $f(x - h)$ come closer as $h$ shrinks, their rounding errors do not, and the division by
-$2h$ magnifies what is left (\cref{sec:rounding-v}).
+which is large when $a$ and $b$ are close. An error that was small compared with $a$ and $b$ is large compared with
+their difference. This is \emph{cancellation}. It is the whole reason for the rounding branch of the error model. As
+$h$ shrinks, the values $f(x + h)$ and $f(x - h)$ come closer, but their rounding errors stay the same size. And the
+division by $2h$ magnifies what is left (\cref{sec:rounding-v}).
 
 \section{Other types}\label{sec:fp-types}
 
-Nothing above is special to binary: decimal types round to decimal digits, with their own $\epsmach$, and
-multiprecision types such as \code{cpp_bin_float_50} of Boost.Multiprecision ($p = \num{\valDigitsMultiprecision}$
-bits, $\epsmach = \num{\valEpsMultiprecision}$) follow the same rules with more digits. What the library needs from a
-type, its arithmetic, its comparisons and a few members of \code{std::numeric_limits}, is listed in
-\cref{sec:api-real}; its error model needs only $\epsmach$.
+Nothing above is special to binary. Decimal types round to decimal digits, with their own $\epsmach$. Multiprecision
+types, which carry more digits than \code{double}, follow the same rules with more digits. An example is
+\code{cpp_bin_float_50} of Boost.Multiprecision, with $p = \num{\valDigitsMultiprecision}$ bits and
+$\epsmach = \num{\valEpsMultiprecision}$. What the library needs from a type is its arithmetic, its comparisons and a
+few members of \code{std::numeric_limits}; \cref{sec:api-real} lists them. The library's error model needs only
+$\epsmach$.

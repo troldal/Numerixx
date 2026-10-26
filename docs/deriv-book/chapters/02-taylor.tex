@@ -1,15 +1,17 @@
 % Chapter 2: Finite differences from Taylor's theorem (fundamentals author). PLAN.md section 1.4.
 % Uses F2 (fig:fd-slopes), S2 (sb:remainder), E2 (code/02-taylor-steps.cpp), the margin table tab:two-point.
+% Language pass for students (PLAN.md section 12.9): the wording only; content, evidence and order as at 3192e8a.
 \chapter[Finite differences from Taylor's theorem]{Finite differences from\\ Taylor's theorem}\label{ch:taylor}
 
 \Cref{fig:secant} showed that the secant through $x - h$ and $x + h$ lies closer to the tangent than the secant
-through $x$ and $x + h$. This chapter says by how much, with one tool: Taylor's theorem. It gives the two simplest
-finite differences, the error each makes, and a rule that predicts how that error changes with the step. All of it
-can be done with pencil and paper, and we measure every prediction on the heat capacity of nitrogen.
+through $x$ and $x + h$. This chapter works out by how much. We need one tool for it: Taylor's theorem, which you
+know from calculus. With it we derive the two simplest finite differences and the error that each one makes. Then we
+find a rule that predicts how that error changes when we change the step. All of it can be done with pencil and
+paper, and we check every prediction by measuring it on the heat capacity of nitrogen.
 
 \section{The secant and the tangent}\label{sec:taylor-secant}
 
-The slope of the secant through $x$ and $x + h$ is the \emph{forward difference}
+We start with the secant through $x$ and $x + h$. Its slope is the \emph{forward difference}
 \begin{equation}
   f'(x) \approx \frac{f(x + h) - f(x)}{h}.
   \label{eq:forward}
@@ -19,21 +21,21 @@ and $x + h$, then
 \begin{equation*}
   f(x + h) = f(x) + h f'(x) + \frac{h^2}{2} f''(\xi)
 \end{equation*}
-for some point $\xi$ between $x$ and $x + h$.\cite{burden2016} The first two terms are the tangent line; the last is
-the \emph{remainder}, the price of stopping the series there. We do not know $\xi$, but we know that it lies in the
-interval. Subtract $f(x)$ and divide by $h$:
+for some point $\xi$ between $x$ and $x + h$.\cite{burden2016} The first two terms on the right are the tangent line.
+The last term is the \emph{remainder}: the price of stopping the series after the term in $h$. We do not know $\xi$.
+We only know that it lies somewhere between $x$ and $x + h$. Now subtract $f(x)$ from both sides and divide by $h$:
 \begin{equation}
   \frac{f(x + h) - f(x)}{h} = f'(x) + \frac{h}{2} f''(\xi).
   \label{eq:forward-error}
 \end{equation}
-The forward difference is $f'(x)$ plus an error of $h f''(\xi) / 2$. This error is the \emph{truncation error}: the
-error of the formula itself, with every number computed exactly, so called because it comes from truncating the
-Taylor series. The picture says the same thing: a secant differs from the tangent because the curve bends, and the
-bending is $f''$.
+The left-hand side is the forward difference. So the forward difference is $f'(x)$ plus an error of
+$h f''(\xi) / 2$. This error is the \emph{truncation error}. It is the error of the formula itself, even when every
+number is computed exactly. The name says where it comes from: we truncated the Taylor series. The picture tells the
+same story. A secant differs from the tangent because the curve bends, and the bending is $f''$.
 
-For the enthalpy of nitrogen, $\enth'' = \dd\cp / \dd T$ is positive at $T_0$, where the closed form gives
-\SI{\valCpSecondExact}{\joule\per\mole\per\kelvin\squared} (the heat capacity still rises at
-\SI{1000}{\kelvin}), so the forward difference comes out too high, by about half of $\enth''$ times the step.
+Let us apply this to the enthalpy of nitrogen. There $\enth'' = \dd\cp / \dd T$, and at $T_0$ the closed form gives
+\SI{\valCpSecondExact}{\joule\per\mole\per\kelvin\squared}. This is positive: the heat capacity still rises at
+\SI{1000}{\kelvin}. So the forward difference comes out too high, by about half of $\enth''$ times the step.
 
 \begin{margintable}
 \caption{The two rules of this chapter, as $f'(x) \approx \sum_k w_k f(x + n_k h) / h$. The complete tables are in
@@ -52,114 +54,126 @@ error & $\frac{h}{2} f''$ & $\frac{h^2}{6} f'''$\\
 
 The library calls this rule \code{Forward<1>}.\mnote{\code{P} in \code{Forward<P>} and \code{Central<P>} is the
 accuracy order, not the number of points: \code{Central<2>} uses two points for $f'$, \code{Forward<1>} two.} The
-number in the name is its accuracy order, defined in \cref{sec:taylor-order}. A rule is written in the library, and
-in this book, as a set of \emph{nodes} $n_k$, the offsets of the sample points in units of $h$, and their
-\emph{weights} $w_k$: the estimate is $\sum_k w_k f(x + n_k h) / h$. \Cref{tab:two-point} gives the nodes and
-weights of the two rules of this chapter.
+number in the name is the rule's accuracy order, which \cref{sec:taylor-order} defines. The library, and this book,
+write a rule as two lists. The \emph{nodes} $n_k$ are the offsets of the sample points, in units of $h$. The
+\emph{weights} $w_k$ say how much each sample counts. The estimate is then $\sum_k w_k f(x + n_k h) / h$. For the
+forward difference the nodes are 0 and 1 and the weights $-1$ and 1, which gives back $(f(x + h) - f(x)) / h$.
+\Cref{tab:two-point} gives the nodes and weights of the two rules of this chapter.
 
 \section{Centring cancels a term}\label{sec:taylor-central}
 
-Now expand $f$ on both sides of $x$, one term further. With $f$ smooth enough,
+The forward difference samples one side of $x$ only. Now we use both sides. We expand $f(x + h)$ and $f(x - h)$, this
+time one term further. If $f$ is smooth enough, that is, if it has enough continuous derivatives,
 \begin{align*}
   f(x + h) &= f(x) + h f'(x) + \frac{h^2}{2} f''(x) + \frac{h^3}{6} f'''(x) + \frac{h^4}{24} f^{(4)}(x) + \cdots\\
   f(x - h) &= f(x) - h f'(x) + \frac{h^2}{2} f''(x) - \frac{h^3}{6} f'''(x) + \frac{h^4}{24} f^{(4)}(x) - \cdots
 \end{align*}
-The terms with even powers of $h$ are the same in both lines, and the terms with odd powers differ only in sign.
-Subtracting the second line from the first therefore removes $f(x)$, $f''$ and $f^{(4)}$ and doubles the rest.
-Divide by $2h$:
+Compare the two lines term by term. The terms with even powers of $h$ are the same in both lines. The terms with odd
+powers differ only in sign. So when we subtract the second line from the first, $f(x)$, $f''$ and $f^{(4)}$ drop out,
+and the remaining terms double. Dividing by $2h$ gives
 \begin{equation}
   \frac{f(x + h) - f(x - h)}{2h} = f'(x) + \frac{h^2}{6} f'''(x) + \frac{h^4}{120} f^{(5)}(x) + \cdots
   \label{eq:central}
 \end{equation}
-This is the \emph{central difference}, the library's \code{Central<2>} and its default rule. The term with $h$ has
-gone: the bending $f''$, which spoils the forward difference, affects the two sides equally and cancels. What is
-left starts with $h^2$ and involves $f'''$, the rate at which the bending changes. With the remainder in Lagrange's
-form instead of the infinite series, the result reads
+The left-hand side is the \emph{central difference}. It is the library's \code{Central<2>}, and its default rule.
+Compare its error with that of the forward difference: the term with $h$ has gone. The bending $f''$, which spoils
+the forward difference, affects the two sides equally and cancels. What is left starts with $h^2$ and involves
+$f'''$, the rate at which the bending changes. We can also write the error with a remainder at an unknown point
+$\xi$, in Lagrange's form, as we did for the forward difference, instead of as an infinite series. The result reads
 \begin{equation}
   \frac{f(x + h) - f(x - h)}{2h} = f'(x) + \frac{h^2}{6} f'''(\xi), \qquad x - h < \xi < x + h,
   \label{eq:central-error}
 \end{equation}
-which holds whenever $f'''$ is continuous on the interval; the sidebar below proves it and shows why the next term is
-of order $h^4$ (\cref{sb:remainder}).
+which holds whenever $f'''$ is continuous on the interval. The sidebar below proves it, and shows why the next term
+is of order $h^4$ (\cref{sb:remainder}).
 
-The sign of the error is the sign of $f'''$: the central difference overestimates $f'$ where $f''' > 0$ and
-underestimates it where $f''' < 0$. For nitrogen at \SI{1000}{\kelvin}, $\enth''' = \dd^2 \cp / \dd T^2$ is negative
-(the heat capacity rises ever more slowly), so the central difference comes out slightly low.
+The factor $h^2 / 6$ is positive, so the sign of the error is the sign of $f'''$. The central difference
+overestimates $f'$ where $f''' > 0$, and underestimates it where $f''' < 0$. For nitrogen at \SI{1000}{\kelvin},
+$\enth''' = \dd^2 \cp / \dd T^2$ is negative: the heat capacity rises, but ever more slowly. So the central difference
+comes out slightly low.
 
-Note what the central difference does not use: the value $f(x)$ has weight zero (\cref{tab:two-point}). It costs two
-evaluations of $f$, the same as the forward difference, and is far more accurate for small $h$. That is why it is
-the default.
+Note what the central difference does not use: the value $f(x)$, which has weight zero (\cref{tab:two-point}). So it
+costs two evaluations of $f$, the same as the forward difference, and it is far more accurate for small $h$. That is
+why it is the default.
 
 There is a second way to see the cancellation. The mirror image of the forward difference is the \emph{backward
-difference} $(f(x) - f(x - h)) / h$, the library's \code{Backward<1>}, the rule for a function known only below $x$.
-By the same expansion its error is $-h f''(x) / 2 + \order(h^2)$,\mnote{$\order(h^2)$, ``of order $h^2$'': terms
-of size $h^2$ and smaller, which shrink at least as fast as $h^2$ (\cref{sec:taylor-order}).} the same size as the forward difference's, with
-the opposite sign. The central difference is exactly the mean of the two,
+difference} $(f(x) - f(x - h)) / h$. The library calls it \code{Backward<1>}; it is the rule for a function known
+only below $x$. The same expansion gives its error as $-h f''(x) / 2 + \order(h^2)$.\mnote{$\order(h^2)$, ``of order
+$h^2$'': terms of size $h^2$ and smaller, which shrink at least as fast as $h^2$ (\cref{sec:taylor-order}).} This is
+the same size as the error of the forward difference, with the opposite sign. The central difference is exactly the
+mean of the two,
 \begin{equation*}
   \frac{f(x + h) - f(x - h)}{2h}
   = \frac{1}{2} \left( \frac{f(x + h) - f(x)}{h} + \frac{f(x) - f(x - h)}{h} \right),
 \end{equation*}
 so their errors of order $h$ cancel, and what remains is of order $h^2$.
 
+We now have two rules and know their errors: an error of order $h$ for the forward difference, and of order $h^2$ for
+the central difference. The next section turns these powers of $h$ into a prediction that we can test.
+
 \begin{sidebar}[label=sb:remainder]{Where the constant 1/6 comes from}
-Taylor's theorem with the remainder in Lagrange's form says: if $f$ has $n + 1$ continuous derivatives between $x$
-and $x + h$, then
+Taylor's theorem with the remainder in Lagrange's form says the following. If $f$ has $n + 1$ continuous derivatives
+between $x$ and $x + h$, then
 \begin{equation*}
   f(x + h) = \sum_{j=0}^{n} \frac{h^j}{j!} f^{(j)}(x) + \frac{h^{n+1}}{(n+1)!} f^{(n+1)}(\xi)
 \end{equation*}
-for some $\xi$ strictly between $x$ and $x + h$; the same holds with $-h$ in place of $h$.\cite{burden2016} Take
-$n = 2$ on both sides of $x$:
+for some $\xi$ strictly between $x$ and $x + h$. The same holds with $-h$ in place of $h$.\cite{burden2016} We take
+$n = 2$, once on each side of $x$:
 \begin{equation*}
   f(x \pm h) = f(x) \pm h f'(x) + \frac{h^2}{2} f''(x) \pm \frac{h^3}{6} f'''(\xi_\pm),
 \end{equation*}
-with $\xi_+$ in $(x, x + h)$ and $\xi_-$ in $(x - h, x)$. Subtract and divide by $2h$:
+with $\xi_+$ in $(x, x + h)$ and $\xi_-$ in $(x - h, x)$. We subtract the two and divide by $2h$:
 \begin{equation*}
   \frac{f(x + h) - f(x - h)}{2h} = f'(x) + \frac{h^2}{6} \cdot \frac{f'''(\xi_+) + f'''(\xi_-)}{2}.
 \end{equation*}
-The mean of $f'''(\xi_+)$ and $f'''(\xi_-)$ lies between the two values, and a continuous function takes every value
-between two of its values (the intermediate value theorem). So the mean equals $f'''(\xi)$ for some $\xi$ in
-$(x - h, x + h)$, which is \cref{eq:central-error}. The $1/6$ is $1/3!$ from the cubic term, unchanged because the
-two cubic terms add.
+The mean of $f'''(\xi_+)$ and $f'''(\xi_-)$ lies between the two values. A continuous function takes every value
+between two of its values; this is the intermediate value theorem. So the mean equals $f'''(\xi)$ for some $\xi$ in
+$(x - h, x + h)$, and that is \cref{eq:central-error}. The $1/6$ is the $1/3!$ of the cubic term. It survives
+unchanged because the two cubic terms add: their sum carries a factor 2, which the division by $2h$ removes.
 
-Why the next term is $h^4$: in the series for $f(x + h) - f(x - h)$ every even power of $h$ cancels, so only odd
-powers $h, h^3, h^5, \ldots$ remain; after the division by $2h$ only even powers $h^0, h^2, h^4, \ldots$ are left.
-The error of the central difference is a series in $h^2$. The forward difference has no such symmetry, and its error
-contains every power of $h$.
+Why is the next term of order $h^4$? In the series for $f(x + h) - f(x - h)$, every even power of $h$ cancels. Only
+the odd powers $h, h^3, h^5, \ldots$ remain. After the division by $2h$, only the even powers $h^0, h^2, h^4,
+\ldots$ are left. So the error of the central difference is a series in $h^2$. The forward difference has no such
+symmetry, and its error contains every power of $h$.
 \end{sidebar}
 
 \section{Order of accuracy}\label{sec:taylor-order}
 
-Both error terms have the form constant times a power of $h$ times a derivative of $f$: $\frac{1}{2} h^1 f''$ for
-the forward difference and $\frac{1}{6} h^2 f'''$ for the central one. In general a rule for the $N$-th derivative
-has a truncation error whose leading term is
+This section gives the power of $h$ in an error term a name, the accuracy order, and shows what it predicts. Both
+error terms have the same form: a constant, times a power of $h$, times a derivative of $f$. For the forward
+difference this is $\frac{1}{2} h^1 f''$, and for the central one $\frac{1}{6} h^2 f'''$. In general a rule for the
+$N$-th derivative has a truncation error whose leading term, the one that dominates for small steps, is
 \begin{equation*}
   \pm \errc\, h^{\aorder} f^{(\aorder + \dorder)}(x),
 \end{equation*}
-with $\errc > 0$ its size and a sign fixed by the rule ($+$ for both rules here; \cref{ch:tables} gives it for every
-rule), and $\aorder$ is its \emph{accuracy order}.\mnote{The \emph{derivative order} $\dorder$ says which derivative is
-computed; this chapter has $\dorder = 1$ throughout. \Cref{ch:orders} treats $\dorder = 2$ to 4.} The forward
-difference has accuracy order 1 and the central difference accuracy order 2; we write that their errors are
-$\order(h)$ and $\order(h^2)$. The statement is about small steps: as $h$ tends to 0, the error divided by
-$h^{\aorder}$ stays bounded, and the leading term describes the error better and better. For larger steps the next
-terms matter too; for the central difference the next one is of order $h^{\aorder + 2}$, here $h^4$, as
-\cref{eq:central} shows.
+where $\errc > 0$ is the size of the term. Its sign is fixed by the rule: $+$ for both rules here, and
+\cref{ch:tables} gives it for every rule. The power $\aorder$ is the rule's \emph{accuracy order}.\mnote{The
+\emph{derivative order}
+$\dorder$ says which derivative is computed; this chapter has $\dorder = 1$ throughout. \Cref{ch:orders} treats
+$\dorder = 2$ to 4.} The forward difference has accuracy order 1, and the central difference accuracy order 2. We
+write that their errors are $\order(h)$ and $\order(h^2)$.
 
-The practical meaning is a prediction. While the leading term dominates, halving the step divides the error by
-$2^{\aorder}$: it halves the error of the forward difference and quarters that of the central difference. To gain a
-factor of 10 in accuracy, the forward difference needs a step 10 times smaller, the central difference a step only
+This is a statement about small steps. As $h$ tends to 0, the error divided by $h^{\aorder}$ stays bounded, and the
+leading term describes the error better and better. For larger steps the next terms matter too. For the central
+difference the next term is of order $h^{\aorder + 2}$, here $h^4$, as \cref{eq:central} shows.
+
+In practice the accuracy order gives us a prediction. Suppose the leading term dominates. When we halve the step,
+$h^{\aorder}$ becomes $h^{\aorder} / 2^{\aorder}$, so the error is divided by $2^{\aorder}$. Halving the step
+therefore halves the error of the forward difference, and quarters that of the central difference. To gain a factor
+of 10 in accuracy, the forward difference needs a step 10 times smaller. The central difference needs a step only
 $\sqrt{10} \approx 3.2$ times smaller.
 
 \begin{figure}[t]
-\sidecaption{Relative error of \code{Forward<1>} and \code{Central<2>} against the step $h$ for the heat capacity of
-nitrogen, $\dd\enth / \dd T$ at $T_0 = \SI{1000}{\kelvin}$, for large steps. On logarithmic axes the errors fall on
-lines of slope 1 and 2: halving the step halves one error and quarters the other. Below \SI{0.01}{\kelvin} the
-central difference stops improving; why is the subject of \cref{ch:rounding}.\label{fig:fd-slopes}}
+\sidecaption{The relative error of \code{Forward<1>} and \code{Central<2>} against the step $h$, for the heat
+capacity of nitrogen, $\dd\enth / \dd T$ at $T_0 = \SI{1000}{\kelvin}$, at large steps. On logarithmic axes the errors
+fall on lines of slope 1 and 2: halving the step halves one error and quarters the other. Below \SI{0.01}{\kelvin}
+the central difference stops improving; \cref{ch:rounding} explains why.\label{fig:fd-slopes}}
 \centering
 \input{figures/02-taylor-fd-slopes}
 \end{figure}
 
-The prediction can be checked by hand. Take $f(x) = x^3$ at $x = 1$, where $f'(1) = 3$ and $f'' = f''' = 6$, with the
-steps $0.1$ and $0.05$:
+We can check the prediction by hand. Take $f(x) = x^3$ at $x = 1$, where $f'(1) = 3$ and $f'' = f''' = 6$. We use
+the steps $0.1$ and $0.05$:
 \begin{center}\small
 \begin{tabular}{@{}lcccc@{}}
 \toprule
@@ -169,62 +183,68 @@ steps $0.1$ and $0.05$:
 \bottomrule
 \end{tabular}
 \end{center}
-Halving the step divides the forward error by a little more than 2 and the central error by exactly 4. The error
-terms predict the sizes too: $h f''/2 = 3h$ gives $0.3$ and $0.15$ for the forward difference, the small rest being
-the next term, $h^2$; and $h^2 f'''/6 = h^2$ gives $1/100$ and $1/400$ for the central difference, exactly, because
-the fourth and higher derivatives of a cubic vanish.
+Halving the step divides the forward error by a little more than 2, and the central error by exactly 4. The error
+terms predict the sizes too. For the forward difference, $h f''/2 = 3h$ gives $0.3$ and $0.15$; the small rest is
+the next term, $h^2$. For the central difference, $h^2 f'''/6 = h^2$ gives $1/100$ and $1/400$. Here the prediction
+is exact, because the fourth and higher derivatives of a cubic vanish.
 
-How small must $h$ be for the leading term to dominate? Small compared with the distance over which $f$ changes its
-character, so that the higher derivatives in the next terms do not outweigh the powers of $h$ they come with. For the
-enthalpy of nitrogen, a smooth function of $T/\SI{1000}{\kelvin}$, steps of many kelvin are already small in this
-sense. Most engineering functions vary on a scale comparable to the size of their argument; \cref{ch:rounding}
-builds the library's default step on that observation, and shows what to do when it fails.
+How small must $h$ be for the leading term to dominate? It must be small compared with the distance over which $f$
+changes its character. Then the higher derivatives in the next terms do not outweigh the extra powers of $h$ that
+they come with. The enthalpy of nitrogen is a smooth function of $T/\SI{1000}{\kelvin}$, so steps of many kelvin are
+already small in this sense. Most engineering functions vary on a scale comparable to the size of their argument.
+\Cref{ch:rounding} builds the library's default step on that observation, and shows what to do when it fails.
 
-\Cref{fig:fd-slopes} tests the prediction on the nitrogen example, $\enth(T)$ at $T_0 = \SI{1000}{\kelvin}$, with the closed
-form of $\cp$ as the answer key. On logarithmic axes an error $\errc h^{\aorder}$ is a straight line of slope
-$\aorder$, and the two measured curves are such lines, of slopes 1 and 2. At every step shown, the central difference
-is more accurate by orders of magnitude.
+\Cref{fig:fd-slopes} tests the prediction on the nitrogen example, $\enth(T)$ at $T_0 = \SI{1000}{\kelvin}$, with the
+closed form of $\cp$ as the answer key. Both axes of the figure are logarithmic. Taking logarithms turns an error
+$\errc h^{\aorder}$ into $\log \errc + \aorder \log h$, so on such axes it is a straight line of slope $\aorder$. The
+two measured curves are such lines, of slopes 1 and 2. At every step shown, the central difference is more accurate
+by orders of magnitude.
 
-
+\needspace{22\baselineskip}% the lead-in and the whole listing on one page, not split around Figure 2.1
 The same check takes a few lines of code. The listing computes both differences at steps of \SI{2}{\kelvin} and
-\SI{1}{\kelvin} and prints the ratio of their errors:
+\SI{1}{\kelvin}. For each rule it prints the errors at the two steps and their ratio:
 \snippet{02-taylor-steps}{forward-vs-central}
-The forward ratio comes out close to 2 and the central ratio close to 4. At such steps the rounding errors of \cref{ch:rounding} are negligible, and the
-next terms of the series shift the ratios only slightly.
+The forward ratio comes out close to 2, and the central ratio close to 4, as predicted. At such steps the rounding
+errors of \cref{ch:rounding} are negligible, and the next terms of the series shift the ratios only slightly.
 
 \section{Exactness on polynomials}\label{sec:taylor-exact}
 
-The error terms give a second, exact check that needs no computer. The forward difference has the error
-$h f''(\xi) / 2$, which vanishes when $f'' = 0$: the forward difference is exact for every straight line, as it
-must be, since a secant of a line is the line. The central difference has the error $h^2 f'''(\xi) / 6$, which
-vanishes when $f''' = 0$: it is exact for every quadratic. With pencil and paper, for $f(x) = a + b x + c x^2$,
+The error terms give a second check, an exact one that needs no computer. The forward difference has the error
+$h f''(\xi) / 2$, which vanishes when $f'' = 0$. So the forward difference is exact for every straight line. It must
+be, since a secant of a line is the line itself. The central difference has the error $h^2 f'''(\xi) / 6$, which
+vanishes when $f''' = 0$. So it is exact for every quadratic. We can confirm this with pencil and paper. For
+$f(x) = a + b x + c x^2$,
 \begin{equation*}
   \frac{f(x + h) - f(x - h)}{2h} = \frac{2bh + 4cxh}{2h} = b + 2cx = f'(x)
 \end{equation*}
-for every $h$. For a cubic it is not exact: $f(x) = x^3$ gives $3x^2 + h^2$, and the excess $h^2$ is the error term
-$h^2 f''' / 6$ with $f''' = 6$. In general a rule of accuracy order $\aorder$ for the $\dorder$-th derivative is exact
-for polynomials of degree up to $\aorder + \dorder - 1$ (\cref{ch:stencils}). ``Exact'' here means in exact
-arithmetic; a computer still rounds the values, which is the subject of the next chapter.
+for every $h$. For a cubic the central difference is not exact. For $f(x) = x^3$ it gives $3x^2 + h^2$, and the
+excess $h^2$ is the error term $h^2 f''' / 6$ with $f''' = 6$. In general, a rule of accuracy order $\aorder$ for the
+$\dorder$-th derivative is exact for polynomials of degree up to $\aorder + \dorder - 1$ (\cref{ch:stencils}). For
+the central difference, $\aorder = 2$ and $\dorder = 1$ give degree 2: the quadratics we just checked. ``Exact'' here
+means exact in exact arithmetic. A computer still rounds the values, and that is the subject of the next chapter.
 
 The structure of \cref{eq:central} also shows where more accuracy can come from. Write $\Dc{h}$ for the central
-difference at step $h$. Its error is $\frac{1}{6} h^2 f''' + \order(h^4)$, so the error of $\Dc{h/2}$ is a quarter
-of that, and the combination
+difference at step $h$. Its error is $\frac{1}{6} h^2 f''' + \order(h^4)$. Since $(h/2)^2 = h^2 / 4$, the error of
+$\Dc{h/2}$ has a quarter of that $h^2$ term. So $4 \Dc{h/2}$ has the same $h^2$ term as $\Dc{h}$, and the combination
 \begin{equation*}
   \frac{4 \Dc{h/2} - \Dc{h}}{3} = f'(x) + \order(h^4)
 \end{equation*}
-cancels the $h^2$ term. This is the four-point rule \code{Central<4>} of \cref{ch:stencils} in disguise
-(\cref{sb:richardson-disguise}), and repeated, the idea of Ridders' method (\cref{ch:ridders}).
+cancels the $h^2$ term: the subtraction leaves $3 f'(x)$ plus terms of order $h^4$, and the division by 3 leaves
+$f'(x)$ with an error of order $h^4$. This combination is the four-point rule \code{Central<4>} of \cref{ch:stencils} in disguise
+(\cref{sb:richardson-disguise}). Applied again and again, the same idea is the heart of Ridders' method
+(\cref{ch:ridders}).
 
 \section{What this chapter did not say}\label{sec:taylor-not-said}
 
-Three assumptions stand behind every formula of this chapter.
+This chapter derived two rules, their errors and the accuracy order, all from Taylor's theorem. Every formula in it
+rests on three assumptions. Here they are, with the places where the book takes each one up.
 \begin{itemize}
-  \item \emph{Exact arithmetic.} The values of $f$ are rounded, and \cref{fig:fd-slopes} stops at
+  \item \emph{Exact arithmetic.} In a computer the values of $f$ are rounded. \Cref{fig:fd-slopes} stops at
     \SI{0.01}{\kelvin} because below that step the central difference stops improving. Why, and how to choose the
-    step, is \cref{ch:rounding}.
+    step, is the subject of \cref{ch:rounding}.
   \item \emph{Two points.} More points buy a higher accuracy order, and one-sided rules of higher order exist
-    (\cref{ch:stencils}); higher derivatives follow in \cref{ch:orders}.
-  \item \emph{Smoothness.} The error terms need $f''$ or $f'''$ to exist and be continuous on the whole interval
-    the rule samples. Where $f$ has a kink or a jump inside that interval, the error terms say nothing, and the
-    result can be wrong without any warning (\cref{sec:using-pitfalls}).
+    (\cref{ch:stencils}). Higher derivatives follow in \cref{ch:orders}.
+  \item \emph{Smoothness.} The error terms need $f''$ or $f'''$ to exist and to be continuous on the whole interval
+    that the rule samples. If $f$ has a kink or a jump inside that interval, the error terms say nothing. The result
+    can then be wrong without any warning (\cref{sec:using-pitfalls}).
 \end{itemize}

@@ -1,44 +1,55 @@
 % Chapter 1: Why numerical derivatives (fundamentals author). PLAN.md section 1.4.
 % Uses F1 (fig:secant), S1 (sb:alternatives), E1 (code/01-why-first.cpp and code/shomate.hpp), T0 (tab:method-summary).
+% Language pass for students (PLAN.md section 12.9): the wording only; content, evidence and order as at 3192e8a.
 \chapter{Why numerical derivatives}\label{ch:why}
 
-Engineering models are full of derivatives that nobody writes down. A heat capacity is the slope of an enthalpy, a
-Jacobian is the slope of a set of balances, and a sensitivity is the slope of a result with respect to a parameter.
-When the function is a formula on paper, the derivative is a matter of calculus. When the function is a program, it
-often is not. This chapter says where such derivatives arise, which tools exist for them, and what the library
-\nxx{} offers; it ends with a first computation and a half-page summary for the reader in a hurry.
+Engineering models are full of derivatives that nobody writes down. A heat capacity is the slope of an enthalpy. A
+Jacobian is the slope of a set of balance equations.\mnote{A \emph{Jacobian} is the matrix of the partial derivatives
+of a set of equations with respect to their unknowns.} A sensitivity is the slope of a result with respect to one of
+the parameters that went into it. When the function is a formula on paper, its derivative is a matter of calculus.
+When the function is a computer program, it often is not.
+
+This chapter first shows where such derivatives arise. It then compares the tools that can compute them, and
+describes what the library \nxx{} offers. It ends with a first computation and a half-page summary for the reader in
+a hurry.
 
 \section{Derivatives without a formula}\label{sec:why-without-formula}
 
-A function in engineering software is usually a piece of code that takes a number and returns a number. Typical
-cases are these.
+In engineering software, a function is usually a piece of code: it takes a number and returns a number. Here are
+some typical cases.
 \begin{itemize}
-  \item \emph{Property models.} A heat capacity $\cp = \dd \enth / \dd T$ from an enthalpy $\enth(T)$, a
-    compressibility from an equation of state, a vapour-pressure slope for the Clausius--Clapeyron equation. The
-    model is a correlation inside a property library, often in several pieces.
-  \item \emph{Simulators.} The outlet temperature of a heat exchanger as a function of a feed flow, computed by a
-    simulation that iterates to convergence.
-  \item \emph{Implicit functions.} A friction factor defined by an equation it must satisfy, or a flash temperature
-    defined by an energy balance: the value comes from a solver, and no formula for it exists.
-  \item \emph{Sensitivities.} How much a reaction rate changes per kelvin, or per unit of activation energy: the
-    numbers a design review asks for.
-  \item \emph{Newton's method.} Solving $g(T) = 0$ needs the slope $g'(T)$ at every iteration.
+  \item \emph{Property models.} A heat capacity $\cp = \dd \enth / \dd T$ from an enthalpy $\enth(T)$; a
+    compressibility from an equation of state; the slope of a vapour pressure for the Clausius--Clapeyron equation.
+    Such a model is a correlation, a formula fitted to measured data, inside a property library. It often comes in
+    several pieces.
+  \item \emph{Simulators.} The outlet temperature of a heat exchanger, as a function of a feed flow. Each value
+    comes from a simulation that iterates until it converges.
+  \item \emph{Implicit functions.} A friction factor is defined by an equation that it must satisfy. A flash
+    temperature is defined by an energy balance. In both cases the value comes from a solver, and no formula for it
+    exists.
+  \item \emph{Sensitivities.} How much does a reaction rate change per kelvin, or per unit of activation energy? A
+    design review asks for numbers like these.
+  \item \emph{Newton's method.} To solve $g(T) = 0$, Newton's method needs the slope $g'(T)$ at every iteration.
 \end{itemize}
-In every case the function can be \emph{evaluated} at any point we like, but its derivative is not given. Deriving
-it by hand from the code is tedious and error-prone, and impossible when the code is not ours.
+In every case we can \emph{evaluate} the function at any point we like, but nobody gives us its derivative. We could
+work the derivative out by hand from the code. That is tedious and error-prone, and impossible when the code is not
+ours.
 
-The way out is old and simple. The derivative $f'(x)$ is the slope of the tangent to the curve of $f$ at $x$, and
-the slope of a line through two nearby points of the curve, a \emph{secant}, is close to it
+The way out is old and simple. The derivative $f'(x)$ is the slope of the tangent to the curve of $f$ at $x$. A line
+through two nearby points of the curve is called a \emph{secant}, and its slope is close to that of the tangent
 (\cref{fig:secant}).\mnote{The \emph{step} $h$ is the distance between $x$ and the points at which $f$ is
-evaluated.} Evaluate $f$ at $x$ and at $x + h$, divide the change of $f$ by $h$, and we have an estimate of $f'(x)$:
-a \emph{finite difference}. The secant through $x - h$ and $x + h$, placed symmetrically around $x$, is much closer
-to the tangent than the one through $x$ and $x + h$, as the figure shows. \Cref{ch:taylor} explains why, and
-\cref{ch:rounding} why the step cannot simply be made as small as we like.
+evaluated.} So we evaluate $f$ at $x$ and at $x + h$, and divide the change of $f$ by $h$. The result is an estimate
+of $f'(x)$, called a \emph{finite difference}. It is the difference quotient from the definition of the derivative,
+taken at a small but finite $h$ instead of in the limit $h \to 0$.
+
+The figure shows a second secant, through $x - h$ and $x + h$, placed symmetrically around $x$. It is much closer to
+the tangent than the secant through $x$ and $x + h$. \Cref{ch:taylor} explains why. Since the derivative is a limit,
+it is tempting to make the step as small as we like. \Cref{ch:rounding} explains why we cannot simply do that.
 
 % A text-width figure in the body, not a margin figure (the author's release comment: too small to read there).
 \begin{figure}
 \sidecaption{The tangent at $x$ and two secants. The central secant, through $x - h$ and $x + h$, is nearly parallel
-to the tangent; the forward secant, through $x$ and $x + h$, is visibly steeper. A diagram, without
+to the tangent. The forward secant, through $x$ and $x + h$, is visibly steeper. A diagram, without
 data.\label{fig:secant}}
 \centering
 \input{figures/01-why-secant}
@@ -46,149 +57,180 @@ data.\label{fig:secant}}
 
 \section{The alternatives in one page}\label{sec:why-alternatives}
 
-A finite difference is not the only way to a derivative, and not always the best.
+A finite difference is not the only way to compute a derivative, and it is not always the best. This section
+compares it with three alternatives, so that you can tell which tool fits which case.
 \begin{itemize}
-  \item \emph{The analytic derivative}, by hand or by computer algebra, is exact and cheap to evaluate. Use it when
-    the formula is at hand and short enough to differentiate without mistakes.
-  \item \emph{Automatic differentiation} runs the program with a special number type that carries a derivative
-    along with every value, and is exact to rounding. It needs the source code, written for a generic number type.
-  \item \emph{The complex step} evaluates $f$ once at a complex argument and reads $f'$ from the imaginary part of
-    the result, again exact to rounding. It needs an $f$ that accepts complex numbers and is analytic.
-  \item \emph{A finite difference} needs only values of $f$ at real points. It works on any function the program
-    can evaluate: a library call, a solver, legacy code. Its price is accuracy (about two thirds of the digits of
-    the number type, \cref{ch:rounding}) and two or more evaluations of $f$.
+  \item \emph{The analytic derivative} is the formula for $f'$, found by hand or by computer algebra. It is exact and
+    cheap to evaluate. Use it when the formula for $f$ is at hand and short enough to differentiate without
+    mistakes.
+  \item \emph{Automatic differentiation} runs the program with a special number type. Each number of this type
+    carries a derivative along with its value. The result is exact to rounding.\mnote{\emph{Exact to rounding}: the
+    only error is the rounding that the computer applies to every arithmetic result, because it keeps a fixed number
+    of digits.} The method needs the source code of the program, written for a generic number type, that is, so
+    that it works with any number type.
+  \item \emph{The complex step} evaluates $f$ once, at a complex argument, and reads $f'$ from the imaginary part of
+    the result. It too is exact to rounding. It needs an $f$ that accepts complex numbers and is analytic, that is,
+    differentiable as a function of a complex variable.
+  \item \emph{A finite difference} needs only values of $f$ at real points. So it works on any function that the
+    program can evaluate: a library call, a solver, legacy code. It has two prices. It is less accurate: it keeps
+    about two thirds of the digits of the number type\mnote{A \emph{number type} such as \code{double} stores a real
+    number with a fixed number of significant digits.} (\cref{ch:rounding}). And it needs two or more evaluations of
+    $f$.
 \end{itemize}
-This book is about the last: the tool for the function that is a black box. When the first three are open to you,
-they are better, and the sidebar below says when (\cref{sb:alternatives}).
+This book is about the last of the four. It is the tool for a function that is a \emph{black box}: we can call it,
+but we cannot look inside. When one of the first three is open to you, it is better. The sidebar below says when
+(\cref{sb:alternatives}).
 
 \begin{sidebar}[label=sb:alternatives]{When automatic differentiation or the complex step is the better tool}
-\emph{Forward-mode automatic differentiation} replaces each number $v$ in the computation by a pair $(v, v')$ and
-each operation by its rule of calculus: $(u, u') \cdot (v, v') = (uv, u'v + uv')$, and so on. Seeding $x$ with
-$(x, 1)$ gives $(f(x), f'(x))$ at the end, exact to rounding, at a cost of a small multiple of one evaluation. It
+\emph{Forward-mode automatic differentiation} replaces each number $v$ in the computation by a pair $(v, v')$: the
+value and its derivative. It replaces each operation by its rule of calculus. For a product the rule is
+$(u, u') \cdot (v, v') = (uv, u'v + uv')$, and so on for the other operations. We seed the input $x$ with the pair
+$(x, 1)$, since the derivative of $x$ with respect to itself is 1. At the end the computation delivers the pair
+$(f(x), f'(x))$. The derivative is exact to rounding, and it costs a small multiple of one evaluation. The method
 needs the function's source, written for a generic number type (a C++ template, for instance), and a library that
 supplies the pair type.\cite{griewank2008}
 
-The \emph{complex step} uses $f'(x) \approx \operatorname{Im} f(x + \mathrm{i} h) / h$.\cite{squire1998} No two
-nearly equal values are subtracted, so the step can be taken far below the limit that rounding sets for a finite
-difference, and the result is exact to rounding with one evaluation. It needs $f$ implemented for complex arguments
-and analytic near $x$: an absolute value, a comparison or a table lookup inside $f$ breaks it. It is closely related
-to forward-mode automatic differentiation.\cite{martins2003} The complex step is a special case of Lyness and Moler's
-earlier contour-integral methods, which also give higher derivatives of analytic functions;\cite{lyness1967} Squire
-and Trapp brought the simple first-derivative form back into use.
+The \emph{complex step} uses $f'(x) \approx \operatorname{Im} f(x + \mathrm{i} h) / h$.\cite{squire1998} The formula
+subtracts no two nearly equal values. So the step can be taken far below the limit that rounding sets for a finite
+difference, and one evaluation gives a result that is exact to rounding. It needs $f$ implemented for complex
+arguments, and analytic near $x$. An absolute value, a comparison or a table lookup inside $f$ breaks it. The complex
+step is closely related to forward-mode automatic differentiation.\cite{martins2003} It is also a special case of the
+earlier contour-integral methods of Lyness and Moler, which give higher derivatives of analytic functions as
+well.\cite{lyness1967} Squire and Trapp brought the simple first-derivative form back into use.
 
-\code{nxx::deriv} takes any callable \code{fn} that maps a real number to a real number, and assumes nothing else:
-not its source, not a complex extension, not even smoothness beyond what the error terms of the later chapters
-need. That is the case the other tools do not cover.
+\code{nxx::deriv} takes any callable \code{fn}, such as a function or a lambda, that maps a real number to a real
+number. It assumes nothing else about \code{fn}: not its source, not a complex extension, not even smoothness beyond
+what the error terms of the later chapters need. That is the case that the other tools do not cover.
 \end{sidebar}
 
 \section{What the library offers}\label{sec:why-offers}
 
-\code{nxx::deriv} is the numerical-derivatives module of \nxx, a header-only C++23 library. Everything goes
-through one function, \code{derivative}, with these choices.
+\code{nxx::deriv} is the numerical-derivatives module of \nxx. \nxx{} is a header-only C++23
+library.\mnote{\emph{Header-only}: the library is a set of header files that your program includes; there is nothing
+to compile or link separately.} Everything in the module goes through one function, \code{derivative}. These are the
+choices it offers.
 \begin{itemize}
-  \item \emph{Six methods.} \code{Central<P>}, the default, samples $f$ on both sides of $x$; \code{Forward<P>}
-    and \code{Backward<P>} sample on one side only, for a function defined on one side; \code{Ridders} adapts its
-    step and also estimates its own error, and its one-sided forms \code{ForwardRidders} and
-    \code{BackwardRidders} do the same on one side of $x$ (\cref{sec:ridders-onesided}). The first three are \emph{stencils}:\mnote{A \emph{stencil} samples $f$
-    at a fixed pattern of points around $x$ and combines the samples with fixed weights. Ridders' method decides
-    its points as it goes.} \code{P} is the accuracy order of \cref{ch:taylor}.
+  \item \emph{Six methods.} \code{Central<P>}, the default, samples $f$ on both sides of $x$. \code{Forward<P>} and
+    \code{Backward<P>} sample on one side only; they are for a function that is defined on one side of $x$.
+    \code{Ridders} adapts its step and also estimates its own error. Its one-sided forms, \code{ForwardRidders} and
+    \code{BackwardRidders}, do the same on one side of $x$ (\cref{sec:ridders-onesided}). The first three methods
+    are \emph{stencils}.\mnote{A \emph{stencil} samples $f$ at a fixed pattern of points around $x$ and combines
+    the samples with fixed weights. Ridders' method decides its points as it goes.} The \code{P} in their names is
+    the accuracy order, which \cref{ch:taylor} defines.
   \item \emph{Derivatives of order 1 to 4}, $f'$ to $f^{(4)}$.
-  \item \emph{Any real type}: \code{float}, \code{double}, or a user type with more digits such as those of
-    Boost.Multiprecision.
-  \item \emph{No exceptions from the library.} A failure is a value: the result is a \code{std::expected} that holds
-    either an estimate or the error \code{non_finite}. The library throws nothing itself; an exception thrown by
-    \code{fn} passes through unchanged, and \code{derivative} is not \code{noexcept}.
+  \item \emph{Any real type}: \code{float}, \code{double}, or a user-defined type with more digits, such as those
+    of Boost.Multiprecision.
+  \item \emph{No exceptions from the library.} A failure is returned as a value. The result is a
+    \code{std::expected}, which holds either an estimate or the error \code{non_finite}. The library throws nothing
+    itself. An exception thrown by \code{fn} passes through unchanged, and \code{derivative} is not
+    \code{noexcept}.\mnote{A C++ function marked \code{noexcept} promises never to throw an exception.}
   \item \emph{A default step}, so that a call needs only the function and the point.
 \end{itemize}
-The calls themselves are the subject of \cref{ch:using}; \cref{ch:api} lists every one.
+\Cref{ch:using} shows how to make the calls, and \cref{ch:api} lists every one of them.
 
 \section{A first example}\label{sec:why-first}
 
-The example that runs through Part~I is the heat capacity of a gas from its enthalpy. For nitrogen the NIST
-Chemistry WebBook gives the molar enthalpy in the Shomate form,\mnote{The \emph{Shomate form}: a fitted polynomial
-in $T/1000$ plus a $1/T$ term, one set of coefficients per temperature range.} a fit to the NIST-JANAF thermochemical
-tables.\cite{nist-webbook,chase1998} We use the range \SIrange{500}{2000}{\kelvin} and the point
-$T_0 = \SI{1000}{\kelvin}$. The function returns $\enth(T)$, the enthalpy relative to its value at
-\SI{298.15}{\kelvin}, in \si{\joule\per\mole}, so that $\dd \enth / \dd T$ is $\cp$ in
-\si{\joule\per\mole\per\kelvin} directly. The whole program is short:
+One example runs through all of Part~I: the heat capacity of a gas, computed from its enthalpy. We call it the
+nitrogen example. For nitrogen, the NIST Chemistry WebBook gives the molar enthalpy in the Shomate
+form.\mnote{The \emph{Shomate form}: a fitted polynomial in $T/1000$ plus a $1/T$ term, one set of coefficients per
+temperature range.} The WebBook's formula is a fit to the NIST-JANAF thermochemical
+tables.\cite{nist-webbook,chase1998} We use the fit for the range \SIrange{500}{2000}{\kelvin} and the point
+$T_0 = \SI{1000}{\kelvin}$. The function returns $\enth(T)$ in \si{\joule\per\mole}, as the enthalpy relative to its
+value at \SI{298.15}{\kelvin}. Then $\dd \enth / \dd T$ is $\cp$ in \si{\joule\per\mole\per\kelvin} directly, with no
+conversion. The whole program is short:
 \snippet{01-why-program}{program}
-It prints $\cp = \num{\valCpDefaultValueLong}$\,\si{\joule\per\mole\per\kelvin}. The heat capacity is one call:
-without a method or a step, \code{derivative} uses \code{Central<2>}, the central difference of \cref{fig:secant},
-with its default step, here \SI{\valCpDefaultStep}{\kelvin}; \cref{ch:rounding} explains where it comes from.
+It prints $\cp = \num{\valCpDefaultValueLong}$\,\si{\joule\per\mole\per\kelvin}. The heat capacity takes one call.
+We gave \code{derivative} no method and no step, so it uses its defaults. The method is \code{Central<2>}, the
+central difference of \cref{fig:secant}. The step is the default step, here \SI{\valCpDefaultStep}{\kelvin};
+\cref{ch:rounding} explains where it comes from.
 
-The result \code{d} holds either an estimate or the reason why there is none. \code{if (d)} is true when there is an
-estimate, and only then is \code{d->value}, the derivative, read; the \code{else} branch handles the failure. The test
-is not a formality. A call fails, with the error \code{error::non_finite}, for example when \code{fn} returns an
-infinite or NaN value at a point the method samples, or when the step is too small to move $x$ (\cref{ch:rounding}).
-Every listing in Part~I reads a result this way.
+The result \code{d} holds either an estimate or the reason why there is none. The test \code{if (d)} is true when
+there is an estimate. Only then does the program read \code{d->value}, the derivative. The \code{else} branch handles
+the failure. The test is not a formality, because a call can fail. It then returns the error
+\code{error::non_finite}. This happens, for example, when \code{fn} returns an infinite or NaN
+value\mnote{\emph{NaN}, ``not a number'', is the value of an undefined floating-point result such as $0/0$.} at a
+point that the method samples. It also happens when the step is too small to move $x$ (\cref{ch:rounding}). Every
+listing in Part~I reads a result this way.
 
-The first include is the book's own header, not the library's: \code{book::} is the namespace of the book's
-examples, and \code{shomate.hpp} defines the fit once for all of them, with the WebBook's coefficients and its
-expression for $\enth$:
+The first header that the program includes is the book's own, not the library's. \code{book::} is the namespace of
+the book's examples. The header \code{shomate.hpp} defines the fit once for all of them. It holds the WebBook's
+coefficients and its expression for $\enth$. First the coefficients:
 \snippetheader{shomate}{shomate}
-\needspace{16\baselineskip}% the lead-in and the listing together, so no empty frame top ends a page
-and the enthalpy itself, in \si{\joule\per\mole}:
+\needspace{4\baselineskip}% the lead-in with the first lines of the listing, so no empty frame top ends a page
+Then the enthalpy itself, in \si{\joule\per\mole}:
 \snippetheader{shomate}{shomate-H}
 
-How good is the estimate? For this function we know the answer. The WebBook also publishes the fit's $\cp(T)$, the
-exact derivative of $\enth(T)$, which gives $\cp(T_0) = \num{\valCpExactLong}$\,\si{\joule\per\mole\per\kelvin}. The
-estimate is off by \num{\valCpDefaultRelError} relative. This closed form is the \emph{answer key} of the book. We
-differentiate a function whose derivative we know so that every error can be measured; in practice you would
-differentiate one whose derivative you do not know, and \cref{ch:using} does so with a friction factor that comes
-from a solver. The closed form is exact for the \emph{function}, not for nitrogen: at \SI{1000}{\kelvin} the tables
-give \SI{\valCpTableValue}{\joule\per\mole\per\kelvin} (Part~II, p.~1621),\cite{chase1998} from which the fit
-differs by \num{\valCpFitVsTableRelDiff} relative. That is a matter for the property data, not for the derivative.
+How good is the estimate? For this function we know the answer. The WebBook also publishes the fit's $\cp(T)$,
+which is the exact derivative of $\enth(T)$. It gives $\cp(T_0) = \num{\valCpExactLong}$\,\si{\joule\per\mole\per\kelvin}.
+The estimate is off by \num{\valCpDefaultRelError} relative.\mnote{A \emph{relative} error is the error divided by
+the size of the exact value; it has no unit.} This closed form is the \emph{answer key} of the book. We differentiate
+a function whose derivative we know, so that we can measure every error. In practice you would differentiate one
+whose derivative you do not know. \Cref{ch:using} does so, with a friction factor that comes from a solver.
 
-Ridders' method adapts its step and reports an estimate of its own error in \code{abs_error}:
+Note that the closed form is exact for the \emph{function}, not for nitrogen. At \SI{1000}{\kelvin} the tables give
+\SI{\valCpTableValue}{\joule\per\mole\per\kelvin} (Part~II, p.~1621),\cite{chase1998} and the fit differs from this
+by \num{\valCpFitVsTableRelDiff} relative. That difference is a matter for the property data, not for the derivative.
+
+Now we try Ridders' method. It adapts its step and reports an estimate of its own error in \code{abs_error}:
 \snippet{01-why-first}{first-ridders}
-After \num{\valCpRiddersEvals} evaluations of $\enth$, against the stencil's two, it returns
+The method evaluates $\enth$ \num{\valCpRiddersEvals} times, where the stencil needed two. It returns
 $\cp = \num{\valCpRiddersValue}$\,\si{\joule\per\mole\per\kelvin} with an error estimate\mnote{\code{abs_error} is a
-\code{std::optional}, empty for the stencils; the \code{*} in \code{*r->abs_error} reads it.} of
-\SI{\valCpRiddersEstimate}{\joule\per\mole\per\kelvin}. The actual error is
-\SI{\valCpRiddersActual}{\joule\per\mole\per\kelvin}, or \num{\valCpRiddersRelError} relative, so the estimate is
-honest here: it is larger than the actual error. \Cref{ch:ridders} shows how the method works and how far its
-estimate can be trusted.
+\code{std::optional}: it either holds a value or is empty. It is empty for the stencils. The \code{*} in
+\code{*r->abs_error} reads the value.} of \SI{\valCpRiddersEstimate}{\joule\per\mole\per\kelvin}. The actual error is
+\SI{\valCpRiddersActual}{\joule\per\mole\per\kelvin}, or \num{\valCpRiddersRelError} relative. So the estimate is
+honest here: it is larger than the actual error. \Cref{ch:ridders} shows how the method works, and how far we can
+trust its estimate.
 
 \section{If you read nothing else}\label{sec:why-summary}
 
-\Cref{tab:method-summary} chooses a method for the five situations that cover most uses; the full decision table is
-\cref{tab:method-choice} in \cref{ch:using}.
+This section gives the essentials of the book in half a page: which method to use, what accuracy and cost to expect,
+and how to check a result. \Cref{tab:method-summary} chooses a method for the five situations that cover most uses. The full
+decision table is \cref{tab:method-choice} in \cref{ch:using}.
 
-\paragraph{Accuracy.} At the default step a first derivative in \code{double} has about
-\num{\valHeadlineFirstDigits} correct digits, a fourth derivative about \num{\valHeadlineFourthDigits}: the medians of
+\paragraph{Accuracy.} At the default step, a first derivative in \code{double} has about
+\num{\valHeadlineFirstDigits} correct digits,\mnote{\emph{About $n$ correct digits}: a relative error of about
+$10^{-n}$.} and a fourth derivative about \num{\valHeadlineFourthDigits}. Both are the medians of
 \cref{tab:accuracy-matrix}, measured on $\mathrm{e}^x$. Higher derivatives lose digits fast (\cref{ch:orders}).
 
-\paragraph{Cost.} A stencil costs a fixed number of evaluations, two for \code{Central<2>} and $f'$; Ridders' method
-typically \num{\valRiddersEvalsMedianFirst} for $f'$ and never more than \num{\valRiddersMaxEvalsFirst} (\cref{tab:cost}).
+\paragraph{Cost.} We count cost in evaluations, that is, in calls of $f$. A stencil costs a fixed number of
+evaluations: two for \code{Central<2>} and $f'$. Ridders' method typically needs \num{\valRiddersEvalsMedianFirst}
+for $f'$, and never more than \num{\valRiddersMaxEvalsFirst} (\cref{tab:cost}).
 
-\paragraph{Did it work?} Test the result before you use it, as in the program of \cref{sec:why-first}:
-\code{if (d)}, then \code{d->value}, and an \code{else} that handles the failure.
+\paragraph{Did it work?} Test the result before you use it, as the program of \cref{sec:why-first} does. Write
+\code{if (d)}, read \code{d->value} only inside it, and handle the failure in an \code{else}.
 
 \paragraph{Is it right?} A value can be wrong without any warning. Three situations cause most such errors:
 \begin{itemize}
-  \item $f$ varies on a scale far from $\max(\abs{x}, 1)$ in your units, such as a narrow transition or a small
-    mole fraction (\cref{sec:rounding-scale});
-  \item $f$ is the output of a solver, or otherwise less accurate than the number type (\cref{sec:rounding-noise});
-  \item $f$ has a kink or a range break within a few steps of $x$ (\cref{sec:using-pitfalls}).
+  \item $f$ changes appreciably over a distance in $x$ that is far from $\max(\abs{x}, 1)$ in your units, as across
+    a narrow transition or for a small mole fraction (\cref{sec:rounding-scale});
+  \item $f$ is the output of a solver, or is otherwise less accurate than the number type
+    (\cref{sec:rounding-noise});
+  \item $f$ has a kink or a range break within a few steps of $x$ (\cref{sec:using-pitfalls}).\mnote{A \emph{kink}
+    is a point where $f$ is continuous but its slope jumps. A \emph{range break} is the point where one fitted formula
+    hands over to the next.}
 \end{itemize}
-A stencil reports no error estimate: if in doubt, repeat the call with the steps $2h$ and $h/2$ and count the digits
-that agree (\cref{sec:using-check}). For Ridders' method, read the estimate before you report a value: accept the
-result \code{res} only if \code{res && res->abs_error && *res->abs_error <= atol + rtol * std::abs(res->value)}
-(\cref{sec:using-result}). Take \code{rtol} $= 10^{-n}$ for a value reported to $n$ significant figures and
-\code{atol} as the error you can accept in the derivative's units, which is what decides near a zero of $f'$; inside
-an iteration no check is needed. A passed check says that the estimate is small, not that the value is right where
-the estimate is blind, as at a kink.
+How can you tell? A stencil reports no error estimate. If in doubt, repeat the call with the steps $2h$ and $h/2$,
+and count the digits that agree (\cref{sec:using-check}). Ridders' method does report an estimate: read it before you
+report a value. Accept the result \code{res} only if
+\code{res && res->abs_error && *res->abs_error <= atol + rtol * std::abs(res->value)} (\cref{sec:using-result}).
+Here \code{rtol} is a relative tolerance and \code{atol} an absolute one. Take \code{rtol} $= 10^{-n}$ for a value
+that you report to $n$ significant figures. Take \code{atol} as the error you can accept, in the derivative's units.
+Near a zero of $f'$ the relative part of the tolerance shrinks to almost nothing, so \code{atol} is what decides
+there. Inside an iteration, no such check is needed. Keep in mind what a passed check says: that the estimate is
+small. It does not say that the value is right where the estimate is blind, as at a kink.
 
 % The table follows the two checks so that the list of the three silent failures is never split by
-% the float (R2-engineer-03); it still precedes the paragraph that cites it on the page.
-\begin{table}
+% the float (R2-engineer-03); it still precedes the paragraph that cites it on the page. [htb]: here, after the
+% checks, rather than at the foot of the chapter's last page below a gap (the language pass, PLAN.md 12.9).
+\begin{table}[htb]
 \sidecaption{The method in five situations. Each row is a call \code{derivative<M>(fn, x)}, or
-\code{derivative<M>(fn, x, h)} with the step given; $\epsmach$ is the machine epsilon of the type ($2^{-52}$ for
-\code{double}); $w$ is the distance in $x$ over which $f$ changes appreciably (\cref{sec:rounding-scale}); $\noise$
-is the relative accuracy of $f$, how many digits of it you can trust, for example $10^{-8}$ for a solver converged
-to a relative tolerance of $10^{-8}$ on its output (\cref{sec:rounding-noise}). Evaluations are those
-of \code{fn} for $f'$. The full table, with the evidence for each row, is \cref{tab:method-choice}; the
-quick-reference page at the end of the book repeats this one.\label{tab:method-summary}}
+\code{derivative<M>(fn, x, h)} when the step is given. Here $\epsmach$ is the machine epsilon of the type, the
+distance from 1 to the next number of the type ($2^{-52}$ for \code{double}). The scale $w$ is the distance in $x$
+over which $f$ changes appreciably (\cref{sec:rounding-scale}). The noise level $\noise$ is the relative accuracy of
+$f$, which says how many digits of it you can trust: for example $10^{-8}$ for a solver converged to a relative tolerance of $10^{-8}$ on its
+output (\cref{sec:rounding-noise}). The evaluations are those of \code{fn} for $f'$. The full table, with the
+evidence for each row, is \cref{tab:method-choice}. The quick-reference page at the end of the book repeats this
+one.\label{tab:method-summary}}
 \centering\footnotesize
 \renewcommand{\arraystretch}{1.15}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{33mm}>{\raggedright\arraybackslash}p{36mm}%
@@ -201,7 +243,7 @@ Situation & Method \code{M} and step & Cost and accuracy\\
 \end{tabular}
 \end{table}
 
-\paragraph{Where to read on.} Why the central difference beats the forward one: \cref{ch:taylor}. Why a smaller step
-is not better, and when to pass your own: \cref{ch:rounding}. More points and one-sided rules: \cref{ch:stencils};
-higher derivatives: \cref{ch:orders}; Ridders' method: \cref{ch:ridders}; the calls and the pitfalls:
-\cref{ch:using}.
+\paragraph{Where to read on.} \Cref{ch:taylor} explains why the central difference beats the forward one.
+\Cref{ch:rounding} explains why a smaller step is not always better, and when to pass your own. \Cref{ch:stencils}
+adds more points and one-sided rules, and \cref{ch:orders} treats higher derivatives. \Cref{ch:ridders} covers
+Ridders' method, and \cref{ch:using} the calls and the pitfalls.
