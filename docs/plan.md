@@ -96,7 +96,13 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
   - [x] CI passes on all five toolchains (2292381: run 40499775174)
   - [x] The independent review (Codex, and Kimi K3.1 Pro through Cline) and its adopted findings: six, all
     reproduced and fixed (`docs/roots/PHASE3_API.md`)
-- Phase 4: `Toms748`, `AndersonBjorck`.
+- Phase 4: `Toms748`, `AndersonBjorck`. API approved: `docs/roots/PHASE4_API.md`.
+  - [ ] `Toms748` (Algorithm 4.2 as printed) and `AndersonBjorck` (with the bisection guard), sharing
+    `detail::enclose` (the paper's modified `bracket`); every operation on fn's values checked
+  - [ ] Tests: the prototype's counts exactly; accuracy; the placement fallbacks; constant evaluation; the types; a
+    demo section
+  - [ ] CI passes on all five toolchains
+  - [ ] The independent review (Codex) and its adopted findings
 - Phase 5: searching, `expand(fn, x0)`.
 - Phase 6, at the user's choice: `Ridders`, `RegulaFalsi`, `Illinois`, `Steffensen`.
 
