@@ -9,10 +9,12 @@ next.
 Each error suggests a next step:
 
 - {cpp:enumerator}`nxx::roots::error::no_sign_change`: the bracket shows no sign change. Widen it, or search from a
-  guess ([Find a bracket](roots-find-a-bracket.md)).
+  guess ([Find a bracket](roots-find-a-bracket.md)). From `search` itself, try another guess, or check that fn changes
+  sign at all: an even root never does.
 - {cpp:enumerator}`nxx::roots::error::not_converged`: an open method found no root from its guess. Give it a bracket.
 - {cpp:enumerator}`nxx::roots::error::non_finite`: a value was not finite, often a point outside fn's domain ([Solve
-  on a restricted domain](roots-restricted-domain.md)), or a start or tolerance was not finite.
+  on a restricted domain](roots-restricted-domain.md)), or a start or tolerance was not finite, or a tolerance was
+  negative.
 
 `or_else` runs its fallback only on failure. Here Newton from 0 cycles on x^3 - 2x + 2 and gives `not_converged`;
 the fallback searches for a bracket and solves in it:
@@ -40,8 +42,17 @@ that is the standard library's exception, not Numerixx's. An exception thrown by
 
 ## Check for a pole
 
-A pole, where fn jumps from minus to plus infinity, changes sign like a root, and a bracketing method may return it as
-one. Where fn may have poles, check |fn(value)|: small at a root, large at a pole.
+A pole, where fn jumps between infinities of opposite signs, changes sign like a root, and a bracketing method may
+return it as one. The size of |fn(value)| alone does not tell them apart: a well-conditioned root can have a large
+|fn| nearby, and a pole a small one. How |fn| changes near the result does: it grows away from a root and falls away
+from a pole. Compare it a little to each side:
+
+```{literalinclude} ../examples/roots_handle_failures.cpp
+:start-after: // <pole-test>
+:end-before: // </pole-test>
+```
+
+and apply it to a result:
 
 ```{literalinclude} ../examples/roots_handle_failures.cpp
 :start-after: // <pole>

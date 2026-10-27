@@ -1,7 +1,8 @@
 // The program of docs/sphinx/how-to/roots-tolerances.md: abs_tol and rel_tol. The page shows the parts between the
 // markers; main returns non-zero unless what the page says holds. Counts are the independent prototypes'
-// (docs/roots/design.md, Evidence) or derived in a comment, for fn written as here and builds without FMA
-// contraction; every fn here is exact near its root, so a root's error is bounded by its abs_error alone.
+// (docs/roots/design.md, Evidence) or derived in a comment, for fn written as here and builds without FMA contraction.
+// x - 1e-300 and x - 1e-9 are exact near their roots, so their error is bounded by abs_error alone; x^2 - 2 adds a
+// conditioning term, derived where it is checked.
 
 // clang-format off
 // <includes>

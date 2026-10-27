@@ -144,3 +144,53 @@ explanations. Phase 5: `nxx::deriv`'s pages.
   guide; no Ridders-derivative counts; formulas as plain text. Adopted. Not adopted: cutting the errors guide (the
   docs review shows the reader needs the recovery it teaches) and not splitting (the pages grew from the other
   reviews; the user decides).
+
+## Reviews of the pages (8422f4a)
+
+CI passed on 8422f4a (run 40584146349). Then `docs-reviewer`, `numerics-reviewer`, a docs-only reader and the
+independent review (Codex); every finding was reproduced or checked before it was acted on.
+
+- The docs-only reader wrote the four programs (Kepler roots over M; van der Waals with `search` and NaN; Newton with
+  `derivative_of`; a root in `cpp_dec_float_50`) from the rendered pages alone. All four compiled under the tests'
+  warning flags and gave correct results. Its gaps, adopted where a page was wrong: the `mp` alias outside the shown
+  snippet; the rest (a table of call shapes, printing Boost values, an install section) deferred below.
+- The pole check (all four reviews): the page taught |fn(value)| against its size at the ends, the rule
+  `docs/roots/PHASE1_API.md` E rejected; reproduced, the resonance (x^2 - 2) / ((x^2 - 2)^2 + 1e-24) on [1, 2] is
+  called a pole at sqrt(2). Fixed: the local test E describes (|fn| at value against value +- 1024 abs_error), asserted
+  on the pole 1/(x - 1/3) and E's three cases.
+- The method table (all but the reader): Brent "never much slower than bisection" and Ridders "cheapest on (x - 1)^3"
+  contradicted the costs table (156 and 86 against Bisection's 54). Fixed; the header says the same (below).
+- `search` "cannot find an even root" (Codex): it returns {1, 1} for (x - 1)^2 from 1, where fn is exactly 0.
+  Reproduced; fixed, with the guess's scale and the root nearest the guess.
+- The van der Waals text credited the root to the edge approach (docs review): the upper side finds it, and without the
+  NaN the same code returns the pole at b. Fixed, and the pole asserted.
+- A bracket keeps fn's own points inside the domain, not a numerical derivative's nodes (three reviews); the ends must
+  be finite. Fixed.
+- The tutorial printed an "actual error" of 0, against the reference rounded to a double (Codex, docs review): the
+  reference is now held as two doubles (the error prints 8.0e-17). Its `int` pitfall was wrong for the shown
+  expression (numerics, Codex): reworded, and `std::pair{f, 1}`'s rejection asserted. "Two iterates have opposite
+  signs": fn's values at them.
+- `abs_tol = 1e-12` "comes out" at 3 digits: it is the guarantee; Brent returns this linear root almost exactly
+  (error 2e-25, reproduced). Reworded. The walk: a tiny root down to its own magnitude; 2e9 halvings is
+  `cpp_bin_float_50`'s.
+- Unchecked numbers (Codex, docs review): numerical Halley's 6 calls per point (now 30 from 2, the Phase 3
+  prototype's) and Newton's first iterate -19.9 (now recorded) asserted. `roots_costs.cpp`'s numerical rows now check
+  the `abs_error` contract too.
+- The other-types page: expression templates refer to fn's locals or by-value parameters, `cpp_bin_float_50` has them
+  off; the constexpr maths functions; the FMA condition on "the constant gives what a run gives" (not reproduced with
+  GCC `-mfma -ffp-contract=fast`, but stated); 80-bit x87. Fixed.
+- Tolerance derivations in the programs' comments (numerics): ln(x / 1e-12) c 2e-28 (was 7e-28), van der Waals 5e-19
+  (2e-18), the pole's c 0, the tolerances header. Fixed; all within their bounds on every toolchain.
+- Inline code in prose (`search(fn, 0.0)`, a type name): allowed; the rule is that code blocks come only from programs.
+
+Proposed to the user (changes to `include/`), from the same findings:
+- `roots.hpp`, `Ridders`: "the cheapest method here on roots of odd multiplicity" is false (Bisection and Halley 54
+  on (x - 1)^3, Ridders 86); and `solve`'s "Choosing a method" recommends Ridders there and lists Steffensen among the
+  bracket overload's teaching examples.
+- `roots.hpp`, `solve`: "where fn may have poles, check |fn(value)|" teaches the unsound test; say how |fn| changes
+  near value.
+- `roots.hpp`, `Criteria`: "about 2e9 in a Boost.Multiprecision type" is `cpp_bin_float_50`'s (`cpp_dec_float_50`:
+  about 2e8).
+
+Deferred from the reader: a table of call shapes (fn, fn and f', fn, f' and f'' against a bracket or a guess);
+printing a Boost value (`str(50)`); a complete CMake and `main.cpp` (with the install section, at the first release).

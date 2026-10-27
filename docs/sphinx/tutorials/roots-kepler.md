@@ -48,8 +48,9 @@ the precision of a double at the root.
 
 ## Checking the result
 
-E for e = 0.5 and M = 1 is 1.4987011335178483140... (computed to 100 digits). Print the actual error beside
-`abs_error`, and substitute E back into the equation:
+E for e = 0.5 and M = 1 is 1.4987011335178483140... (computed to 100 digits; the program holds it as two doubles, so
+that the difference is not rounded away). Print the actual error beside `abs_error`, and substitute E back into the
+equation:
 
 ```{literalinclude} ../examples/roots_kepler.cpp
 :start-after: // <check>
@@ -78,8 +79,8 @@ shows how to recover.
 ## From a guess, with Newton's method
 
 Newton's method needs the derivative, 1 - e cos E, and starts from a guess instead of a bracket; M is a good one.
-Return the value and the derivative together, as a `std::pair` of two doubles (a literal `1` instead of `1.0` would
-make the second an `int`, which `solve` rejects):
+Return the value and the derivative together, as a `std::pair` of two doubles. Both elements must be doubles: a bare
+literal such as `std::pair{f, 1}` would make the second an `int`, which `solve` rejects.
 
 ```{literalinclude} ../examples/roots_kepler.cpp
 :start-after: // <newton>
@@ -87,8 +88,8 @@ make the second an `int`, which `solve` rejects):
 :dedent:
 ```
 
-Newton's method iterates from the guess until two iterates have opposite signs, then finishes inside that bracket, so
-its result carries the same kind of bound as Brent's. It gives the same root to the same precision.
+Newton's method iterates from the guess until fn has opposite signs at two consecutive iterates, then finishes inside
+that bracket, so its result carries the same kind of bound as Brent's. It gives the same root to the same precision.
 
 ## Next
 

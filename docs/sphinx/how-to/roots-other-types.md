@@ -13,10 +13,10 @@ type you want.
 ```
 
 Write the literals in the type as well (`2.0f`, `2.0L`): `Bracket{1.0, 2.0}` would be a `double` bracket. The result is
-accurate to the precision of the type. That precision differs by platform for `long double`: it is the same as
-`double` with MSVC and clang-cl, 64-bit x87 extended precision with GCC and Clang on x86-64, and 113-bit quadruple
-precision with Emscripten. Take tolerances and expectations from `std::numeric_limits<long double>`, not from a fixed
-number of digits.
+accurate to the precision of the type. That precision differs by platform for `long double`: it is the same as `double`
+with MSVC and clang-cl, the x87's 80-bit extended precision (a 64-bit significand) with GCC and Clang on x86-64, and
+quadruple precision (a 113-bit significand) with Emscripten. Take tolerances and expectations from
+`std::numeric_limits<long double>`, not from a fixed number of digits.
 
 ## Boost.Multiprecision
 
@@ -28,9 +28,10 @@ number of digits.
 
 The root comes out to the 50 digits of the type. Three rules make a multiprecision fn correct:
 
-- Return the type itself, `bin50(x * x - 2)`, not the arithmetic expression. Several Boost types use expression
-  templates: `x * x - 2` is then an object that refers to `x`, and returning it from a lambda leaves it dangling. For
-  a pair or tuple of derivatives, name the element types, `std::pair<T, T>`:
+- Return the type itself, `bin50(x * x - 2)`, not the arithmetic expression. Some Boost types, such as
+  `cpp_dec_float_50`, use expression templates (`cpp_bin_float_50` does not): `x * x - 2` is then an object that may
+  refer to fn's locals or to a parameter taken by value, which are gone once fn returns. For a pair or tuple of
+  derivatives, name the element types, `std::pair<T, T>`:
 
   ```{literalinclude} ../examples/roots_other_types.cpp
   :start-after: // <expression-templates>
@@ -45,9 +46,9 @@ The root comes out to the 50 digits of the type. Three rules make a multiprecisi
 
 ## At compile time
 
-Every method is `constexpr`. In a constant expression, fn must be `constexpr` too, so it may use `+ - * /` and
-comparisons but not `std::sin` and the other mathematical functions of the standard library, and the type must be a
-literal type, which excludes the Boost types:
+Every method is `constexpr`. In a constant expression, fn must be `constexpr` too: `+ - * /` and comparisons, but not,
+portably, `std::sin`, `std::exp`, `std::log` or `std::sqrt`, which C++23 does not make `constexpr` (GCC accepts some as
+an extension). The type must be a literal type, which excludes the Boost types:
 
 ```{literalinclude} ../examples/roots_other_types.cpp
 :start-after: // <constexpr>
@@ -55,7 +56,8 @@ literal type, which excludes the Boost types:
 :dedent:
 ```
 
-The constant gives exactly what the same call gives at run time.
+The constant gives exactly what the same call gives at run time, on builds that do not contract `x * x - 2.0` into a
+fused multiply-add (the default on x86-64 and WebAssembly).
 
 The program needs:
 

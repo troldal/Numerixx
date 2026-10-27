@@ -67,7 +67,9 @@ namespace {
             return std::get<0>(fn(x));
         };
         auto const r = rt::solve<rt::Newton>(value, nxx::deriv::derivative_of(value), start);
-        if (!(r && std::abs(r->value - root) <= r->abs_error + c)) {
+        double const eps = std::numeric_limits<double>::epsilon();
+        if (!(r && std::abs(r->value - root) <= r->abs_error + c
+              && r->abs_error <= 2 * (std::numeric_limits<double>::denorm_min() + 2 * eps * std::abs(r->value)))) {
             std::println("inaccurate (numerical): root {}", root);
             ++failures;
         }

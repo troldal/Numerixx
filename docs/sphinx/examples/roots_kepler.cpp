@@ -14,11 +14,24 @@
 
 #include <limits>
 
+namespace {
+
+    // The page's pitfall: a bare literal 1 as the pair's second element makes it an int, which solve rejects.
+    template<typename F>
+    constexpr bool solvable = requires(F const &fn) { nxx::roots::solve<nxx::roots::Newton>(fn, 1.0); };
+    constexpr auto int_slope = [](double E) { return std::pair{E - 1.0, 1}; };
+    constexpr auto double_slope = [](double E) { return std::pair{E - 1.0, 1.0}; };
+    static_assert(!solvable<decltype(int_slope)> && solvable<decltype(double_slope)>);
+
+} // namespace
+
 int main()
 {
     // E for e = 0.5, M = 1: mpmath's findroot at 100 digits, and the Bessel series E = M + sum 2/n J_n(n e) sin(n M)
-    // as a second, independent computation (they agree to 1e-101).
+    // as a second, independent computation (they agree to 1e-101). Held as two doubles, reference + below, so that
+    // the printed error is not rounded to 0: reference is the nearest double, below the rest (-7.99e-17).
     constexpr double reference = 1.498701133517848314057985497256239901590695552547389812626730414735991;
+    constexpr double below = -7.9892103805705475e-17;
 
     // clang-format off
     // <function>
@@ -38,7 +51,7 @@ int main()
 
     // <check>
     if (r) {
-        std::println("actual error = {:.1e}", std::abs(r->value - reference));
+        std::println("actual error = {:.1e}", std::abs((r->value - reference) - below));
         std::println("kepler(E)    = {:.1e}", kepler(r->value));
     }
     // </check>
@@ -62,13 +75,14 @@ int main()
     double const eps = std::numeric_limits<double>::epsilon();
     double const bound = 2 * (std::numeric_limits<double>::denorm_min() + 2 * eps * reference);
 
-    // "The actual error is within abs_error": within abs_error + c, c the shift of fn's sign change from the exact
-    // root. Near the root sin(E) = 0.997 errs by at most 2 ulps (2.2e-16), times e = 0.5 (exact) 1.1e-16; E - e sin E
-    // rounds by half an ulp of 1 (1.1e-16), and - M is exact; the budget 2.2e-16 over f' = 1 - e cos E = 0.964 is
-    // 2.3e-16. The reference held in a double adds half an ulp of the root, 1.1e-16.
-    double const c = 2.3e-16 + 1.2e-16;
+    // "The actual error is within abs_error, give or take about 2e-16": within abs_error + c, c the shift of fn's
+    // sign change from the exact root. Near the root sin(E) = 0.997 errs by at most 2 ulps (2.2e-16), times e = 0.5
+    // (exact) 1.1e-16; E - e sin E rounds by half an ulp of 1 (1.1e-16), and - M is exact; the budget 2.2e-16 over
+    // f' = 1 - e cos E = 0.964 is 2.3e-16. The difference (value - reference) is exact (Sterbenz), and subtracting
+    // below adds at most half an ulp of it.
+    double const c = 2.3e-16 + 1e-31;
     for (auto const &root : {*r, *n}) {
-        if (!(std::abs(root.value - reference) <= root.abs_error + c)) return 2;
+        if (!(std::abs((root.value - reference) - below) <= root.abs_error + c)) return 2;
         if (!(root.abs_error <= bound)) return 3;
     }
     // "kepler(E) is close to 0": |fn(value)| <= max |f'| (1.5) times the distance to the exact root, plus fn's own

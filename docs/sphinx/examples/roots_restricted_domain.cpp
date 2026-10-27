@@ -14,6 +14,7 @@
 // </includes>
 // clang-format on
 
+#include <algorithm>
 #include <numbers>
 
 int main()
@@ -58,8 +59,17 @@ int main()
     // </stencil>
     // clang-format on
 
-    // Newton's first step from 20 is -(ln 20 - 1) / (1/20) = -39.9, to x = -19.9, where fn is NaN.
+    // Newton's first step from 20 is -(ln 20 - 1) / (1/20) = -39.9, to x = 20 - 20 (ln 20 - 1) = -19.9146, where fn
+    // is NaN: the lowest point it evaluates.
     if (!(newton == std::unexpected(rt::error::non_finite))) return 1;
+    double lowest = 20.0;
+    (void)rt::solve<rt::Newton>(
+        [&](double x) {
+            lowest = std::min(lowest, x);
+            return fn_and_slope(x);
+        },
+        20.0);
+    if (!(std::abs(lowest - (20.0 - 20.0 * (std::log(20.0) - 1.0))) <= 1e-13 && lowest < -19.9)) return 8;
     // e within abs_error + c: ln x near e errs by 2 ulps of 1 (4.4e-16), - 1 is exact, over f'(e) = 1/e = 0.37:
     // 1.2e-15, plus half an ulp of e for the reference in a double, 2.2e-16.
     if (!brent || !(std::abs(brent->value - std::numbers::e) <= brent->abs_error + 1.2e-15 + 2.3e-16)) return 2;
@@ -73,17 +83,23 @@ int main()
         },
         1e-4);
     if (!(b == rt::Bracket{0x1.78f49491f2dc3p-12, 0x1.00808c8259e20p-11} && calls == 29)) return 3;
-    // v = 4.36658136461612262e-4 (mpmath, with the constants as the doubles above). Each term of fn errs by a few
-    // units of its magnitude (5.9e6, 1.9e6, 4e6), about 8e-9 in all, over |f'| = 6.3e9: c = 1.3e-18; with half an ulp
-    // of v, 2e-18.
+    // v = 4.36658136461612262e-4 (mpmath, with the constants as the doubles above). The first term's three roundings
+    // (about 2e-9 at 5.9e6), the second's (4e-10 at 1.9e6) and the subtraction's (2.3e-10) make about 2.6e-9; - 4e6 is
+    // exact. Over |f'| = 6.3e9 that is 4.1e-19, plus half an ulp of v for the reference in a double, 2.7e-20: 5e-19.
     double const v = 4.36658136461612262e-4;
-    if (!volume || !(std::abs(volume->value - v) <= volume->abs_error + 2e-18)) return 4;
+    if (!volume || !(std::abs(volume->value - v) <= volume->abs_error + 5e-19)) return 4;
+    // Without the NaN, the formula's pole at b changes sign like a root: the same search and Brent return it.
+    auto const formula = [](double w) { return 8.314 * 280.0 / (w - 4.27e-5) - 0.364 / (w * w) - 4e6; };
+    auto const pole = rt::search(formula, 1e-4).and_then([&](rt::Bracket<double> const &b2) {
+        return rt::solve<rt::Brent>(formula, b2);
+    });
+    if (!pole || !(std::abs(pole->value - 4.27e-5) <= pole->abs_error)) return 9;
 
-    // The stencil: not_converged from the guess. In the bracket, the root 1e-12 within abs_error + c: x / 1e-12 near
-    // 1 rounds by half an ulp of 1 and ln adds 2 ulps of its result, 5.5e-16 in all, over f' = 1e12: 5.5e-28; with
-    // half an ulp of 1e-12, 7e-28.
+    // The stencil: not_converged from the guess. In the bracket, the root 1e-12 within abs_error + c: the computed
+    // sign change is where fl(x / 1e-12) crosses 1, and that quotient rounds by half an ulp of 1 (1.1e-16), so within
+    // 1.1e-16 * 1e-12 = 1.1e-28 of the double 1e-12, which fn and the check share; at most an ulp of x, 2e-28.
     if (!(from_guess == std::unexpected(rt::error::not_converged))) return 5;
-    if (!in_bracket || !(std::abs(in_bracket->value - 1e-12) <= in_bracket->abs_error + 7e-28)) return 6;
+    if (!in_bracket || !(std::abs(in_bracket->value - 1e-12) <= in_bracket->abs_error + 2e-28)) return 6;
     if (!(in_bracket->abs_error <= 2 * (std::numeric_limits<double>::denorm_min() + 2 * eps * in_bracket->value)))
         return 7;
     return 0;

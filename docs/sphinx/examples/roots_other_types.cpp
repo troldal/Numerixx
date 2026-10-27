@@ -21,7 +21,6 @@
 namespace {
 
     namespace rt = nxx::roots;
-    namespace mp = boost::multiprecision;
 
     constexpr char const *sqrt2_70 = "1.414213562373095048801688724209698078569671875376948073176679737990732";
 
@@ -29,7 +28,7 @@ namespace {
     // <constexpr>
     constexpr auto square = [](double x) { return x * x - 2.0; };
     constexpr auto root = rt::solve<rt::Brent>(square, rt::Bracket{1.0, 2.0});
-    static_assert(root.has_value() && root->abs_error < 1e-15);
+    static_assert(root.has_value());
     // </constexpr>
     // clang-format on
 
@@ -67,14 +66,14 @@ int main()
     // </float>
 
     // <multiprecision>
-    using bin50 = mp::cpp_bin_float_50;
+    using bin50 = boost::multiprecision::cpp_bin_float_50;
     auto const in_bin50 = rt::solve<rt::Brent>([](bin50 const &x) { return bin50(x * x - 2); },
                                                rt::Bracket{bin50(1), bin50(2)});
     if (in_bin50) std::println("{}", in_bin50->value.str(50));
     // </multiprecision>
 
     // <expression-templates>
-    using dec50 = mp::cpp_dec_float_50; // expression templates on
+    using dec50 = boost::multiprecision::cpp_dec_float_50; // expression templates on
     auto const fdf = [](dec50 const &x) { return std::pair<dec50, dec50>{x * x - 2, 2 * x}; };
     auto const in_dec50 = rt::solve<rt::Newton>(fdf, dec50(1));
     // </expression-templates>
@@ -84,7 +83,8 @@ int main()
     if (!accurate(in_long_double, 1.414213562373095048801688724209698078570L)) return 2;
     if (!accurate(in_bin50, bin50(sqrt2_70))) return 3;
     if (!accurate(in_dec50, dec50(sqrt2_70))) return 4;
-    // The constant expression gives what a run gives.
+    // The constant expression gives what a run gives (on builds without FMA contraction), and sqrt(2).
     if (!(root == rt::solve<rt::Brent>(square, rt::Bracket{1.0, 2.0}))) return 5;
+    if (!accurate(root, 1.4142135623730950488)) return 6;
     return 0;
 }

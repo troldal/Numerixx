@@ -102,6 +102,11 @@ int main()
     calls = 0;
     (void)rt::solve<rt::Newton>(counted_f, nxx::deriv::derivative_of(counted_f), 2.0);
     if (!(calls == 18)) return 8;
+    // Halley with f' and f'' both numerical, Central<2>: 6 calls per point (3 for f', 3 for f''), 30 from 2.
+    calls = 0;
+    (void)rt::solve<rt::Halley>(counted_f, nxx::deriv::derivative_of(counted_f),
+                                nxx::deriv::derivative_of<nxx::deriv::Central<2>, 2>(counted_f), 2.0);
+    if (!(calls == 30)) return 10;
     // Secant, value-only, from the same guess: 8 (Phase 2's prototype).
     calls = 0;
     (void)rt::solve<rt::Secant>(counted_f, 2.0);

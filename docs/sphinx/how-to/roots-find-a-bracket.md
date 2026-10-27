@@ -28,9 +28,13 @@ found a bracket, and either error comes through.
 
 - The type of the guess is the type of the search: `search(fn, 0)` asks for an `int` and does not compile. Write
   `search(fn, 0.0)`.
-- The search finds a sign change, not every root. It cannot find an even root, where fn touches 0 without changing
-  sign, nor two roots within one step of each other, and it brackets a pole like a root. When it finds no sign change
-  it returns {cpp:enumerator}`nxx::roots::error::no_sign_change`.
+- The guess sets the scale: the first step is a fiftieth of its magnitude (of 1 at 0), and the steps grow by half at
+  each try, within a cap. A guess far smaller than the root's scale may not reach it.
+- The search finds a sign change, not every root, and not necessarily the root nearest the guess. It misses an even
+  root, where fn touches 0 without changing sign (unless fn is exactly 0 at a point it tries), two roots within one
+  step of each other, and a root beyond a region where fn is not finite; it brackets a pole like a root. When it finds
+  no sign change it returns {cpp:enumerator}`nxx::roots::error::no_sign_change`: try another guess, or check that fn
+  changes sign at all. The reference for {cpp:func}`nxx::roots::search` lists its limits.
 - Where fn is defined on part of the line only, see [Solve on a restricted domain](roots-restricted-domain.md).
 
 The program needs:

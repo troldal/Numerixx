@@ -173,9 +173,10 @@ locally and in CI, and the examples' tests pass on all five toolchains.
   independent prototypes' counts and asserted by its program (the program that writes tables is dropped: a generated
   count would be Numerixx's own). Plan approved: `docs/sphinx/PHASE3_PLAN.md` (2026-10-27), with two comment fixes in
   `roots.hpp`.
-  - [ ] Pages, programs and tests; docs build clean
+  - [x] Pages, programs and tests; docs build clean (8422f4a: run 40584146349)
   - [ ] Reviews: `docs-reviewer`, numerics, a docs-only reader who writes client code that must compile; then the
-    independent review (Codex)
+    independent review (Codex). Done, findings fixed; three header comment fixes await the user
+    (`docs/sphinx/PHASE3_PLAN.md`)
 - Phase 4: `nxx::roots`, the explanations: bracketing and open methods; what a result means.
   - [ ] Pages; docs build clean
   - [ ] Reviews as in Phase 3
