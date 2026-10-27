@@ -11,7 +11,8 @@
  * with `->` or `*`.
  *
  * Newton and Halley take fn's derivatives either from fn, which then returns a std::pair, std::tuple or std::array of
- * exactly T (the value, f', f''), or from separate callables passed after fn.
+ * exactly T (the value, f', f''), or from separate callables passed after fn, which may return a std::expected:
+ * nxx::deriv::derivative_of(fn) gives a numerical derivative as such a callable.
  *
  * @code
  * namespace rt = nxx::roots;
@@ -64,7 +65,9 @@ namespace nxx::roots {
 
         /**
          * An open method found no root from its guess: no sign change between its iterates within its iteration cap,
-         * or no usable step (f' = 0 or not finite, Secant's two values equal, a step that would overflow).
+         * or no usable step (f' = 0, not finite or a failed std::expected, Secant's two values equal, a step that would
+         * overflow). With a numerical derivative also where its stencil leaves fn's domain at an iterate, or where |f'|
+         * is as small as the derivative's own error (a multiple root): see Newton with separate derivatives.
          */
         not_converged
     };
@@ -302,6 +305,36 @@ namespace nxx::roots {
         template<typename F, typename T>
         concept value_valued = nxx::detail::callable<F, T>
                                && !is_standard_tuple<std::remove_cvref_t<std::invoke_result_t<F &, T const &>>>;
+
+        /**
+         * @brief Whether R is a std::expected.
+         * @tparam R The type.
+         */
+        template<typename R>
+        inline constexpr bool is_expected = false;
+
+        /**
+         * @brief A std::expected is one.
+         * @tparam U The value type.
+         * @tparam E The error type.
+         */
+        template<typename U, typename E>
+        inline constexpr bool is_expected<std::expected<U, E>> = true;
+
+        /**
+         * @brief A separate derivative callable: one returning a value (value_valued), or a std::expected whose value
+         * converts to T, such as nxx::deriv::derivative_of's callable. The expected's error is never read.
+         *
+         * @tparam D The callable type.
+         * @tparam T The real type.
+         */
+        // is_expected comes first, so that value_type is formed only for an expected.
+        template<typename D, typename T>
+        concept derivative_valued =
+            value_valued<D, T>
+            || (std::invocable<D &, T const &> && is_expected<std::remove_cvref_t<std::invoke_result_t<D &, T const &>>>
+                && std::convertible_to<typename std::remove_cvref_t<std::invoke_result_t<D &, T const &>>::value_type,
+                    T>);
 
         /**
          * @brief fn gives at least K values at a point: its value alone (K = 1, value_valued), or a tuple-like of at
@@ -613,6 +646,32 @@ namespace nxx::roots {
         { return detail::evaluate<K>(fn, x, std::make_index_sequence<K>{}); }
 
         /**
+         * @brief A separate derivative's value at x: its value converted to T, or 0 for a std::expected without one.
+         *
+         * A failed derivative counts as one that is not finite, and 0 has the same effect in both steps: f' = 0 makes
+         * Newton's step unusable, as f' = inf does, and f'' = 0 gives exactly Newton's step in Halley's, as f'' = inf
+         * does. 0, because every nxx::real has it, where a NaN or an infinity need not exist.
+         *
+         * @tparam T The real type.
+         * @tparam D The callable type.
+         * @param dfn The derivative.
+         * @param x The point.
+         * @return The value.
+         */
+        template<real T, typename D>
+        constexpr T derivative_value(D &dfn, T const &x)
+        {
+            if constexpr (value_valued<D, T>) {
+                return static_cast<T>(std::invoke(dfn, x));
+            } else {
+                // Called once, and the result kept while it is read.
+                std::remove_cvref_t<std::invoke_result_t<D &, T const &>> const r = std::invoke(dfn, x);
+                if (!r) return T(0);
+                return static_cast<T>(*r);
+            }
+        }
+
+        /**
          * @brief fn and its separate derivative callables, joined into one function that returns their values as an
          * array: the separate form becomes the tuple form, so each method has one implementation.
          *
@@ -621,7 +680,7 @@ namespace nxx::roots {
          *
          * @tparam T The real type.
          * @tparam F The function's type, possibly a function type.
-         * @tparam Ds The derivatives' types.
+         * @tparam Ds The derivatives' types: each returns a value or a std::expected (derivative_valued).
          */
         template<real T, typename F, typename... Ds>
         struct Joined
@@ -642,7 +701,7 @@ namespace nxx::roots {
             constexpr std::array<T, 1 + sizeof...(Ds)> values(T const &x, std::index_sequence<I...>) const
             {
                 return std::array<T, 1 + sizeof...(Ds)>{ static_cast<T>(std::invoke(*fn, x)),
-                    static_cast<T>(std::invoke(*std::get<I>(derivatives), x))... };
+                    detail::derivative_value(*std::get<I>(derivatives), x)... };
             }
 
             /**
@@ -1179,10 +1238,39 @@ namespace nxx::roots {
     /**
      * @brief Newton on @p bracket with the derivative as a separate callable: the same as Newton on a fn returning
      * (f, f'), with each callable evaluated once per point.
+     *
+     * The derivative may return a value, or a std::expected whose value converts to T (its error is never read), such
+     * as the callable nxx::deriv::derivative_of(fn) or a lambda around nxx::deriv::derivative(fn, x, h) with a step of
+     * one's own. A std::expected without a value counts as a derivative that is not finite: on a bracket the step is a
+     * bisection step, from a guess the method ends with error::not_converged, and Halley takes Newton's step where only
+     * f'' failed. A numerical derivative fails only where fn returns a value that is not finite: return NaN outside
+     * fn's domain. Only its value is read: Ridders' error estimate does not steer the search.
+     *
+     * A numerical derivative is a convenience. With nxx::deriv's default `Central<2>` a point costs 3 calls of fn for
+     * Newton and 6 for Halley, about twice Secant from a guess and two to three times Brent on a bracket for a
+     * value-only fn; with `Ridders`, 6 to 11 times Secant. The bound never depends on the derivative, but from a guess
+     * the iterates can: where |f'| is as small as the derivative's own error, at a multiple root or a stationary point,
+     * Newton can stall into error::not_converged ((x - 1)^3 from 2) or jump far. A bracket always converges.
+     *
+     * @code
+     * namespace rt = nxx::roots;
+     * auto const r = rt::solve<rt::Newton>(fn, nxx::deriv::derivative_of(fn), rt::Bracket{0.0, 1.0});
+     * auto const s = rt::solve<rt::Newton>(fn, [&](double x) { return nxx::deriv::derivative(fn, x, 1e-4); }, 1.0);
+     * // f with its numerical derivative from one callable, evaluating f(x) once:
+     * auto const d = nxx::deriv::derivative_of(fn);
+     * auto const fd = [&](double x) {
+     *     auto const df = d(x);
+     *     return std::pair{fn(x), df ? df->value : std::numeric_limits<double>::quiet_NaN()};
+     * };
+     * @endcode
+     *
+     * A misuse fails one of the constraints, named in the compiler's message: detail::value_valued (fn returns a
+     * value, not a tuple or a std::expected), detail::derivative_valued (the derivatives), detail::bracketing and
+     * detail::open (the method and the start).
      * @tparam M Newton.
      * @tparam T The real type, deduced from @p bracket.
      * @tparam F A callable taking T const & and returning something convertible to T.
-     * @tparam D The derivative: a callable as F.
+     * @tparam D The derivative: a callable as F, or one returning a std::expected whose value converts to T.
      * @param fn The function.
      * @param dfn Its derivative.
      * @param bracket An interval in which fn changes sign.
@@ -1190,7 +1278,7 @@ namespace nxx::roots {
      * @return As for a bracket.
      */
     template<typename M, real T, typename F, typename D>
-    requires std::same_as<M, Newton> && detail::value_valued<F, T> && detail::value_valued<D, T>
+    requires std::same_as<M, Newton> && detail::value_valued<F, T> && detail::derivative_valued<D, T>
     [[nodiscard]] constexpr std::expected<Root<T>, error>
         solve(F &&fn, D &&dfn, Bracket<T> const &bracket, Criteria<std::type_identity_t<T>> const &criteria = {})
     {
@@ -1204,7 +1292,7 @@ namespace nxx::roots {
      * @tparam M Newton.
      * @tparam T The real type, deduced from @p guess.
      * @tparam F A callable taking T const & and returning something convertible to T.
-     * @tparam D The derivative: a callable as F.
+     * @tparam D The derivative: a callable as F, or one returning a std::expected whose value converts to T.
      * @param fn The function.
      * @param dfn Its derivative.
      * @param guess The starting point.
@@ -1212,7 +1300,7 @@ namespace nxx::roots {
      * @return As from a guess.
      */
     template<typename M, real T, typename F, typename D>
-    requires std::same_as<M, Newton> && detail::value_valued<F, T> && detail::value_valued<D, T>
+    requires std::same_as<M, Newton> && detail::value_valued<F, T> && detail::derivative_valued<D, T>
     [[nodiscard]] constexpr std::expected<Root<T>, error>
         solve(F &&fn, D &&dfn, T const &guess, Criteria<std::type_identity_t<T>> const &criteria = {})
     {
@@ -1226,8 +1314,8 @@ namespace nxx::roots {
      * @tparam M Halley.
      * @tparam T The real type, deduced from @p bracket.
      * @tparam F A callable taking T const & and returning something convertible to T.
-     * @tparam D The first derivative: a callable as F.
-     * @tparam D2 The second derivative: a callable as F.
+     * @tparam D The first derivative: a callable as F, or one returning a std::expected whose value converts to T.
+     * @tparam D2 The second derivative: as D.
      * @param fn The function.
      * @param dfn Its first derivative.
      * @param d2fn Its second derivative.
@@ -1236,8 +1324,8 @@ namespace nxx::roots {
      * @return As for a bracket.
      */
     template<typename M, real T, typename F, typename D, typename D2>
-    requires std::same_as<M, Halley> && detail::value_valued<F, T> && detail::value_valued<D, T>
-             && detail::value_valued<D2, T>
+    requires std::same_as<M, Halley> && detail::value_valued<F, T> && detail::derivative_valued<D, T>
+             && detail::derivative_valued<D2, T>
     [[nodiscard]] constexpr std::expected<Root<T>, error> solve(F &&fn,
         D &&dfn,
         D2 &&d2fn,
@@ -1254,8 +1342,8 @@ namespace nxx::roots {
      * @tparam M Halley.
      * @tparam T The real type, deduced from @p guess.
      * @tparam F A callable taking T const & and returning something convertible to T.
-     * @tparam D The first derivative: a callable as F.
-     * @tparam D2 The second derivative: a callable as F.
+     * @tparam D The first derivative: a callable as F, or one returning a std::expected whose value converts to T.
+     * @tparam D2 The second derivative: as D.
      * @param fn The function.
      * @param dfn Its first derivative.
      * @param d2fn Its second derivative.
@@ -1264,8 +1352,8 @@ namespace nxx::roots {
      * @return As from a guess.
      */
     template<typename M, real T, typename F, typename D, typename D2>
-    requires std::same_as<M, Halley> && detail::value_valued<F, T> && detail::value_valued<D, T>
-             && detail::value_valued<D2, T>
+    requires std::same_as<M, Halley> && detail::value_valued<F, T> && detail::derivative_valued<D, T>
+             && detail::derivative_valued<D2, T>
     [[nodiscard]] constexpr std::expected<Root<T>, error>
         solve(F &&fn, D &&dfn, D2 &&d2fn, T const &guess, Criteria<std::type_identity_t<T>> const &criteria = {})
     {

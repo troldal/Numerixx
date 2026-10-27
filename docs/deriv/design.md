@@ -112,6 +112,24 @@ module (the library, real types, the general test rules) is in `docs/design.md`;
   the evaluation (`difference_of`, `second_difference_of`), so that the forward levels, which have fn(x) already, use
   the same checks.
 
+## A derivative as a callable (`derivative_of`)
+
+Added for `nxx::roots`' Newton and Halley (roots Milestone 2, Phase 3; `docs/roots/PHASE3_API.md`, user decisions
+P1, P4, P5).
+- `derivative_of<M, N>(fn)` returns a callable whose call at x is `derivative<M, N>(fn, x)` with the default step,
+  bit for bit. Its type is unspecified (`detail::DerivativeOf<M, N, G>`), as `std::bind_front`'s, so a second call
+  operator (one that shares fn(x) with the caller) could be added later without a break.
+- It holds a decayed copy of fn, so it cannot dangle; `std::ref(fn)` shares a large or stateful fn. The call operator
+  has an explicit object parameter, so fn is called with the callable's constness, as `std::bind_front`'s result
+  calls its target: a `mutable` fn's copy is callable through a non-const callable only.
+- The call operator's constraint states `derivative`'s conditions (`callable` of fn as stored, `exact_weights`)
+  instead of naming `derivative`, whose overload resolution would select the deprecated twin for float above f'.
+- No precision warning: the type is known only where an algorithm calls the callable, inside a header, where a pragma
+  at the user's line cannot silence it and a system-header include hides it (the reasons for the twin overloads). The
+  documentation states float's accuracy above f'. A spike showed the call operator warning-free on all five
+  toolchains with warnings as errors.
+- No step parameter: a step of one's own is a lambda around `derivative(fn, x, h)`.
+
 ## Ridders (`derivative<Ridders>`, `ForwardRidders`, `BackwardRidders`)
 
 The specification, with the evidence for each rule and constant, is `PHASE3_API.md` ("Algorithm" and "The
@@ -173,6 +191,11 @@ The one-sided methods:
   whose NaN guides its restarts.
 
 ## Tests
+
+- `derivative_of` (`tests/test_deriv_of.cpp`, `deriv:of:*`): the same result as `derivative`, bit for bit, for
+  `Central<2>` (f' and `order::second`) and `Ridders` (its error estimate passed through), in constant evaluation and
+  at run time, one multiprecision case; the copy, `std::ref`, the constness and the constraint (also for the narrow
+  types of `test_callables.cpp`).
 
 - Ridders: the actual error must be within 6 times the estimate, and the estimate within twice the independent
   Python prototype's value for the case (for the multiprecision types, which the prototype does not model, twice the

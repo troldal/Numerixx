@@ -343,6 +343,19 @@ From the usage sketch (7 snippets, 7 misuses):
 - The copy, `std::ref`'s lifetime, `std::move`, `abs_error` and two recipes documented; the misuse concepts named in
   `solve`'s documentation.
 
+## Changes during implementation
+
+- No change to the API. Every `Central<2>` count of the table is reproduced exactly by the C++ (`roots:numerical:*`).
+- A failed derivative is converted in one helper, `detail::derivative_value`, which `Joined` calls once per
+  derivative and point.
+- The tests: the failure equivalence against infinity is tested with the derivatives that fail only sometimes (below
+  x = 1.42 on x^2 - 2: on [1, 2] Newton's accepted step from 1.4167 becomes a bisection step; from 10 the iterate
+  1.4145 has no step; Halley's f'' on [1, 2] and [1.3, 2] and from 10), each also checked to differ from the analytic
+  run; an always-failing f' on [1, 2] is checked for accuracy, not against `Bisection`, whose stop differs from the
+  bracket loop's.
+- `demo/roots_demo.cpp` section 11: Kepler by Newton and Halley with `Central<2>`, Newton with `Ridders`, and Secant
+  (21, 30, 107 and 10 calls); ln(x / 1e-12) from 1e-13 and on [1e-20, 1].
+
 ## Deferred
 
 - fn (the value) returning `std::expected` (P3).

@@ -111,6 +111,26 @@ the phases in `docs/plan.md`, and each phase's specification and evidence in `PH
 - **An open method returns a root,** the first sign change its iterates cross, not necessarily the one nearest the
   guess; documented.
 
+## Numerical derivatives (Phase 3)
+
+- **A separate derivative may return a std::expected** whose value converts to T (user decision P3): any
+  `std::expected<U, E>`, so `nxx::roots` names no type of `nxx::deriv`; `nxx::deriv::derivative_of`'s callable and a
+  lambda around `derivative(fn, x, h)` are the uses. fn itself still returns a value or a tuple (deferred).
+- **A failed derivative counts as one that is not finite** (P2, superseding `BRIEF.md` 3.4's `non_finite`): on a
+  bracket a bisection step, from a guess `not_converged`, for Halley's f'' Newton's step. Stored as 0, which every
+  `nxx::real` has and which has the same effect in both steps (tested against a derivative returning infinity, bit for
+  bit). Final for behaviour: an error later would turn roots found today into errors.
+- **The cost is documented, not prevented:** with `Central<2>` a point costs 3 calls of fn for Newton, 6 for Halley
+  (f'' evaluates fn(x) again; sharing it is deferred, P6). Newton then costs 1.5 to 2.3 times Secant from the same
+  guess and 1.7 to 3.5 times Brent on the same bracket (6.1 on ln(x / 1e-12) over [1e-20, 1]); Halley 1.5 to 4.2 times
+  Secant; with `Ridders` 6 to 11 times Secant.
+- **The bound never depends on the derivative; the iterates can.** `Central<2>`'s error is absolute (h^2 f''' / 6,
+  h^2 = 3.7e-11 near |x| <= 1, plus rounding). Where |f'| is far above it the points are the analytic ones; where
+  comparable, the outcome changes either way: (x - 1)^3 from 2 and x^2 - 2 from 1e-12 become `not_converged`,
+  x^3 - 1e-3 from 0 converges. A bracket always converges.
+- **The default step assumes fn varies on the scale max(|x|, 1):** ln(x / 1e-12) from 1e-13 has a failed f' at the
+  guess (`not_converged`), and on [1e-20, 1] every point below 6e-6 has one (pure bisection, 276 calls).
+
 ## Evidence (Phase 1)
 
 An independent Python implementation of the specification in double (`.scratch/roots1/proto3.py`, references from
@@ -147,6 +167,26 @@ gives these evaluation counts, which the C++ reproduces exactly for fn of `+ - *
 | 1e300 (x - 1) | x0 = 1e7: 2 / 2 / 4 | |
 | W10 (Wilkinson) | x0 = 7.2: 21 / 19 / 23; 6.8: 22 / 16 / 23 | [6.7, 7.6]: 28 / 24 (Brent 23) |
 
+## Evidence (Phase 3)
+
+`.scratch/roots3/proto3.py` (Phase 2's prototype with `nxx::deriv`'s `Central<2>` f' and f'' reproduced step for step)
+gives these calls of f, which the C++ reproduces exactly for fn of `+ - * /` and sqrt (Newton / Halley, numerical;
+the analytic counts in brackets):
+
+| Case | From a guess | On a bracket |
+|---|---|---|
+| x^2 - 2 | x0 = 1: 21 / 30 (7 / 5); 10: 27 / 42 (9 / 7); 1e-12: `not_converged` 3 / 6 (47 / 31) | [1, 2]: 24 / 36 (8 / 6) |
+| x^3 - 2x - 5 | x0 = 2: 18 / 30 (6 / 5); 10: 33 / 48 (11 / 8) | [2, 3]: 21 / 36 (7 / 6) |
+| (x - 1)^3 | x0 = 2: `not_converged` 639 / 1278 (89 / 53) | [0, 3]: 549 / 1008 (91 / 54) |
+| x^3 - 1e-3 | x0 = 0: 105 / 204 (`not_converged`) | [0, 1]: 33 / 54 (11 / 9) |
+| 1/x - 1 | x0 = 0.5: 21 / 18 (7 / 2) | [0.5, 3]: 27 / 36 (9 / 6) |
+| x^20 - 1 | x0 = 0.5: 66 / 66 (22 / 11); 2: 60 / 66 (20 / 11) | [0, 5]: 33 / 66 (11 / 11) |
+| sqrt x - 0.5 | x0 = 1: 15 / 30 (4 / 5) | [0, 1]: 12 / 24 (4 / 4) |
+| ln(x / 1e-12) | x0 = 1e-13: `not_converged` 3 / 6 (8 / 6) | [1e-20, 1]: 276 / 552 (20 / 18) |
+
+`Ridders` (the library's, measured, not a reference): Newton from a guess / on a bracket 53 / 58 calls on x^2 - 2,
+69 / 78 on cos x - x, 91 / 95 on e^x - 2, 107 / 112 on Kepler.
+
 ## Tests
 
 - References from closed forms and published constants, at 70 digits for the multiprecision types (more digits than
@@ -157,3 +197,7 @@ gives these evaluation counts, which the C++ reproduces exactly for fn of `+ - *
   rounding is involved.
 - The edge cases in double; a few accuracy cases and a `static_assert` per other type (no `static_assert` for the
   Boost types, which are not literal types).
+- Numerical derivatives (`tests/test_roots_numerical.cpp`, `roots:numerical:*`): counts are calls of the user's f.
+  A derivative returning an expected against the plain one, a failed derivative against one returning infinity, and
+  a derivative that fails only sometimes, chosen so that a step that would be accepted is refused, with a check that
+  the run differs from the analytic one (so the test is not vacuous).

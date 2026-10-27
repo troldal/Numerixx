@@ -14,6 +14,9 @@
  * if (d) use(d->value, *d->abs_error); // e to about 1e-15, with an error estimate of about 6e-14
  * auto const d2 = nxx::deriv::derivative<nxx::deriv::Ridders, 2>([](double x) { return std::exp(x); }, 1.0);
  * @endcode
+ *
+ * derivative_of<M, N>(fn) gives the same derivative as a callable, for algorithms that take one, such as Newton's
+ * method in nxx::roots.
  */
 
 #pragma once
@@ -1819,6 +1822,82 @@ namespace nxx::deriv {
         "use double, or silence this warning at the call or with NUMERIXX_NO_PRECISION_WARNING")]] [[nodiscard]]
     constexpr std::expected<Estimate<T>, error> derivative(F &&fn, T const &x)
     { return detail::derivative_default<M, static_cast<int>(N)>(fn, x); }
+
+    namespace detail {
+
+        /**
+         * @brief The callable that derivative_of() returns: a copy of fn and the method, called as derivative<M, N>.
+         *
+         * The call operator has an explicit object parameter, so fn is called with the callable's own constness, as
+         * the result of std::bind_front calls its target: a `mutable` fn can be called through a non-const callable,
+         * not through a const one. Its constraint states derivative()'s conditions directly rather than naming
+         * derivative(), whose overload resolution would select the deprecated twin for a coarse type above f'.
+         *
+         * @tparam M The method.
+         * @tparam N The derivative order, 1 to 4.
+         * @tparam G The stored callable: fn decayed.
+         */
+        template<typename M, int N, typename G>
+        struct DerivativeOf
+        {
+            /** @brief The function, a copy (or a std::reference_wrapper of it). */
+            G fn;
+
+            /**
+             * @brief derivative<M, N>(fn, x), with the default step.
+             * @tparam Self The callable's own type, with its constness and value category.
+             * @tparam T The real type, deduced from @p x.
+             * @param self The callable.
+             * @param x The point.
+             * @return The estimate of the derivative, or error::non_finite.
+             */
+            template<typename Self, real T>
+            requires nxx::detail::callable<decltype((std::declval<std::remove_reference_t<Self> &>().fn)), T>
+                     && detail::exact_weights<M, N, T>
+            constexpr std::expected<Estimate<T>, error> operator()(this Self &&self, T const &x)
+            { return detail::derivative_default<M, N>(self.fn, x); }
+        };
+
+    } // namespace detail
+
+    /**
+     * @brief A derivative of @p fn as a callable: d(x) is `derivative<M, N>(fn, x)`, with the default step.
+     *
+     * For an algorithm that takes a derivative as a callable, such as Newton's method in nxx::roots:
+     * `solve<Newton>(fn, derivative_of(fn), x0)`. d(x) is valid for every real T for which `derivative<M, N>(fn, x)` is,
+     * and gives the same result, bit for bit, a std::expected<Estimate<T>, error> whose error estimate (Ridders') is
+     * passed through.
+     *
+     * The callable holds a copy of fn, decayed (a free function becomes a pointer, a lambda is copied or moved), so it
+     * stays valid when fn's scope ends. A large fn, such as one holding a table, is copied too: pass `std::ref(fn)` to
+     * share it, and keep fn alive while the callable is used. A stateful fn (a `mutable` lambda, a cache) is copied, so
+     * its state diverges from the original's; `std::ref(fn)` shares it. A copy of a `mutable` fn is called through a
+     * non-const callable (`auto d = derivative_of(g)`), not through a const one. `derivative_of(std::move(fn))` moves
+     * from fn.
+     *
+     * The step is derivative()'s default, which assumes that fn varies on the scale max(|x|, 1); for another step,
+     * write the lambda `[&](double x) { return derivative<M, N>(fn, x, h); }`. Unlike a direct call of derivative(), a
+     * call of the callable does not warn for a derivative above the first in a coarse type such as float, where it
+     * keeps few correct digits: the type is known only where an algorithm calls it, inside a header, where the warning
+     * could not be silenced at the caller's line.
+     *
+     * @code
+     * auto const d = derivative_of(fn);                          // f' by Central<2>
+     * auto const d2 = derivative_of<Ridders, order::second>(fn); // f'' by Ridders
+     * if (auto const r = d(1.0)) use(r->value);
+     * @endcode
+     *
+     * @tparam M The method: `Central<P>` (by default `Central<2>`), `Forward<P>`, `Backward<P>`, `Ridders`,
+     *           `ForwardRidders` or `BackwardRidders`.
+     * @tparam N The derivative order: 1 (the default) to 4, an integer or an `order`.
+     * @tparam F The callable type; its decayed type must be constructible from it.
+     * @param fn The function to differentiate.
+     * @return The callable, of an unspecified type.
+     */
+    template<typename M = Central<2>, auto N = 1, typename F>
+    requires detail::method<M> && detail::valid_order<N> && std::constructible_from<std::decay_t<F>, F>
+    [[nodiscard]] constexpr auto derivative_of(F &&fn)
+    { return detail::DerivativeOf<M, static_cast<int>(N), std::decay_t<F>>{ std::forward<F>(fn) }; }
 
 } // namespace nxx::deriv
 

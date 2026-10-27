@@ -1,5 +1,6 @@
 // Numerixx demo: roots of a function of one variable in a bracket with nxx::roots.
 
+#include <numerixx/deriv.hpp>
 #include <numerixx/roots.hpp>
 
 #include <cmath>
@@ -215,6 +216,50 @@ namespace {
         count<rt::Newton>("x^3 - 2x + 2: Newton, [-2, -1]", cycle, { -2.0, -1.0 });
     }
 
+    void numerical_derivatives()
+    {
+        // Where f' is inconvenient to derive, nxx::deriv computes it: derivative_of(f) is a callable whose call at x
+        // is derivative(f, x). Each point then costs the derivative's calls of f too (Central<2>: 2 more), so for a
+        // value-only f, Secant and Brent are usually cheaper. Every call of f is counted here.
+        namespace dv = nxx::deriv;
+        std::println("\n11. Numerical derivatives (calls of f)");
+        auto const report = [](std::string_view label, std::expected<rt::Root<double>, rt::error> const &r, int n) {
+            if (r)
+                std::println("   {:<30} {:.17g} +- {:.1e}  ({} calls)", label, r->value, r->abs_error, n);
+            else
+                std::println("   {:<30} error: {}  ({} calls)", label, r.error(), n);
+        };
+        auto const kepler = [](double big_e) { return big_e - 0.9 * std::sin(big_e) - 1.0; };
+        int n = 0;
+        Counted<decltype(kepler)> const f{ kepler, &n };
+        auto r = rt::solve<rt::Newton>(f, dv::derivative_of(f), 1.0);
+        report("Kepler: Newton, Central<2>", r, n);
+        n = 0;
+        r = rt::solve<rt::Halley>(f, dv::derivative_of(f), dv::derivative_of<dv::Central<2>, 2>(f), 1.0);
+        report("Kepler: Halley, Central<2>", r, n);
+        n = 0;
+        r = rt::solve<rt::Newton>(f, dv::derivative_of<dv::Ridders>(f), 1.0);
+        report("Kepler: Newton, Ridders", r, n);
+        n = 0;
+        r = rt::solve<rt::Secant>(f, 1.0);
+        report("Kepler: Secant", r, n);
+
+        // A numerical derivative fails where its stencil leaves f's domain. A failure counts as a derivative that is
+        // not finite: from a guess there is no step, on a bracket a bisection step. ln(x / 1e-12) varies on a scale
+        // far below the default step's max(|x|, 1) eps^(1/3) = 6e-6.
+        auto const ln = [](double x) { return std::log(x / 1e-12); };
+        Counted<decltype(ln)> const g{ ln, &n };
+        n = 0;
+        r = rt::solve<rt::Newton>(g, dv::derivative_of(g), 1e-13);
+        report("ln: Newton from 1e-13", r, n);
+        n = 0;
+        r = rt::solve<rt::Newton>(g, dv::derivative_of(g), rt::Bracket{ 1e-20, 1.0 });
+        report("ln: Newton on [1e-20, 1]", r, n);
+        n = 0;
+        r = rt::solve<rt::Secant>(g, 1e-13);
+        report("ln: Secant from 1e-13", r, n);
+    }
+
 } // namespace
 
 int main()
@@ -229,4 +274,5 @@ int main()
     errors();
     composition();
     open_methods();
+    numerical_derivatives();
 }

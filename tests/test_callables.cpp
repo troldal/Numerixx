@@ -194,6 +194,13 @@ static_assert(accepted<nxx::deriv::BackwardRidders, 4, Narrow<11>>);
 // The built-in types hold every table: Central<10> f'''' needs 6,222,216, below float's 2^24.
 static_assert(accepted<Central<10>, 4, double> && accepted<Forward<6>, 4, double>);
 static_assert(accepted_with_step<Central<10>, 3, float> && accepted_with_step<Backward<6>, 3, float>);
+// derivative_of's callable carries the same constraint: invocable exactly where derivative<M, N>(fn, x) is.
+static_assert(std::is_invocable_v<decltype(nxx::deriv::derivative_of(narrow_square<Narrow<11>>)) const &,
+    Narrow<11> const &>);
+static_assert(!std::is_invocable_v<decltype(nxx::deriv::derivative_of<Central<10>>(narrow_square<Narrow<11>>)) const &,
+    Narrow<11> const &>);
+static_assert(!std::is_invocable_v<decltype(nxx::deriv::derivative_of<Forward<6>, 2>(narrow_square<Narrow<11>>)) &,
+    Narrow<11> const &>);
 // A narrow type differentiates where its digits suffice: x^2 at 3 with h = 1/2 is exact.
 static_assert(derivative(narrow_square<Narrow<11>>, Narrow<11>(3), Narrow<11>(0.5))->value.v == 6.0);
 

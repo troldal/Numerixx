@@ -88,10 +88,11 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
     (`docs/roots/PHASE2_API.md`)
 - Phase 3: numerical derivatives, `nxx::deriv::derivative_of<M, N>(fn)`, and derivative callables returning
   `std::expected`. API approved: `docs/roots/PHASE3_API.md`.
-  - [ ] `derivative_of` (a decayed copy of fn, called with the callable's constness, no precision warning); `dfn` and
+  - [x] `derivative_of` (a decayed copy of fn, called with the callable's constness, no precision warning); `dfn` and
     `d2fn` returning `std::expected`, a failed derivative counting as one that is not finite
-  - [ ] Tests: `derivative_of` against `derivative` bit for bit; the equivalences and the partial failure; the
-    prototype's `Central<2>` counts exactly; the types; constant evaluation; the constraints; a demo section
+  - [x] Tests: `derivative_of` against `derivative` bit for bit; the equivalences and the partial failure; the
+    prototype's `Central<2>` counts exactly; the types; constant evaluation; the constraints; a demo section (five
+    toolchains and WSL GCC and Clang, locally)
   - [ ] CI passes on all five toolchains
   - [ ] The independent review (Codex) and its adopted findings
 - Phase 4: `Toms748`, `AndersonBjorck`.
@@ -103,8 +104,9 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
 ### Derivatives (`nxx::deriv`)
 
 - Gradients and Jacobians, until a module needs them.
-- A derivative as a callable (`derivative_of(fn)`): planned, Milestone 2 Phase 3 (its use: numerical derivatives for
-  Newton and Halley).
+- For `derivative_of` (`docs/roots/PHASE3_API.md`): a step or scale (a lambda around `derivative(fn, x, h)` does it
+  now), and a second call operator that takes fn(x) from the caller, so that Halley's numerical f'' need not evaluate
+  it again.
 
 Customization (reviewed 2026-10-25 with a usage sketch and a simplicity review; every item can be added without
 breaking the API, so none needs a hook now):
