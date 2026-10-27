@@ -102,27 +102,30 @@ namespace {
 
 } // namespace
 
-// Constant evaluation, per method and type, and the wide brackets in double.
-static_assert(nxx::math::abs(rt::solve<rt::Toms748>(sq, B{ 1.0, 2.0 })->value - sqrt2) <= 3e-16);
-static_assert(nxx::math::abs(rt::solve<rt::AndersonBjorck>(sq, B{ 1.0, 2.0 })->value - sqrt2) <= 3e-16);
+// Constant evaluation, per method and type, and the wide brackets in double. Each bound is the contract's:
+// |value - ref| <= abs_error + c <= 2 tol(value) + c, with tol = 2 eps |x| near sqrt(2) (4 eps |x| = 5.7 eps), c fn's
+// rounding over |f'| (0.35 eps, as for double in test_roots_bracketing.cpp), and the reference within half an ulp:
+// about 6.3 eps, so 8 eps.
+static_assert(nxx::math::abs(rt::solve<rt::Toms748>(sq, B{ 1.0, 2.0 })->value - sqrt2) <= 8 * deps);
+static_assert(nxx::math::abs(rt::solve<rt::AndersonBjorck>(sq, B{ 1.0, 2.0 })->value - sqrt2) <= 8 * deps);
 static_assert(nxx::math::abs(rt::solve<rt::Toms748>([](float x) { return x * x - 2.0f; }, rt::Bracket{ 1.0f, 2.0f })
                                  ->value
                              - 1.41421356f)
-              <= 4e-7f);
+              <= 8 * std::numeric_limits<float>::epsilon());
 static_assert(
     nxx::math::abs(rt::solve<rt::AndersonBjorck>([](float x) { return x * x - 2.0f; }, rt::Bracket{ 1.0f, 2.0f })
                        ->value
                    - 1.41421356f)
-    <= 4e-7f);
+    <= 8 * std::numeric_limits<float>::epsilon());
 static_assert(
     nxx::math::abs(rt::solve<rt::Toms748>([](long double x) { return x * x - 2.0L; }, rt::Bracket{ 1.0L, 2.0L })->value
                    - 1.4142135623730950488016887242096980785696718753769L)
-    <= 8 * std::numeric_limits<long double>::epsilon()); // 2 tol + c, about 7 eps near sqrt(2)
+    <= 8 * std::numeric_limits<long double>::epsilon());
 static_assert(nxx::math::abs(rt::solve<rt::AndersonBjorck>([](long double x) { return x * x - 2.0L; },
                                  rt::Bracket{ 1.0L, 2.0L })
                                  ->value
                              - 1.4142135623730950488016887242096980785696718753769L)
-              <= 8 * std::numeric_limits<long double>::epsilon()); // 2 tol + c, about 7 eps near sqrt(2)
+              <= 8 * std::numeric_limits<long double>::epsilon());
 static_assert(rt::solve<rt::Toms748>(minus_1, B{ -dmax, dmax })->value == 1.0);
 static_assert(rt::solve<rt::AndersonBjorck>(minus_1, B{ -dmax, dmax })->value == 1.0);
 
@@ -249,12 +252,15 @@ TEST_CASE("roots: Toms748 and AndersonBjorck, edges")
     bin50 const placed = rt::detail::place(near0, std::optional<bin50>(bin50(0)), big_defaults);
     CHECK(placed > bin50(0));
     CHECK(placed < bin50(0.5));
-    // ... and the solve that reached it: fn = 1 above 0 and -min at 0, on [0, 0.5].
+    // ... and the solve that reached it: fn = 1 above 0 and -min at 0, on [0, 0.5]. The sign change is at 0, the end
+    // with the smaller |fn|, and the contract's bound there is 2 tol(0) = 2 min (the default abs_tol is denorm_min()).
     auto const step_at_0 = [smallest](bin50 const &x) { return x > 0 ? bin50(1) : bin50(-smallest); };
     for (auto const &r : { rt::solve<rt::Toms748>(step_at_0, rt::Bracket<bin50>{ bin50(0), bin50(0.5) }),
              rt::solve<rt::AndersonBjorck>(step_at_0, rt::Bracket<bin50>{ bin50(0), bin50(0.5) }) }) {
         REQUIRE(r.has_value());
-        CHECK(r->abs_error <= bin50(4 * smallest));
+        CHECK(r->value == bin50(0));
+        CHECK(r->abs_error > bin50(0));
+        CHECK(r->abs_error <= bin50(2 * smallest));
     }
 }
 

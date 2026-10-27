@@ -101,8 +101,9 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
     `detail::enclose` (the paper's modified `bracket`); every operation on fn's values checked
   - [x] Tests: the prototype's counts exactly; accuracy; the placement fallbacks; constant evaluation; the types; a
     demo section (five toolchains and WSL GCC and Clang, locally)
-  - [ ] CI passes on all five toolchains
-  - [ ] The independent review (Codex) and its adopted findings
+  - [x] CI passes on all five toolchains (8951e7c: run 40511081791)
+  - [x] The independent reviews (Codex, and Kimi K3.1 Pro through Cline): no defect in the header; two test
+    findings fixed (`docs/roots/PHASE4_API.md`)
 - Phase 5: searching, `expand(fn, x0)`.
 - Phase 6, at the user's choice: `Ridders`, `RegulaFalsi`, `Illinois`, `Steffensen`.
 

@@ -277,6 +277,19 @@ From the usage sketch (6 snippets, 6 misuses):
 - The multiprecision walk to 0, and constant evaluation of long walks: stated (E).
 - A reversed bracket: tested.
 
+## Independent reviews (OpenAI Codex and Kimi K3.1 Pro, 8951e7c)
+
+After the implementation (8951e7c, CI run 40511081791), two read-only reviews with the same brief: OpenAI Codex, and,
+at the user's request, Kimi K3.1 Pro through the Cline CLI (plan mode) as a cold read, without Codex's findings.
+Neither found a defect in `roots.hpp`: both checked Algorithm 4.2 against the paper, the arithmetic checks, the
+placement and its fallbacks, termination, the stop test and `abs_error`, AndersonBjorck's rescaling and guard, the user
+types and the constraints, and Codex ran extreme inputs in constant evaluation on GCC and Clang and 400 random cases
+per method. Their findings were in the tests, and both are fixed:
+1. **The constant-evaluation bounds for float and double had no derivation** (both): now the contract's bound,
+   2 tol(value) + c with the reference's rounding, 8 eps for every type, derived in a comment.
+2. **The no-subnormal test accepted an invalid bound** (Codex): it checked `abs_error <= 4 min` only; it now checks
+   the value (0) and `abs_error <= 2 tol(0) = 2 min`.
+
 ## Sources
 
 - Alefeld, G. E., Potra, F. A. and Shi, Y. (1995). Algorithm 748: Enclosing zeros of continuous functions. *ACM
