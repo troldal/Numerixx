@@ -11,7 +11,7 @@
  *
  * @code
  * auto const d = nxx::deriv::derivative<nxx::deriv::Ridders>([](double x) { return std::exp(x); }, 1.0);
- * if (d) use(d->value, *d->abs_error); // e to about 1e-15, with an error estimate of about 6e-14
+ * if (d) use(d->value, *d->abs_error); // e to about 3e-15, with an error estimate of about 2e-13
  * auto const d2 = nxx::deriv::derivative<nxx::deriv::Ridders, 2>([](double x) { return std::exp(x); }, 1.0);
  * @endcode
  *

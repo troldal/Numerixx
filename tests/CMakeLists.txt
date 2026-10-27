@@ -28,16 +28,28 @@ target_compile_definitions(boost_multiprecision INTERFACE BOOST_MP_STANDALONE)
 
 add_executable(numerixx_tests test_math.cpp test_deriv.cpp test_stencils.cpp test_callables.cpp test_ridders.cpp
         test_orders.cpp test_onesided.cpp test_deriv_of.cpp test_roots_bracketing.cpp test_roots_open.cpp
-        test_roots_numerical.cpp test_roots_toms_anderson.cpp test_roots_search.cpp test_roots_classic.cpp)
+        test_roots_numerical.cpp test_roots_toms_anderson.cpp test_roots_search.cpp test_roots_classic.cpp
+        test_roots_examples.cpp)
 target_link_libraries(numerixx_tests PRIVATE numerixx::numerixx doctest::doctest_with_main boost_multiprecision)
 if (MSVC)
-    target_compile_options(numerixx_tests PRIVATE /W4 /WX /permissive-)
+    set(numerixx_test_warnings /W4 /WX /permissive-)
 else ()
-    target_compile_options(numerixx_tests PRIVATE
-            -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion -Werror)
+    set(numerixx_test_warnings -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion -Werror)
 endif ()
+target_compile_options(numerixx_tests PRIVATE ${numerixx_test_warnings})
 
 add_test(NAME numerixx_tests COMMAND numerixx_tests)
+
+# The program of the documentation's getting-started page (docs/sphinx), built and run so that the page's code cannot
+# rot; it checks what the page says about its results.
+add_executable(numerixx_docs_example_getting_started ${PROJECT_SOURCE_DIR}/docs/sphinx/examples/getting_started.cpp)
+target_link_libraries(numerixx_docs_example_getting_started PRIVATE numerixx::numerixx)
+target_compile_options(numerixx_docs_example_getting_started PRIVATE ${numerixx_test_warnings})
+# libstdc++ on MinGW keeps the Windows console part of std::print in libstdc++exp.
+if (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_link_libraries(numerixx_docs_example_getting_started PRIVATE stdc++exp)
+endif ()
+add_test(NAME numerixx_docs_example_getting_started COMMAND numerixx_docs_example_getting_started)
 
 # The low-precision warning of a derivative above the first in float. Each case is an object library outside the normal
 # build, built by its test, since two of them must fail: with warnings as errors, "warns_step" and "warns_default" (one

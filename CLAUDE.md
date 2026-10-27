@@ -32,6 +32,8 @@ A module may use another module's public API, never its `detail`.
 - `CMakePresets.json` one preset per toolchain, used locally and in CI (`.github/workflows/ci.yml`)
 - `docs/plan.md` the plan; `docs/design.md` the decisions for every module; `docs/<module>/` per module (above)
 - `docs/Doxyfile` the API documentation settings, used by the docs targets in `docs/CMakeLists.txt`
+- `docs/sphinx/` the documentation site (MyST pages, `conf.py` with its Breathe patch and checks, pinned
+  `requirements.txt`); a page shows code only from `docs/sphinx/examples/`, programs built and run as tests
 - `docs/deriv-book/` the book on `nxx::deriv` (LaTeX): its own `CLAUDE.md` holds its rules, roles and process; its
   examples build as tests (`NUMERIXX_BUILD_BOOK`), its PDF is the target `numerixx_book`
 
@@ -43,9 +45,12 @@ Presets: `clang-cl`, `cl`, `gcc`, `clang`, `emscripten`; each builds Debug into 
 - Build: `cmake --build --preset <preset>`
 - Run affected tests: `build/<preset>/tests/numerixx_tests --test-case="roots:*"` (the module's prefixes, above)
 - Full suite: `ctest --preset <preset>`
-- Docs: `cmake --build --preset <preset> --target numerixx_docs` (or `numerixx_docs_internal`, which adds the `detail`
-  namespaces) writes `build/<preset>/docs/public/html`; a Doxygen warning fails it. The targets exist when Doxygen
-  1.10 or later is found (Strawberry Perl's 1.10 is first on PATH; 1.18 is in `C:/Program Files/doxygen/bin`).
+- Docs: `cmake --build --preset <preset> --target numerixx_docs` writes the Sphinx site to
+  `build/<preset>/docs/public/html` (Doxygen XML, then Sphinx with Breathe and MyST through `uv run` with
+  `docs/sphinx/requirements.txt`); a Doxygen or Sphinx warning, or a failed check in `docs/sphinx/conf.py`, fails it.
+  It needs uv and Doxygen 1.18 or later (in `C:/Program Files/doxygen/bin`; a build directory configured earlier may
+  have cached Strawberry Perl's 1.10: pass `-DDOXYGEN_EXECUTABLE`). `numerixx_docs_internal` writes Doxygen's HTML
+  with the `detail` namespaces to `build/<preset>/docs/internal/html`, with Doxygen 1.10 or later.
 - `clang-cl` and `cl` need the MSVC environment, which the agent's shell lacks: run them from a batch file that first
   calls `"C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"`.
 - `g++` on PATH is Strawberry Perl's; configure `gcc` with `-DCMAKE_CXX_COMPILER=C:/Toolchains/GCC16/bin/g++.exe` and

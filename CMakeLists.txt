@@ -24,7 +24,8 @@ if (NUMERIXX_BUILD_BOOK)
     add_subdirectory(docs/deriv-book)
 endif ()
 
-option(NUMERIXX_BUILD_DOCS "Add the Numerixx documentation targets (needs Doxygen)" ${PROJECT_IS_TOP_LEVEL})
+option(NUMERIXX_BUILD_DOCS "Add the Numerixx documentation targets (needs Doxygen; the site also uv)"
+        ${PROJECT_IS_TOP_LEVEL})
 if (NUMERIXX_BUILD_DOCS)
     find_package(Doxygen 1.10)
     if (DOXYGEN_FOUND)

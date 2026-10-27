@@ -222,6 +222,7 @@ static_assert(mirrored<6, 1>() && mirrored<5, 2>() && mirrored<1, 3>() && mirror
 static_assert(has_weights<Central<2>, 2, 3>({ -1, 0, 1 }, { 1, -2, 1 }, 1));
 static_assert(has_weights<Central<4>, 2, 5>({ -2, -1, 0, 1, 2 }, { -1, 16, -30, 16, -1 }, 12));
 static_assert(has_weights<Central<6>, 2, 7>({ -3, -2, -1, 0, 1, 2, 3 }, { 2, -27, 270, -490, 270, -27, 2 }, 180));
+// This row and Backward<2>'s f'''' below are the nodes the example in derivative's comment (deriv.hpp) states.
 static_assert(has_weights<Central<2>, 3, 4>({ -2, -1, 1, 2 }, { -1, 2, -2, 1 }, 2));
 static_assert(has_weights<Central<4>, 3, 6>({ -3, -2, -1, 1, 2, 3 }, { 1, -8, 13, -13, 8, -1 }, 8));
 static_assert(has_weights<Central<2>, 4, 5>({ -2, -1, 0, 1, 2 }, { 1, -4, 6, -4, 1 }, 1));

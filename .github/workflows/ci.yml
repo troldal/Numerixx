@@ -68,6 +68,28 @@ jobs:
       - run: cmake --build --preset ${{ matrix.compiler }}
       - run: ctest --preset ${{ matrix.compiler }}
 
+  # The documentation site (docs/sphinx): Doxygen's XML, then Sphinx through uv, failing on any warning or check.
+  docs:
+    runs-on: ubuntu-26.04
+    env:
+      DOXYGEN_VERSION: '1.18.0'
+      DOXYGEN_SHA256: 14fa81bdc34171edb5f1f02b1d60e74802f0439b77fa44e592565d517d72df90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: '0.13.5'
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - run: |
+          curl -sSL -o doxygen.tar.gz \
+            "https://github.com/doxygen/doxygen/releases/download/Release_${DOXYGEN_VERSION//./_}/doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz"
+          echo "$DOXYGEN_SHA256  doxygen.tar.gz" | sha256sum -c -
+          tar xzf doxygen.tar.gz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/doxygen-$DOXYGEN_VERSION/bin" >> "$GITHUB_PATH"
+      - run: >
+          cmake --preset gcc -DNUMERIXX_BUILD_TESTS=OFF -DNUMERIXX_BUILD_DEMOS=OFF -DNUMERIXX_BUILD_BOOK=OFF
+      - run: cmake --build --preset gcc --target numerixx_docs
+
   emscripten:
     runs-on: ubuntu-26.04
     env:

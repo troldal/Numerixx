@@ -204,6 +204,7 @@ static_assert(agrees_at_three_points<nxx::deriv::Ridders>());
 static_assert(agrees_at_three_points<nxx::deriv::ForwardRidders>());
 static_assert(agrees_at_three_points<nxx::deriv::BackwardRidders>());
 
+// The claim of the example in default_step's comment (deriv.hpp): it is what derivative(fn, x) uses.
 TEST_CASE("deriv: default_step is the step of the default-step call")
 {
     CHECK(default_step(0.5) == nxx::math::root_epsilon<3, double>());
@@ -280,6 +281,7 @@ TEST_CASE("deriv: a step that is not positive and finite is an error, and fn is 
 // error is formattable: the enumerator's name, with the format specification of a string (U-11).
 static_assert(std::formattable<nxx::deriv::error, char>);
 
+// The output in the example of the formatter's comment (deriv.hpp): "no estimate: non_finite".
 TEST_CASE("deriv: error formats as its name")
 {
     CHECK(std::format("{}", nxx::deriv::error::non_finite) == "non_finite");

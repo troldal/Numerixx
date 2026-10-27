@@ -140,24 +140,27 @@ locally and in CI, and the examples' tests pass on all five toolchains.
     parameter list. A patch in `conf.py` fixes the first two, and with it `sphinx-build -W` reports nothing. MkDocs
     was rejected: MkDoxy 1.2.8 reads neither clauses nor concepts, and MkDocs is unmaintained
   - [x] Toolchain chosen by the user (2026-10-27): Sphinx, Breathe and MyST for the guides and the full reference
-- Phase 2: skeleton. `docs/sphinx/` (`conf.py`, pinned `requirements.txt`, MyST pages), `GENERATE_XML` in the Doxyfile,
-  a `numerixx_sphinx` target after the Doxygen run, `-W --keep-going` and `nitpicky`.
-  - [ ] The Breathe patch in `conf.py`, with Breathe pinned: the `requires` clause appended to the template prefix
+- Phase 2: skeleton. Plan approved: `docs/sphinx/PHASE2_PLAN.md` (2026-10-27). `docs/sphinx/` (`conf.py`, pinned
+  `requirements.txt`, MyST pages); `numerixx_docs` becomes the Sphinx site (Doxygen XML, then Sphinx `-E -W` through
+  `uv run`), `numerixx_docs_internal` stays Doxygen HTML.
+  - [x] The Breathe patch in `conf.py`, with Breathe pinned: the `requires` clause appended to the template prefix
     (`SphinxRenderer.create_template_prefix`), and a concept's `<initializer>` shown as a code block (the
     `Node_compounddefType` entry of `SphinxRenderer.node_handlers`)
-  - [ ] Doxygen: `EXCLUDE_SYMBOLS = *::detail *::detail::*` (deriv's `detail` leaks into the public docs now) and
-    `GENERATE_DEPRECATEDLIST = NO`; Sphinx: `breathe_show_include = False`, `detail` and `std` names in clauses
-    ignored by `nitpick_ignore_regex`
-  - [ ] One reference page per namespace (`doxygennamespace`, a `doxygenconcept` per concept), no suppressed warning
-  - [ ] Checks that fail the build: every public symbol in Doxygen's `index.xml`, outside `detail`, appears in a
-    directive on some page; the rendered pages hold as many `requires` clauses as the XML, so that a Breathe upgrade
-    cannot drop them silently
-  - [ ] Examples as tests: pages show code only through `literalinclude` from `.cpp` files built into `numerixx_tests`
-    (`docs:*`); tables of counts and accuracy written by a program at build time, not typed
-  - [ ] The header `@code` blocks covered by tests that assert their claims (counts, accuracy)
-  - [ ] A CI job (pinned Doxygen 1.10 or later, Sphinx `-W`, `linkcheck`)
-- Phase 3: `nxx::roots`: getting started, the user guide (the result types, choosing a method, tolerances, errors,
-  user-defined types, derivatives), the API reference.
+  - [x] Doxygen: `EXCLUDE_SYMBOLS = *::detail *::detail::*` (deriv's `detail` leaks into the public docs now) and
+    `GENERATE_DEPRECATEDLIST = NO`; Sphinx: `breathe_show_include = False`, names without a target ignored by
+    `nitpick_ignore_regex`
+  - [x] One reference page per namespace, with the concept and the `std::formatter` specialisations; no suppressed
+    warning (`clang-cl`: no warning from Doxygen or Sphinx)
+  - [x] Checks in `conf.py` that fail the build: every symbol in the XML is reached by a directive; the clauses and
+    concept definitions the patch emitted equal those in the XML, so that a Breathe upgrade cannot drop them silently
+  - [x] Examples as tests: pages show code only through `literalinclude` from standalone programs, each built and run
+    as a test on all five toolchains
+  - [x] The header `@code` blocks covered by tests in the module test files that assert their claims; the
+    `deriv.hpp:14` comment corrected (it gave relative figures as absolute)
+  - [ ] A CI job (Doxygen 1.18.0 pinned, uv, Sphinx `-W`)
+  - [ ] The reviews of the phase and the independent review (Codex)
+- Phase 3: `nxx::roots`: the user guide (the result types, choosing a method, tolerances, errors, user-defined types,
+  derivatives); the program that writes tables of counts and accuracy, at the first table.
   - [ ] Pages, examples and tests; docs build clean
   - [ ] Reviews: the API statements against the code, numerics, a docs-only reader who writes client code that must
     compile; then the independent review (Codex)
@@ -165,7 +168,8 @@ locally and in CI, and the examples' tests pass on all five toolchains.
   - [ ] Pages, examples and tests; docs build clean
   - [ ] Reviews as in Phase 3
 
-Open decisions: hosting (GitHub Pages from CI, or Read the Docs) and versioning (one site per release, or `dev` only);
+Open decisions: hosting (GitHub Pages from CI, or Read the Docs) and versioning (one site per release, or `dev` only),
+with `linkcheck` and the install section of getting-started;
 whether the headers' `@code` blocks move to `@snippet` from tests (a change to `include/`); whether to offer the
 `requires` patch to Breathe upstream.
 

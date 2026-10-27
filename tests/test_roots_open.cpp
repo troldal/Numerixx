@@ -152,7 +152,7 @@ TEST_CASE("roots: open methods, evaluation counts in double")
         CHECK(counted<rt::Halley>(fn, x0).second == halley);
         if (secant > 0) CHECK(counted<rt::Secant>(fn, x0).second == secant);
     };
-    check(sq, 1.0, 7, 5, 9); // the early hand-over: 1.5 is past the root
+    check(sq, 1.0, 7, 5, 9); // the early hand-over: 1.5 is past the root; the counts of roots.hpp's examples
     check(sq, 10.0, 9, 7, 13); // the late hand-over: monotone from above, crossing only at the minimum step
     check(sq, 1e-3, 17, 12, 25);
     check(sq, 1.4142135623730951, 2, 2, 4); // a guess at the root: one minimum step past it

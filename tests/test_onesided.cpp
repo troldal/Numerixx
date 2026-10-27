@@ -251,6 +251,11 @@ TEST_CASE("onesided: domain edges")
     CHECK(accurate<4>(exp_above, 1.0, e, { 4.7e-7, 2.2e-3, 25 }));
     CHECK(covered(derivative<BackwardRidders>(exp_below, 1.0), e));
     CHECK(covered(derivative<BackwardRidders, 4>(exp_below, 1.0), e));
+    // The example of ForwardRidders' comment in deriv.hpp: log, NaN below 0.5, at 0.5. Ridders fails, ForwardRidders
+    // gives 2 to about 1e-13 relative (4 * 9.4e-15 here; the prototype's run of this case gives the reference).
+    auto const log_above = [](double t) { return t < 0.5 ? std::nan("") : std::log(t); };
+    CHECK(derivative<Ridders>(log_above, 0.5) == non_finite);
+    CHECK(accurate<1>(log_above, 0.5, 2.0, { 9.4e-15, 1.7e-12, 10 }));
 
     // sqrt and log near 0, where fn varies on the scale x, far below the default step: after untrusted results the
     // restarts start below the smallest step tried, and reach the scale of x within the levels.

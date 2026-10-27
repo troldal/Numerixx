@@ -86,7 +86,8 @@ static_assert(!bracket_of<int>); // integers are not real
 TEST_CASE("roots: accuracy in double")
 {
     // x^2 - 2: fn errs by at most half an ulp of 2 (x * x rounds; - 2 is exact near 2), so its sign change is within
-    // 2.2e-16 / |f'| = 2.2e-16 / 2.83 = 7.9e-17 of sqrt(2).
+    // 2.2e-16 / |f'| = 2.2e-16 / 2.83 = 7.9e-17 of sqrt(2). Brent's case is the example of roots.hpp's file comment,
+    // whose 9 evaluations are asserted in "roots: evaluation counts in double".
     CHECK(brackets(rt::solve<rt::Bisection>(square_minus_2, rt::Bracket{ 1.0, 2.0 }), sqrt2, 8e-17));
     CHECK(brackets(rt::solve<rt::Brent>(square_minus_2, rt::Bracket{ 1.0, 2.0 }), sqrt2, 8e-17));
 
@@ -387,6 +388,7 @@ TEST_CASE("roots: fn's exceptions pass through")
 }
 #endif
 
+// The output in the example of the formatter's comment (roots.hpp): "no root: no_sign_change".
 TEST_CASE("roots: error formats as its name")
 {
     CHECK(std::format("{}", rt::error::non_finite) == "non_finite");

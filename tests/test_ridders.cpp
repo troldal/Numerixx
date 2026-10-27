@@ -153,7 +153,8 @@ static_assert(within(derivative<Ridders>(opposite_levels, 1.0, h_levels)->value,
     *derivative<Ridders>(opposite_levels, 1.0, h_levels)->abs_error));
 static_assert(*derivative<Ridders>(opposite_levels, 1.0, h_levels)->abs_error <= 4 * deps * (dmax / 2));
 
-// The uniform return type: stencils leave the error estimate empty, Ridders fills it in.
+// The uniform return type: stencils leave the error estimate empty, Ridders fills it in (the claim of the example in
+// Estimate's comment, deriv.hpp).
 static_assert(!derivative(cube, 2.0, 0.25)->abs_error.has_value());
 static_assert(!derivative<Central<4>>(cube, 2.0, 0.25)->abs_error.has_value());
 static_assert(derivative<Ridders>(cube, 2.0, 1.0 / 16)->abs_error.has_value());
@@ -220,7 +221,9 @@ TEST_CASE("ridders: polynomials, the uniform type and the conversion at run time
 
 TEST_CASE("ridders: accuracy against closed forms, double and float")
 {
-    // The prototype's values for the same cases, with the default initial step (docs/deriv/PHASE3_API.md).
+    // The prototype's values for the same cases, with the default initial step (docs/deriv/PHASE3_API.md). exp at 1 in
+    // double is the example of deriv.hpp's file comment: e to about 3e-15 (4 * 9.8e-16 * e = 1.1e-14 here), with an
+    // estimate of about 2e-13 (2 * 6.0e-14 * e = 3.3e-13 here).
     auto const check = []<typename T>(T, Reference exp_ref, Reference sin_ref, Reference runge_ref, Reference log_ref) {
         using std::cos, std::exp, std::log, std::sin;
         CHECK(accurate([](T x) { return T(exp(x)); }, T(1), T(exp(T(1))), exp_ref));
@@ -236,11 +239,14 @@ TEST_CASE("ridders: accuracy against closed forms, double and float")
         { 5.6e-15, 4.9e-14, 16 },
         { 1.6e-14, 7.3e-14, 16 });
     check(float{}, { 7.2e-6, 1.9e-5, 10 }, { 4.4e-6, 3.3e-5, 10 }, { 3.3e-7, 5.7e-6, 10 }, { 1.1e-6, 9.8e-6, 12 });
+    // The second call of that example, which makes no claim.
+    CHECK(derivative<Ridders, 2>([](double x) { return std::exp(x); }, 1.0).has_value());
 }
 
 TEST_CASE("ridders: restarts below a failing or untrusted step")
 {
-    // Domain edges: the default initial step 1/32 reaches below 0, where log is NaN.
+    // Domain edges: the default initial step 1/32 reaches below 0, where log is NaN. log at 0.01 is the example of
+    // Ridders' comment in deriv.hpp: 100 to about 1e-13 relative (4 * 5.0e-14 here).
     auto const log = [](double x) { return std::log(x); };
     CHECK(accurate(log, 0.01, 100.0, { 5.0e-14, 1.8e-13, 24 }));
     CHECK(accurate(log, 1e-4, 1e4, { 1.6e-14, 2.8e-13, 36 }));

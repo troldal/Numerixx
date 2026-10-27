@@ -51,6 +51,7 @@ namespace {
 
 // The same result as derivative<M, N>(fn, x), bit for bit, the whole std::expected: the order passes through (an
 // integer or an order), and so does Ridders' error estimate.
+// derivative_of(fn) is f' by Central<2>, as the example in its comment (deriv.hpp) says.
 static_assert(derivative_of(cube)(1.5) == derivative(cube, 1.5));
 static_assert(derivative_of<Central<2>, nxx::deriv::order::second>(cube)(1.5)
               == derivative<Central<2>, nxx::deriv::order::second>(cube, 1.5));
