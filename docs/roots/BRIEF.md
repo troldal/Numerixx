@@ -1,5 +1,9 @@
 # `nxx::roots`: architecture brief
 
+Note (2026-10-27): the entry point `root<M>(...)` of this brief is now `solve<M>(...)` (`PHASE2_API.md`, user
+decision), and the open methods finish inside the first sign change their iterates cross, so every method's
+`abs_error` is a bound (it supersedes 3.5's "open: the last step, an estimate" and 3.7's stop test for them).
+
 Status: approved by the user on 2026-10-25, D1 to D9 as recommended. Not a phase API: it fixes the architecture that
 the phase specifications (`PHASE<n>_API.md`) will refine. One review round (usage-sketcher, simplicity-critic) is folded
 in (section 8), and the user's first decisions (2026-10-25): Steffensen, Illinois and regula falsi are deferred, not
@@ -379,7 +383,10 @@ Non-breaking to add later unless marked:
 - `Root`'s extra members (3.5) and its conversion to T; `Criteria::max_iterations`.
 - Other tuple-like types for fn (a user struct opting in).
 - A guess inside a bracket, a two-point start for `Secant`, fn(lower) and fn(upper) supplied with the bracket (new
-  overloads).
+  overloads). Each new start is its own aggregate type, never extra positional T parameters, which would capture a
+  braced criteria list such as `{1.0}` and change the meaning of existing calls (Phase 2 review).
+- User tuple-like types for fn: only by an explicit opt-in trait, never detected through `std::tuple_size` (Phase 2
+  review).
 - A partial form for `and_then` (`then<M>(fn)`).
 - A tolerance on |f|; user stop callables.
 - Complex roots and roots of analytic fn by contour methods: the polynomial module.

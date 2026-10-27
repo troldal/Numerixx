@@ -65,9 +65,9 @@ API approved: `docs/deriv/PHASE5_API.md`.
 Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its API approved before it is written
 (`docs/roots/PHASE<n>_API.md`), as in Milestone 1.
 
-- Phase 1: bracketing core, `Bracket`, `Root`, `error`, `Criteria`, `root<M>(fn, Bracket[, criteria])`; `Bisection`
+- Phase 1: bracketing core, `Bracket`, `Root`, `error`, `Criteria`, `solve<M>(fn, Bracket[, criteria])`; `Bisection`
   and `Brent`. API approved: `docs/roots/PHASE1_API.md`.
-  - [x] `roots.hpp` with `root<Bisection>` and `root<Brent>`, constexpr, the validation, zero first and the defaults
+  - [x] `roots.hpp` with `solve<Bisection>` and `solve<Brent>`, constexpr, the validation, zero first and the defaults
     of the specification; `nxx::detail::callable` shared from `math.hpp`
   - [x] Tests on float, double, long double and Boost.Multiprecision (`cpp_bin_float_50` with and without expression
     templates, `cpp_dec_float_50`), with the prototype's evaluation counts reproduced exactly in double
@@ -77,7 +77,8 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
   - [x] A demo, `numerixx_roots_demo`: Bisection against Brent, Kepler's equation, tolerances, a bracket around 0,
     types, compile time, failures and composition (added after the review, at the user's request)
 - Phase 2: open methods and derivatives (fn returning a tuple-like, or separate derivative callables); `Newton` and
-  `Halley` on a guess or a bracket, `Secant`.
+  `Halley` on a guess or a bracket, `Secant`; the entry point renamed `solve`. API approved:
+  `docs/roots/PHASE2_API.md`.
 - Phase 3: numerical derivatives, `nxx::deriv::derivative_of<M, N>(fn)`, and derivative callables returning
   `std::expected`.
 - Phase 4: `Toms748`, `AndersonBjorck`.
