@@ -682,8 +682,10 @@ namespace nxx::roots {
         }
 
         /**
-         * @brief Whether x + s cannot overflow: opposite signs; or both at most max / 2; or |x| above max / 2 and |s|
-         * at most max - |x| (exact there, by Sterbenz's lemma).
+         * @brief Whether x + s cannot overflow: opposite signs; or both at most max / 2; or the smaller magnitude at
+         * most max less the larger (exact there, by Sterbenz's lemma, since the larger exceeds max / 2). The test is on
+         * the magnitudes, not on x's: 0 + max fits (a first form tested |s| <= max / 2 wherever |x| was, and rejected
+         * Steffensen's first point on max - x from 0; independent review of Phase 6).
          * @param x A finite point.
          * @param s A finite step.
          * @return true if x + s may be formed.
@@ -695,8 +697,10 @@ namespace nxx::roots {
             T const half = T(detail::largest<T>() / T(2));
             T const ax = math::abs(x);
             T const as = math::abs(s);
-            if (ax <= half) return as <= half;
-            return as <= T(detail::largest<T>() - ax);
+            T const larger = ax < as ? as : ax;
+            T const smaller = ax < as ? ax : as;
+            if (larger <= half) return true;
+            return smaller <= T(detail::largest<T>() - larger);
         }
 
         /**
@@ -1590,12 +1594,15 @@ namespace nxx::roots {
             assert(!(x < T(0)));
             if (!(x > T(0)) || !math::isfinite(x)) return x;
             T const r = static_cast<T>(std::numeric_limits<T>::radix);
-            T const r2 = T(r * r);
             T const top = detail::largest<T>();
             T s = x;
             T scale = T(1);
+            // A type too narrow to hold radix^2 (a Boost type whose max is 3.98) is not scaled, and Newton starts at
+            // max(1, s), above the root (independent review of Phase 6: radix^2 overflowed, and sqrt 2 came out 1.9e-6).
+            bool const scalable = r <= T(top / r);
+            T const r2 = scalable ? T(r * r) : r;
             // p = q^2 is squared up while it fits and keeps s on its side of the interval; s is scaled by p, scale by q.
-            while (s > T(1)) {
+            while (scalable && s > T(1)) {
                 T p = r2;
                 T q = r;
                 while (p <= T(top / p) && T(s / p) > p) {
@@ -1605,7 +1612,7 @@ namespace nxx::roots {
                 s = T(s / p);
                 scale = T(scale * q);
             }
-            while (s < T(T(1) / r2)) {
+            while (scalable && s < T(T(1) / r2)) {
                 T p = r2;
                 T q = r;
                 while (p <= T(top / p) && T(s * p) < T(T(1) / p)) {
@@ -1615,7 +1622,7 @@ namespace nxx::roots {
                 s = T(s * p);
                 scale = T(scale / q);
             }
-            T y = T(1);
+            T y = s > T(1) ? s : T(1);
             while (true) {
                 T const next = T(y + T(T(T(s / y) - y) / T(2)));
                 if (!(next < y)) break;

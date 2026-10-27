@@ -118,8 +118,9 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
     (`false_position<M>`, guarded), `Steffensen` (Secant's step shared, the hand-over at z)
   - [x] Tests: the prototype's counts exactly; the roots Steffensen finds; the sqrt; constant evaluation; the types; the
     demo (five toolchains and WSL GCC and Clang, locally)
-  - [ ] CI passes on all five toolchains
-  - [ ] The independent review (Codex) and its adopted findings
+  - [x] CI passes on all five toolchains (840e04b)
+  - [x] The independent review (Codex; Kimi K3.1 Pro incomplete): three findings, all reproduced and fixed
+    (`docs/roots/PHASE6_API.md`)
 
 ## Deferred
 

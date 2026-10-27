@@ -112,7 +112,9 @@ From a guess x with f(x):
    product that cannot be formed: `not_converged`.
 4. fn at the new point: as in 2, with the sign change against f(x) handed over; else it becomes x.
 5. **The hand-over:** Brent's loop on the two points of the first sign change, x and z or x and the new point (as
-   Secant, `PHASE2_API.md` C). The cap is Phase 2's (212 iterations in double), so at most 2 x 212 + 1 evaluations.
+   Secant, `PHASE2_API.md` C). The cap is Phase 2's (212 iterations in double), so at most 2 x 212 + 1 evaluations
+   before the hand-over; Brent's loop after it has its own bound, with no cap (a jump at 0 from 1: 1359 evaluations
+   in all; independent review).
 6. **Scale-dependent:** f's scale sets z's distance from x, so it changes the cost (1000 (x^2 - 2) from 1: 27
    evaluations, x^2 - 2: 10) and which root is found: z = 1 - 1000 = -999 brackets -sqrt 2 with x = 1; from 0.5 on
    x^2 - 2 the first step lands at -1.83, and the root found is -sqrt 2 too, where Secant and Newton find sqrt 2.
@@ -219,6 +221,27 @@ mostly Brent's; its own convergence shows from far guesses.
 - `demo/roots_demo.cpp`: Ridders, RegulaFalsi and Illinois on (x - 1)^3 in section 2; Steffensen on x^2 - 2 and
   1000 (x^2 - 2), with Secant's result, in section 10; section 11's label names `nxx::deriv`'s Ridders.
 
+## Independent review (OpenAI Codex, 840e04b)
+
+After the implementation (840e04b, CI green), a read-only review by OpenAI Codex. A cold read by Kimi K3.1 Pro through
+the Cline CLI did not complete (a dropped connection, then the ClinePass usage limit; its first run had also read the
+Codex reproductions in `.scratch`, so it was not independent); its partial notes found Codex's third finding
+independently and nothing else. The user approved all three fixes.
+1. **`sum_fits` rejected sums that fit**: it required |s| <= max / 2 wherever |x| <= max / 2, so Steffensen on max - x
+   from 0 gave up after one evaluation, though its first point z = 0 + max is the root. Now exact on the magnitudes
+   (the smaller at most max less the larger, exact by Sterbenz). It only admits sums the old test wrongly rejected;
+   every earlier count is unchanged.
+2. **`detail::sqrt` overflowed in a type too narrow to hold radix^2** (a Boost type whose max is 3.98): sqrt 2 came out
+   1.9e-6. Now such a type is not scaled, and Newton starts at max(1, s), above the root.
+3. **"At most 2 x 212 + 1 evaluations" for Steffensen** holds before the hand-over only; Brent's loop after it has no
+   cap (1359 evaluations on a jump at 0 from 1). Reworded.
+Also added: `detail::sqrt` exact on perfect squares and even powers of 10 in `cpp_dec_float_50` (a test gap Kimi's notes
+named). Codex checked and found correct, among others: Secant and AndersonBjorck unchanged bit for bit (every evaluated
+point compared with the parent commit on five cases), the square root faithful (all positive `float16` values, a million
+random doubles against exact comparisons, decimal sweeps at 1 to 4 digits), Ridders' bookkeeping and Steffensen's
+directions. Noted for the library, not fixed: `nxx::real` does not require round-to-nearest, which the faithful square
+root and the Sterbenz arguments assume.
+
 ## Decisions for the user
 
 - **P1. Ridders as two `enclose` steps** (the midpoint, then the exponential fit's zero), in the cancellation-free
@@ -268,7 +291,7 @@ From the usage sketch (6 snippets, 6 misuses):
 - Steffensen's silent other root (the sketch's first finding) confirmed and documented (above).
 - RegulaFalsi's one-line documentation says it is guarded.
 - Ridders' advantage holds for odd multiplicity (an even root has no sign change): said.
-- Steffensen's worst case is in evaluations (2 x 212 + 1), not iterations.
+- Steffensen's worst case is in evaluations (2 x 212 + 1 before the hand-over), not iterations.
 
 ## Sources
 

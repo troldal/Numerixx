@@ -109,6 +109,13 @@ static_assert(nxx::math::abs(rt::solve<rt::Steffensen>([](long double x) { retur
                              - 1.4142135623730950488016887242096980785696718753769L)
               <= 8 * std::numeric_limits<long double>::epsilon());
 
+// The independent review of Phase 6 (840e04b).
+// 1. sum_fits tested |s| <= max / 2 wherever |x| <= max / 2, so it rejected 0 + max, and Steffensen gave up on
+//    max - x from 0, whose first point z = 0 + max is the root. Now exact on the magnitudes.
+static_assert(rt::detail::sum_fits(0.0, dmax) && rt::detail::sum_fits(dmax / 4, 0.75 * dmax));
+static_assert(!rt::detail::sum_fits(0.3 * dmax, 0.75 * dmax) && rt::detail::sum_fits(dmax, -dmax));
+static_assert(rt::solve<rt::Steffensen>([](double x) { return dmax - x; }, 0.0)->value == dmax);
+
 // Each new tag at the wrong start is rejected.
 static_assert(solvable<rt::Ridders, B> && !solvable<rt::Ridders, double>);
 static_assert(solvable<rt::RegulaFalsi, B> && !solvable<rt::RegulaFalsi, double>);
@@ -233,6 +240,29 @@ TEST_CASE("roots: the square root and the new methods in other types")
     CHECK(abs(bin50(tiny / bin50("1e-500000") - s2)) <= bin50(2 * bin_eps * s2));
     dec50 const d2 = from_string<dec50>(sqrt2_70);
     CHECK(abs(dec50(rt::detail::sqrt(dec50(2)) - d2)) <= dec50(std::numeric_limits<dec50>::epsilon() * d2));
+    // Exact on even powers of the radix in radix 10; faithful elsewhere (0.0144, whose root 0.12 Newton need not land
+    // on exactly: within one ulp).
+    CHECK(rt::detail::sqrt(dec50(100)) == dec50(10));
+    CHECK(rt::detail::sqrt(dec50("1e100")) == dec50("1e50"));
+    CHECK(abs(dec50(rt::detail::sqrt(dec50("0.0144")) - dec50("0.12")))
+          <= dec50(std::numeric_limits<dec50>::epsilon() * dec50("0.12")));
+
+    // The independent review of Phase 6 (840e04b), 2: a type too narrow to hold radix^2 (max 3.98, 8 bits). radix^2
+    // overflowed and sqrt 2 came out 1.9e-6; now within one ulp (2^-7 at sqrt 2) of it.
+    using narrow = boost::multiprecision::number<
+        boost::multiprecision::cpp_bin_float<8, boost::multiprecision::digit_base_2, void, int, -20, 1>>;
+    static_assert(nxx::real<narrow>);
+    // The reference and the bound by halvings, since the type holds nothing above 3.98 (not 128) and does not construct
+    // from these double literals: sqrt 2 rounds to 1.0110101 in 8 bits, 1 + 1/4 + 1/8 + 1/32 + 1/128 = 1.4140625, and
+    // one ulp there is 1/128.
+    narrow const half = narrow(narrow(1) / narrow(2));
+    narrow const q4 = narrow(half * half);
+    narrow const q8 = narrow(q4 * half);
+    narrow const q32 = narrow(q8 * q4);
+    narrow const q128 = narrow(q32 * q4);
+    narrow const narrow_root = narrow(narrow(narrow(narrow(narrow(1) + q4) + q8) + q32) + q128);
+    CHECK(abs(narrow(rt::detail::sqrt(narrow(2)) - narrow_root)) <= q128);
+    CHECK(rt::detail::sqrt(narrow(1)) == narrow(1));
 
     // The methods: x^2 - 2 with c = eps |ref| (fn's rounding), as for Brent.
     auto const check = [](auto zero) {
