@@ -164,6 +164,18 @@ from 1.
 - `demo/roots_demo.cpp`: a section on searching (a bracket from a guess, a domain edge, a pole, a miss).
 - `docs/plan.md`: Phase 5's checkboxes.
 
+## Changes during implementation
+
+- The probe limit is the bits of T (`iteration_cap<T>() / 4`), not `std::numeric_limits<T>::digits`: they agree in
+  binary (53 in double, 168 in `cpp_bin_float_50`), but for a decimal type `digits` counts decimal digits, which would
+  give it about a quarter of the halvings.
+- From x0 near max the search reaches down to about max / 3 (no step exceeds max / (3/2)): x - 1 from max is
+  `no_sign_change`, x - max / 2 from max is found. Documented with `search` and tested.
+- The tests use the test cases `roots:search:*` in `tests/test_roots_search.cpp`; every count and bracket end of the
+  `+ - * /` and sqrt rows is reproduced exactly, the ends written as hexadecimal literals.
+- `demo/roots_demo.cpp` section 12: a bracket and its root, a domain edge, van der Waals with and without the NaN, and
+  a miss.
+
 ## Decisions for the user
 
 - **P1. A first step |x0| / 50 (1/50 at 0, at least denorm_min) and growth 3/2.** Recommended: x0 sets the scale; 3/2

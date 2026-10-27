@@ -6,6 +6,7 @@
 #include <cmath>
 #include <expected>
 #include <format>
+#include <limits>
 #include <numbers>
 #include <print>
 #include <string_view>
@@ -268,6 +269,40 @@ namespace {
         report("ln: Secant from 1e-13", r, n);
     }
 
+    void searching()
+    {
+        // Without a bracket, search(fn, x0) finds one: fn at x0, then at x0 -+ h for h = |x0| / 50 growing by 3/2,
+        // until the sign differs from fn(x0). A bracketing method then finishes, through and_then.
+        std::println("\n12. Searching for a bracket from a guess");
+        auto const show_bracket = [](std::string_view label, std::expected<rt::Bracket<double>, rt::error> const &b) {
+            if (b)
+                std::println("   {:<30} [{:.6g}, {:.6g}]", label, b->lower, b->upper);
+            else
+                std::println("   {:<30} error: {}", label, b.error());
+        };
+        auto const psat = [](double t) { return std::exp(20.0 - 5000.0 / t) - 1.0; };
+        show_bracket("e^(20 - 5000/T) = 1 from 300", rt::search(psat, 300.0));
+        show("... and Brent on it", rt::search(psat, 300.0).and_then([&](rt::Bracket<double> b) {
+            return rt::solve<rt::Brent>(psat, b);
+        }));
+
+        // A domain edge: where fn is not finite, that side bisects towards its last finite point.
+        show_bracket("ln(x / 1e-12) = 0 from 1", rt::search([](double x) { return std::log(x / 1e-12); }, 1.0));
+
+        // van der Waals is finite below its co-volume b, with a pole at b, which a search would bracket. Returning
+        // NaN outside the domain keeps the search inside it.
+        double const b = 4.27e-5;
+        auto const vdw = [b](double v) { return 8.314 * 280.0 / (v - b) - 0.364 / (v * v) - 4e6; };
+        auto const vdw_domain = [&vdw, b](double v) {
+            return v > b ? vdw(v) : std::numeric_limits<double>::quiet_NaN();
+        };
+        show_bracket("van der Waals from 1e-4", rt::search(vdw, 1e-4));
+        show_bracket("... NaN outside v > b", rt::search(vdw_domain, 1e-4));
+
+        // What an outward search cannot find: two roots within one step.
+        show_bracket("x^2 = 2 from 100", rt::search([](double x) { return x * x - 2.0; }, 100.0));
+    }
+
 } // namespace
 
 int main()
@@ -283,4 +318,5 @@ int main()
     composition();
     open_methods();
     numerical_derivatives();
+    searching();
 }

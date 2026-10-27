@@ -43,6 +43,8 @@ auto n = rt::solve<rt::Newton>(fdf, 1.0); // from a guess, finishing inside the 
 
 auto f = [](double x) { return x * x - 2.0; };
 auto m = rt::solve<rt::Newton>(f, nxx::deriv::derivative_of(f), 1.0); // f' numerically (#include <numerixx/deriv.hpp>)
+
+auto s = rt::search(f, 1.0).and_then([&](rt::Bracket<double> b) { return rt::solve<rt::Brent>(f, b); }); // no bracket
 ```
 
 The default tolerances give the full precision of the type at every magnitude: a root at 1e-12 keeps its digits, with

@@ -156,6 +156,21 @@ the phases in `docs/plan.md`, and each phase's specification and evidence in `PH
   about 4 evaluations per halving. AndersonBjorck is far cheaper where fn is strongly curved near one end and on a walk
   to a sign change at 0 (51 evaluations against Brent's 1076). Brent stays the default.
 
+## Searching (Phase 5)
+
+- **`search(fn, x0)`** (the brief's `expand`, renamed by the user so that a search that does not expand can share the
+  name; a second algorithm would be a defaulted leading tag, `search<M>(fn, x0)`): fn at x0, then at x0 - h and
+  x0 + h, h = |x0| / 50 (1/50 at 0, at least denorm_min) growing by 3/2, until the sign differs from fn(x0); the result
+  is the narrowest bracket that shows it, its ends in order, or {x, x} where fn is exactly 0 at x (user decision P1).
+- **Domain edges:** a non-finite value makes that side bisect towards its last finite point, at most as many probes as
+  T has bits (P2; BRIEF.md 3.9 had the side stop, which misses roots near an edge).
+- **No search bound** (P3): where fn is finite outside its domain, the caller returns NaN there; a bound (`within`)
+  is deferred. **No sign change found is `no_sign_change`** (P4).
+- **Limits:** at most 4 times the bits of T steps (2 cap + 1 evaluations), no step above max / (3/2) (from near max
+  the search reaches down to about max / 3), x0 +- h formed only where `sum_fits` admits it. What no outward search
+  finds, and the documentation says: an even root, two roots within one step, a root beyond a non-finite region on
+  the same side, a root beyond the cap; a pole brackets like a root.
+
 ## Evidence (Phase 1)
 
 An independent Python implementation of the specification in double (`.scratch/roots1/proto3.py`, references from
@@ -233,6 +248,15 @@ reproduces exactly for fn of `+ - * /` and sqrt (Brent / Toms748 / AndersonBjorc
 
 Under Boost.Math's arrangement, placement and stop rule, the prototype takes Boost.Math 1.92.0's own counts on 7 of 8
 cases (one fewer on the eighth).
+
+## Evidence (Phase 5)
+
+`.scratch/roots5/proto5d.py` gives these evaluations and brackets, which the C++ reproduces exactly (to the last bit
+of each end) for fn of `+ - * /` and sqrt: x^2 - 2 from 1 (19) and 0 (24); x^3 - 2x - 5 from 0 (27); 1/x - 1 from 3
+(20; growth 2 misses it); x - 1e6 from 1 (91); x - 1e-300 from 1 (22); x + 1e-300 from denorm_min (266); x - 1 from
+max / 2 (22); sqrt x - 1e-3 from 1 (60, through a domain edge); van der Waals from 1e-3 (20), from 1e-4 and 5e-5
+around its pole (20, 12) and, with NaN outside v > b, to the root (29, 33); `no_sign_change` after 425 for x^2 - 2
+from 100, x^2 + 1, (x - 1)^2 and x - 1 from 1e-300.
 
 ## Tests
 

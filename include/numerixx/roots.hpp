@@ -15,6 +15,9 @@
  * exactly T (the value, f', f''), or from separate callables passed after fn, which may return a std::expected:
  * nxx::deriv::derivative_of(fn) gives a numerical derivative as such a callable.
  *
+ * search(fn, x0) finds a bracket from a guess, by an outward search, for a bracketing method to finish:
+ * `search(fn, x0).and_then([&](Bracket<double> b) { return solve<Brent>(fn, b); })`.
+ *
  * @code
  * namespace rt = nxx::roots;
  * auto const r = rt::solve<rt::Brent>([](double x) { return x * x - 2.0; }, rt::Bracket{1.0, 2.0});
@@ -61,7 +64,10 @@ namespace nxx::roots {
          */
         non_finite,
 
-        /** fn has the same sign at both ends of the bracket, and is 0 at neither. */
+        /**
+         * fn has the same sign at both ends of the bracket, and is 0 at neither; or search() found no sign change
+         * between the points it evaluated, within its cap or before both its sides ended.
+         */
         no_sign_change,
 
         /**
@@ -1879,6 +1885,144 @@ namespace nxx::roots {
             joined{ std::addressof(fn), { std::addressof(dfn), std::addressof(d2fn) } };
         return nxx::roots::solve<M>(joined, guess, criteria);
     }
+
+    /** @cond INTERNAL */
+    namespace detail {
+
+        /**
+         * @brief One side of search(): growing away from x0, or probing towards fn's domain edge once a value was not
+         * finite.
+         * @tparam T The real type.
+         */
+        template<real T>
+        struct SearchSide
+        {
+            /** @brief -1 below x0, +1 above. */
+            int direction;
+
+            /** @brief Whether the side still searches. */
+            bool alive;
+
+            /** @brief The side's last point where fn was finite, with fn(x0)'s sign. */
+            T last;
+
+            /** @brief The nearest point where fn was not finite, once one was met: the side probes towards it. */
+            std::optional<T> edge;
+
+            /** @brief The probes taken towards the edge. */
+            int probes;
+        };
+
+        /**
+         * @brief The outward search behind search() (`PHASE5_API.md`).
+         * @param fn The function.
+         * @param x0 The start.
+         * @return The bracket, or error::non_finite or error::no_sign_change.
+         */
+        template<real T, typename F>
+        constexpr std::expected<Bracket<T>, error> outward(F &fn, T const &x0)
+        {
+            if (!math::isfinite(x0)) return std::unexpected(error::non_finite);
+            T const f0 = detail::evaluate<1>(fn, x0)[0];
+            if (!math::isfinite(f0)) return std::unexpected(error::non_finite);
+            if (f0 == T(0)) return Bracket<T>{ x0, x0 };
+            // |x0| / 50 rather than |x0| (1/50), whose rounding differs; at least denorm_min, since |x0| / 50
+            // underflows to 0 for |x0| below 25 denorm_min.
+            T h = x0 == T(0) ? T(T(1) / T(50)) : T(math::abs(x0) / T(50));
+            if (h == T(0)) h = T(std::numeric_limits<T>::denorm_min());
+            T const growth = T(T(3) / T(2));
+            T const largest_step = T(detail::largest<T>() / growth);
+            // Probes towards a domain edge: the bits of T, enough to approach an edge at 0 by as many halvings.
+            int const probe_limit = detail::iteration_cap<T>() / 4;
+            std::array<SearchSide<T>, 2> sides{ SearchSide<T>{ -1, true, x0, std::nullopt, 0 },
+                SearchSide<T>{ 1, true, x0, std::nullopt, 0 } };
+            for (int step = 0; step < detail::iteration_cap<T>(); ++step) {
+                for (SearchSide<T> &side : sides) {
+                    if (!side.alive) continue;
+                    T x = x0;
+                    if (side.edge) {
+                        if (side.probes >= probe_limit) {
+                            side.alive = false;
+                            continue;
+                        }
+                        x = detail::midpoint(side.last, *side.edge);
+                        bool const between =
+                            side.last < *side.edge ? side.last < x && x < *side.edge : *side.edge < x && x < side.last;
+                        if (!between) {
+                            side.alive = false;
+                            continue;
+                        }
+                        ++side.probes;
+                    } else {
+                        T const s = side.direction < 0 ? T(-h) : h;
+                        if (!detail::sum_fits(x0, s)) {
+                            side.alive = false;
+                            continue;
+                        }
+                        x = T(x0 + s);
+                    }
+                    T const fx = detail::evaluate<1>(fn, x)[0];
+                    if (!math::isfinite(fx)) {
+                        side.edge = x;
+                        continue;
+                    }
+                    if (fx == T(0)) return Bracket<T>{ x, x };
+                    if (!detail::same_sign(fx, f0)) {
+                        if (side.last < x) return Bracket<T>{ side.last, x };
+                        return Bracket<T>{ x, side.last };
+                    }
+                    side.last = x;
+                }
+                if (!sides[0].alive && !sides[1].alive) return std::unexpected(error::no_sign_change);
+                if (h > largest_step) return std::unexpected(error::no_sign_change); // no larger step exists
+                h = T(h * growth);
+            }
+            return std::unexpected(error::no_sign_change);
+        }
+
+    } // namespace detail
+    /** @endcond */
+
+    /**
+     * @brief A bracket around a sign change of @p fn, searched outward from @p x0.
+     *
+     * fn is evaluated at x0, then at x0 - h and x0 + h for h = |x0| / 50 (1/50 at x0 = 0) growing by 3/2 per step,
+     * until fn's sign differs from its sign at x0. The result is the narrowest bracket that shows the sign change: the
+     * last point on that side where fn had x0's sign, and the new point, in order; {x, x} where fn is exactly 0 at x,
+     * which solve() returns at once as a root. x0 sets the scale of the search, so a quantity searches at its own
+     * scale; from a tiny x0 a root at scale 1 can lie beyond the cap. At most 4 times the bits of T steps (212 in
+     * double, so at most 425 evaluations), and no step larger than max / (3/2): from x0 near max the search reaches
+     * down to about max / 3.
+     *
+     * Where fn is not finite at a point (outside its domain), that side bisects towards its last finite point, at most
+     * as many times as T has bits, to find a root near the domain's edge. Where fn is finite outside its domain,
+     * return NaN there, so that the search does not cross the edge: a pole at the edge, as van der Waals' at its
+     * co-volume, would otherwise be bracketed.
+     *
+     * What it cannot find: a root of even multiplicity, two roots within one step (x^2 - 2 from 100), a root beyond a
+     * region where fn is not finite on the same side, and a sign change beyond the cap. A pole brackets like a root (tan
+     * x from 1.4), and solve() then returns the pole: check |fn(value)|. The bracket need not hold the root nearest x0,
+     * and where several roots lie in it, solve() returns one of them.
+     *
+     * @code
+     * namespace rt = nxx::roots;
+     * auto const f = [](double t) { return std::exp(20.0 - 5000.0 / t) - 1.0; };
+     * auto const r = rt::search(f, 300.0) // [231.7, 254.4], 14 evaluations
+     *                    .and_then([&](rt::Bracket<double> b) { return rt::solve<rt::Brent>(f, b); }); // 250
+     * @endcode
+     *
+     * @tparam T The real type, deduced from @p x0 (search(fn, 0) deduces int: write 0.0).
+     * @tparam F A callable taking T const & and returning something convertible to T, or a std::pair, std::tuple or
+     *           std::array of exactly T, whose first element is used.
+     * @param fn The function.
+     * @param x0 The start.
+     * @return The bracket, its ends in order; error::non_finite if x0 or fn(x0) is not finite; error::no_sign_change
+     *         if no sign change was found.
+     */
+    template<real T, typename F>
+    requires detail::gives<F, T, 1>
+    [[nodiscard]] constexpr std::expected<Bracket<T>, error> search(F &&fn, T const &x0)
+    { return detail::outward(fn, x0); }
 
 } // namespace nxx::roots
 
