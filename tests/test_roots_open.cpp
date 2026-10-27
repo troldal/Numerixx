@@ -329,9 +329,12 @@ TEST_CASE("roots: safeguarded methods, edges")
     // A derivative that is not finite makes the step unusable: bisection steps, not an error, at an end and at 0.
     auto const sqrt_fn = [](double x) { return std::pair{ std::sqrt(x) - 0.5, 0.5 / std::sqrt(x) }; }; // f'(0) = inf
     auto const cbrt_fn = [](double x) { return std::pair{ std::cbrt(x) - 0.5, 1.0 / (3.0 * std::cbrt(x * x)) }; };
-    // sqrt x - 0.5 changes sign at 0.25, where sqrt is exact; cbrt x - 0.5 at 0.125, where cbrt is exact: c = 0.
+    // sqrt x - 0.5 changes sign at 0.25, where sqrt is exact and correctly rounded (IEEE): c = 0. cbrt is a libm
+    // function, not correctly rounded: glibc's returns 0.5 + 2^-53 one ulp below 0.125, so the computed fn changes
+    // sign about 1.1e-16 from 0.125. Its 2-ulp budget, 2.2e-16 over f' = 1 / (3 cbrt(x)^2) = 1.33: c = 1.7e-16.
     CHECK(brackets(rt::solve<rt::Newton>(sqrt_fn, rt::Bracket{ 0.0, 1.0 }), 0.25, 0.0));
-    CHECK(brackets(rt::solve<rt::Newton>(cbrt_fn, rt::Bracket{ -1.0, 1.0 }), 0.125, 0.0)); // f'(0) = inf at zero first
+    CHECK(brackets(
+        rt::solve<rt::Newton>(cbrt_fn, rt::Bracket{ -1.0, 1.0 }), 0.125, 1.7e-16)); // f'(0) = inf at zero first
 
     // A pole inside a bracket is returned as a root, as for Brent (documented): 1/(x - 1/3) on [0, 1].
     double const third = 1.0 / 3.0;
