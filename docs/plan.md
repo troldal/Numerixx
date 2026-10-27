@@ -104,7 +104,13 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
   - [x] CI passes on all five toolchains (8951e7c: run 40511081791)
   - [x] The independent reviews (Codex, and Kimi K3.1 Pro through Cline): no defect in the header; two test
     findings fixed (`docs/roots/PHASE4_API.md`)
-- Phase 5: searching, `expand(fn, x0)`.
+- Phase 5: searching, `search(fn, x0)` (the brief's `expand`, renamed). API approved: `docs/roots/PHASE5_API.md`.
+  - [ ] `search(fn, x0)`: the outward search (first step |x0| / 50, growth 3/2), domain edges probed (at most
+    `digits` probes), `no_sign_change` when none is found
+  - [ ] Tests: the prototype's counts and brackets exactly; the domain edge; the composition; the edges; constant
+    evaluation; the types; a demo section
+  - [ ] CI passes on all five toolchains
+  - [ ] The independent review (Codex) and its adopted findings
 - Phase 6, at the user's choice: `Ridders`, `RegulaFalsi`, `Illinois`, `Steffensen`.
 
 ## Deferred

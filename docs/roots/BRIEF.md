@@ -3,6 +3,9 @@
 Note (2026-10-27): the entry point `root<M>(...)` of this brief is now `solve<M>(...)` (`PHASE2_API.md`, user
 decision), and the open methods finish inside the first sign change their iterates cross, so every method's
 `abs_error` is a bound (it supersedes 3.5's "open: the last step, an estimate" and 3.7's stop test for them).
+Note (2026-10-27): the search `expand(fn, x0)` of this brief is named `search(fn, x0)` (`PHASE5_API.md`, user
+decision), so that a search that does not expand can share the name later; and a non-finite value of fn makes a side
+approach fn's domain edge rather than stop (3.9).
 
 Status: approved by the user on 2026-10-25, D1 to D9 as recommended. Not a phase API: it fixes the architecture that
 the phase specifications (`PHASE<n>_API.md`) will refine. One review round (usage-sketcher, simplicity-critic) is folded
