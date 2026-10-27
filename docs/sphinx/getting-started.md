@@ -21,9 +21,9 @@ and, in `main`:
 :dedent:
 ```
 
-Both results are close to the full precision of `double`, with errors of order 1e-16 and 1e-15. Each comes with a bound
-on its error: for the root, `abs_error` bounds its distance to the sign change of the function; for the derivative,
-`abs_error` is Ridders' estimate of its error. Every algorithm returns a `std::expected`, so test the result before
+Both results are close to the full precision of `double`, with errors of order 1e-16 and 1e-15. Each comes with an
+`abs_error`: for the root, a bound on its distance to a sign change of the function as evaluated; for the derivative,
+Ridders' estimate of its error, not a guaranteed bound. Every algorithm returns a `std::expected`, so test the result before
 reading it with `->` or `*`, and print or inspect `error()` when there is no result.
 
 The [roots reference](reference/roots.md) and the [derivatives reference](reference/deriv.md) list the other methods.

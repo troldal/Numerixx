@@ -65,14 +65,15 @@ environment fails rather than rendering without the patch.
   2. The `Node_compounddefType` entry of `SphinxRenderer.node_handlers` puts a concept's `<initializer>`, its
      definition, as a C++ code block before its description.
   Each part counts what it emits.
-- The checks, in a `build-finished` handler that fails the build on a mismatch:
-  1. Clauses and concepts: the clauses part 1 appended equal the `<requiresclause>` elements in the XML, and the
-     definitions part 2 emitted equal the concepts in the XML, so that a Breathe change that bypasses either part
-     fails the build rather than dropping them silently.
-  2. Coverage: every symbol in the XML (`EXCLUDE_SYMBOLS` has removed `detail`; the `std::formatter`
-     specialisations included) is reached by a directive on some page: a `doxygennamespace` covers its namespace's
-     members, the other directives one entity each. From the spike's `coverage.py`, simplified to the directive forms
-     the pages use.
+- The checks, in a `build-finished` handler that fails the build on a mismatch. As implemented after the reviews
+  (below), they work on Doxygen IDs, recorded where Breathe renders: `SphinxRenderer.render`, after the directive's
+  filters, and the two parts of the patch.
+  1. Coverage: every class, concept and declaration in the XML (`EXCLUDE_SYMBOLS` has removed `detail`; the
+     `std::formatter` specialisations included) was rendered exactly once.
+  2. Clauses and concepts: every declaration with a `<requiresclause>` got its clause exactly once, and every concept
+     its definition, so that a Breathe change that bypasses either part fails the build rather than dropping them
+     silently.
+  The first version counted totals and read the directives in the pages; see the reviews of the implementation.
 - A Python warnings filter for Breathe's `unexpected element "conceptparts"` (a Doxygen 1.18 element Breathe 5.1 does
   not know; it reads the rest of the concept), for a clean log.
 
@@ -166,6 +167,32 @@ packages through uv. The example and the claims tests build in the existing five
 - `ForwardRidders` at the edge 0.5 (`deriv.hpp:310`), from a run of the independent prototype
   `.scratch/onesided/ridders5.py`: relative error 9.4e-15, estimate 1.7e-12, 10 evaluations. The comment's "about
   1e-13" is ten times the error: conservative, not wrong.
+
+## Reviews of the implementation (06267f3)
+
+CI passed on 06267f3 (run 40572439269, the `docs` job included). Then `numerics-reviewer` and the independent review
+(Codex, read-only); every finding below was reproduced or checked before it was acted on.
+
+- Checks that pass when they should fail (Codex). Reproduced on copies of `docs/sphinx`: a directive only in the
+  excluded `PHASE2_PLAN.md`, and `:desc-only:` on the `nxx::math` page, each left content off the site and the build
+  passed; and totals cannot show that each clause was rendered once. Fixed: the checks above, by ID, of what Breathe
+  rendered. Shown to fail on both reproductions, on each part of the patch disabled, on a page without the
+  formatter, and on `search` rendered twice (with its name in each message).
+- The getting-started page called Ridders' `abs_error` a bound (both reviews); it is an estimate (`deriv.hpp:84`).
+  Fixed.
+- "sqrt(2) to about 1e-16" was checked only to about 1.3e-15 (numerics). The roots prototypes give Brent's value
+  1.4142135623730949 and Newton's and Secant's 1.4142135623730951 (rerun 2026-10-27, the same bits as the C++); the
+  test now asserts those values, and the example allows 4 times the prototype's error.
+- `derivative_of<Ridders, order::second>` untested (both reviews). Fixed: equal to `derivative<Ridders, 2>`, and
+  within 6 estimates of the closed form 9 for x^3 at 1.5.
+- The nodes of `deriv.hpp:1722` were checked through the weight tables, not through fn (numerics). Fixed: a recording
+  fn shows the extremes x - 2h, x + 2h and x - 5h, x.
+- The example's checks rejected with `>`, so a NaN passed (Codex). Fixed: each check states what must hold.
+- The example's `abs_error` check used 4 eps sqrt(2) instead of the contract 2 (denorm_min + 2 eps |value|)
+  (numerics). Fixed.
+- `deriv.hpp:310`'s "2 to about 1e-13 relative" (numerics): the error is 9.4e-15 and the estimate 1.7e-12 relative,
+  and the comment's layout (as at line 14) reads as the estimate. Proposed to the user: "2 to about 1e-14 relative,
+  with an estimate of about 2e-12" (a change to `include/`); the test already asserts both.
 
 ## Deferred
 

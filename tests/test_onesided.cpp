@@ -320,6 +320,19 @@ TEST_CASE("onesided: fn is evaluated on one side of x only, restarts included")
     CHECK(sides(std::integral_constant<int, 4>{}, log, 1e-6));
     CHECK(sides(std::integral_constant<int, 1>{}, behind, 0.0));
     CHECK(sides(std::integral_constant<int, 4>{}, behind, 0.0));
+
+    // The nodes of the example in derivative's comment (deriv.hpp): f''' by Central<2> on x +- h and x +- 2h, f'''' by
+    // Backward<2> on x - 5h ... x. At x = 1 and h = 1/8 every node is exact.
+    auto const extent = [](auto d) {
+        double lowest = std::numeric_limits<double>::infinity();
+        double highest = -lowest;
+        REQUIRE(d(Recorded{ [](double t) { return std::exp(t); }, &lowest, &highest }).has_value());
+        return std::pair{ lowest, highest };
+    };
+    CHECK(extent([](auto fn) { return derivative<nxx::deriv::Central<2>, order::third>(fn, 1.0, 0.125); })
+          == std::pair{ 0.75, 1.25 });
+    CHECK(extent([](auto fn) { return derivative<nxx::deriv::Backward<2>, 4>(fn, 1.0, 0.125); })
+          == std::pair{ 0.375, 1.0 });
 }
 
 TEST_CASE("onesided: BackwardRidders is ForwardRidders on the mirrored function")

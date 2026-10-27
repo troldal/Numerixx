@@ -5,9 +5,9 @@ folder in NUMERIXX_DOXYGEN_XML. Breathe renders the reference from that XML, wit
 """
 
 import os
-import re
 import warnings
 import xml.etree.ElementTree as ET
+from collections import Counter
 from pathlib import Path
 
 import breathe
@@ -43,8 +43,8 @@ nitpick_ignore_regex = [(r"cpp:identifier", r"nxx|(nxx::)?detail(::.*)?|std::.*|
 warnings.filterwarnings("ignore", message=r'.*unexpected element "conceptparts"')
 
 # The patch (breathe#482, open since 2020): Breathe parses a requires clause and a concept's definition from the XML
-# but renders neither. Each part counts what it emits, for the checks at the end.
-emitted = {"clauses": 0, "concepts": 0}
+# but renders neither. Each part records the Doxygen IDs of the declarations it completed, for the checks at the end.
+emitted = {"clauses": Counter(), "concepts": Counter()}
 
 # 1. The requires clause after the template parameter list, where Sphinx's C++ domain accepts it since Sphinx 5.2.
 #    Relies on SphinxRenderer.create_template_prefix, which every templated declaration goes through.
@@ -56,7 +56,7 @@ def _template_prefix_with_clause(self, decl):
     clause = getattr(decl, "requiresclause", None)
     if prefix and clause is not None:
         prefix += " requires " + " ".join("".join(n.astext() for n in self.render(clause)).split())
-        emitted["clauses"] += 1
+        emitted["clauses"][decl.id] += 1
     return prefix
 
 
@@ -76,78 +76,57 @@ def _compounddef_with_definition(self, node):
         initializer = ET.parse(xml_dir / f"{node.id}.xml").getroot().find("compounddef/initializer")
         text = "".join(initializer.itertext())
         result.insert(0, nodes.literal_block(text, text, language="cpp"))
-        emitted["concepts"] += 1
+        emitted["concepts"][node.id] += 1
     return result
 
 
 sphinxrenderer.SphinxRenderer.node_handlers[_parser.Node_compounddefType] = _compounddef_with_definition
 
 
-# The checks, after a successful build; a mismatch fails it.
-def _scope(name):
-    """The enclosing scope of a qualified name, ignoring the :: inside template arguments."""
-    depth = 0
-    for i in range(len(name) - 1, 0, -1):
-        depth += {">": 1, "<": -1}.get(name[i], 0)
-        if depth == 0 and name[i - 1 : i + 1] == "::":
-            return name[: i - 1]
-    return ""
+# What reached the site: the Doxygen ID of every declaration and class Breathe rendered. Recorded in
+# SphinxRenderer.render after the directive's filters (such as :desc-only:) have applied, so it counts what was
+# rendered, not what a page asked for.
+rendered = Counter()
+_render = sphinxrenderer.SphinxRenderer.render
 
 
-def _directives(srcdir):
-    """{directive: {normalised argument}} over every page."""
-    found = {}
-    for page in Path(srcdir).rglob("*.md"):
-        for kind, arg in re.findall(r"^```\{doxygen(\w+)\}\s*(.+)$", page.read_text(encoding="utf-8"), re.M):
-            found.setdefault(kind, set()).add(re.sub(r"\s+", "", arg))
-    return found
+def _render_recorded(self, node, context=None, tag=None):
+    result = _render(self, node, context, tag)
+    if result and isinstance(node, (_parser.Node_memberdefType, _parser.Node_compounddefType)):
+        rendered[node.id] += 1
+    return result
+
+
+sphinxrenderer.SphinxRenderer.render = _render_recorded
 
 
 def _check(app, exception):
+    """After a successful build, fail it unless every declaration, class and concept in the XML was rendered exactly
+    once, and the patch completed every requires clause and concept definition exactly once."""
     if exception is not None:
         return
-    problems = []
-
-    # The patch ran once for every clause and concept in the XML: none dropped, none rendered twice.
-    clauses = concepts = 0
+    declarations, clauses, concepts, names = set(), set(), set(), {}
     for f in xml_dir.glob("*.xml"):
-        if f.name != "index.xml":
-            root = ET.parse(f).getroot()
-            clauses += len(root.findall(".//requiresclause"))
-            concepts += len(root.findall(".//compounddef[@kind='concept']"))
-    if emitted["clauses"] != clauses:
-        problems.append(f"{emitted['clauses']} requires clauses rendered, {clauses} in the XML")
-    if emitted["concepts"] != concepts:
-        problems.append(f"{emitted['concepts']} concept definitions rendered, {concepts} in the XML")
+        compound = ET.parse(f).getroot().find("compounddef")
+        if compound is None or compound.get("kind") not in ("namespace", "struct", "class", "union", "concept"):
+            continue
+        if compound.get("kind") != "namespace":
+            declarations.add(compound.get("id"))
+        if compound.get("kind") == "concept":
+            concepts.add(compound.get("id"))
+        names[compound.get("id")] = compound.findtext("compoundname")
+        for member in compound.iter("memberdef"):
+            declarations.add(member.get("id"))
+            names[member.get("id")] = f"{compound.findtext('compoundname')}::{member.findtext('name')}"
+        clauses |= {e.get("id") for e in compound.iter() if e.find("requiresclause") is not None}
 
-    # Coverage: every symbol in the XML is reached by a directive. A doxygennamespace renders its namespace's members
-    # and classes, not its concepts; a doxygenstruct or doxygenclass renders its members.
-    directives = _directives(app.srcdir)
-    namespaces = directives.get("namespace", set())
-    named = directives.get("struct", set()) | directives.get("class", set())
-
-    def reached(name, kind):
-        key = re.sub(r"\s+", "", name)
-        if kind == "concept":
-            return key in directives.get("concept", set())
-        scope = key
-        while scope:
-            if scope in named or (scope != key and scope in namespaces):
-                return True
-            scope = _scope(scope)
-        return False
-
-    index = ET.parse(xml_dir / "index.xml").getroot()
-    for compound in index.findall("compound"):
-        kind, name = compound.get("kind"), compound.findtext("name")
-        if kind in ("struct", "class", "union", "concept"):
-            if not reached(name, kind):
-                problems.append(f"{kind} {name} is on no page")
-        elif kind == "namespace":
-            for member in compound.findall("member"):
-                if member.get("kind") != "enumvalue" and name not in namespaces:
-                    problems.append(f"{member.get('kind')} {name}::{member.findtext('name')} is on no page")
-
+    problems = []
+    for what, expected, counted in (("rendered", declarations, rendered),
+                                    ("given its requires clause", clauses, emitted["clauses"]),
+                                    ("given its definition", concepts, emitted["concepts"])):
+        for doxygen_id in sorted(expected):
+            if counted[doxygen_id] != 1:
+                problems.append(f"{names[doxygen_id]} ({doxygen_id}) {what} {counted[doxygen_id]} times, not once")
     if problems:
         raise RuntimeError("documentation checks failed:\n  " + "\n  ".join(problems))
 

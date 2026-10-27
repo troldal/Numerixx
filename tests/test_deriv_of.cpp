@@ -124,6 +124,13 @@ TEST_CASE("deriv:of: the same result as derivative")
     CHECK(derivative_of<Central<2>, nxx::deriv::order::second>(cube)(1.5)
           == derivative<Central<2>, nxx::deriv::order::second>(cube, 1.5));
     CHECK(derivative_of<Ridders>(cube)(1.5) == derivative<Ridders>(cube, 1.5));
+    // f'' by Ridders, the second line of the example in derivative_of's comment (deriv.hpp): the same result as
+    // derivative, and the second derivative, 6 x = 9 at 1.5, not the first, 6.75, within 6 times its estimate (the
+    // rule of test_ridders.cpp).
+    auto const second = derivative_of<Ridders, nxx::deriv::order::second>(cube)(1.5);
+    CHECK(second == derivative<Ridders, nxx::deriv::order::second>(cube, 1.5));
+    REQUIRE((second && second->abs_error));
+    CHECK(std::abs(second->value - 9.0) <= 6 * *second->abs_error);
 
     // libm: the same calls in the same order, so the same values.
     auto const lg = [](double x) { return std::log(x); };

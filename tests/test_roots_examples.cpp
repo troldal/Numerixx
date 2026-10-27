@@ -21,16 +21,24 @@ static_assert(std::is_same_v<decltype(rt::Bracket{ 300.0, 400.0 }), rt::Bracket<
 
 TEST_CASE("roots: the examples of the header comments")
 {
-    // The file comment and solve's comment for a guess: Newton on f and f' as a std::pair, and Secant on f, from 1,
-    // after 7 and 9 evaluations, the prototype's counts that test_roots_open.cpp asserts for a tuple with the same
-    // value and derivative. Brent's case of the file comment is in test_roots_bracketing.cpp.
+    // The file comment and solve's comment for a guess: Brent in [1, 2], and Newton on f and f' as a std::pair and
+    // Secant on f from 1, after 9, 7 and 9 evaluations (the counts are asserted in test_roots_bracketing.cpp and, for a
+    // tuple with the same value and derivative, test_roots_open.cpp). "sqrt(2) to about 1e-16": the prototypes'
+    // values (.scratch/roots1/proto3.py, .scratch/roots2/proto2.py), which the C++ reproduces bit for bit without FMA
+    // contraction, are 1.4142135623730949 for Brent and 1.4142135623730951 for the others, 1.25e-16 and 9.7e-17 from
+    // sqrt(2).
+    auto const brent = rt::solve<rt::Brent>([](double x) { return x * x - 2.0; }, rt::Bracket{ 1.0, 2.0 });
+    REQUIRE(brent.has_value());
+    CHECK(brent->value == 0x1.6a09e667f3bccp+0);
     auto const fdf = [](double x) { return std::pair{ x * x - 2.0, 2.0 * x }; };
     auto const [newton, newton_count] = counted<rt::Newton>(fdf, 1.0);
     CHECK(newton_count == 7);
     CHECK(brackets(newton, sqrt2, 8e-17));
+    CHECK(newton->value == 0x1.6a09e667f3bcdp+0);
     auto const [secant, secant_count] = counted<rt::Secant>([](double x) { return x * x - 2.0; }, 1.0);
     CHECK(secant_count == 9);
     CHECK(brackets(secant, sqrt2, 8e-17));
+    CHECK(secant->value == 0x1.6a09e667f3bcdp+0);
 
     // search's comment: from 300 for exp(20 - 5000/t) - 1, whose root is 5000/20 = 250. The search steps 6 * 1.5^k
     // (k = 0, 1, ...) below and then above 300, every point exact in double; fn > 0 above 250, so the first sign change

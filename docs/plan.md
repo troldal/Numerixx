@@ -157,7 +157,7 @@ locally and in CI, and the examples' tests pass on all five toolchains.
     as a test on all five toolchains
   - [x] The header `@code` blocks covered by tests in the module test files that assert their claims; the
     `deriv.hpp:14` comment corrected (it gave relative figures as absolute)
-  - [ ] A CI job (Doxygen 1.18.0 pinned, uv, Sphinx `-W`)
+  - [x] A CI job (Doxygen 1.18.0 pinned, uv, Sphinx `-W`) (06267f3: run 40572439269)
   - [ ] The reviews of the phase and the independent review (Codex)
 - Phase 3: `nxx::roots`: the user guide (the result types, choosing a method, tolerances, errors, user-defined types,
   derivatives); the program that writes tables of counts and accuracy, at the first table.
