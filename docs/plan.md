@@ -87,7 +87,13 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
   - [x] The independent review (Codex) and its adopted findings: eight, all reproduced and fixed
     (`docs/roots/PHASE2_API.md`)
 - Phase 3: numerical derivatives, `nxx::deriv::derivative_of<M, N>(fn)`, and derivative callables returning
-  `std::expected`.
+  `std::expected`. API approved: `docs/roots/PHASE3_API.md`.
+  - [ ] `derivative_of` (a decayed copy of fn, called with the callable's constness, no precision warning); `dfn` and
+    `d2fn` returning `std::expected`, a failed derivative counting as one that is not finite
+  - [ ] Tests: `derivative_of` against `derivative` bit for bit; the equivalences and the partial failure; the
+    prototype's `Central<2>` counts exactly; the types; constant evaluation; the constraints; a demo section
+  - [ ] CI passes on all five toolchains
+  - [ ] The independent review (Codex) and its adopted findings
 - Phase 4: `Toms748`, `AndersonBjorck`.
 - Phase 5: searching, `expand(fn, x0)`.
 - Phase 6, at the user's choice: `Ridders`, `RegulaFalsi`, `Illinois`, `Steffensen`.
