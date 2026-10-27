@@ -10,6 +10,11 @@ the phases in `docs/plan.md`, and each phase's specification and evidence in `PH
   the procedure `zero` (section 6), its tolerance (eq. 2.9), the error bound of its result (eq. 2.18) and its
   worst case (eq. 3.4). Checked against the scan Brent publishes on his website (Phase 1). After Dekker (1969).
 - Bisection: textbook.
+- Alefeld, G. E., Potra, F. A. and Shi, Y. (1995). Algorithm 748: Enclosing zeros of continuous functions. *ACM TOMS*
+  21(3), 327-344: Algorithm 4.2, its subroutines and its modified `bracket` (Phase 4), read from the scan on the first
+  author's page. Boost.Math's `toms748_solve` (BSL-1.0) built and run as a cross-check, no code taken.
+- Anderson, N. and Bjorck, A. (1973), *BIT* 13, 253-264: the rescaling, as King (1983) and the Wikipedia article
+  "Regula falsi" state it; the paper itself was not read (Phase 4).
 - Not used: Numerical Recipes (`zbrent`, `rtsafe`, `zbrac`, `zbrak`), GSL, and the Forsythe, Malcolm and Moler
   `zeroin` listing; Numerixx 1.x's root finders were surveyed (`BRIEF.md` section 2) but none of their code is kept.
 
@@ -131,6 +136,26 @@ the phases in `docs/plan.md`, and each phase's specification and evidence in `PH
 - **The default step assumes fn varies on the scale max(|x|, 1):** ln(x / 1e-12) from 1e-13 has a failed f' at the
   guess (`not_converged`), and on [1e-20, 1] every point below 6e-6 has one (pure bisection, 276 calls).
 
+## More bracketing methods (Phase 4)
+
+- **`Toms748` is Algorithm 4.2 as printed** (user decision P1): a secant step; then per iteration the inverse cubic
+  (`ipzero`) or `Newton-Quadratic` with 2 steps, the same with 3 steps, a double-length secant step, and a bisection
+  where the iteration has not halved the bracket. Boost.Math's arrangement (a quadratic step before the loop, a
+  fallback of 3 steps in 4.2.3) differs; it was the prototype's first form and is the cross-check.
+- **`AndersonBjorck` is guarded** (P2): a bisection after three steps that have not halved the bracket since the last
+  halving, a guard bisection counting as one. The published method took 65,109,847 evaluations on x^20 - 1.
+- **One step for both, `detail::enclose`** (the paper's modified `bracket`): delta = 0.7 tol(u), at least denorm_min
+  (Boost.Multiprecision's denorm_min() is min(), and 0.7 min flushes to 0); the midpoint where the bracket is at most
+  4 delta wide, where the method has no point, and where the point kept 2 delta inside is not strictly inside (2 delta
+  rounds away at an end of much larger magnitude than u). No point is formed while the bracket is wider than max / 16.
+- **Arithmetic:** unlike Brent's, these steps form differences of fn's values of opposite signs; every quotient,
+  product and sum on fn's values and the interpolations' terms is checked, and a failed check makes the point
+  unusable, so the paper's fallbacks apply (inverse cubic, quadratic, secant, midpoint).
+- **The cost** (`PHASE4_API.md`): neither is cheaper than Brent in general (309, 325 and 327 evaluations on 27 of the
+  paper's cases at full precision; the paper reports 4% fewer for 4.2 over its own set); both bound the worst case at
+  about 4 evaluations per halving. AndersonBjorck is far cheaper where fn is strongly curved near one end and on a walk
+  to a sign change at 0 (51 evaluations against Brent's 1076). Brent stays the default.
+
 ## Evidence (Phase 1)
 
 An independent Python implementation of the specification in double (`.scratch/roots1/proto3.py`, references from
@@ -186,6 +211,28 @@ the analytic counts in brackets):
 
 `Ridders` (the library's, measured, not a reference): Newton from a guess / on a bracket 53 / 58 calls on x^2 - 2,
 69 / 78 on cos x - x, 91 / 95 on e^x - 2, 107 / 112 on Kepler.
+
+## Evidence (Phase 4)
+
+`.scratch/roots4/proto4.py` (revision 2: the C++'s checks for every operation) gives these counts, which the C++
+reproduces exactly for fn of `+ - * /` and sqrt (Brent / Toms748 / AndersonBjorck):
+
+| Case | Bracket | Counts |
+|---|---|---|
+| x^2 - 2 | [1, 2] | 9 / 9 / 9 |
+| x^3 - 2x - 5 | [2, 3] | 8 / 9 / 9 |
+| x^20 - 1 | [0, 5] | 19 / 21 / 30 |
+| (x - 1)^3 | [0, 3] | 156 / 149 / 152 |
+| x - 1 | [-max, max] | 8 / 8 / 13 |
+| 1/x - 1 | [0.5, 3] | 11 / 6 / 5 |
+| W10 near 7 | [6.7, 7.6] | 23 / 18 / 18 |
+| a jump at 0 | [-1, 2] | 1076 / 981 / 51 |
+| 1/(x - 1/3) | [0, 1] | 55 / `non_finite` (84) / 95 |
+| sqrt x - 0.5 | [0, 1] | 4 / 6 / 9 |
+| Alefeld, Potra and Shi's problems #1, #2, #4 to #12 (27 cases) | | 309 / 325 / 327 in all |
+
+Under Boost.Math's arrangement, placement and stop rule, the prototype takes Boost.Math 1.92.0's own counts on 7 of 8
+cases (one fewer on the eighth).
 
 ## Tests
 

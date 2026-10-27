@@ -218,6 +218,17 @@ settles or splits them), powers written as products:
 - `demo/roots_demo.cpp`: Toms748 and AndersonBjorck in section 2 (the comparison of methods).
 - `docs/plan.md`: Phase 4's checkboxes.
 
+## Changes during implementation
+
+- The tests are in their own file, `tests/test_roots_toms_anderson.cpp` (as Phases 2 and 3), not in
+  `test_roots_bracketing.cpp`. Every count of both tables for `+ - * /` and sqrt is reproduced exactly.
+- The pole's `non_finite` for Toms748 is tested at run time only: fn itself divides by zero at fl(1/3), which is not a
+  constant expression.
+- Toms748's steps go through a small function, `detail::advance`, rather than a lambda capturing fn: MSVC rejects a
+  lambda's capture of a function reference in constant evaluation (as at `Joined`).
+- `demo/roots_demo.cpp` section 2 adds cos x - x and ln(x / 1e-12) for the two methods (7 / 8 and 53 / 18
+  evaluations, Brent 9 and 45).
+
 ## Decisions for the user
 
 - **P1. Toms748 is Algorithm 4.2 as printed.** Recommended: the method the name and the citation promise. Its first

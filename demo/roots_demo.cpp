@@ -72,8 +72,10 @@ namespace {
     void methods()
     {
         // Bisection gains one bit per evaluation, whatever fn is. Brent interpolates and is much faster on a smooth fn
-        // with a simple root, but slower on a multiple root, where the interpolation converges only linearly.
-        std::println("\n2. Bisection against Brent");
+        // with a simple root, but slower on a multiple root, where the interpolation converges only linearly. Toms748
+        // costs about what Brent costs, with a better worst case; AndersonBjorck wins where fn is strongly curved near
+        // one end of the bracket, as ln(x / 1e-12) is near 1e-20.
+        std::println("\n2. Bisection, Brent, Toms748 and AndersonBjorck");
         auto const dottie = [](double x) { return std::cos(x) - x; };
         auto const wallis = [](double x) { return (x * x - 2.0) * x - 5.0; };
         auto const triple = [](double x) { return (x - 1.0) * (x - 1.0) * (x - 1.0); };
@@ -83,6 +85,12 @@ namespace {
         count<rt::Brent>("x^3 - 2x - 5: Brent", wallis, { 2.0, 3.0 });
         count<rt::Bisection>("(x - 1)^3: Bisection", triple, { 0.0, 3.0 });
         count<rt::Brent>("(x - 1)^3: Brent", triple, { 0.0, 3.0 });
+        count<rt::Toms748>("cos x = x: Toms748", dottie, { 0.0, 1.0 });
+        count<rt::AndersonBjorck>("cos x = x: AndersonBjorck", dottie, { 0.0, 1.0 });
+        auto const trace = [](double x) { return std::log(x / 1e-12); };
+        count<rt::Brent>("ln(x / 1e-12): Brent", trace, { 1e-20, 1.0 });
+        count<rt::Toms748>("ln(x / 1e-12): Toms748", trace, { 1e-20, 1.0 });
+        count<rt::AndersonBjorck>("ln(x / 1e-12): AndersonBjorck", trace, { 1e-20, 1.0 });
     }
 
     void kepler()

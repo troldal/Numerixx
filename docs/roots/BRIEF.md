@@ -91,7 +91,7 @@ namespace nxx::roots {
 |---|---|---|---|---|---|---|
 | `Bisection` | bracket | f | 1 (halves) | 1 | - | textbook |
 | `Brent` | bracket | f | up to about 1.84 | 1 | about 1.8 | Brent 1973, ch. 4 (after Dekker 1969) |
-| `Toms748` | bracket | f | | 2 to 3 | 1.65 | Alefeld, Potra and Shi 1995; Boost.Math's `toms748_solve` (BSL-1.0, with its notice) |
+| `Toms748` | bracket | f | 4.646 (R-order of the brackets) | at most 4, asymptotically 3 | 1.6686 | Alefeld, Potra and Shi 1995, Algorithm 4.2 (the row first had Algorithm 4.1's figures; corrected in Phase 4) |
 | `AndersonBjorck` | bracket | f | about 1.7 | 1 | about 1.7 | Anderson and Bjorck 1973 |
 | `Newton` | guess; bracket (safeguarded) | f, f' (fn, or fn and dfn) | 2 | 2 | 1.41 | textbook; the safeguard from a textbook, not NR's `rtsafe` |
 | `Halley` | guess; bracket (safeguarded) | f, f', f'' (fn, or fn, dfn and d2fn) | 3 | 3 | 1.44 | textbook (Scavo and Thoo 1995 for its history) |
