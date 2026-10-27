@@ -168,14 +168,18 @@ locally and in CI, and the examples' tests pass on all five toolchains.
     `explanation/`, with `how-to/` from Phase 3), the book's PDF offered by the explanation part, the target
     `numerixx_docs_all`, and the patch and checks moved from `conf.py` to the local extension
     `docs/sphinx/_ext/numerixx_breathe.py`
-- Phase 3: `nxx::roots`, in the Diataxis parts: a tutorial (a first root, from a bracket and from a guess); how-to
-  guides (choose a method, set tolerances, find a bracket, use numerical derivatives, use a multiprecision type,
-  handle errors); explanation (bracketing and open methods, what `abs_error` bounds, conditioning); the program that
-  writes tables of counts and accuracy, at the first table.
-  - [ ] Pages, examples and tests; docs build clean
-  - [ ] Reviews: `docs-reviewer` (every statement against the code, and each page's Diataxis job), numerics, a
-    docs-only reader who writes client code that must compile; then the independent review (Codex)
-- Phase 4: `nxx::deriv` and `nxx::math`, in the same parts, from `docs/deriv/DERIV_TUTORIAL.md`; the explanation part
+- Phase 3: `nxx::roots`, the tutorial (Kepler's equation), seven how-to guides (choose a method, tolerances, find a
+  bracket, a restricted domain, derivatives, other types, failures) and a reference page of costs, typed from the
+  independent prototypes' counts and asserted by its program (the program that writes tables is dropped: a generated
+  count would be Numerixx's own). Plan approved: `docs/sphinx/PHASE3_PLAN.md` (2026-10-27), with two comment fixes in
+  `roots.hpp`.
+  - [ ] Pages, programs and tests; docs build clean
+  - [ ] Reviews: `docs-reviewer`, numerics, a docs-only reader who writes client code that must compile; then the
+    independent review (Codex)
+- Phase 4: `nxx::roots`, the explanations: bracketing and open methods; what a result means.
+  - [ ] Pages; docs build clean
+  - [ ] Reviews as in Phase 3
+- Phase 5: `nxx::deriv` and `nxx::math`, in the same parts, from `docs/deriv/DERIV_TUTORIAL.md`; the explanation part
   summarises the book and points into it.
   - [ ] Pages, examples and tests; docs build clean
   - [ ] Reviews as in Phase 3

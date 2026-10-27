@@ -34,7 +34,8 @@ A module may use another module's public API, never its `detail`.
 - `docs/Doxyfile` the API documentation settings, used by the docs targets in `docs/CMakeLists.txt`
 - `docs/sphinx/` the documentation site, in Diataxis parts (`tutorials/`, `how-to/`, `reference/`, `explanation/`;
   MyST pages), with `conf.py`, the local extension `_ext/numerixx_breathe.py` (the Breathe patch and the checks) and
-  the pinned `requirements.txt`; a page shows code only from `docs/sphinx/examples/`, programs built and run as tests;
+  the pinned `requirements.txt`; a page shows code only from `docs/sphinx/examples/`, programs built and run as tests
+  (`numerixx_docs_example_<name>`, a glob in `tests/CMakeLists.txt`), each checking its page's claims;
   `docs-reviewer` reviews the pages
 - `docs/deriv-book/` the book on `nxx::deriv` (LaTeX): its own `CLAUDE.md` holds its rules, roles and process; its
   examples build as tests (`NUMERIXX_BUILD_BOOK`), its PDF is the target `numerixx_book`

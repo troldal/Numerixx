@@ -1897,8 +1897,8 @@ namespace nxx::roots {
     /** @endcond */
 
     /**
-     * @brief A root of @p fn in @p bracket by the method @p M: Bisection, Brent, or Newton or Halley safeguarded by the
-     * bracket.
+     * @brief A root of @p fn in @p bracket by the method @p M: a bracketing method (Bisection, Brent, Toms748,
+     * AndersonBjorck, Ridders, RegulaFalsi or Illinois), or Newton or Halley safeguarded by the bracket.
      *
      * The bracket's ends may come in either order; fn must have opposite signs at them, or be 0 at one. When the
      * bracket contains 0 in its interior, fn is also evaluated at 0 first: a root at 0 is then found at once, and the
@@ -1927,7 +1927,8 @@ namespace nxx::roots {
      *                                      rt::Bracket{1.0, 2.0});
      * @endcode
      *
-     * @tparam M The method: `Bisection`, `Brent`, `Toms748`, `AndersonBjorck`, `Newton` or `Halley`.
+     * @tparam M The method: `Bisection`, `Brent`, `Toms748`, `AndersonBjorck`, `Ridders`, `RegulaFalsi`, `Illinois`,
+     *           `Newton` or `Halley`.
      * @tparam T The real type, deduced from @p bracket.
      * @tparam F A callable taking T const & and returning something convertible to T, or (for Newton and Halley, which
      *           need it) a std::pair, std::tuple or std::array of exactly T: the value and the derivatives. For Newton
@@ -1967,7 +1968,7 @@ namespace nxx::roots {
     }
 
     /**
-     * @brief A root of @p fn from @p guess by the open method @p M: Newton, Halley or Secant.
+     * @brief A root of @p fn from @p guess by the open method @p M: Newton, Halley, Secant or Steffensen.
      *
      * The method iterates from the guess until fn's values at two consecutive iterates have opposite signs, then
      * continues inside that bracket (Newton and Halley safeguarded, Secant as Brent), so the result is a verified sign
@@ -1984,11 +1985,12 @@ namespace nxx::roots {
      * auto const s = rt::solve<rt::Secant>([](double x) { return x * x - 2.0; }, 1.0); // 9
      * @endcode
      *
-     * @tparam M The method: `Newton`, `Halley` or `Secant`.
+     * @tparam M The method: `Newton`, `Halley`, `Secant` or `Steffensen`.
      * @tparam T The real type, deduced from @p guess.
-     * @tparam F A callable taking T const &: for Secant returning something convertible to T, for Newton and Halley a
-     *           std::pair, std::tuple or std::array of exactly T (the value, f', f''). For Newton on a fn without a
-     *           derivative, pass the derivative as a callable after fn, use nxx::deriv::derivative_of, or use Secant.
+     * @tparam F A callable taking T const &: for Secant and Steffensen returning something convertible to T, for Newton
+     *           and Halley a std::pair, std::tuple or std::array of exactly T (the value, f', f''). For Newton on a fn
+     *           without a derivative, pass the derivative as a callable after fn, use nxx::deriv::derivative_of, or use
+     *           Secant.
      * @param fn The function.
      * @param guess The starting point.
      * @param criteria When to stop; it converts to T.

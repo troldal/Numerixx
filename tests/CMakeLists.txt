@@ -40,16 +40,21 @@ target_compile_options(numerixx_tests PRIVATE ${numerixx_test_warnings})
 
 add_test(NAME numerixx_tests COMMAND numerixx_tests)
 
-# The program of the documentation's getting-started page (docs/sphinx), built and run so that the page's code cannot
-# rot; it checks what the page says about its results.
-add_executable(numerixx_docs_example_getting_started ${PROJECT_SOURCE_DIR}/docs/sphinx/examples/getting_started.cpp)
-target_link_libraries(numerixx_docs_example_getting_started PRIVATE numerixx::numerixx)
-target_compile_options(numerixx_docs_example_getting_started PRIVATE ${numerixx_test_warnings})
-# libstdc++ on MinGW keeps the Windows console part of std::print in libstdc++exp.
-if (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_link_libraries(numerixx_docs_example_getting_started PRIVATE stdc++exp)
-endif ()
-add_test(NAME numerixx_docs_example_getting_started COMMAND numerixx_docs_example_getting_started)
+# The programs of the documentation's pages (docs/sphinx/examples), built and run so that a page's code cannot rot;
+# each checks what its page says about its results. Boost.Multiprecision (header-only) is linked for all.
+file(GLOB numerixx_docs_examples CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/docs/sphinx/examples/*.cpp)
+foreach (source IN LISTS numerixx_docs_examples)
+    get_filename_component(name ${source} NAME_WE)
+    set(target numerixx_docs_example_${name})
+    add_executable(${target} ${source})
+    target_link_libraries(${target} PRIVATE numerixx::numerixx boost_multiprecision)
+    target_compile_options(${target} PRIVATE ${numerixx_test_warnings})
+    # libstdc++ on MinGW keeps the Windows console part of std::print in libstdc++exp.
+    if (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_link_libraries(${target} PRIVATE stdc++exp)
+    endif ()
+    add_test(NAME ${target} COMMAND ${target})
+endforeach ()
 
 # The low-precision warning of a derivative above the first in float. Each case is an object library outside the normal
 # build, built by its test, since two of them must fail: with warnings as errors, "warns_step" and "warns_default" (one
