@@ -287,13 +287,25 @@ namespace nxx::roots {
         template<typename F, typename T>
         concept tuple_valued =
             std::invocable<F &, T const &> && !std::is_reference_v<std::invoke_result_t<F &, T const &>>
+            && !std::is_volatile_v<std::invoke_result_t<F &, T const &>>
             && is_standard_tuple<std::remove_cv_t<std::invoke_result_t<F &, T const &>>>
             && detail::elements_are<std::remove_cv_t<std::invoke_result_t<F &, T const &>>, T>(
                 std::make_index_sequence<std::tuple_size_v<std::remove_cv_t<std::invoke_result_t<F &, T const &>>>>{});
 
         /**
-         * @brief fn gives at least K values at a point: its value alone (K = 1, a result convertible to T), or a
-         * tuple-like of at least K elements, each exactly T. A tuple-like result is never read as a value.
+         * @brief A function returning one value: its result converts to T and is not a std::pair, std::tuple or
+         * std::array (a tuple-like result is never read as a value, even where T converts from it).
+         *
+         * @tparam F The callable type.
+         * @tparam T The real type.
+         */
+        template<typename F, typename T>
+        concept value_valued = nxx::detail::callable<F, T>
+                               && !is_standard_tuple<std::remove_cvref_t<std::invoke_result_t<F &, T const &>>>;
+
+        /**
+         * @brief fn gives at least K values at a point: its value alone (K = 1, value_valued), or a tuple-like of at
+         * least K elements, each exactly T.
          *
          * @tparam F The callable type.
          * @tparam T The real type.
@@ -301,7 +313,7 @@ namespace nxx::roots {
          */
         template<typename F, typename T, std::size_t K>
         concept gives =
-            (K == 1 && nxx::detail::callable<F, T>)
+            (K == 1 && value_valued<F, T>)
             || (tuple_valued<F, T> && std::tuple_size_v<std::remove_cv_t<std::invoke_result_t<F &, T const &>>> >= K);
 
         /**
@@ -325,9 +337,15 @@ namespace nxx::roots {
         template<real T>
         consteval int iteration_cap()
         {
-            int bits_per_digit = 0;
-            while ((1 << bits_per_digit) < std::numeric_limits<T>::radix) ++bits_per_digit;
-            return 4 * std::numeric_limits<T>::digits * bits_per_digit;
+            // In 64 bits: an admitted radix may exceed 2^30, where an int shift would overflow.
+            long long bits_per_digit = 0;
+            long long reach = 1;
+            while (reach < std::numeric_limits<T>::radix) {
+                reach *= 2;
+                ++bits_per_digit;
+            }
+            long long const cap = 4LL * std::numeric_limits<T>::digits * bits_per_digit;
+            return cap > (std::numeric_limits<int>::max)() ? (std::numeric_limits<int>::max)() : static_cast<int>(cap);
         }
 
         /**
@@ -422,7 +440,9 @@ namespace nxx::roots {
          *   which covers its rounding (loose tolerances stop with ends far apart, where the difference rounds).
          * - denorm_min where ends that differ give a difference of 0: a type without subnormals, such as
          *   cpp_bin_float, flushes a difference below its smallest number to 0.
-         * - max where the distance may exceed what T holds: ends of opposite signs, one of them above max / 4.
+         * - max where the distance may exceed what T holds: ends of opposite signs whose halves sum to more than
+         *   max / 2. Ends of opposite signs above max / 4 are measured by halves, raised by two units (in radix 10 the
+         *   halvings and the doubling may round).
          *
          * @param u A finite point.
          * @param v A finite point.
@@ -439,6 +459,7 @@ namespace nxx::roots {
             if (au == T(0)) return av; // a distance from 0 is exact
             if (av == T(0)) return au;
             T distance = T(0);
+            T units = T(1);
             if ((u < T(0)) == (v < T(0))) {
                 // Of one sign, |u - v| <= max(|u|, |v|): finite.
                 distance = math::abs(T(u - v));
@@ -453,12 +474,20 @@ namespace nxx::roots {
                         return distance;
                 }
             } else {
-                // Of opposite signs the distance is |u| + |v|, finite (at most max / 2) when both are at most max / 4.
+                // Of opposite signs the distance is |u| + |v|: finite (at most max / 2) when both are at most max / 4;
+                // above that, by halves. Saturating there instead left a bracket around 0 under huge tolerances wider
+                // than its true width forever (independent review of Phase 2).
                 T const quarter = T(max / T(4));
-                if (au > quarter || av > quarter) return max;
-                distance = T(au + av);
+                if (au <= quarter && av <= quarter) {
+                    distance = T(au + av);
+                } else {
+                    T const half_sum = T(T(au / T(2)) + T(av / T(2)));
+                    if (half_sum > T(max / T(2))) return max;
+                    distance = T(T(2) * half_sum);
+                    units = T(2);
+                }
             }
-            T raise = T(distance * T(std::numeric_limits<T>::epsilon()));
+            T raise = T(T(distance * T(std::numeric_limits<T>::epsilon())) * units);
             if (raise < tiny) raise = tiny;
             if (raise >= T(max - distance)) return max; // max - distance is exact above max / 2 (Sterbenz)
             return T(distance + raise);
@@ -498,7 +527,9 @@ namespace nxx::roots {
         /**
          * @brief a / b, where it can be formed: b is not 0 and the quotient is at most about max / 2.
          *
-         * The test |a| / max < |b| / 2 (nxx::deriv's) is conservative by a factor 2 and forms nothing that overflows.
+         * Formed directly where |b| >= 1 (then |a / b| <= |a|); otherwise only if |a| < (max / 2) |b|, which neither
+         * overflows nor underflows to 0 for |b| < 1. The one-line test |a| / max < |b| / 2 rejected representable
+         * quotients where both sides underflow to 0 (d (x - 1) / d with d = denorm_min; independent review).
          *
          * @param a A finite value.
          * @param b A finite value.
@@ -508,7 +539,9 @@ namespace nxx::roots {
         constexpr std::optional<T> quotient(T const &a, T const &b)
         {
             if (b == T(0)) return std::nullopt;
-            if (!(T(math::abs(a) / detail::largest<T>()) < T(math::abs(b) / T(2)))) return std::nullopt;
+            T const ab = math::abs(b);
+            if (ab >= T(1)) return T(a / b);
+            if (!(math::abs(a) < T(T(detail::largest<T>() / T(2)) * ab))) return std::nullopt;
             return T(a / b);
         }
 
@@ -891,14 +924,19 @@ namespace nxx::roots {
                         e = m;
                     }
                 }
+                T next = b;
+                if (math::abs(d) > tol)
+                    next = T(b + d);
+                else if (m > T(0))
+                    next = T(b + tol);
+                else
+                    next = T(b - tol);
+                // A point not strictly inside the bracket means it is already at the tolerance's resolution: no step
+                // can make progress, and evaluating there again would repeat the iteration forever.
+                if (!((b < next && next < c) || (c < next && next < b))) return Root<T>{ b, width };
                 a = b;
                 va = vb;
-                if (math::abs(d) > tol)
-                    b = T(b + d);
-                else if (m > T(0))
-                    b = T(b + tol);
-                else
-                    b = T(b - tol);
+                b = next;
                 vb = detail::evaluate<K>(fn, b);
                 if (!math::isfinite(vb[0])) return std::unexpected(error::non_finite);
                 if (vb[0] == T(0)) return Root<T>{ b, tolerance.at(b) };
@@ -971,17 +1009,21 @@ namespace nxx::roots {
 
         /**
          * @brief Secant's second point: x0 (1 + eta), eta = eps^(1/4); eta at x0 = 0; x0 (1 - eta) where x0 (1 + eta)
-         * would overflow. Relative, so no scale is assumed.
+         * would overflow; x0 + tol(x0) where x0 (1 + eta) rounds back to x0 (among the subnormals). Relative, so no
+         * scale is assumed.
          * @param x0 The guess, finite.
-         * @return The second point.
+         * @param tolerance The tolerances.
+         * @return The second point, distinct from x0.
          */
         template<real T>
-        constexpr T secant_second_point(T const &x0)
+        constexpr T secant_second_point(T const &x0, Tolerance<T> const &tolerance)
         {
             T const eta = math::root_epsilon<4, T>();
             if (x0 == T(0)) return eta;
             if (math::abs(x0) > T(detail::largest<T>() / T(T(1) + eta))) return T(x0 * T(T(1) - eta));
-            return T(x0 * T(T(1) + eta));
+            T const second = T(x0 * T(T(1) + eta));
+            if (second == x0) return T(x0 + tolerance.at(x0)); // tiny x0: tol(x0) is about denorm_min
+            return second;
         }
 
         /**
@@ -1005,13 +1047,15 @@ namespace nxx::roots {
             std::array<T, 1> vp = detail::evaluate<1>(fn, xp);
             if (!math::isfinite(vp[0])) return std::unexpected(error::non_finite);
             if (vp[0] == T(0)) return Root<T>{ xp, tolerance.at(xp) };
-            T x = detail::secant_second_point(xp);
+            T x = detail::secant_second_point(xp, tolerance);
             T dx = T(x - xp); // small: x0 eta, or eta
             std::array<T, 1> vx = detail::evaluate<1>(fn, x);
-            for (int i = 0; i < detail::iteration_cap<T>(); ++i) {
+            for (int i = 0;; ++i) {
+                // The checks come first, so that the last point evaluated before the cap is checked too.
                 if (!math::isfinite(vx[0])) return std::unexpected(error::non_finite);
                 if (vx[0] == T(0)) return Root<T>{ x, tolerance.at(x) };
                 if (!detail::same_sign(vx[0], vp[0])) return detail::hand_over<Brent>(fn, xp, vp, x, vx, tolerance);
+                if (i == detail::iteration_cap<T>()) return std::unexpected(error::not_converged);
                 T const difference = T(vp[0] - vx[0]);
                 if (difference == T(0)) return std::unexpected(error::not_converged);
                 std::optional<T> const ratio = detail::quotient(vx[0], difference);
@@ -1029,7 +1073,6 @@ namespace nxx::roots {
                 dx = move;
                 vx = detail::evaluate<1>(fn, x);
             }
-            return std::unexpected(error::not_converged);
         }
 
     } // namespace detail
@@ -1147,7 +1190,7 @@ namespace nxx::roots {
      * @return As for a bracket.
      */
     template<typename M, real T, typename F, typename D>
-    requires std::same_as<M, Newton> && nxx::detail::callable<F, T> && nxx::detail::callable<D, T>
+    requires std::same_as<M, Newton> && detail::value_valued<F, T> && detail::value_valued<D, T>
     [[nodiscard]] constexpr std::expected<Root<T>, error>
         solve(F &&fn, D &&dfn, Bracket<T> const &bracket, Criteria<std::type_identity_t<T>> const &criteria = {})
     {
@@ -1169,7 +1212,7 @@ namespace nxx::roots {
      * @return As from a guess.
      */
     template<typename M, real T, typename F, typename D>
-    requires std::same_as<M, Newton> && nxx::detail::callable<F, T> && nxx::detail::callable<D, T>
+    requires std::same_as<M, Newton> && detail::value_valued<F, T> && detail::value_valued<D, T>
     [[nodiscard]] constexpr std::expected<Root<T>, error>
         solve(F &&fn, D &&dfn, T const &guess, Criteria<std::type_identity_t<T>> const &criteria = {})
     {
@@ -1193,8 +1236,8 @@ namespace nxx::roots {
      * @return As for a bracket.
      */
     template<typename M, real T, typename F, typename D, typename D2>
-    requires std::same_as<M, Halley> && nxx::detail::callable<F, T> && nxx::detail::callable<D, T>
-             && nxx::detail::callable<D2, T>
+    requires std::same_as<M, Halley> && detail::value_valued<F, T> && detail::value_valued<D, T>
+             && detail::value_valued<D2, T>
     [[nodiscard]] constexpr std::expected<Root<T>, error> solve(F &&fn,
         D &&dfn,
         D2 &&d2fn,
@@ -1221,8 +1264,8 @@ namespace nxx::roots {
      * @return As from a guess.
      */
     template<typename M, real T, typename F, typename D, typename D2>
-    requires std::same_as<M, Halley> && nxx::detail::callable<F, T> && nxx::detail::callable<D, T>
-             && nxx::detail::callable<D2, T>
+    requires std::same_as<M, Halley> && detail::value_valued<F, T> && detail::value_valued<D, T>
+             && detail::value_valued<D2, T>
     [[nodiscard]] constexpr std::expected<Root<T>, error>
         solve(F &&fn, D &&dfn, D2 &&d2fn, T const &guess, Criteria<std::type_identity_t<T>> const &criteria = {})
     {

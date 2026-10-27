@@ -94,12 +94,17 @@ the phases in `docs/plan.md`, and each phase's specification and evidence in `PH
   formed, 1 - u is 0, or the step points against Newton's (Boost.Math does the same). It costs one case: from 0 on
   x^3 - 2x + 2, Halley follows Newton's cycle to `not_converged` (user decision P5).
 - **Secant's step** `(x - xp) (f / (fp - f))`, the ratio first (fp - f cannot overflow before the hand-over); its
-  second point `x0 (1 + eps^(1/4))`, relative (P4).
+  second point `x0 (1 + eps^(1/4))`, relative (P4), or x0 + tol(x0) where that rounds back to x0. Every point it
+  evaluates is checked, the last before the cap included.
 - **The minimum step** tol(x), in the direction of the method's step taken from the signs (of f and f'; of f, fp - f
   and x - xp), not from a step that may have underflowed.
-- **Overflow:** every quotient (`|a| / max < |b| / 2`), product (`|a| <= 1` or `|b| <= (max / 2) / |a|`) and x + s
-  (opposite signs, both at most max / 2, or exact above max / 2) is checked before it is formed; a step that fails is
-  unusable.
+- **Overflow:** every quotient (directly where |b| >= 1, else only if `|a| < (max / 2) |b|`), product (`|a| <= 1`
+  or `|b| <= (max / 2) / |a|`) and x + s (opposite signs, both at most max / 2, or exact above max / 2) is checked
+  before it is formed; a step that fails is unusable. The quotient's one-line test `|a| / max < |b| / 2` rejected
+  ordinary quotients whose operands underflow (independent review, `PHASE2_API.md`).
+- **Progress:** the bracket loop stops where its next point would not land strictly inside the bracket (it is then at
+  the tolerance's resolution); `distance_bound` measures ends of opposite signs above max / 4 by halves rather than
+  saturating. Together they closed an endless loop under huge tolerances (independent review).
 - **The cap** of the open methods is 4 times the bits of T (212 for double, 672 for `cpp_bin_float_50`; P3). Beyond
   it: a multiple root at 0 with the default abs_tol, a guess very far from the root, multiplicities above about 5
   (Newton), 3 (Secant), 11 (Halley). A bracket solves them. One `not_converged` for every failure (P2).

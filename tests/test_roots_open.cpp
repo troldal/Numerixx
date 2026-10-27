@@ -80,7 +80,7 @@ static_assert(nxx::math::abs(rt::solve<rt::Halley>(sq, 1.0)->value - sqrt2) <= 1
 static_assert(nxx::math::abs(rt::solve<rt::Secant>(sq, 1.0)->value - sqrt2) <= 1e-15);
 static_assert(nxx::math::abs(rt::solve<rt::Newton>(wal, rt::Bracket{ 2.0, 3.0 })->value - wallis) <= 1e-15);
 static_assert(nxx::math::abs(rt::solve<rt::Halley>(wal, rt::Bracket{ 2.0, 3.0 })->value - wallis) <= 1e-15);
-static_assert(rt::solve<rt::Newton>(line, 1e308) == std::unexpected(rt::error::not_converged)); // a step above max / 2
+static_assert(rt::solve<rt::Newton>(line, 1e308)->value == 1.0); // a step of -1e308, formed since |f'| >= 1
 static_assert(rt::solve<rt::Secant>(steep, 1e7)->value == 1.0); // the ratio first: f (x - xp) would overflow
 static_assert(rt::solve<rt::Halley>([](double x) { return std::tuple{ 1e308 * (x - 1.0), 1e308, 1e308 }; }, 2.0)->value
               == 1.0); // f'' / f' and t f'' / (2 f') near max
@@ -379,4 +379,85 @@ TEST_CASE("roots: open methods in float, long double and multiprecision types")
     check(bin50{});
     check(bin50_et{});
     check(dec50{});
+}
+
+// The independent review of Phase 2 (9c00c98): each finding's case, failing on that commit.
+namespace {
+
+    // Free functions as fn and derivatives: overload resolution once tried the guess overload with T a function type.
+    constexpr double f_free(double x) { return x * x - 2.0; }
+    constexpr double df_free(double x) { return 2.0 * x; }
+    constexpr double d2f_free(double) { return 2.0; }
+
+    // A real type that converts from std::pair: a pair-returning fn must not pass as a value-returning one. With
+    // Radix above 2^30 (WideRadix), the iteration cap's computation once shifted an int too far.
+    template<int Radix>
+    struct Wrap
+    {
+        double value = 0.0;
+        constexpr Wrap() = default;
+        constexpr Wrap(int v) : value(v) {}
+        constexpr Wrap(double v) : value(v) {}
+        constexpr Wrap(std::pair<double, double> p) : value(p.first) {}
+        friend constexpr Wrap operator+(Wrap a, Wrap b) { return a.value + b.value; }
+        friend constexpr Wrap operator-(Wrap a, Wrap b) { return a.value - b.value; }
+        friend constexpr Wrap operator*(Wrap a, Wrap b) { return a.value * b.value; }
+        friend constexpr Wrap operator/(Wrap a, Wrap b) { return a.value / b.value; }
+        friend constexpr Wrap operator-(Wrap a) { return -a.value; }
+        friend constexpr auto operator<=>(Wrap const &, Wrap const &) = default;
+    };
+
+    using Wrapped = Wrap<2>;
+    using WideRadix = Wrap<1073741825>;
+
+} // namespace
+
+template<int Radix>
+struct std::numeric_limits<Wrap<Radix>> : std::numeric_limits<double>
+{
+    static constexpr int radix = Radix;
+    static constexpr Wrap<Radix> epsilon() { return std::numeric_limits<double>::epsilon(); }
+    static constexpr Wrap<Radix> max() { return (std::numeric_limits<double>::max)(); }
+    static constexpr Wrap<Radix> denorm_min() { return std::numeric_limits<double>::denorm_min(); }
+};
+
+static_assert(nxx::real<Wrapped> && nxx::real<WideRadix>);
+
+// 1. A hand-over of huge tolerances onto a bracket around 0 with an end above max / 4 repeated forever: the bracket's
+//    distance saturated at max, so it never met the stop test, and the minimum step landed on the end it came from.
+//    Now measured by halves, and a step that cannot land strictly inside stops the loop. The sign change is at 0.
+static_assert([] {
+    auto const fn = [](double x) { return std::tuple{ x < 0.0 ? x / 8.0 : x, x < 0.0 ? 0.125 : 1.0, 0.0 }; };
+    auto const r = rt::solve<rt::Newton>(fn, -dmax * 0.375, { .abs_tol = dmax / 4.0, .rel_tol = 0.5 });
+    return r && nxx::math::abs(r->value) <= r->abs_error;
+}());
+// 2. Free functions as fn and its derivatives.
+static_assert(nxx::math::abs(rt::solve<rt::Newton>(f_free, df_free, 1.0)->value - sqrt2) <= 1e-15);
+static_assert(nxx::math::abs(rt::solve<rt::Halley>(f_free, df_free, d2f_free, 1.0)->value - sqrt2) <= 1e-15);
+static_assert(nxx::math::abs(rt::solve<rt::Newton>(f_free, df_free, rt::Bracket{ 1.0, 2.0 })->value - sqrt2) <= 1e-15);
+static_assert(!nxx::real<double(double)>); // rejected as a type, before numeric_limits is instantiated
+// 4. A quotient whose operands are tiny but whose value is ordinary: the step -1 of d (x - 1) / d, d = denorm_min.
+static_assert(rt::solve<rt::Newton>([](double x) { return std::pair{ dmin * (x - 1.0), dmin }; }, 0.0)->value == 1.0);
+// 5. A pair-returning fn is not a value fn, even where T converts from a pair; nor is it a value-only fn beside a
+//    separate derivative (a mixed form).
+static_assert(!solvable<rt::Brent, std::pair<double, double> (*)(Wrapped const &), rt::Bracket<Wrapped>>);
+static_assert(
+    !solvable_with<rt::Newton, std::pair<double, double> (*)(Wrapped const &), Wrapped (*)(Wrapped const &), Wrapped>);
+static_assert(solvable<rt::Brent, Wrapped (*)(Wrapped const &), rt::Bracket<Wrapped>>);
+// 6. Secant's second point among the subnormals: x0 (1 + eta) rounds back to x0, so x0 + tol(x0) instead.
+static_assert(rt::solve<rt::Secant>([](double x) { return x - 2.0 * dmin; }, dmin)->value == 2.0 * dmin);
+// 7. The iteration cap for a radix above 2^30: 31 bits per digit, 4 x 53 x 31.
+static_assert(rt::detail::iteration_cap<WideRadix>() == 4 * 53 * 31);
+static_assert(rt::detail::iteration_cap<double>() == 212 && rt::detail::iteration_cap<dec50>() == 4 * 50 * 4);
+// 8. A volatile tuple result is rejected by the constraint (volatile return types are deprecated, so not tested here).
+
+TEST_CASE("roots: Secant checks the last point it evaluates")
+{
+    // 3. fn is exactly 0 from 2e44 on, which Secant reaches at its last iteration: that point, not not_converged.
+    auto const fn = [](double x) { return x >= 2e44 ? 0.0 : 1.0 / (1.0 + x); };
+    auto const [r, n] = counted<rt::Secant>(fn, 0.0);
+    REQUIRE(r.has_value());
+    CHECK(r->value >= 2e44);
+    CHECK(fn(r->value) == 0.0);
+    CHECK(n == 2 + 212);
 }

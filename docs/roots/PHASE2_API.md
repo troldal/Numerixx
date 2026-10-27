@@ -328,6 +328,47 @@ From the usage sketch (7 snippets, 7 misuses):
 - The prototype was aligned with the C++ arithmetic before its counts became test values (Brent's acceptance limit
   as 3 |m| / 2, Secant's step length kept rather than recomputed as x - xp); no count changed.
 
+## Independent review (OpenAI Codex, 9c00c98 and 8b3ff81)
+
+After the implementation (9c00c98, the test fix 8b3ff81, CI run 40477325328), a read-only review by OpenAI Codex.
+Every finding was reproduced before it was acted on (`.scratch/roots2/codex/`); the user approved all eight fixes.
+
+1. **A hand-over could loop forever.** With huge tolerances (`abs_tol = max / 4`, `rel_tol = 0.5`), Newton from
+   -0.375 max handed over to a bracket around 0 with an end above max / 4. `distance_bound` saturated at max for such
+   ends, so the bracket never met the stop test, and the minimum step landed on the end it came from: the same state
+   forever (stopped after 100,000 evaluations; constant evaluation exhausted GCC's budget). Fixed twice over:
+   `distance_bound` measures ends of opposite signs above max / 4 by halves (raised by two units, for radix 10), and
+   the bracket loop stops where its next point would not land strictly inside the bracket.
+2. **Free functions as derivatives did not compile.** `solve<Newton>(f, df, 1.0)` with `f` and `df` free functions:
+   the guess overload was tried with T = `double(double)`, and `nxx::real` instantiated
+   `std::numeric_limits<double(double)>`, ill-formed (a hard error, "function returning a function"). Fixed in
+   `math.hpp`: `nxx::real` first requires `std::is_object_v<T>` (non-breaking: a function type was never a real).
+3. **Secant discarded the last point it evaluated.** Its checks ran at the top of the loop, so the point evaluated in
+   the last iteration was never checked: an exact zero there gave `not_converged`. Fixed: the checks run on every
+   point, the last included; no extra evaluation.
+4. **The quotient guard rejected ordinary quotients after underflow.** `|a| / max < |b| / 2` is `0 < 0` when both
+   underflow: Newton on `d (x - 1)` with `f' = d = denorm_min` could not take its step of -1. Fixed: a / b is formed
+   directly where |b| >= 1, else only if `|a| < (max / 2) |b|` (the two-branch form). Newton on x - 1 from 1e308 now
+   converges (its step of -1e308 is formed), where the spec had `not_converged`.
+5. **A pair-returning fn passed as a value fn where T converts from a pair**, and so did a mixed form. Fixed: the value
+   branch of `gives`, and the separate callables, require a result that is not a pair, tuple or array
+   (`detail::value_valued`).
+6. **Secant's second point equalled the first among the subnormals** (x0 (1 + eta) rounds back to x0). Fixed: x0 +
+   tol(x0) there.
+7. **The iteration cap shifted an `int` too far** for an admitted radix above 2^30. Fixed: computed in 64 bits,
+   saturated.
+8. **A `volatile` tuple result passed the constraint and failed inside.** Fixed: rejected by the constraint (volatile
+   return types are deprecated; not tested, since declaring one warns).
+
+The regression tests (`test_roots_open.cpp`, "The independent review of Phase 2") fail on 9c00c98. Every earlier
+result and evaluation count is unchanged; the prototype (`proto2.py`) was aligned with fixes 3, 4 and 6 and gives the
+same counts.
+
+Codex also checked and found correct: Brent's derivative acceptance, direction, history and resets; the max / 16
+guard's headroom; Halley's fallbacks; the minimum steps' directions; the hand-over's ordering and values; `Joined`'s
+lifetimes and constness; the tuple checks of every element; the user-type rules; the libm-free counts and the
+conditioning budget of 8b3ff81.
+
 ## Deferred
 
 - Derivative callables that return `std::expected`, and `nxx::deriv::derivative_of`: Phase 3.

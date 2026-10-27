@@ -32,9 +32,11 @@ namespace nxx {
     // read: radix and digits in constant expressions (the exact-weights and float-warning constraints of derivative),
     // radix at least 2 because root_epsilon and the overflow guards scale by it; epsilon() and max() are
     // copy-initialised into T, while denorm_min() is read as T(denorm_min()), so a type that inherits
-    // numeric_limits<double> and constructs from double only explicitly is accepted.
+    // numeric_limits<double> and constructs from double only explicitly is accepted. An object type first: for a
+    // function type, which overload resolution may try as a deduced T (a derivative passed as a free function), the
+    // standard library's numeric_limits is ill-formed, a hard error rather than a failed constraint.
     template<typename T>
-    concept real = std::numeric_limits<T>::is_specialized && !std::numeric_limits<T>::is_integer
+    concept real = std::is_object_v<T> && std::numeric_limits<T>::is_specialized && !std::numeric_limits<T>::is_integer
                    && std::numeric_limits<T>::is_bounded && !std::numeric_limits<T>::is_exact
                    && std::constructible_from<T, int> && std::copyable<T> && std::totally_ordered<T>
                    && requires(T const a, T const b) {

@@ -25,6 +25,9 @@ decisions are in `docs/<module>/design.md` (`docs/deriv/design.md`).
   lacking one fails at the concept instead of inside the header. `denorm_min()` need only construct `T` because the
   code reads it as `T(denorm_min())`; a type that inherits `numeric_limits<double>` and constructs from `double`
   only explicitly is accepted.
+- `nxx::real` first requires an object type (`std::is_object_v<T>`): overload resolution may try a function type
+  as a deduced T (a derivative passed as a free function to `nxx::roots::solve`), and the standard library's
+  `numeric_limits` of a function type is ill-formed, a hard error rather than a failed constraint.
 - The type must also be bounded and inexact (`numeric_limits` `is_bounded`, `!is_exact`): `isfinite` needs a finite
   `max()` and `root_epsilon` a positive `epsilon()`. This rejects rationals such as `cpp_rational`, whose epsilon is 0
   (the scaling loop never ended). The concept is not split into arithmetic and default-step parts: exact types have no

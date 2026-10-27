@@ -83,8 +83,9 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
     a derivative step, both derivative forms, `not_converged`; Phase 1's results unchanged
   - [x] Tests in double (the prototype's counts exactly), float, long double and the Boost.Multiprecision types; the
     constraints; a demo section
-  - [ ] CI passes on all five toolchains
-  - [ ] The independent review (Codex) and its adopted findings
+  - [x] CI passes on all five toolchains (9c00c98 with 8b3ff81: run 40477325328)
+  - [x] The independent review (Codex) and its adopted findings: eight, all reproduced and fixed
+    (`docs/roots/PHASE2_API.md`)
 - Phase 3: numerical derivatives, `nxx::deriv::derivative_of<M, N>(fn)`, and derivative callables returning
   `std::expected`.
 - Phase 4: `Toms748`, `AndersonBjorck`.
