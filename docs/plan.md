@@ -109,8 +109,9 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
     `digits` probes), `no_sign_change` when none is found
   - [x] Tests: the prototype's counts and brackets exactly; the domain edge; the composition; the edges; constant
     evaluation; the types; a demo section (five toolchains and WSL GCC and Clang, locally)
-  - [ ] CI passes on all five toolchains
-  - [ ] The independent review (Codex) and its adopted findings
+  - [x] CI passes on all five toolchains (ff58d32: run 40519529656)
+  - [x] The independent reviews (Codex, and Kimi K3.1 Pro through Cline): six findings, all reproduced and fixed
+    (`docs/roots/PHASE5_API.md`)
 - Phase 6, at the user's choice: `Ridders`, `RegulaFalsi`, `Illinois`, `Steffensen`.
 
 ## Deferred

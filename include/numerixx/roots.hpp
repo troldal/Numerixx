@@ -1930,8 +1930,10 @@ namespace nxx::roots {
             // underflows to 0 for |x0| below 25 denorm_min.
             T h = x0 == T(0) ? T(T(1) / T(50)) : T(math::abs(x0) / T(50));
             if (h == T(0)) h = T(std::numeric_limits<T>::denorm_min());
+            // A type whose denorm_min() is 0, where the standard says min() (independent reviews of Phase 5).
+            if (h == T(0)) h = math::abs(x0);
             T const growth = T(T(3) / T(2));
-            T const largest_step = T(detail::largest<T>() / growth);
+            T const half_max = T(detail::largest<T>() / T(2));
             // Probes towards a domain edge: the bits of T, enough to approach an edge at 0 by as many halvings.
             int const probe_limit = detail::iteration_cap<T>() / 4;
             std::array<SearchSide<T>, 2> sides{ SearchSide<T>{ -1, true, x0, std::nullopt, 0 },
@@ -1974,8 +1976,15 @@ namespace nxx::roots {
                     side.last = x;
                 }
                 if (!sides[0].alive && !sides[1].alive) return std::unexpected(error::no_sign_change);
-                if (h > largest_step) return std::unexpected(error::no_sign_change); // no larger step exists
-                h = T(h * growth);
+                // h grows by 3/2 where that fits: h (3/2) below max / 2, and above it h + h / 2, checked (the same
+                // value in binary, where h / 2 is exact). A guard h <= max / (3/2) let 1.5 h overflow where the quotient
+                // rounds up, as in double and std::float16_t (independent reviews of Phase 5). Else no larger step.
+                if (h <= half_max)
+                    h = T(h * growth);
+                else if (detail::sum_fits(h, T(h / T(2))))
+                    h = T(h + T(h / T(2)));
+                else
+                    return std::unexpected(error::no_sign_change);
             }
             return std::unexpected(error::no_sign_change);
         }
@@ -1991,8 +2000,8 @@ namespace nxx::roots {
      * last point on that side where fn had x0's sign, and the new point, in order; {x, x} where fn is exactly 0 at x,
      * which solve() returns at once as a root. x0 sets the scale of the search, so a quantity searches at its own
      * scale; from a tiny x0 a root at scale 1 can lie beyond the cap. At most 4 times the bits of T steps (212 in
-     * double, so at most 425 evaluations), and no step larger than max / (3/2): from x0 near max the search reaches
-     * down to about max / 3.
+     * double, so at most 425 evaluations), and no step that would pass max: from x0 = max, whose largest step is
+     * 0.77 max, the search reaches down to 0.23 max.
      *
      * Where fn is not finite at a point (outside its domain), that side bisects towards its last finite point, at most
      * as many times as T has bits, to find a root near the domain's edge. Where fn is finite outside its domain,

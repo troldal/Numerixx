@@ -289,8 +289,8 @@ namespace {
         // A domain edge: where fn is not finite, that side bisects towards its last finite point.
         show_bracket("ln(x / 1e-12) = 0 from 1", rt::search([](double x) { return std::log(x / 1e-12); }, 1.0));
 
-        // van der Waals is finite below its co-volume b, with a pole at b, which a search would bracket. Returning
-        // NaN outside the domain keeps the search inside it.
+        // van der Waals is finite between 0 and its co-volume b, with a pole at b, which a search would bracket.
+        // Returning NaN outside the domain keeps the search inside it.
         double const b = 4.27e-5;
         auto const vdw = [b](double v) { return 8.314 * 280.0 / (v - b) - 0.364 / (v * v) - 4e6; };
         auto const vdw_domain = [&vdw, b](double v) {

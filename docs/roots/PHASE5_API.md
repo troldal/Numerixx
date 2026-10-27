@@ -28,7 +28,8 @@ auto const v = rt::search(g, 1e-4); // [3.6e-4, 4.9e-4] in 29 evaluations; witho
 - **`search(fn, x0)`**: evaluates fn at x0, then at x0 - h and x0 + h for growing h, until fn's sign differs from its
   sign at x0; returns the narrowest bracket that shows it, its ends in order.
 - **The rules** (P1, P2): a first step |x0| / 50 (1/50 at 0), growing by 3/2 per step; at a non-finite value of fn,
-  that side approaches fn's domain edge by bisection, at most `digits` probes (53 in double), instead of stopping
+  that side approaches fn's domain edge by bisection, at most as many probes as T has bits (53 in double), instead of
+  stopping
   (which changes BRIEF.md 3.9's rule); no bound on the search region (P3: return NaN outside fn's domain).
 - **Errors:** `non_finite` (x0 or fn(x0) not finite) and `no_sign_change` (none found: P4). Composes with `solve`
   through `and_then`; a `no_sign_change` from the composition is always search's, since its bracket always has one.
@@ -69,15 +70,15 @@ namespace nxx::roots {
    fn(x0) exactly 0: the bracket {x0, x0}, which `solve` returns at once as a root.
 2. **Steps:** h_0 = |x0| / T(50), or T(1) / T(50) where x0 = 0, and at least `denorm_min` (|x0| / 50 underflows to 0
    for |x0| below 25 denorm_min). Each step tries x0 - h, then x0 + h, checking the sign after each evaluation. A side
-   whose point would overflow (`sum_fits(x0, -+h)` fails) ends. h grows by 3/2 after a step while h <= max / (3/2);
-   past that no larger step exists, and the search ends.
+   whose point would overflow (`sum_fits(x0, -+h)` fails) ends. h grows by 3/2 after a step where 1.5 h fits (h (3/2)
+   below max / 2; above it h + h / 2, checked by `sum_fits`); past that no larger step exists, and the search ends.
 3. **A sign change** (fn at the new point of the other sign than fn(x0)) returns [the side's last point, the new
    point], in order: fn has x0's sign at the former, since every earlier finite point of that side had it. fn exactly
    0 at the new point returns {x, x}.
 4. **Domain edges (P2):** a non-finite value of fn makes that side bisect (Phase 1's `midpoint`) between its last
    finite point and the failing one, checking the sign at each finite midpoint, instead of growing; the side ends
-   after `digits` probes (53 in double, 168 in `cpp_bin_float_50`), or where the midpoint is no longer strictly between
-   the two. Each probe is that side's evaluation for the step.
+   after as many probes as T has bits (53 in double, 168 in `cpp_bin_float_50`, 200 in `cpp_dec_float_50`), or where
+   the midpoint is no longer strictly between the two. Each probe is that side's evaluation for the step.
 5. **The cap:** at most `iteration_cap<T>()` steps (4 times the bits of T: 212 in double, 672 in `cpp_bin_float_50`),
    reaching h_0 1.5^211 = 1.4e37 h_0; so at most 2 cap + 1 evaluations (425 in double, 1345 in `cpp_bin_float_50`),
    then `no_sign_change`. A search to max in `cpp_bin_float_50`, whose exponents reach 2^31, would take about 3.7e9
@@ -169,19 +170,42 @@ from 1.
 - The probe limit is the bits of T (`iteration_cap<T>() / 4`), not `std::numeric_limits<T>::digits`: they agree in
   binary (53 in double, 168 in `cpp_bin_float_50`), but for a decimal type `digits` counts decimal digits, which would
   give it about a quarter of the halvings.
-- From x0 near max the search reaches down to about max / 3 (no step exceeds max / (3/2)): x - 1 from max is
-  `no_sign_change`, x - max / 2 from max is found. Documented with `search` and tested.
+- From x0 = max the search reaches down to 0.23 max (its largest step is 0.77 max): x - 1 from max is
+  `no_sign_change`, x - max / 2 and x - max / 4 from max are found. Documented with `search` and tested (the first
+  wording, max / 3, was wrong: corrected after the independent reviews).
 - The tests use the test cases `roots:search:*` in `tests/test_roots_search.cpp`; every count and bracket end of the
   `+ - * /` and sqrt rows is reproduced exactly, the ends written as hexadecimal literals.
 - `demo/roots_demo.cpp` section 12: a bracket and its root, a domain edge, van der Waals with and without the NaN, and
   a miss.
+
+## Independent reviews (OpenAI Codex and Kimi K3.1 Pro, ff58d32)
+
+After the implementation (ff58d32, CI run 40519529656), two read-only reviews with the same brief: OpenAI Codex, and,
+at the user's request, Kimi K3.1 Pro through the Cline CLI (plan mode) as a cold read, without Codex's findings. Both
+found the first finding independently; every finding was reproduced (`.scratch/roots5/`), and the user approved all six
+fixes.
+1. **The growth guard could overflow** (both). h <= max / (3/2) does not make 1.5 h finite where the quotient rounds
+   up, as in double and `std::float16_t`: from 11.3828125 (Codex) or 2214 (Kimi) in `std::float16_t` the step reached
+   43680, 1.5 h rounded to infinity, and the search returned a bracket from -infinity. Fixed: h grows only where
+   1.5 h fits (h (3/2) below max / 2; h + h / 2 checked above, the same value in binary). No count changed.
+2. **The first step stayed 0 for a type whose denorm_min() is 0** (Codex): the standard says min() for a type without
+   subnormals, but `nxx::real` does not require it. Fixed: |x0| then.
+3. **The reach near max was misstated** (Codex): from max the search reaches 0.23 max, not max / 3. Corrected.
+4. **The tests' sign-change helper accepted NaN and infinite values** (Codex). Fixed: finite ends and values required.
+5. **The probe limit contradicted itself** (Kimi): the summary and Behaviour said `digits`, the implementation note
+   the bits of T, which differ in radix 10 (50 against 200). Now the bits of T throughout.
+6. **The demo said van der Waals is finite below b** (Kimi); it is not at v = 0. Corrected to "between 0 and b".
+
+Both also checked and found correct: every count and bracket end against the prototype, the bound of 2 cap + 1
+evaluations and termination, the domain-edge probing and its limit, the order of the ends and the sign change, the
+user types and the qualified calls.
 
 ## Decisions for the user
 
 - **P1. A first step |x0| / 50 (1/50 at 0, at least denorm_min) and growth 3/2.** Recommended: x0 sets the scale; 3/2
   is exact in every type and keeps a root and a pole apart where 2 does not. Alternatives: max(|x0|, 1) / 50 (assumes
   a scale of 1; misses van der Waals from 1e-3); sqrt 2 (needs a square root); 2 (cheaper, misses 1/x - 1 from 3).
-- **P2. A side approaches a domain edge by bisection, at most `digits` probes**, rather than stopping. Recommended:
+- **P2. A side approaches a domain edge by bisection, at most as many probes as T has bits**, rather than stopping. Recommended:
   finds roots near an edge (logarithms, square roots, volumes above a co-volume); the limit bounds the cost where the
   edge is on the far side (150 against 97 on ln x - 30). Alternatives: BRIEF.md 3.9's rule, the side stops; unlimited
   probing (171).

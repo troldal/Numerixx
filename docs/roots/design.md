@@ -166,8 +166,9 @@ the phases in `docs/plan.md`, and each phase's specification and evidence in `PH
   T has bits (P2; BRIEF.md 3.9 had the side stop, which misses roots near an edge).
 - **No search bound** (P3): where fn is finite outside its domain, the caller returns NaN there; a bound (`within`)
   is deferred. **No sign change found is `no_sign_change`** (P4).
-- **Limits:** at most 4 times the bits of T steps (2 cap + 1 evaluations), no step above max / (3/2) (from near max
-  the search reaches down to about max / 3), x0 +- h formed only where `sum_fits` admits it. What no outward search
+- **Limits:** at most 4 times the bits of T steps (2 cap + 1 evaluations); h grows only where 1.5 h fits, so no step
+  passes max (from max the search reaches down to 0.23 max); x0 +- h formed only where `sum_fits` admits it; the first
+  step |x0| where denorm_min() is 0. What no outward search
   finds, and the documentation says: an even root, two roots within one step, a root beyond a non-finite region on
   the same side, a root beyond the cap; a pole brackets like a root.
 

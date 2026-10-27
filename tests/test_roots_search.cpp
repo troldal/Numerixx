@@ -9,9 +9,14 @@
 #include <doctest/doctest.h>
 
 #include <cmath>
+#include <compare>
 #include <expected>
 #include <limits>
 #include <utility>
+
+#if __has_include(<stdfloat>)
+#include <stdfloat>
+#endif
 
 using namespace roots_check;
 
@@ -33,16 +38,62 @@ namespace {
         return { b, n };
     }
 
-    // fn's signs at the bracket's ends differ, or fn is 0 at one.
+    // The bracket's ends are finite and in order, fn is finite at both, and its signs differ there (or it is 0 at one).
     template<typename F>
     bool sign_change(F const &fn, rt::Bracket<double> const &b)
     {
         double const lo = fn(b.lower);
         double const hi = fn(b.upper);
-        return b.lower <= b.upper && (lo == 0.0 || hi == 0.0 || (lo < 0.0) != (hi < 0.0));
+        bool const finite = nxx::math::isfinite(b.lower) && nxx::math::isfinite(b.upper) && nxx::math::isfinite(lo)
+                            && nxx::math::isfinite(hi);
+        return finite && b.lower <= b.upper && (lo == 0.0 || hi == 0.0 || (lo < 0.0) != (hi < 0.0));
     }
 
+    // A real type whose denorm_min() is 0 and whose arithmetic flushes subnormal results to 0 (the standard says
+    // denorm_min() is min() for a type without subnormals, but nxx::real does not require it).
+    struct Flushed
+    {
+        double v = 0.0;
+
+        constexpr Flushed() = default;
+        constexpr Flushed(int i) : v(i) {}
+        constexpr explicit Flushed(double d) : v(d > -0x1p-1022 && d < 0x1p-1022 ? 0.0 : d) {}
+
+        friend constexpr Flushed operator+(Flushed a, Flushed b) { return Flushed(a.v + b.v); }
+        friend constexpr Flushed operator-(Flushed a, Flushed b) { return Flushed(a.v - b.v); }
+        friend constexpr Flushed operator*(Flushed a, Flushed b) { return Flushed(a.v * b.v); }
+        friend constexpr Flushed operator/(Flushed a, Flushed b) { return Flushed(a.v / b.v); }
+        friend constexpr Flushed operator-(Flushed a) { return Flushed(-a.v); }
+        friend constexpr auto operator<=>(Flushed, Flushed) = default;
+    };
+
 } // namespace
+
+template<>
+struct std::numeric_limits<Flushed> : std::numeric_limits<double>
+{
+    static constexpr Flushed epsilon() { return Flushed(std::numeric_limits<double>::epsilon()); }
+    static constexpr Flushed max() { return Flushed((std::numeric_limits<double>::max)()); }
+    static constexpr Flushed denorm_min() { return Flushed(0.0); }
+};
+
+static_assert(nxx::real<Flushed>);
+
+// The independent reviews of Phase 5 (ff58d32).
+// 1. The growth guard h <= max / (3/2) let 1.5 h overflow where the quotient rounds up: in std::float16_t the step
+//    reached max / (3/2) = 43680 exactly, 1.5 h = 65520 rounded to infinity, and the search returned a bracket from
+//    -infinity. Now the step grows only where 1.5 h fits, and -60000 lies beyond the largest step.
+#if defined(__STDCPP_FLOAT16_T__)
+static_assert(rt::search([](std::float16_t x) { return x < std::float16_t(-60000) ? std::float16_t(-1) : std::float16_t(1); },
+                  std::float16_t(11.3828125))
+              == std::unexpected(rt::error::no_sign_change));
+static_assert(rt::search([](std::float16_t x) { return x < std::float16_t(-60000) ? std::float16_t(-1) : std::float16_t(1); },
+                  std::float16_t(2214))
+              == std::unexpected(rt::error::no_sign_change));
+#endif
+// 2. With denorm_min() = 0, a first step |x0| / 50 that flushes to 0 stayed 0: now |x0|, which finds the root at 2 x0.
+static_assert(rt::search([](Flushed x) { return x - Flushed(0x1p-1021); }, Flushed(0x1p-1022))
+              == rt::Bracket<Flushed>{ Flushed(0x1p-1021), Flushed(0x1p-1021) });
 
 // Constant evaluation in each type, and a domain edge (fn returns NaN explicitly: sqrt or log of a negative number is
 // not a constant expression).
@@ -130,8 +181,8 @@ TEST_CASE("roots:search: libm, the composition and the edges")
     CHECK(rt::search(sq, dinf) == std::unexpected(rt::error::non_finite));
     CHECK(rt::search([](double x) { return std::log(x); }, -1.0) == std::unexpected(rt::error::non_finite));
 
-    // x0 at +-max: no overflow. No step exceeds max / (3/2), so from max the search reaches down to about max / 3: a
-    // root at max / 2 is found, one at 1 is not.
+    // x0 at +-max: no overflow. No step passes max; from max the largest step is 0.77 max (max / 50 1.5^9), so the
+    // search reaches down to 0.23 max: roots at max / 2 and max / 4 are found, one at 1 is not.
     auto const half = [](double x) { return x - dmax / 2.0; };
     auto const neg_half = [](double x) { return x + dmax / 2.0; };
     auto const from_max = rt::search(half, dmax);
@@ -140,6 +191,10 @@ TEST_CASE("roots:search: libm, the composition and the edges")
     REQUIRE(from_min.has_value());
     CHECK(sign_change(half, *from_max));
     CHECK(sign_change(neg_half, *from_min));
+    auto const quarter = [](double x) { return x - dmax / 4.0; };
+    auto const from_max_quarter = rt::search(quarter, dmax);
+    REQUIRE(from_max_quarter.has_value());
+    CHECK(sign_change(quarter, *from_max_quarter));
     CHECK(rt::search([](double x) { return x - 1.0; }, dmax) == std::unexpected(rt::error::no_sign_change));
 
     // A tuple fn gives the value fn's bracket.
