@@ -48,3 +48,6 @@ build/
 
 # Throwaway prototypes
 .scratch/
+
+# Python bytecode (the documentation extension)
+__pycache__/
