@@ -1,5 +1,8 @@
 # Phase 1 API proposal: the bracketing core, Bisection and Brent
 
+Note (2026-10-27): the entry point `root<M>(...)` of this document is now `solve<M>(...)` (`PHASE2_API.md`, user
+decision); the text below keeps the name it was approved with.
+
 Status: approved by the user on 2026-10-25 (P1 to P5 as recommended; P6: the walk to 0 documented, the fast descent
 deferred). One review round (numerics-reviewer, simplicity-critic, usage-sketcher) is folded in ("Decisions from the
 reviews"). Architecture: `docs/roots/BRIEF.md` (approved 2026-10-25).

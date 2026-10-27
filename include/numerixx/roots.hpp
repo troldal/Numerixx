@@ -2,7 +2,7 @@
  * @file
  * @brief Roots of a real function of one variable: bracketing methods.
  *
- * root<M>(fn, bracket) finds a point where fn changes sign inside a bracket, an interval at whose ends fn has opposite
+ * solve<M>(fn, bracket) finds a point where fn changes sign inside a bracket, an interval at whose ends fn has opposite
  * signs, by a method M: `Bisection`, which halves the bracket, or `Brent`, which interpolates and falls back on
  * bisection. It returns a std::expected<Root<T>, error>: the root and a bound on its distance to a sign change of fn.
  * Numerixx itself never throws, but the result's own value() throws std::bad_expected_access on a failure, so test
@@ -10,7 +10,7 @@
  *
  * @code
  * namespace rt = nxx::roots;
- * auto const r = rt::root<rt::Brent>([](double x) { return x * x - 2.0; }, rt::Bracket{1.0, 2.0});
+ * auto const r = rt::solve<rt::Brent>([](double x) { return x * x - 2.0; }, rt::Bracket{1.0, 2.0});
  * if (r) use(r->value, r->abs_error); // sqrt(2) to about 1e-16, after 9 evaluations of fn
  * @endcode
  */
@@ -33,7 +33,7 @@
 namespace nxx::roots {
 
     /**
-     * @brief Why root() returned no root.
+     * @brief Why solve() returned no root.
      *
      * More values will be added, and a listed cause may move to a new value: a switch on it should have a default, and
      * a caller should test for success rather than for a particular error. It is formattable: std::format("{}", e)
@@ -110,7 +110,7 @@ namespace nxx::roots {
      * exponent range is much wider). Set abs_tol to the distance from 0 that is close enough there.
      *
      * @code
-     * auto const r = nxx::roots::root<nxx::roots::Brent>(fn, nxx::roots::Bracket{0.0, 1.0}, {.abs_tol = 1e-12});
+     * auto const r = nxx::roots::solve<nxx::roots::Brent>(fn, nxx::roots::Bracket{0.0, 1.0}, {.abs_tol = 1e-12});
      * @endcode
      *
      * @tparam T The real type.
@@ -152,7 +152,7 @@ namespace nxx::roots {
     namespace detail {
 
         /**
-         * @brief The bracketing methods root() accepts: a closed set.
+         * @brief The bracketing methods solve() accepts: a closed set.
          * @tparam M The method.
          */
         template<typename M>
@@ -566,8 +566,8 @@ namespace nxx::roots {
      *
      * @code
      * namespace rt = nxx::roots;
-     * auto const r = rt::root<rt::Brent>([](double t) { return psat(t) - 101325.0; }, rt::Bracket{300.0, 400.0});
-     * auto const s = rt::root<rt::Bisection>(fn, rt::Bracket{0.0, 1.0}, {.rel_tol = 1e-8});
+     * auto const r = rt::solve<rt::Brent>([](double t) { return psat(t) - 101325.0; }, rt::Bracket{300.0, 400.0});
+     * auto const s = rt::solve<rt::Bisection>(fn, rt::Bracket{0.0, 1.0}, {.rel_tol = 1e-8});
      * @endcode
      *
      * @tparam M The method: `Bisection` or `Brent`.
@@ -585,7 +585,7 @@ namespace nxx::roots {
     template<typename M, real T, typename F>
     requires detail::bracketing<M> && nxx::detail::callable<F, T>
     [[nodiscard]] constexpr std::expected<Root<T>, error>
-        root(F &&fn, Bracket<T> const &bracket, Criteria<std::type_identity_t<T>> const &criteria = {})
+        solve(F &&fn, Bracket<T> const &bracket, Criteria<std::type_identity_t<T>> const &criteria = {})
     {
         // Qualified, so that argument-dependent lookup cannot pick a function from the namespace of T or F.
         std::expected<detail::Tolerance<T>, error> const tolerance = detail::checked_tolerance(criteria);

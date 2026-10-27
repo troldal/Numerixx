@@ -34,7 +34,7 @@ static_assert(*nxx::deriv::derivative([](double x) { return x * x; }, 3.0, 0.5) 
 #include <numerixx/roots.hpp>
 
 namespace rt = nxx::roots;
-auto r = rt::root<rt::Brent>([](double x) { return x * x - 2.0; }, rt::Bracket{1.0, 2.0});
+auto r = rt::solve<rt::Brent>([](double x) { return x * x - 2.0; }, rt::Bracket{1.0, 2.0});
 if (r) { /* r->value is sqrt(2) to about 1e-16; r->abs_error bounds its distance to fn's sign change */ }
 ```
 

@@ -40,7 +40,7 @@ namespace {
     void count(std::string_view label, F const &fn, rt::Bracket<double> const &bracket, rt::Criteria<double> c = {})
     {
         int n = 0;
-        auto const r = rt::root<M>(Counted<F>{ fn, &n }, bracket, c);
+        auto const r = rt::solve<M>(Counted<F>{ fn, &n }, bracket, c);
         if (r)
             std::println("   {:<30} {:.17g} +- {:.1e}  ({} evaluations)", label, r->value, r->abs_error, n);
         else
@@ -51,7 +51,7 @@ namespace {
     {
         std::println("1. sqrt(2) as the root of x^2 - 2 in [1, 2], by Brent's method");
         auto const f = [](double x) { return x * x - 2.0; };
-        auto const r = rt::root<rt::Brent>(f, rt::Bracket{ 1.0, 2.0 });
+        auto const r = rt::solve<rt::Brent>(f, rt::Bracket{ 1.0, 2.0 });
         show("root", r);
         std::println("   {:<30} {:.17g}", "exact", std::numbers::sqrt2);
         // abs_error bounds the distance to the point where fn, as evaluated, changes sign.
@@ -82,7 +82,7 @@ namespace {
         double const e = 0.9;
         for (double const m : { 0.1, 0.5, 1.0, 2.0, 3.0 }) {
             auto const fn = [e, m](double big_e) { return big_e - e * std::sin(big_e) - m; };
-            show(std::format("M = {:.1f}", m), rt::root<rt::Brent>(fn, rt::Bracket{ 0.0, std::numbers::pi }));
+            show(std::format("M = {:.1f}", m), rt::solve<rt::Brent>(fn, rt::Bracket{ 0.0, std::numbers::pi }));
         }
     }
 
@@ -118,7 +118,7 @@ namespace {
     void precision(std::string_view type)
     {
         auto const f = [](T x) { return x * x - T(2); };
-        if (auto const r = rt::root<rt::Brent>(f, rt::Bracket{ T(1), T(2) }))
+        if (auto const r = rt::solve<rt::Brent>(f, rt::Bracket{ T(1), T(2) }))
             std::println("   {:<12} abs_error {:.1e}, error {:.1e}",
                 type,
                 static_cast<double>(r->abs_error),
@@ -138,26 +138,26 @@ namespace {
     {
         std::println("\n7. At compile time");
         constexpr auto f = [](double x) { return x * x - 2.0; };
-        constexpr auto r = rt::root<rt::Brent>(f, rt::Bracket{ 1.0, 2.0 });
+        constexpr auto r = rt::solve<rt::Brent>(f, rt::Bracket{ 1.0, 2.0 });
         static_assert(r.has_value() && nxx::math::abs(r->value - 1.4142135623730951) <= r->abs_error);
         show("constexpr sqrt(2)", r);
         // Bisection reaches a dyadic root exactly: 0.5, 0.25, then 0.375.
         static_assert(
-            rt::root<rt::Bisection>([](double x) { return x - 0.375; }, rt::Bracket{ 0.0, 1.0 })->value == 0.375);
+            rt::solve<rt::Bisection>([](double x) { return x - 0.375; }, rt::Bracket{ 0.0, 1.0 })->value == 0.375);
     }
 
     void errors()
     {
         std::println("\n8. Failures are values, not exceptions");
         auto const f = [](double x) { return x * x - 2.0; };
-        show("x^2 - 2 in [2, 3]", rt::root<rt::Brent>(f, rt::Bracket{ 2.0, 3.0 })); // the same sign at both ends
+        show("x^2 - 2 in [2, 3]", rt::solve<rt::Brent>(f, rt::Bracket{ 2.0, 3.0 })); // the same sign at both ends
         auto const log = [](double x) { return std::log(x) + 1.0; };
-        show("log x + 1 in [0, 1]", rt::root<rt::Brent>(log, rt::Bracket{ 0.0, 1.0 })); // log 0 is -inf
-        show("x^2 - 2, rel_tol = -1", rt::root<rt::Brent>(f, rt::Bracket{ 1.0, 2.0 }, { .rel_tol = -1.0 }));
+        show("log x + 1 in [0, 1]", rt::solve<rt::Brent>(log, rt::Bracket{ 0.0, 1.0 })); // log 0 is -inf
+        show("x^2 - 2, rel_tol = -1", rt::solve<rt::Brent>(f, rt::Bracket{ 1.0, 2.0 }, { .rel_tol = -1.0 }));
 
         // A pole changes sign like a root, and is returned as one: check |fn| at the result where fn may have poles.
         auto const pole = [](double x) { return 1.0 / (x - 1.0 / 3.0); };
-        auto const p = rt::root<rt::Brent>(pole, rt::Bracket{ 0.0, 1.0 });
+        auto const p = rt::solve<rt::Brent>(pole, rt::Bracket{ 0.0, 1.0 });
         show("1 / (x - 1/3) in [0, 1]", p);
         if (p) std::println("   {:<30} {:.1e}", "|fn| there", std::abs(pole(p->value)));
     }
@@ -168,9 +168,9 @@ namespace {
         // stops the chain.
         std::println("\n9. Composition: the x where x e^x = 1, then the y where y^2 = that x");
         auto const omega = [](double x) { return x * std::exp(x) - 1.0; };
-        auto const both = rt::root<rt::Brent>(omega, rt::Bracket{ 0.0, 1.0 }).and_then([](rt::Root<double> const &w) {
+        auto const both = rt::solve<rt::Brent>(omega, rt::Bracket{ 0.0, 1.0 }).and_then([](rt::Root<double> const &w) {
             auto const g = [x = w.value](double y) { return y * y - x; };
-            return rt::root<rt::Brent>(g, rt::Bracket{ 0.0, 1.0 });
+            return rt::solve<rt::Brent>(g, rt::Bracket{ 0.0, 1.0 });
         });
         show("sqrt(W(1))", both);
         std::println("   {:<30} {:.17g}", "via std::sqrt", std::sqrt(0.56714329040978387300));

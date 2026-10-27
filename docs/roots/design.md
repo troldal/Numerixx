@@ -15,7 +15,9 @@ the phases in `docs/plan.md`, and each phase's specification and evidence in `PH
 
 ## The interface (`roots.hpp`)
 
-- One entry point, `root<M>(fn, Bracket[, Criteria])`, for every bracketing method M (`Bisection`, `Brent`); a closed
+- The entry point is `solve<M>(...)` (user decision, 2026-10-27; `root<M>(...)` in Phase 1 and the brief), so that it
+  is not told apart from its result type `Root<T>` only by case.
+- One entry point, `solve<M>(fn, Bracket[, Criteria])`, for every bracketing method M (`Bisection`, `Brent`); a closed
   set of empty tags, `detail::bracketing<M>`, as in `nxx::deriv`. The open methods (Phase 2) take a guess as their
   start, by an overload; `BRIEF.md` 3.1.
 - `Bracket<T>{lower, upper}`: the ends in either order (swapped, not an error: an interval is unambiguous).
