@@ -79,6 +79,12 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
 - Phase 2: open methods and derivatives (fn returning a tuple-like, or separate derivative callables); `Newton` and
   `Halley` on a guess or a bracket, `Secant`; the entry point renamed `solve`. API approved:
   `docs/roots/PHASE2_API.md`.
+  - [x] Newton, Halley and Secant from a guess with the hand-over, Newton and Halley on a bracket as Brent's loop with
+    a derivative step, both derivative forms, `not_converged`; Phase 1's results unchanged
+  - [x] Tests in double (the prototype's counts exactly), float, long double and the Boost.Multiprecision types; the
+    constraints; a demo section
+  - [ ] CI passes on all five toolchains
+  - [ ] The independent review (Codex) and its adopted findings
 - Phase 3: numerical derivatives, `nxx::deriv::derivative_of<M, N>(fn)`, and derivative callables returning
   `std::expected`.
 - Phase 4: `Toms748`, `AndersonBjorck`.

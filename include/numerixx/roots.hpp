@@ -1,17 +1,24 @@
 /**
  * @file
- * @brief Roots of a real function of one variable: bracketing methods.
+ * @brief Roots of a real function of one variable: bracketing methods and open methods.
  *
- * solve<M>(fn, bracket) finds a point where fn changes sign inside a bracket, an interval at whose ends fn has opposite
- * signs, by a method M: `Bisection`, which halves the bracket, or `Brent`, which interpolates and falls back on
- * bisection. It returns a std::expected<Root<T>, error>: the root and a bound on its distance to a sign change of fn.
- * Numerixx itself never throws, but the result's own value() throws std::bad_expected_access on a failure, so test
- * the result and read it with `->` or `*`.
+ * solve<M>(fn, start) finds a point where fn changes sign, by a method M. From a bracket, an interval at whose ends fn
+ * has opposite signs: `Bisection`, which halves it, `Brent`, which interpolates and falls back on bisection, and
+ * `Newton` and `Halley`, whose derivative steps the bracket safeguards. From a guess: `Newton`, `Halley` and `Secant`,
+ * which iterate until a sign change appears between two iterates and then finish inside it. Every method returns a
+ * std::expected<Root<T>, error>: the root and a bound on its distance to a sign change of fn. Numerixx itself never
+ * throws, but the result's own value() throws std::bad_expected_access on a failure, so test the result and read it
+ * with `->` or `*`.
+ *
+ * Newton and Halley take fn's derivatives either from fn, which then returns a std::pair, std::tuple or std::array of
+ * exactly T (the value, f', f''), or from separate callables passed after fn.
  *
  * @code
  * namespace rt = nxx::roots;
  * auto const r = rt::solve<rt::Brent>([](double x) { return x * x - 2.0; }, rt::Bracket{1.0, 2.0});
  * if (r) use(r->value, r->abs_error); // sqrt(2) to about 1e-16, after 9 evaluations of fn
+ * auto const fdf = [](double x) { return std::pair{x * x - 2.0, 2.0 * x}; };
+ * auto const n = rt::solve<rt::Newton>(fdf, 1.0); // the same root from a guess, after 7 evaluations
  * @endcode
  */
 
@@ -19,15 +26,20 @@
 
 #include <numerixx/math.hpp>
 
+#include <array>
 #include <cassert>
 #include <concepts>
+#include <cstddef>
 #include <expected>
 #include <format>
 #include <functional>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
+#include <utility>
 
 /** @brief Roots of real functions of one variable. */
 namespace nxx::roots {
@@ -41,13 +53,20 @@ namespace nxx::roots {
      */
     enum class error {
         /**
-         * A bracket end, a value of fn or a tolerance is not finite, or a tolerance is negative. A value of fn that is
-         * infinite at a bracket end is reported here; a later version may accept it for its sign.
+         * A bracket end, the guess, a value of fn or a tolerance is not finite, or a tolerance is negative. A value of
+         * fn that is infinite at a bracket end is reported here; a later version may accept it for its sign. The
+         * derivatives are not checked: one that is 0 or not finite makes a derivative step unusable (see Newton).
          */
         non_finite,
 
         /** fn has the same sign at both ends of the bracket, and is 0 at neither. */
-        no_sign_change
+        no_sign_change,
+
+        /**
+         * An open method found no root from its guess: no sign change between its iterates within its iteration cap,
+         * or no usable step (f' = 0 or not finite, Secant's two values equal, a step that would overflow).
+         */
+        not_converged
     };
 
     /**
@@ -76,8 +95,8 @@ namespace nxx::roots {
      * @brief A root, and a bound on its distance to a sign change of fn.
      *
      * abs_error bounds the distance from value to a point where fn, as evaluated, changes sign, and is at most
-     * 2 tol(value) (see Criteria). It saturates at max where that distance exceeds what T holds (only with tolerances
-     * near max). The root of the exact function may differ by fn's own rounding error divided by
+     * 2 tol(value) (see Criteria), for every method. It saturates at max where that distance exceeds what T holds
+     * (only with tolerances near max). The root of the exact function may differ by fn's own rounding error divided by
      * |f'|, which no method can see. Where fn evaluates to exactly 0, abs_error is the requested tolerance tol(value),
      * not 0: such a point is only as good as fn's evaluation (`(x + 1e10) - (1e10 + 1.0 / 3)` is 0 on an interval
      * about 2e-6 wide). Read the members by name: members may be added in a later version, which would break a
@@ -148,15 +167,142 @@ namespace nxx::roots {
     {
     };
 
+    /**
+     * @brief Newton's method: the step -f / f'. Needs fn and f'.
+     *
+     * On a bracket it is Brent's method with Newton's step in place of the interpolation, safeguarded the same way:
+     * x^2 - 2 on [1, 2] in 8 evaluations. From a guess it iterates until a sign change appears between two iterates,
+     * then continues on that bracket; every result is then a verified sign change, at about one evaluation more than
+     * the textbook stop (7 from 1 for x^2 - 2). From a guess it returns a root, the first sign change its iterates
+     * cross, not necessarily the one nearest the guess, and error::not_converged where it finds none (a cycle, a
+     * divergence, f' = 0). Its iteration cap is 4 times the bits of T (212 in double): beyond it lie a multiple root
+     * at 0 with the default abs_tol (x^3 from 1 shrinks by 2/3 per step until x^3 underflows), a guess very far from
+     * the root, and roots of multiplicity above about 5; a bracket, or abs_tol, solves them.
+     */
+    struct Newton
+    {
+    };
+
+    /**
+     * @brief Halley's method: the step -t / (1 - t f'' / (2 f')) with t = f / f'. Needs fn, f' and f''.
+     *
+     * Cubic near a simple root: x^2 - 2 from 1 in 5 evaluations. Where its correction cannot be formed or would point
+     * against Newton's step (far from a root), it takes Newton's step, as Boost.Math's Halley does. On a bracket and
+     * from a guess as Newton.
+     */
+    struct Halley
+    {
+    };
+
+    /**
+     * @brief The secant method: the step through the latest two iterates. Needs fn only; from a guess.
+     *
+     * Its second point is x0 (1 + eps^(1/4)) (eps^(1/4) itself at x0 = 0). At the first sign change it continues as
+     * Brent's method on that bracket, so its results are verified sign changes, as Newton's are: x^2 - 2 from 1 in 9
+     * evaluations. Superlinear (order 1.62) on a simple root.
+     */
+    struct Secant
+    {
+    };
+
     /** @cond INTERNAL */
     namespace detail {
 
         /**
-         * @brief The bracketing methods solve() accepts: a closed set.
+         * @brief The methods solve() accepts on a bracket.
          * @tparam M The method.
          */
         template<typename M>
-        concept bracketing = std::same_as<M, Bisection> || std::same_as<M, Brent>;
+        concept bracketing =
+            std::same_as<M, Bisection> || std::same_as<M, Brent> || std::same_as<M, Newton> || std::same_as<M, Halley>;
+
+        /**
+         * @brief The methods solve() accepts from a guess.
+         * @tparam M The method.
+         */
+        template<typename M>
+        concept open = std::same_as<M, Newton> || std::same_as<M, Halley> || std::same_as<M, Secant>;
+
+        /**
+         * @brief The number of values a method needs from fn at a point: the value, and the derivatives it uses.
+         * @tparam M The method.
+         */
+        template<typename M>
+        inline constexpr std::size_t values_needed = std::same_as<M, Newton>   ? 2
+                                                     : std::same_as<M, Halley> ? 3
+                                                                               : 1;
+
+        /**
+         * @brief Whether R is a std::pair, std::tuple or std::array: the tuple-likes fn may return.
+         * @tparam R The type.
+         */
+        template<typename R>
+        inline constexpr bool is_standard_tuple = false;
+
+        /**
+         * @brief A std::pair is a tuple-like fn may return.
+         * @tparam A The first element type.
+         * @tparam B The second element type.
+         */
+        template<typename A, typename B>
+        inline constexpr bool is_standard_tuple<std::pair<A, B>> = true;
+
+        /**
+         * @brief A std::tuple is a tuple-like fn may return.
+         * @tparam Ts The element types.
+         */
+        template<typename... Ts>
+        inline constexpr bool is_standard_tuple<std::tuple<Ts...>> = true;
+
+        /**
+         * @brief A std::array is a tuple-like fn may return.
+         * @tparam U The element type.
+         * @tparam N The size.
+         */
+        template<typename U, std::size_t N>
+        inline constexpr bool is_standard_tuple<std::array<U, N>> = true;
+
+        /**
+         * @brief Whether every element of the tuple-like R is exactly T.
+         * @tparam R The tuple-like type.
+         * @tparam T The real type.
+         * @tparam I The indices of the elements.
+         * @return true if each `std::tuple_element_t<I, R>` is T.
+         */
+        template<typename R, typename T, std::size_t... I>
+        consteval bool elements_are(std::index_sequence<I...>)
+        { return (std::same_as<std::tuple_element_t<I, R>, T> && ...); }
+
+        /**
+         * @brief A function returning, by value, a std::pair, std::tuple or std::array whose elements are all exactly
+         * T: the value of fn and its derivatives, in order.
+         *
+         * Exactly T, not convertible to T: an element of a reference type (std::tie of fn's locals) or of an expression
+         * type (Boost.Multiprecision's expression templates) could refer to fn's locals and dangle once fn returns, and
+         * converting it afterwards is too late.
+         *
+         * @tparam F The callable type.
+         * @tparam T The real type.
+         */
+        template<typename F, typename T>
+        concept tuple_valued =
+            std::invocable<F &, T const &> && !std::is_reference_v<std::invoke_result_t<F &, T const &>>
+            && is_standard_tuple<std::remove_cv_t<std::invoke_result_t<F &, T const &>>>
+            && detail::elements_are<std::remove_cv_t<std::invoke_result_t<F &, T const &>>, T>(
+                std::make_index_sequence<std::tuple_size_v<std::remove_cv_t<std::invoke_result_t<F &, T const &>>>>{});
+
+        /**
+         * @brief fn gives at least K values at a point: its value alone (K = 1, a result convertible to T), or a
+         * tuple-like of at least K elements, each exactly T. A tuple-like result is never read as a value.
+         *
+         * @tparam F The callable type.
+         * @tparam T The real type.
+         * @tparam K The number of values needed.
+         */
+        template<typename F, typename T, std::size_t K>
+        concept gives =
+            (K == 1 && nxx::detail::callable<F, T>)
+            || (tuple_valued<F, T> && std::tuple_size_v<std::remove_cv_t<std::invoke_result_t<F &, T const &>>> >= K);
 
         /**
          * @brief The largest finite value of T.
@@ -168,6 +314,20 @@ namespace nxx::roots {
         {
             // Parenthesised, so that a max macro, as defined by <windows.h>, cannot expand.
             return T((std::numeric_limits<T>::max)());
+        }
+
+        /**
+         * @brief The open methods' iteration cap: 4 times the bits of T, digits times the smallest b with
+         * 2^b >= radix (212 for double, 672 for cpp_bin_float_50).
+         * @tparam T The real type.
+         * @return The cap.
+         */
+        template<real T>
+        consteval int iteration_cap()
+        {
+            int bits_per_digit = 0;
+            while ((1 << bits_per_digit) < std::numeric_limits<T>::radix) ++bits_per_digit;
+            return 4 * std::numeric_limits<T>::digits * bits_per_digit;
         }
 
         /**
@@ -336,20 +496,137 @@ namespace nxx::roots {
         }
 
         /**
-         * @brief fn at x, converted to T before any arithmetic (expression templates do not escape).
-         * @param fn The function.
-         * @param x The point, a T const lvalue as the constraint promises.
-         * @return fn(x) as a T.
+         * @brief a / b, where it can be formed: b is not 0 and the quotient is at most about max / 2.
+         *
+         * The test |a| / max < |b| / 2 (nxx::deriv's) is conservative by a factor 2 and forms nothing that overflows.
+         *
+         * @param a A finite value.
+         * @param b A finite value.
+         * @return a / b, or nothing.
          */
-        template<real T, typename F>
-        constexpr T evaluate(F &fn, T const &x)
-        { return static_cast<T>(std::invoke(fn, x)); }
+        template<real T>
+        constexpr std::optional<T> quotient(T const &a, T const &b)
+        {
+            if (b == T(0)) return std::nullopt;
+            if (!(T(math::abs(a) / detail::largest<T>()) < T(math::abs(b) / T(2)))) return std::nullopt;
+            return T(a / b);
+        }
+
+        /**
+         * @brief a * b, where it cannot overflow: |a| <= 1, or |b| <= (max / 2) / |a|.
+         * @param a A finite value.
+         * @param b A finite value.
+         * @return a * b, or nothing.
+         */
+        template<real T>
+        constexpr std::optional<T> product(T const &a, T const &b)
+        {
+            T const aa = math::abs(a);
+            if (aa > T(1) && math::abs(b) > T(T(detail::largest<T>() / T(2)) / aa)) return std::nullopt;
+            return T(a * b);
+        }
+
+        /**
+         * @brief Whether x + s cannot overflow: opposite signs; or both at most max / 2; or |x| above max / 2 and |s|
+         * at most max - |x| (exact there, by Sterbenz's lemma).
+         * @param x A finite point.
+         * @param s A finite step.
+         * @return true if x + s may be formed.
+         */
+        template<real T>
+        constexpr bool sum_fits(T const &x, T const &s)
+        {
+            if ((x < T(0)) != (s < T(0))) return true;
+            T const half = T(detail::largest<T>() / T(2));
+            T const ax = math::abs(x);
+            T const as = math::abs(s);
+            if (ax <= half) return as <= half;
+            return as <= T(detail::largest<T>() - ax);
+        }
+
+        /**
+         * @brief The values fn gives at a point, as a std::array of K values of T, converted where fn is evaluated.
+         * @tparam K The number of values: 1 (the value), 2 (with f') or 3 (with f'').
+         * @tparam T The real type.
+         * @tparam F The callable type.
+         * @tparam I The indices of the values.
+         * @param fn The function.
+         * @param x The point, a T const lvalue as the constraints promise.
+         * @return fn's first K values at x.
+         */
+        template<std::size_t K, real T, typename F, std::size_t... I>
+        constexpr std::array<T, K> evaluate(F &fn, T const &x, std::index_sequence<I...>)
+        {
+            if constexpr (tuple_valued<F, T>) {
+                std::invoke_result_t<F &, T const &> const values = std::invoke(fn, x);
+                return std::array<T, K>{ std::get<I>(values)... };
+            } else {
+                // A value: expression templates are converted to T before any arithmetic.
+                return std::array<T, K>{ static_cast<T>(std::invoke(fn, x)) };
+            }
+        }
+
+        /**
+         * @brief The values fn gives at a point (see the overload above).
+         * @tparam K The number of values.
+         * @tparam T The real type.
+         * @tparam F The callable type.
+         * @param fn The function.
+         * @param x The point.
+         * @return fn's first K values at x.
+         */
+        template<std::size_t K, real T, typename F>
+        constexpr std::array<T, K> evaluate(F &fn, T const &x)
+        { return detail::evaluate<K>(fn, x, std::make_index_sequence<K>{}); }
+
+        /**
+         * @brief fn and its separate derivative callables, joined into one function that returns their values as an
+         * array: the separate form becomes the tuple form, so each method has one implementation.
+         *
+         * Pointers rather than a lambda that captures the callables by reference: MSVC rejects such a capture of a
+         * function reference in constant evaluation (as at nxx::deriv's Mirrored).
+         *
+         * @tparam T The real type.
+         * @tparam F The function's type, possibly a function type.
+         * @tparam Ds The derivatives' types.
+         */
+        template<real T, typename F, typename... Ds>
+        struct Joined
+        {
+            /** @brief The function. */
+            F *fn;
+
+            /** @brief The derivative callables, f' then f''. */
+            std::tuple<Ds *...> derivatives;
+
+            /**
+             * @brief The values at x: fn's, then each derivative's, converted to T.
+             * @tparam I The indices of the derivatives.
+             * @param x The point.
+             * @return The values.
+             */
+            template<std::size_t... I>
+            constexpr std::array<T, 1 + sizeof...(Ds)> values(T const &x, std::index_sequence<I...>) const
+            {
+                return std::array<T, 1 + sizeof...(Ds)>{ static_cast<T>(std::invoke(*fn, x)),
+                    static_cast<T>(std::invoke(*std::get<I>(derivatives), x))... };
+            }
+
+            /**
+             * @brief The values at x: fn's, then each derivative's.
+             * @param x The point.
+             * @return The values.
+             */
+            constexpr std::array<T, 1 + sizeof...(Ds)> operator()(T const &x) const
+            { return values(x, std::index_sequence_for<Ds...>{}); }
+        };
 
         /**
          * @brief A validated bracket, in order, with fn's values at its ends; or a root found during validation.
          * @tparam T The real type.
+         * @tparam K The number of values at each end.
          */
-        template<real T>
+        template<real T, std::size_t K>
         struct Start
         {
             /** @brief The root, if validation found one (fn exactly 0 at an end or at 0). */
@@ -358,14 +635,14 @@ namespace nxx::roots {
             /** @brief The lower end. */
             T lower;
 
-            /** @brief fn at the lower end, finite and nonzero. */
-            T f_lower;
+            /** @brief fn's values at the lower end; the value finite and nonzero. */
+            std::array<T, K> at_lower;
 
             /** @brief The upper end. */
             T upper;
 
-            /** @brief fn at the upper end, finite, nonzero and of the other sign. */
-            T f_upper;
+            /** @brief fn's values at the upper end; the value finite, nonzero and of the other sign. */
+            std::array<T, K> at_upper;
         };
 
         /**
@@ -374,15 +651,16 @@ namespace nxx::roots {
          * Zero first: a root at 0 costs one evaluation, where the default tolerance would otherwise approach it down
          * to T's smallest numbers, and the rest of the method sees a bracket of one sign. Skipped where fn(0) is not
          * finite, since removable singularities at 0 (sin(x)/x, x/(e^x - 1)) are common and an evaluation the caller
-         * did not ask for must not fail the solve.
+         * did not ask for must not fail the solve. Only fn's value is checked; the derivatives at the ends are not.
          *
+         * @tparam K The number of values the method needs.
          * @param fn The function.
          * @param bracket The caller's bracket.
          * @param tolerance The tolerances.
          * @return The start, or error::non_finite or error::no_sign_change.
          */
-        template<real T, typename F>
-        constexpr std::expected<Start<T>, error>
+        template<std::size_t K, real T, typename F>
+        constexpr std::expected<Start<T, K>, error>
             prepare(F &fn, Bracket<T> const &bracket, Tolerance<T> const &tolerance)
         {
             if (!math::isfinite(bracket.lower) || !math::isfinite(bracket.upper))
@@ -393,30 +671,30 @@ namespace nxx::roots {
                 lower = bracket.upper;
                 upper = bracket.lower;
             }
-            T f_lower = detail::evaluate(fn, lower);
-            T f_upper = detail::evaluate(fn, upper);
-            if (!math::isfinite(f_lower) || !math::isfinite(f_upper)) return std::unexpected(error::non_finite);
-            if (f_lower == T(0))
-                return Start<T>{ Root<T>{ lower, tolerance.at(lower) }, lower, f_lower, upper, f_upper };
-            if (f_upper == T(0))
-                return Start<T>{ Root<T>{ upper, tolerance.at(upper) }, lower, f_lower, upper, f_upper };
-            if (detail::same_sign(f_lower, f_upper)) return std::unexpected(error::no_sign_change);
+            std::array<T, K> at_lower = detail::evaluate<K>(fn, lower);
+            std::array<T, K> at_upper = detail::evaluate<K>(fn, upper);
+            if (!math::isfinite(at_lower[0]) || !math::isfinite(at_upper[0])) return std::unexpected(error::non_finite);
+            if (at_lower[0] == T(0))
+                return Start<T, K>{ Root<T>{ lower, tolerance.at(lower) }, lower, at_lower, upper, at_upper };
+            if (at_upper[0] == T(0))
+                return Start<T, K>{ Root<T>{ upper, tolerance.at(upper) }, lower, at_lower, upper, at_upper };
+            if (detail::same_sign(at_lower[0], at_upper[0])) return std::unexpected(error::no_sign_change);
             if (lower < T(0) && T(0) < upper) {
                 T const zero = T(0);
-                T const f_zero = detail::evaluate(fn, zero);
-                if (f_zero == T(0))
-                    return Start<T>{ Root<T>{ zero, tolerance.at(zero) }, lower, f_lower, upper, f_upper };
-                if (math::isfinite(f_zero)) {
-                    if (detail::same_sign(f_zero, f_lower)) {
+                std::array<T, K> const at_zero = detail::evaluate<K>(fn, zero);
+                if (at_zero[0] == T(0))
+                    return Start<T, K>{ Root<T>{ zero, tolerance.at(zero) }, lower, at_lower, upper, at_upper };
+                if (math::isfinite(at_zero[0])) {
+                    if (detail::same_sign(at_zero[0], at_lower[0])) {
                         lower = zero;
-                        f_lower = f_zero;
+                        at_lower = at_zero;
                     } else {
                         upper = zero;
-                        f_upper = f_zero;
+                        at_upper = at_zero;
                     }
                 }
             }
-            return Start<T>{ std::nullopt, lower, f_lower, upper, f_upper };
+            return Start<T, K>{ std::nullopt, lower, at_lower, upper, at_upper };
         }
 
         /**
@@ -426,11 +704,11 @@ namespace nxx::roots {
          * @param tolerance The tolerances.
          * @return The root, or error::non_finite if fn is not finite at a midpoint.
          */
-        template<real T, typename F>
-        constexpr std::expected<Root<T>, error> bisection(F &fn, Start<T> const &s, Tolerance<T> const &tolerance)
+        template<std::size_t K, real T, typename F>
+        constexpr std::expected<Root<T>, error> bisection(F &fn, Start<T, K> const &s, Tolerance<T> const &tolerance)
         {
             T a = s.lower;
-            T fa = s.f_lower;
+            T fa = s.at_lower[0];
             T b = s.upper;
             while (true) {
                 T const m = detail::midpoint(a, b);
@@ -440,7 +718,7 @@ namespace nxx::roots {
                 T const right = detail::distance_bound(b, m);
                 T const half = right < left ? left : right;
                 if (!(a < m && m < b) || half <= tolerance.at(m)) return Root<T>{ m, half };
-                T const fm = detail::evaluate(fn, m);
+                T const fm = detail::evaluate<K>(fn, m)[0];
                 if (!math::isfinite(fm)) return std::unexpected(error::non_finite);
                 if (fm == T(0)) return Root<T>{ m, tolerance.at(m) };
                 if (detail::same_sign(fm, fa)) {
@@ -453,48 +731,111 @@ namespace nxx::roots {
         }
 
         /**
-         * @brief Brent's procedure zero (Brent 1973, ch. 4, section 6) on a validated bracket.
+         * @brief Newton's step -f / f' from the values (f, f', ...), where it can be formed: f' nonzero and finite,
+         * and the quotient representable.
+         * @param v The values at the point.
+         * @return The step, or nothing.
+         */
+        template<real T, std::size_t K>
+        constexpr std::optional<T> newton_step(std::array<T, K> const &v)
+        {
+            static_assert(K >= 2);
+            if (v[1] == T(0) || !math::isfinite(v[1])) return std::nullopt;
+            std::optional<T> const ratio = detail::quotient(v[0], v[1]);
+            if (!ratio) return std::nullopt;
+            return T(-*ratio);
+        }
+
+        /**
+         * @brief Halley's step -t / (1 - u), with t = f / f' and u = t (f'' / f') / 2, from the values (f, f', f''):
+         * the form without f'^2, which overflows sooner. Where u cannot be formed, 1 - u is 0, or the step would point
+         * against Newton's (u > 1, far from a root), Newton's step, as Boost.Math's Halley does.
+         * @param v The values at the point.
+         * @return The step, or nothing where Newton's cannot be formed either.
+         */
+        template<real T>
+        constexpr std::optional<T> halley_step(std::array<T, 3> const &v)
+        {
+            std::optional<T> const newton = detail::newton_step(v);
+            if (!newton) return std::nullopt;
+            if (!math::isfinite(v[2])) return newton;
+            std::optional<T> const curvature = detail::quotient(v[2], v[1]); // f'' / f'
+            if (!curvature) return newton;
+            std::optional<T> const u = detail::product(T(-*newton), T(*curvature / T(2))); // t f'' / (2 f')
+            if (!u) return newton;
+            T const denominator = T(T(1) - *u);
+            if (denominator == T(0)) return newton;
+            std::optional<T> const step = detail::quotient(*newton, denominator);
+            if (!step || (*step > T(0)) != (*newton > T(0))) return newton;
+            return step;
+        }
+
+        /**
+         * @brief The derivative step of method M from the values at a point (Newton's or Halley's).
+         * @tparam M The method, Newton or Halley.
+         * @param v The values at the point.
+         * @return The step, or nothing where it cannot be formed.
+         */
+        template<typename M, real T, std::size_t K>
+        constexpr std::optional<T> derivative_step(std::array<T, K> const &v)
+        {
+            if constexpr (std::same_as<M, Halley>)
+                return detail::halley_step(v);
+            else
+                return detail::newton_step(v);
+        }
+
+        /**
+         * @brief Brent's procedure zero (Brent 1973, ch. 4, section 6) on a validated bracket, with the step chosen by
+         * the method: Brent's interpolation, or Newton's or Halley's step from b, the end with the smaller |f|.
          *
          * Implemented from the book, with three changes: the tolerance is the caller's tol(b) rather than
          * 2 macheps |b| + t; the stop test is distance_bound(c, b) <= 2 tol(b) rather than |c - b| / 2 <= tol(b),
          * since the bound is exact there while the half may round in radix 10; and a step is a bisection step whenever
          * |c - b|, |b - a| or |e| exceeds max / 16, so that no product of the interpolation overflows (3 m q reaches 12
          * |c - b|, 2 p 4 (|c - b| + |b - a|)). The quotients cannot overflow: in the interpolation |fb| < |fa| <= |fc|.
+         * A derivative step is accepted by Brent's test written for a step s: towards c, |s| < 3 |m| / 2 - tol / 2,
+         * and |s| < |e| / 2; one that cannot be formed is a bisection step. The bookkeeping, and so the termination
+         * argument, is Brent's for every method.
          *
+         * @tparam M The method: Brent, Newton or Halley.
          * @param fn The function.
          * @param s The start: a bracket in order with a sign change and no root found.
          * @param tolerance The tolerances.
          * @return The root, or error::non_finite if fn is not finite at a point.
          */
-        template<real T, typename F>
-        constexpr std::expected<Root<T>, error> brent(F &fn, Start<T> const &s, Tolerance<T> const &tolerance)
+        template<typename M, std::size_t K, real T, typename F>
+        constexpr std::expected<Root<T>, error> brent(F &fn, Start<T, K> const &s, Tolerance<T> const &tolerance)
         {
             T const big = T(detail::largest<T>() / T(16));
 
             T a = s.lower;
-            T fa = s.f_lower;
+            std::array<T, K> va = s.at_lower;
             T b = s.upper;
-            T fb = s.f_upper;
+            std::array<T, K> vb = s.at_upper;
             T c = a;
-            T fc = fa;
+            std::array<T, K> vc = va;
             T d = detail::bounded_difference(b, a, big);
             T e = d;
             while (true) {
-                // [b, c] is the bracket, with fb and fc of opposite signs; a is the previous b.
-                if (detail::same_sign(fb, fc)) {
+                // [b, c] is the bracket, with fn(b) and fn(c) of opposite signs; a is the previous b.
+                if (detail::same_sign(vb[0], vc[0])) {
                     c = a;
-                    fc = fa;
+                    vc = va;
                     d = detail::bounded_difference(b, a, big);
                     e = d;
                 }
-                if (math::abs(fc) < math::abs(fb)) {
+                if (math::abs(vc[0]) < math::abs(vb[0])) {
                     a = b;
                     b = c;
                     c = a;
-                    fa = fb;
-                    fb = fc;
-                    fc = fa;
+                    va = vb;
+                    vb = vc;
+                    vc = va;
                 }
+                T const fa = va[0];
+                T const fb = vb[0];
+                T const fc = vc[0];
                 T const tol = tolerance.at(b);
                 T const width = detail::distance_bound(c, b);
                 if (width <= detail::twice(tol)) return Root<T>{ b, width };
@@ -505,7 +846,7 @@ namespace nxx::roots {
                 if (wide || math::abs(e) < tol || math::abs(fa) <= math::abs(fb)) {
                     d = m;
                     e = m;
-                } else {
+                } else if constexpr (std::same_as<M, Brent>) {
                     T const ratio = T(fb / fa);
                     T p = T(0);
                     T q = T(0);
@@ -535,31 +876,175 @@ namespace nxx::roots {
                         d = m;
                         e = m;
                     }
+                } else {
+                    std::optional<T> const step = detail::derivative_step<M>(vb);
+                    T const before_last = e;
+                    e = d;
+                    // Brent's acceptance for a step: towards c, well inside the bracket (so that b + step cannot round
+                    // onto c), and shorter than half the step before last.
+                    T const inside = T(T(T(3) * math::abs(m)) / T(2) - T(tol / T(2)));
+                    if (step && (*step > T(0)) == (m > T(0)) && math::abs(*step) < inside
+                        && math::abs(*step) < T(math::abs(before_last) / T(2))) {
+                        d = *step;
+                    } else {
+                        d = m;
+                        e = m;
+                    }
                 }
                 a = b;
-                fa = fb;
+                va = vb;
                 if (math::abs(d) > tol)
                     b = T(b + d);
                 else if (m > T(0))
                     b = T(b + tol);
                 else
                     b = T(b - tol);
-                fb = detail::evaluate(fn, b);
-                if (!math::isfinite(fb)) return std::unexpected(error::non_finite);
-                if (fb == T(0)) return Root<T>{ b, tolerance.at(b) };
+                vb = detail::evaluate<K>(fn, b);
+                if (!math::isfinite(vb[0])) return std::unexpected(error::non_finite);
+                if (vb[0] == T(0)) return Root<T>{ b, tolerance.at(b) };
             }
+        }
+
+        /**
+         * @brief The bracket loop of method M on two consecutive iterates of an open method, whose values have
+         * opposite signs: the hand-over. No zero first: they are adjacent iterates, not the caller's bracket.
+         * @tparam M The bracketing method: Brent (for Secant), Newton or Halley.
+         * @param fn The function.
+         * @param x One iterate.
+         * @param vx fn's values there.
+         * @param y The other iterate.
+         * @param vy fn's values there.
+         * @param tolerance The tolerances.
+         * @return The root, or error::non_finite.
+         */
+        template<typename M, std::size_t K, real T, typename F>
+        constexpr std::expected<Root<T>, error> hand_over(F &fn,
+            T const &x,
+            std::array<T, K> const &vx,
+            T const &y,
+            std::array<T, K> const &vy,
+            Tolerance<T> const &tolerance)
+        {
+            if (x < y) return detail::brent<M>(fn, Start<T, K>{ std::nullopt, x, vx, y, vy }, tolerance);
+            return detail::brent<M>(fn, Start<T, K>{ std::nullopt, y, vy, x, vx }, tolerance);
+        }
+
+        /**
+         * @brief Newton or Halley from a guess: the method's step, at least tol(x) long, until fn's values at two
+         * consecutive iterates have opposite signs; then the bracket loop on them (the hand-over).
+         *
+         * The minimum step takes its direction from the signs of f and f', not from a step that may have underflowed to
+         * 0. An x + step that would overflow, or a step that cannot be formed, is error::not_converged.
+         *
+         * @tparam M The method, Newton or Halley.
+         * @param fn The function, giving the values M needs.
+         * @param guess The starting point.
+         * @param tolerance The tolerances.
+         * @return The root, error::non_finite or error::not_converged.
+         */
+        template<typename M, real T, typename F>
+        constexpr std::expected<Root<T>, error> open_derivative(F &fn, T const &guess, Tolerance<T> const &tolerance)
+        {
+            constexpr std::size_t K = values_needed<M>;
+            if (!math::isfinite(guess)) return std::unexpected(error::non_finite);
+            T x = guess;
+            std::array<T, K> vx = detail::evaluate<K>(fn, x);
+            if (!math::isfinite(vx[0])) return std::unexpected(error::non_finite);
+            if (vx[0] == T(0)) return Root<T>{ x, tolerance.at(x) };
+            for (int i = 0; i < detail::iteration_cap<T>(); ++i) {
+                std::optional<T> const step = detail::derivative_step<M>(vx);
+                if (!step) return std::unexpected(error::not_converged);
+                T const tol = tolerance.at(x);
+                bool const upward = !detail::same_sign(vx[0], vx[1]); // Newton's direction, -f / f'
+                T const move = math::abs(*step) > tol ? *step : (upward ? tol : T(-tol));
+                if (!detail::sum_fits(x, move)) return std::unexpected(error::not_converged);
+                T const next = T(x + move);
+                std::array<T, K> const vn = detail::evaluate<K>(fn, next);
+                if (!math::isfinite(vn[0])) return std::unexpected(error::non_finite);
+                if (vn[0] == T(0)) return Root<T>{ next, tolerance.at(next) };
+                if (!detail::same_sign(vn[0], vx[0])) return detail::hand_over<M>(fn, x, vx, next, vn, tolerance);
+                x = next;
+                vx = vn;
+            }
+            return std::unexpected(error::not_converged);
+        }
+
+        /**
+         * @brief Secant's second point: x0 (1 + eta), eta = eps^(1/4); eta at x0 = 0; x0 (1 - eta) where x0 (1 + eta)
+         * would overflow. Relative, so no scale is assumed.
+         * @param x0 The guess, finite.
+         * @return The second point.
+         */
+        template<real T>
+        constexpr T secant_second_point(T const &x0)
+        {
+            T const eta = math::root_epsilon<4, T>();
+            if (x0 == T(0)) return eta;
+            if (math::abs(x0) > T(detail::largest<T>() / T(T(1) + eta))) return T(x0 * T(T(1) - eta));
+            return T(x0 * T(T(1) + eta));
+        }
+
+        /**
+         * @brief Secant from a guess: the step (x - xp) (f / (fp - f)) through the latest two iterates, at least tol(x)
+         * long, until fn's values at two consecutive iterates have opposite signs; then Brent on them.
+         *
+         * fp and f have one sign before the hand-over, so fp - f cannot overflow; the ratio first keeps a large f from
+         * overflowing the product (1e300 (x - 1) from 1e7). The minimum step takes its direction from the signs of f,
+         * fp - f and x - xp.
+         *
+         * @param fn The function.
+         * @param guess The starting point.
+         * @param tolerance The tolerances.
+         * @return The root, error::non_finite or error::not_converged.
+         */
+        template<real T, typename F>
+        constexpr std::expected<Root<T>, error> open_secant(F &fn, T const &guess, Tolerance<T> const &tolerance)
+        {
+            if (!math::isfinite(guess)) return std::unexpected(error::non_finite);
+            T xp = guess;
+            std::array<T, 1> vp = detail::evaluate<1>(fn, xp);
+            if (!math::isfinite(vp[0])) return std::unexpected(error::non_finite);
+            if (vp[0] == T(0)) return Root<T>{ xp, tolerance.at(xp) };
+            T x = detail::secant_second_point(xp);
+            T dx = T(x - xp); // small: x0 eta, or eta
+            std::array<T, 1> vx = detail::evaluate<1>(fn, x);
+            for (int i = 0; i < detail::iteration_cap<T>(); ++i) {
+                if (!math::isfinite(vx[0])) return std::unexpected(error::non_finite);
+                if (vx[0] == T(0)) return Root<T>{ x, tolerance.at(x) };
+                if (!detail::same_sign(vx[0], vp[0])) return detail::hand_over<Brent>(fn, xp, vp, x, vx, tolerance);
+                T const difference = T(vp[0] - vx[0]);
+                if (difference == T(0)) return std::unexpected(error::not_converged);
+                std::optional<T> const ratio = detail::quotient(vx[0], difference);
+                if (!ratio) return std::unexpected(error::not_converged);
+                std::optional<T> const step = detail::product(dx, *ratio);
+                if (!step) return std::unexpected(error::not_converged);
+                T const tol = tolerance.at(x);
+                // The step's sign is that of dx * f / (fp - f), taken from the signs in case the step underflowed.
+                bool const upward = ((dx > T(0)) == (vx[0] > T(0))) == (difference > T(0));
+                T const move = math::abs(*step) > tol ? *step : (upward ? tol : T(-tol));
+                if (!detail::sum_fits(x, move)) return std::unexpected(error::not_converged);
+                xp = x;
+                vp = vx;
+                x = T(x + move);
+                dx = move;
+                vx = detail::evaluate<1>(fn, x);
+            }
+            return std::unexpected(error::not_converged);
         }
 
     } // namespace detail
     /** @endcond */
 
     /**
-     * @brief A root of @p fn in @p bracket by the bracketing method @p M.
+     * @brief A root of @p fn in @p bracket by the method @p M: Bisection, Brent, or Newton or Halley safeguarded by the
+     * bracket.
      *
      * The bracket's ends may come in either order; fn must have opposite signs at them, or be 0 at one. When the
      * bracket contains 0 in its interior, fn is also evaluated at 0 first: a root at 0 is then found at once, and the
      * bracket is halved at 0 (skipped where fn(0) is not finite). The method then narrows the bracket until it is at
-     * most 2 tol(x) wide (see Criteria), or fn is exactly 0 at a point.
+     * most 2 tol(x) wide (see Criteria), or fn is exactly 0 at a point. Newton and Halley take their derivatives from
+     * fn, which then returns a std::pair, std::tuple or std::array of exactly T (the value, f', f''); the other methods
+     * accept such a fn too and use its first element.
      *
      * A pole inside the bracket changes sign like a root, and is returned as one: where fn may have poles, check
      * |fn(value)| (a later version may report a pole as an error). fn's exceptions pass through unchanged.
@@ -568,11 +1053,16 @@ namespace nxx::roots {
      * namespace rt = nxx::roots;
      * auto const r = rt::solve<rt::Brent>([](double t) { return psat(t) - 101325.0; }, rt::Bracket{300.0, 400.0});
      * auto const s = rt::solve<rt::Bisection>(fn, rt::Bracket{0.0, 1.0}, {.rel_tol = 1e-8});
+     * auto const n = rt::solve<rt::Newton>([](double x) { return std::pair{x * x - 2.0, 2.0 * x}; },
+     *                                      rt::Bracket{1.0, 2.0});
      * @endcode
      *
-     * @tparam M The method: `Bisection` or `Brent`.
+     * @tparam M The method: `Bisection`, `Brent`, `Newton` or `Halley`.
      * @tparam T The real type, deduced from @p bracket.
-     * @tparam F A callable taking T const & and returning something convertible to T.
+     * @tparam F A callable taking T const & and returning something convertible to T, or (for Newton and Halley, which
+     *           need it) a std::pair, std::tuple or std::array of exactly T: the value and the derivatives. For Newton
+     *           on a fn without a derivative, pass the derivative as a callable after fn, use
+     *           nxx::deriv::derivative_of, or use Secant or Brent.
      * @param fn The function.
      * @param bracket An interval in which fn changes sign.
      * @param criteria When to stop; it converts to T, so `{.rel_tol = 1e-10}` works for any T.
@@ -583,20 +1073,162 @@ namespace nxx::roots {
     // criteria is a non-deduced context (type_identity_t), so T comes from the bracket alone and a braced list of
     // doubles converts to a multiprecision T.
     template<typename M, real T, typename F>
-    requires detail::bracketing<M> && nxx::detail::callable<F, T>
+    requires detail::bracketing<M> && detail::gives<F, T, detail::values_needed<M>>
     [[nodiscard]] constexpr std::expected<Root<T>, error>
         solve(F &&fn, Bracket<T> const &bracket, Criteria<std::type_identity_t<T>> const &criteria = {})
     {
+        constexpr std::size_t K = detail::values_needed<M>;
         // Qualified, so that argument-dependent lookup cannot pick a function from the namespace of T or F.
         std::expected<detail::Tolerance<T>, error> const tolerance = detail::checked_tolerance(criteria);
         if (!tolerance) return std::unexpected(tolerance.error());
-        std::expected<detail::Start<T>, error> const start = detail::prepare(fn, bracket, *tolerance);
+        std::expected<detail::Start<T, K>, error> const start = detail::prepare<K>(fn, bracket, *tolerance);
         if (!start) return std::unexpected(start.error());
         if (start->root) return *start->root;
         if constexpr (std::same_as<M, Bisection>)
             return detail::bisection(fn, *start, *tolerance);
         else
-            return detail::brent(fn, *start, *tolerance);
+            return detail::brent<M>(fn, *start, *tolerance);
+    }
+
+    /**
+     * @brief A root of @p fn from @p guess by the open method @p M: Newton, Halley or Secant.
+     *
+     * The method iterates from the guess until fn's values at two consecutive iterates have opposite signs, then
+     * continues inside that bracket (Newton and Halley safeguarded, Secant as Brent), so the result is a verified sign
+     * change with a bound, as for the bracketing methods. It returns a root, the first sign change its iterates cross,
+     * not necessarily the one nearest the guess; from a guess already within tol of a root it takes one step past it (2
+     * evaluations). error::not_converged where it finds no sign change within its cap (4 times the bits of T: 212
+     * iterations in double) or cannot take a step: a cycle, a divergence, f' = 0, a multiple root at 0 with the default
+     * abs_tol. A bracket solves those.
+     *
+     * @code
+     * namespace rt = nxx::roots;
+     * auto const fdf = [](double x) { return std::pair{x * x - 2.0, 2.0 * x}; };
+     * auto const n = rt::solve<rt::Newton>(fdf, 1.0);                              // 7 evaluations
+     * auto const s = rt::solve<rt::Secant>([](double x) { return x * x - 2.0; }, 1.0); // 9
+     * @endcode
+     *
+     * @tparam M The method: `Newton`, `Halley` or `Secant`.
+     * @tparam T The real type, deduced from @p guess.
+     * @tparam F A callable taking T const &: for Secant returning something convertible to T, for Newton and Halley a
+     *           std::pair, std::tuple or std::array of exactly T (the value, f', f''). For Newton on a fn without a
+     *           derivative, pass the derivative as a callable after fn, use nxx::deriv::derivative_of, or use Secant.
+     * @param fn The function.
+     * @param guess The starting point.
+     * @param criteria When to stop; it converts to T.
+     * @return The root and a bound on its distance to a sign change of fn; error::non_finite if the guess, a tolerance
+     *         or a value of fn is not finite or a tolerance is negative; error::not_converged if the method found no
+     *         root.
+     */
+    template<typename M, real T, typename F>
+    requires detail::open<M> && detail::gives<F, T, detail::values_needed<M>>
+    [[nodiscard]] constexpr std::expected<Root<T>, error>
+        solve(F &&fn, T const &guess, Criteria<std::type_identity_t<T>> const &criteria = {})
+    {
+        std::expected<detail::Tolerance<T>, error> const tolerance = detail::checked_tolerance(criteria);
+        if (!tolerance) return std::unexpected(tolerance.error());
+        if constexpr (std::same_as<M, Secant>)
+            return detail::open_secant(fn, guess, *tolerance);
+        else
+            return detail::open_derivative<M>(fn, guess, *tolerance);
+    }
+
+    /**
+     * @brief Newton on @p bracket with the derivative as a separate callable: the same as Newton on a fn returning
+     * (f, f'), with each callable evaluated once per point.
+     * @tparam M Newton.
+     * @tparam T The real type, deduced from @p bracket.
+     * @tparam F A callable taking T const & and returning something convertible to T.
+     * @tparam D The derivative: a callable as F.
+     * @param fn The function.
+     * @param dfn Its derivative.
+     * @param bracket An interval in which fn changes sign.
+     * @param criteria When to stop.
+     * @return As for a bracket.
+     */
+    template<typename M, real T, typename F, typename D>
+    requires std::same_as<M, Newton> && nxx::detail::callable<F, T> && nxx::detail::callable<D, T>
+    [[nodiscard]] constexpr std::expected<Root<T>, error>
+        solve(F &&fn, D &&dfn, Bracket<T> const &bracket, Criteria<std::type_identity_t<T>> const &criteria = {})
+    {
+        detail::Joined<T, std::remove_reference_t<F>, std::remove_reference_t<D>> const joined{ std::addressof(fn),
+            { std::addressof(dfn) } };
+        return nxx::roots::solve<M>(joined, bracket, criteria);
+    }
+
+    /**
+     * @brief Newton from @p guess with the derivative as a separate callable.
+     * @tparam M Newton.
+     * @tparam T The real type, deduced from @p guess.
+     * @tparam F A callable taking T const & and returning something convertible to T.
+     * @tparam D The derivative: a callable as F.
+     * @param fn The function.
+     * @param dfn Its derivative.
+     * @param guess The starting point.
+     * @param criteria When to stop.
+     * @return As from a guess.
+     */
+    template<typename M, real T, typename F, typename D>
+    requires std::same_as<M, Newton> && nxx::detail::callable<F, T> && nxx::detail::callable<D, T>
+    [[nodiscard]] constexpr std::expected<Root<T>, error>
+        solve(F &&fn, D &&dfn, T const &guess, Criteria<std::type_identity_t<T>> const &criteria = {})
+    {
+        detail::Joined<T, std::remove_reference_t<F>, std::remove_reference_t<D>> const joined{ std::addressof(fn),
+            { std::addressof(dfn) } };
+        return nxx::roots::solve<M>(joined, guess, criteria);
+    }
+
+    /**
+     * @brief Halley on @p bracket with the first and second derivatives as separate callables.
+     * @tparam M Halley.
+     * @tparam T The real type, deduced from @p bracket.
+     * @tparam F A callable taking T const & and returning something convertible to T.
+     * @tparam D The first derivative: a callable as F.
+     * @tparam D2 The second derivative: a callable as F.
+     * @param fn The function.
+     * @param dfn Its first derivative.
+     * @param d2fn Its second derivative.
+     * @param bracket An interval in which fn changes sign.
+     * @param criteria When to stop.
+     * @return As for a bracket.
+     */
+    template<typename M, real T, typename F, typename D, typename D2>
+    requires std::same_as<M, Halley> && nxx::detail::callable<F, T> && nxx::detail::callable<D, T>
+             && nxx::detail::callable<D2, T>
+    [[nodiscard]] constexpr std::expected<Root<T>, error> solve(F &&fn,
+        D &&dfn,
+        D2 &&d2fn,
+        Bracket<T> const &bracket,
+        Criteria<std::type_identity_t<T>> const &criteria = {})
+    {
+        detail::Joined<T, std::remove_reference_t<F>, std::remove_reference_t<D>, std::remove_reference_t<D2>> const
+            joined{ std::addressof(fn), { std::addressof(dfn), std::addressof(d2fn) } };
+        return nxx::roots::solve<M>(joined, bracket, criteria);
+    }
+
+    /**
+     * @brief Halley from @p guess with the first and second derivatives as separate callables.
+     * @tparam M Halley.
+     * @tparam T The real type, deduced from @p guess.
+     * @tparam F A callable taking T const & and returning something convertible to T.
+     * @tparam D The first derivative: a callable as F.
+     * @tparam D2 The second derivative: a callable as F.
+     * @param fn The function.
+     * @param dfn Its first derivative.
+     * @param d2fn Its second derivative.
+     * @param guess The starting point.
+     * @param criteria When to stop.
+     * @return As from a guess.
+     */
+    template<typename M, real T, typename F, typename D, typename D2>
+    requires std::same_as<M, Halley> && nxx::detail::callable<F, T> && nxx::detail::callable<D, T>
+             && nxx::detail::callable<D2, T>
+    [[nodiscard]] constexpr std::expected<Root<T>, error>
+        solve(F &&fn, D &&dfn, D2 &&d2fn, T const &guess, Criteria<std::type_identity_t<T>> const &criteria = {})
+    {
+        detail::Joined<T, std::remove_reference_t<F>, std::remove_reference_t<D>, std::remove_reference_t<D2>> const
+            joined{ std::addressof(fn), { std::addressof(dfn), std::addressof(d2fn) } };
+        return nxx::roots::solve<M>(joined, guess, criteria);
     }
 
 } // namespace nxx::roots
@@ -634,6 +1266,9 @@ namespace std {
                 break;
             case nxx::roots::error::no_sign_change:
                 name = "no_sign_change";
+                break;
+            case nxx::roots::error::not_converged:
+                name = "not_converged";
                 break;
             }
             return formatter<string_view>::format(name, ctx);

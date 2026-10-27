@@ -7,8 +7,9 @@ unchanged.
 
 Numerixx 2 is in development on the `dev` branch and currently provides numerical derivatives: central and one-sided
 finite differences of orders up to 10, and Ridders' extrapolation with an error estimate, central or one-sided, for
-the first to the fourth derivative; and roots of a function of one variable in a bracket, by bisection or Brent's
-method. Numerixx 1.x is at the tag `v1.1.0-legacy`.
+the first to the fourth derivative; and roots of a function of one variable, in a bracket by bisection, Brent's method
+or a safeguarded Newton or Halley, or from a guess by Newton, Halley or the secant method, each with a bound on its
+error. Numerixx 1.x is at the tag `v1.1.0-legacy`.
 
 ```cpp
 #include <numerixx/deriv.hpp>
@@ -36,6 +37,9 @@ static_assert(*nxx::deriv::derivative([](double x) { return x * x; }, 3.0, 0.5) 
 namespace rt = nxx::roots;
 auto r = rt::solve<rt::Brent>([](double x) { return x * x - 2.0; }, rt::Bracket{1.0, 2.0});
 if (r) { /* r->value is sqrt(2) to about 1e-16; r->abs_error bounds its distance to fn's sign change */ }
+
+auto fdf = [](double x) { return std::pair{x * x - 2.0, 2.0 * x}; }; // f and f'
+auto n = rt::solve<rt::Newton>(fdf, 1.0); // from a guess, finishing inside the first sign change it crosses
 ```
 
 The default tolerances give the full precision of the type at every magnitude: a root at 1e-12 keeps its digits, with

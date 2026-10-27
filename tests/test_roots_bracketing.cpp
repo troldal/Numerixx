@@ -7,10 +7,8 @@
 // double), against an independent Python implementation of the specification (.scratch/roots1/proto3.py and
 // counts.py; its values are in the comments); for Bisection they also follow from the derivation in the spec.
 
-#include <numerixx/roots.hpp>
+#include "roots_check.hpp"
 
-#include <boost/multiprecision/cpp_bin_float.hpp>
-#include <boost/multiprecision/cpp_dec_float.hpp>
 #include <doctest/doctest.h>
 
 #include <cmath>
@@ -18,31 +16,9 @@
 #include <limits>
 #include <stdexcept>
 
-namespace mp = boost::multiprecision;
-namespace rt = nxx::roots;
-
-using bin50 = mp::cpp_bin_float_50;
-using bin50_et = mp::number<mp::cpp_bin_float<50>, mp::et_on>;
-using dec50 = mp::cpp_dec_float_50;
+using namespace roots_check;
 
 namespace {
-
-    constexpr double dmax = std::numeric_limits<double>::max();
-    constexpr double dmin = std::numeric_limits<double>::denorm_min();
-    constexpr double deps = std::numeric_limits<double>::epsilon();
-    constexpr double dnan = std::numeric_limits<double>::quiet_NaN();
-    constexpr double dinf = std::numeric_limits<double>::infinity();
-
-    // 70-digit references (mpmath at 80 digits): more digits than any type tested (cpp_bin_float_50 carries about
-    // 50.6 decimal digits, so a 50-digit reference would err by up to 10 of its epsilons).
-    constexpr char const *sqrt2_70 = "1.414213562373095048801688724209698078569671875376948073176679737990732";
-    constexpr char const *wallis_70 =
-        "2.094551481542326591482386540579302963857306105628239180304128529045312"; // x^3 - 2x - 5
-    constexpr double sqrt2 = 1.4142135623730950488;
-    constexpr double wallis = 2.0945514815423265915;
-    constexpr double dottie = 0.73908513321516064166; // cos x = x, OEIS A003957
-    constexpr double omega = 0.56714329040978387300; // x e^x = 1, W(1), OEIS A030178
-    constexpr double ln2 = 0.69314718055994530942;
 
     constexpr auto square_minus_2 = [](double x) { return x * x - 2.0; };
     constexpr auto square_minus_4 = [](double x) { return x * x - 4.0; };
@@ -51,47 +27,6 @@ namespace {
     constexpr auto wallis_fn = [](double x) { return (x * x - 2.0) * x - 5.0; };
     constexpr auto minus_1 = [](double x) { return x - 1.0; };
     constexpr auto nan_below_0 = [](double x) { return x < 0.0 ? dnan : x - 1.0; };
-
-    // tol(x) with the default criteria, and the bound every result keeps: abs_error <= 2 tol(value).
-    constexpr double default_tol(double x) { return dmin + 2.0 * deps * nxx::math::abs(x); }
-
-    // |value - ref| <= abs_error + c, and abs_error <= 2 tol(value): the two checks of every accuracy case.
-    template<typename T>
-    bool brackets(std::expected<rt::Root<T>, rt::error> const &r, T const &ref, T const &c, T const &tol2)
-    {
-        using std::abs;
-        return r.has_value() && abs(T(r->value - ref)) <= T(r->abs_error + c) && r->abs_error <= tol2;
-    }
-
-    bool brackets(std::expected<rt::Root<double>, rt::error> const &r, double ref, double c)
-    { return r.has_value() && brackets(r, ref, c, 2.0 * default_tol(r->value)); }
-
-    // The same check in cpp_bin_float_50, which holds every double and the difference of any two exactly: for
-    // references and distances that double cannot represent (2.5 denorm_min; 2^53 + 0.5).
-    bool brackets_exactly(std::expected<rt::Root<double>, rt::error> const &r, bin50 const &ref)
-    { return r.has_value() && bin50(abs(bin50(bin50(r->value) - ref))) <= bin50(r->abs_error); }
-
-    // fn wrapped to count its evaluations.
-    template<typename F>
-    struct Counted
-    {
-        F fn;
-        int *count;
-        double operator()(double x) const
-        {
-            ++*count;
-            return fn(x);
-        }
-    };
-
-    template<typename M, typename F>
-    std::pair<std::expected<rt::Root<double>, rt::error>, int>
-        counted(F fn, rt::Bracket<double> b, rt::Criteria<double> c = {})
-    {
-        int n = 0;
-        auto const r = rt::solve<M>(Counted<F>{ fn, &n }, b, c);
-        return { r, n };
-    }
 
 } // namespace
 
@@ -195,24 +130,24 @@ TEST_CASE("roots: evaluation counts in double")
     auto const cubed = [](double x) { return (x - 1.0) * (x - 1.0) * (x - 1.0); };
     auto const tiny = [](double x) { return x - 1e-300; };
 
-    CHECK(counted<rt::Bisection>(square_minus_2, { 1.0, 2.0 }).second == 52);
-    CHECK(counted<rt::Brent>(square_minus_2, { 1.0, 2.0 }).second == 9);
-    CHECK(counted<rt::Bisection>(wallis_fn, { 2.0, 3.0 }).second == 51);
-    CHECK(counted<rt::Brent>(wallis_fn, { 2.0, 3.0 }).second == 8);
-    CHECK(counted<rt::Bisection>(x20, { 0.0, 5.0 }).second == 55);
-    CHECK(counted<rt::Brent>(x20, { 0.0, 5.0 }).second == 19);
+    CHECK(counted<rt::Bisection>(square_minus_2, rt::Bracket{ 1.0, 2.0 }).second == 52);
+    CHECK(counted<rt::Brent>(square_minus_2, rt::Bracket{ 1.0, 2.0 }).second == 9);
+    CHECK(counted<rt::Bisection>(wallis_fn, rt::Bracket{ 2.0, 3.0 }).second == 51);
+    CHECK(counted<rt::Brent>(wallis_fn, rt::Bracket{ 2.0, 3.0 }).second == 8);
+    CHECK(counted<rt::Bisection>(x20, rt::Bracket{ 0.0, 5.0 }).second == 55);
+    CHECK(counted<rt::Brent>(x20, rt::Bracket{ 0.0, 5.0 }).second == 19);
     // A triple root makes Brent's interpolation linear: slower than Bisection, as documented.
-    CHECK(counted<rt::Bisection>(cubed, { 0.0, 3.0 }).second == 54);
-    CHECK(counted<rt::Brent>(cubed, { 0.0, 3.0 }).second == 156);
+    CHECK(counted<rt::Bisection>(cubed, rt::Bracket{ 0.0, 3.0 }).second == 54);
+    CHECK(counted<rt::Brent>(cubed, rt::Bracket{ 0.0, 3.0 }).second == 156);
     // A root at 1e-300 from [0, 1]: Bisection halves down to it, Brent's secant lands on it.
-    CHECK(counted<rt::Bisection>(tiny, { 0.0, 1.0 }).second == 1049);
-    CHECK(counted<rt::Brent>(tiny, { 0.0, 1.0 }).second == 3);
+    CHECK(counted<rt::Bisection>(tiny, rt::Bracket{ 0.0, 1.0 }).second == 1049);
+    CHECK(counted<rt::Brent>(tiny, rt::Bracket{ 0.0, 1.0 }).second == 3);
     // Brent's guard bisects while the bracket is wider than max / 16, then interpolates.
-    CHECK(counted<rt::Bisection>(minus_1, { -dmax, dmax }).second == 1077);
-    CHECK(counted<rt::Brent>(minus_1, { -dmax, dmax }).second == 8);
-    CHECK(counted<rt::Brent>(minus_1, { 0.0, dmax }).second == 7);
+    CHECK(counted<rt::Bisection>(minus_1, rt::Bracket{ -dmax, dmax }).second == 1077);
+    CHECK(counted<rt::Brent>(minus_1, rt::Bracket{ -dmax, dmax }).second == 8);
+    CHECK(counted<rt::Brent>(minus_1, rt::Bracket{ 0.0, dmax }).second == 7);
     // Brent's worst case is (k + 1)^2 - 2 evaluations for k bisection steps (Brent 1973, ch. 4, eq. (3.4)).
-    CHECK(counted<rt::Brent>(cubed, { 0.0, 3.0 }).second <= 53 * 53 - 2);
+    CHECK(counted<rt::Brent>(cubed, rt::Bracket{ 0.0, 3.0 }).second <= 53 * 53 - 2);
 }
 
 TEST_CASE("roots: the bracket")
@@ -277,7 +212,7 @@ TEST_CASE("roots: criteria")
     CHECK(zero != rt::Criteria<double>{});
 
     // A looser tolerance: fewer evaluations, and the result within the bracket it asked for.
-    auto const [loose, n_loose] = counted<rt::Brent>(square_minus_2, { 1.0, 2.0 }, { .rel_tol = 1e-6 });
+    auto const [loose, n_loose] = counted<rt::Brent>(square_minus_2, rt::Bracket{ 1.0, 2.0 }, { .rel_tol = 1e-6 });
     CHECK(loose.has_value());
     CHECK(n_loose < 9);
     CHECK(nxx::math::abs(loose->value - sqrt2) <= loose->abs_error + 8e-17);
@@ -305,7 +240,7 @@ TEST_CASE("roots: criteria")
 
     // abs_tol near 0: a root at 1e-300 to an absolute 1e-12 in a few halvings rather than 1047.
     auto const [near0, n_near0] =
-        counted<rt::Bisection>([](double x) { return x - 1e-300; }, { 0.0, 1.0 }, { .abs_tol = 1e-12 });
+        counted<rt::Bisection>([](double x) { return x - 1e-300; }, rt::Bracket{ 0.0, 1.0 }, { .abs_tol = 1e-12 });
     CHECK((near0 && near0->value <= 2e-12));
     CHECK(n_near0 == 2 + 39); // 2^-(k+1) <= 1e-12 at k = 39
 }
@@ -343,8 +278,8 @@ TEST_CASE("roots: edges of T")
     // A jump at 0, the documented walk: with fn(0) = 1 the bracket becomes [-1, 0], approached down to denorm_min
     // (1076 evaluations in double, for both methods, since Brent bisects at a jump).
     auto const jump = [](double x) { return x < 0.0 ? -1.0 : 1.0; };
-    auto const [jb, njb] = counted<rt::Bisection>(jump, { -1.0, 2.0 });
-    auto const [jr, njr] = counted<rt::Brent>(jump, { -1.0, 2.0 });
+    auto const [jb, njb] = counted<rt::Bisection>(jump, rt::Bracket{ -1.0, 2.0 });
+    auto const [jr, njr] = counted<rt::Brent>(jump, rt::Bracket{ -1.0, 2.0 });
     CHECK((jb && nxx::math::abs(jb->value) <= 2.0 * dmin && njb == 1076));
     CHECK((jr && nxx::math::abs(jr->value) <= 2.0 * dmin && njr == 1076));
 }

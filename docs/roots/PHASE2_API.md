@@ -318,6 +318,16 @@ From the usage sketch (7 snippets, 7 misuses):
 - A multiprecision tuple fn needs `std::pair<Big, Big>{...}`; the generic constraint message does not name the
   offending element: documented with an example.
 
+## Changes during implementation
+
+- The test of a hand-over onto a pole has no case: a search of Newton and Secant on tan x - 0.5 from 400 guesses found
+  none, since near a simple pole Newton's step points away from it (as the numerics review noted). The documented
+  behaviour is tested on a bracket instead (Newton on 1/(x - 1/3) over [0, 1] returns the pole).
+- The tests of both phases share `tests/roots_check.hpp` (types, references, the accuracy checks, an evaluation
+  counter that passes a tuple through).
+- The prototype was aligned with the C++ arithmetic before its counts became test values (Brent's acceptance limit
+  as 3 |m| / 2, Secant's step length kept rather than recomputed as x - xp); no count changed.
+
 ## Deferred
 
 - Derivative callables that return `std::expected`, and `nxx::deriv::derivative_of`: Phase 3.

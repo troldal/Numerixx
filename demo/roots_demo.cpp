@@ -8,6 +8,8 @@
 #include <numbers>
 #include <print>
 #include <string_view>
+#include <tuple>
+#include <utility>
 
 namespace {
 
@@ -29,23 +31,31 @@ namespace {
         F fn;
         int *count;
 
-        double operator()(double x) const
+        auto operator()(double x) const // a value, or a tuple of the value and its derivatives
         {
             ++*count;
             return fn(x);
         }
     };
 
-    template<typename M, typename F>
-    void count(std::string_view label, F const &fn, rt::Bracket<double> const &bracket, rt::Criteria<double> c = {})
+    template<typename M, typename F, typename S>
+    void count_from(std::string_view label, F const &fn, S const &start, rt::Criteria<double> c)
     {
         int n = 0;
-        auto const r = rt::solve<M>(Counted<F>{ fn, &n }, bracket, c);
+        auto const r = rt::solve<M>(Counted<F>{ fn, &n }, start, c);
         if (r)
             std::println("   {:<30} {:.17g} +- {:.1e}  ({} evaluations)", label, r->value, r->abs_error, n);
         else
             std::println("   {:<30} error: {}  ({} evaluations)", label, r.error(), n);
     }
+
+    template<typename M, typename F>
+    void count(std::string_view label, F const &fn, rt::Bracket<double> const &bracket, rt::Criteria<double> c = {})
+    { count_from<M>(label, fn, bracket, c); }
+
+    template<typename M, typename F>
+    void count(std::string_view label, F const &fn, double guess, rt::Criteria<double> c = {})
+    { count_from<M>(label, fn, guess, c); }
 
     void first_root()
     {
@@ -176,6 +186,35 @@ namespace {
         std::println("   {:<30} {:.17g}", "via std::sqrt", std::sqrt(0.56714329040978387300));
     }
 
+    void open_methods()
+    {
+        // Newton and Halley take fn's derivatives from fn, which returns them with the value, or from callables of
+        // their own; Secant needs none. From a guess, each iterates until two iterates bracket a sign change, then
+        // finishes inside that bracket, so every result has a bound like Brent's.
+        std::println("\n10. Newton, Halley and Secant");
+        auto const fdf = [](double x) { return std::tuple{ x * x - 2.0, 2.0 * x, 2.0 }; }; // f, f', f''
+        count<rt::Newton>("x^2 - 2: Newton from 1", fdf, 1.0);
+        count<rt::Halley>("x^2 - 2: Halley from 1", fdf, 1.0);
+        count<rt::Secant>("x^2 - 2: Secant from 1", fdf, 1.0);
+        count<rt::Newton>("x^2 - 2: Newton on [1, 2]", fdf, { 1.0, 2.0 });
+
+        // The derivative as a callable of its own: the same result.
+        auto const f = [](double x) { return std::exp(x) - 2.0; };
+        auto const df = [](double x) { return std::exp(x); };
+        show("e^x = 2: Newton, f and f'", rt::solve<rt::Newton>(f, df, 0.0));
+
+        // Kepler's equation again, now from a guess: E = M is a common start.
+        auto const kepler = [](double big_e) {
+            return std::pair{ big_e - 0.9 * std::sin(big_e) - 1.0, 1.0 - 0.9 * std::cos(big_e) };
+        };
+        count<rt::Newton>("Kepler, M = 1: Newton from M", kepler, 1.0);
+
+        // An open method can fail where a bracket cannot: Newton cycles between 0 and 1 on x^3 - 2x + 2.
+        auto const cycle = [](double x) { return std::pair{ (x * x - 2.0) * x + 2.0, 3.0 * x * x - 2.0 }; };
+        count<rt::Newton>("x^3 - 2x + 2: Newton from 0", cycle, 0.0);
+        count<rt::Newton>("x^3 - 2x + 2: Newton, [-2, -1]", cycle, { -2.0, -1.0 });
+    }
+
 } // namespace
 
 int main()
@@ -189,4 +228,5 @@ int main()
     compile_time();
     errors();
     composition();
+    open_methods();
 }
