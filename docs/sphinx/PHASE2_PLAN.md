@@ -191,8 +191,19 @@ CI passed on 06267f3 (run 40572439269, the `docs` job included). Then `numerics-
 - The example's `abs_error` check used 4 eps sqrt(2) instead of the contract 2 (denorm_min + 2 eps |value|)
   (numerics). Fixed.
 - `deriv.hpp:310`'s "2 to about 1e-13 relative" (numerics): the error is 9.4e-15 and the estimate 1.7e-12 relative,
-  and the comment's layout (as at line 14) reads as the estimate. Proposed to the user: "2 to about 1e-14 relative,
-  with an estimate of about 2e-12" (a change to `include/`); the test already asserts both.
+  and the comment's layout (as at line 14) reads as the estimate. Approved by the user and changed to "2 to about
+  1e-14 relative, with an estimate of about 2e-12"; the test already asserted both.
+
+## After the phase (2026-10-27, at the user's request)
+
+- The site follows Diataxis: `tutorials/` (getting started), `reference/`, `explanation/` (the deriv book, offered
+  as the released PDF `docs/deriv-book/book.pdf`); `how-to/` comes with the first guide (Phase 3).
+- `numerixx_docs_all` builds the whole documentation: `numerixx_docs`, `numerixx_docs_internal`, and `numerixx_book`
+  where latexmk is found. Built on `clang-cl`: the site with no warning, and the book with its check passing.
+- The patch and the checks moved from `conf.py` into the local extension `_ext/numerixx_breathe.py`, which takes the
+  XML folder from Breathe's configuration; `conf.py` holds only settings. The checks fail as before on `:desc-only:`
+  and on either part of the patch disabled.
+- A `docs-reviewer` agent (`.claude/agents/docs-reviewer.md`) for the review rounds of Phases 3 and 4.
 
 ## Deferred
 

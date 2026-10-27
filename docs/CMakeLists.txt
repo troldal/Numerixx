@@ -1,8 +1,9 @@
 # The documentation targets, run on demand and never part of the default build (docs/sphinx/PHASE2_PLAN.md):
 # - numerixx_docs: the public site. Doxygen writes XML without the detail namespaces, then Sphinx renders it with
 #   Breathe and MyST (docs/sphinx), through uv with the pinned requirements, and fails on any warning or check;
-# - numerixx_docs_internal: Doxygen's HTML with the detail namespaces, for developers.
-# Each runs docs/Doxyfile from the project root, through a small Doxyfile here that includes it.
+# - numerixx_docs_internal: Doxygen's HTML with the detail namespaces, for developers;
+# - numerixx_docs_all: both, and the deriv book's PDF (numerixx_book) where its target exists.
+# The doxygen targets run docs/Doxyfile from the project root, through a small Doxyfile here that includes it.
 function(numerixx_write_doxyfile target)
     set(doxyfile ${CMAKE_CURRENT_BINARY_DIR}/${target}.doxyfile)
     list(JOIN ARGN "\n" settings)
@@ -46,3 +47,13 @@ add_custom_target(numerixx_docs
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
         COMMENT "Generating ${html}/index.html"
         VERBATIM)
+
+# The whole documentation. The site offers the book's released PDF (docs/deriv-book/book.pdf); numerixx_book builds
+# and checks the current one.
+add_custom_target(numerixx_docs_all)
+add_dependencies(numerixx_docs_all numerixx_docs numerixx_docs_internal)
+if (TARGET numerixx_book)
+    add_dependencies(numerixx_docs_all numerixx_book)
+else ()
+    message(STATUS "numerixx_docs_all without the book: no target numerixx_book")
+endif ()

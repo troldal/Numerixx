@@ -32,8 +32,10 @@ A module may use another module's public API, never its `detail`.
 - `CMakePresets.json` one preset per toolchain, used locally and in CI (`.github/workflows/ci.yml`)
 - `docs/plan.md` the plan; `docs/design.md` the decisions for every module; `docs/<module>/` per module (above)
 - `docs/Doxyfile` the API documentation settings, used by the docs targets in `docs/CMakeLists.txt`
-- `docs/sphinx/` the documentation site (MyST pages, `conf.py` with its Breathe patch and checks, pinned
-  `requirements.txt`); a page shows code only from `docs/sphinx/examples/`, programs built and run as tests
+- `docs/sphinx/` the documentation site, in Diataxis parts (`tutorials/`, `how-to/`, `reference/`, `explanation/`;
+  MyST pages), with `conf.py`, the local extension `_ext/numerixx_breathe.py` (the Breathe patch and the checks) and
+  the pinned `requirements.txt`; a page shows code only from `docs/sphinx/examples/`, programs built and run as tests;
+  `docs-reviewer` reviews the pages
 - `docs/deriv-book/` the book on `nxx::deriv` (LaTeX): its own `CLAUDE.md` holds its rules, roles and process; its
   examples build as tests (`NUMERIXX_BUILD_BOOK`), its PDF is the target `numerixx_book`
 
@@ -51,6 +53,8 @@ Presets: `clang-cl`, `cl`, `gcc`, `clang`, `emscripten`; each builds Debug into 
   It needs uv and Doxygen 1.18 or later (in `C:/Program Files/doxygen/bin`; a build directory configured earlier may
   have cached Strawberry Perl's 1.10: pass `-DDOXYGEN_EXECUTABLE`). `numerixx_docs_internal` writes Doxygen's HTML
   with the `detail` namespaces to `build/<preset>/docs/internal/html`, with Doxygen 1.10 or later.
+  `numerixx_docs_all` builds the whole documentation: both, and the deriv book (`numerixx_book`) where latexmk is
+  found.
 - `clang-cl` and `cl` need the MSVC environment, which the agent's shell lacks: run them from a batch file that first
   calls `"C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"`.
 - `g++` on PATH is Strawberry Perl's; configure `gcc` with `-DCMAKE_CXX_COMPILER=C:/Toolchains/GCC16/bin/g++.exe` and

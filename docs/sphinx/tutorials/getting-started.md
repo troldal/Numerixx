@@ -8,14 +8,14 @@ folder on the include path, or in CMake link the target `numerixx::numerixx`. It
 The program finds the root of `x * x - 2` in the interval `[1, 2]` by Brent's method, and the derivative of `exp(x)`
 at 1 by Ridders' method. It needs these headers:
 
-```{literalinclude} examples/getting_started.cpp
+```{literalinclude} ../examples/getting_started.cpp
 :start-after: // <includes>
 :end-before: // </includes>
 ```
 
 and, in `main`:
 
-```{literalinclude} examples/getting_started.cpp
+```{literalinclude} ../examples/getting_started.cpp
 :start-after: // <program>
 :end-before: // </program>
 :dedent:
@@ -26,4 +26,4 @@ Both results are close to the full precision of `double`, with errors of order 1
 Ridders' estimate of its error, not a guaranteed bound. Every algorithm returns a `std::expected`, so test the result before
 reading it with `->` or `*`, and print or inspect `error()` when there is no result.
 
-The [roots reference](reference/roots.md) and the [derivatives reference](reference/deriv.md) list the other methods.
+The [roots reference](../reference/roots.md) and the [derivatives reference](../reference/deriv.md) list the other methods.

@@ -252,7 +252,8 @@ TEST_CASE("onesided: domain edges")
     CHECK(covered(derivative<BackwardRidders>(exp_below, 1.0), e));
     CHECK(covered(derivative<BackwardRidders, 4>(exp_below, 1.0), e));
     // The example of ForwardRidders' comment in deriv.hpp: log, NaN below 0.5, at 0.5. Ridders fails, ForwardRidders
-    // gives 2 to about 1e-13 relative (4 * 9.4e-15 here; the prototype's run of this case gives the reference).
+    // gives 2 to about 1e-14 relative, with an estimate of about 2e-12 (4 * 9.4e-15 and 2 * 1.7e-12 here; the
+    // prototype's run of this case gives the reference).
     auto const log_above = [](double t) { return t < 0.5 ? std::nan("") : std::log(t); };
     CHECK(derivative<Ridders>(log_above, 0.5) == non_finite);
     CHECK(accurate<1>(log_above, 0.5, 2.0, { 9.4e-15, 1.7e-12, 10 }));

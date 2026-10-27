@@ -311,7 +311,7 @@ namespace nxx::deriv {
      * // log is NaN below 0.5 here, and x is the edge: Ridders returns non_finite, ForwardRidders the derivative.
      * auto const fn = [](double x) { return x < 0.5 ? std::nan("") : std::log(x); };
      * auto const r = nxx::deriv::derivative<nxx::deriv::ForwardRidders>(fn, 0.5);
-     * if (r) use(r->value, *r->abs_error); // 2 to about 1e-13 relative
+     * if (r) use(r->value, *r->abs_error); // 2 to about 1e-14 relative, with an estimate of about 2e-12
      * @endcode
      */
     struct ForwardRidders

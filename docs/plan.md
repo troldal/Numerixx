@@ -125,8 +125,10 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
 ## Milestone 3: user documentation (Doxygen, Breathe, Sphinx)
 
 A manual for library users, beside the API reference: Doxygen reads the headers and stays the gate that every public
-entity is documented; Sphinx with Breathe and MyST (Markdown) renders a getting-started page, a user guide and an API
-reference per module. The deriv book stays the theory and is linked, not repeated. Each phase gets its plan approved
+entity is documented; Sphinx with Breathe and MyST (Markdown) renders the site. The site follows Diataxis (the user's
+choice, 2026-10-27): tutorials, how-to guides, reference and explanation, each page doing one of the four jobs. The
+deriv book stays the long explanation of `nxx::deriv` and is offered as its PDF, not repeated. `numerixx_docs_all`
+builds the whole documentation: the site, Doxygen's internal HTML and the book. Each phase gets its plan approved
 before it is written, and the pages get the reviews of a phase. A box is ticked when the docs build with no warning
 locally and in CI, and the examples' tests pass on all five toolchains.
 
@@ -151,20 +153,30 @@ locally and in CI, and the examples' tests pass on all five toolchains.
     `nitpick_ignore_regex`
   - [x] One reference page per namespace, with the concept and the `std::formatter` specialisations; no suppressed
     warning (`clang-cl`: no warning from Doxygen or Sphinx)
-  - [x] Checks in `conf.py` that fail the build: every symbol in the XML is reached by a directive; the clauses and
-    concept definitions the patch emitted equal those in the XML, so that a Breathe upgrade cannot drop them silently
+  - [x] Checks that fail the build: every class, concept and declaration in the XML rendered exactly once, and every
+    clause and concept definition given exactly once, by Doxygen ID of what Breathe rendered (ad96830, after the
+    reviews; the first version read the pages' directives)
   - [x] Examples as tests: pages show code only through `literalinclude` from standalone programs, each built and run
     as a test on all five toolchains
   - [x] The header `@code` blocks covered by tests in the module test files that assert their claims; the
     `deriv.hpp:14` comment corrected (it gave relative figures as absolute)
   - [x] A CI job (Doxygen 1.18.0 pinned, uv, Sphinx `-W`) (06267f3: run 40572439269)
-  - [ ] The reviews of the phase and the independent review (Codex)
-- Phase 3: `nxx::roots`: the user guide (the result types, choosing a method, tolerances, errors, user-defined types,
-  derivatives); the program that writes tables of counts and accuracy, at the first table.
+  - [x] The reviews of the phase (`numerics-reviewer`) and the independent review (Codex): ten findings, all
+    reproduced or checked and fixed (ad96830, the `deriv.hpp:310` comment after the user's approval;
+    `docs/sphinx/PHASE2_PLAN.md`)
+  - [x] After the phase, at the user's request: the site in Diataxis parts (`tutorials/`, `reference/`,
+    `explanation/`, with `how-to/` from Phase 3), the book's PDF offered by the explanation part, the target
+    `numerixx_docs_all`, and the patch and checks moved from `conf.py` to the local extension
+    `docs/sphinx/_ext/numerixx_breathe.py`
+- Phase 3: `nxx::roots`, in the Diataxis parts: a tutorial (a first root, from a bracket and from a guess); how-to
+  guides (choose a method, set tolerances, find a bracket, use numerical derivatives, use a multiprecision type,
+  handle errors); explanation (bracketing and open methods, what `abs_error` bounds, conditioning); the program that
+  writes tables of counts and accuracy, at the first table.
   - [ ] Pages, examples and tests; docs build clean
-  - [ ] Reviews: the API statements against the code, numerics, a docs-only reader who writes client code that must
-    compile; then the independent review (Codex)
-- Phase 4: `nxx::deriv` and `nxx::math`, as Phase 3, from `docs/deriv/DERIV_TUTORIAL.md` and linking the book.
+  - [ ] Reviews: `docs-reviewer` (every statement against the code, and each page's Diataxis job), numerics, a
+    docs-only reader who writes client code that must compile; then the independent review (Codex)
+- Phase 4: `nxx::deriv` and `nxx::math`, in the same parts, from `docs/deriv/DERIV_TUTORIAL.md`; the explanation part
+  summarises the book and points into it.
   - [ ] Pages, examples and tests; docs build clean
   - [ ] Reviews as in Phase 3
 
