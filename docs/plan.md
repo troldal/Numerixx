@@ -114,10 +114,10 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
     (`docs/roots/PHASE5_API.md`)
 - Phase 6: `Ridders`, `RegulaFalsi`, `Illinois`, `Steffensen` (the user chose all four). API approved:
   `docs/roots/PHASE6_API.md`.
-  - [ ] `Ridders` (two `enclose` steps, the cancellation-free point, `detail::sqrt`), `RegulaFalsi` and `Illinois`
+  - [x] `Ridders` (two `enclose` steps, the cancellation-free point, `detail::sqrt`), `RegulaFalsi` and `Illinois`
     (`false_position<M>`, guarded), `Steffensen` (Secant's step shared, the hand-over at z)
-  - [ ] Tests: the prototype's counts exactly; the roots Steffensen finds; the sqrt; constant evaluation; the types; the
-    demo
+  - [x] Tests: the prototype's counts exactly; the roots Steffensen finds; the sqrt; constant evaluation; the types; the
+    demo (five toolchains and WSL GCC and Clang, locally)
   - [ ] CI passes on all five toolchains
   - [ ] The independent review (Codex) and its adopted findings
 

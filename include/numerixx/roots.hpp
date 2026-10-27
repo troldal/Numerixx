@@ -4,8 +4,9 @@
  *
  * solve<M>(fn, start) finds a point where fn changes sign, by a method M. From a bracket, an interval at whose ends fn
  * has opposite signs: `Bisection`, which halves it, `Brent`, which interpolates and falls back on bisection,
- * `Toms748` and `AndersonBjorck`, two more interpolating methods, and `Newton` and `Halley`, whose derivative steps
- * the bracket safeguards. From a guess: `Newton`, `Halley` and `Secant`,
+ * `Toms748` and `AndersonBjorck`, two more interpolating methods, `Ridders`, `RegulaFalsi` and `Illinois`, kept as
+ * teaching examples, and `Newton` and `Halley`, whose derivative steps the bracket safeguards. From a guess:
+ * `Newton`, `Halley`, `Secant` and `Steffensen`,
  * which iterate until a sign change appears between two iterates and then finish inside it. Every method returns a
  * std::expected<Root<T>, error>: the root and a bound on its distance to a sign change of fn. Numerixx itself never
  * throws, but the result's own value() throws std::bad_expected_access on a failure, so test the result and read it
@@ -206,6 +207,40 @@ namespace nxx::roots {
     };
 
     /**
+     * @brief Ridders' method (1979): the midpoint, then the zero of an exponential fit through the three values. A
+     * bracket. Not nxx::deriv::Ridders, the derivative method of the same author.
+     *
+     * Each iteration halves the bracket at a cost of 2 evaluations (so at most twice Bisection's count) and converges
+     * quadratically per iteration on a simple root. A teaching example; the cheapest method here on roots of odd
+     * multiplicity and on flat fn ((x - 1)^3: 86 evaluations against Brent's 156), dearer than Brent otherwise (416
+     * against 309 on 27 of Alefeld, Potra and Shi's test cases). The fit's zero is formed without the cancellation of
+     * the textbook formula, which loses roots near an end of the bracket.
+     */
+    struct Ridders
+    {
+    };
+
+    /**
+     * @brief False position: the zero of the secant through the bracket's ends, guarded. A bracket.
+     *
+     * A teaching example. As published, one end of the bracket stalls while the other converges: x^20 - 1 over [0, 5]
+     * took over 200,000 evaluations. Guarded here, as AndersonBjorck, by a bisection after three steps that have not
+     * halved the bracket (45 evaluations there), so the stall shows only in its counts: 645 on 27 of Alefeld, Potra and
+     * Shi's test cases, against Illinois' 382 and AndersonBjorck's 327.
+     */
+    struct RegulaFalsi
+    {
+    };
+
+    /**
+     * @brief The Illinois method (Dowell and Jarratt 1971): false position with the retained end's value halved
+     * whenever that end is retained again, the simplest cure for its stall; guarded, as AndersonBjorck. A bracket.
+     */
+    struct Illinois
+    {
+    };
+
+    /**
      * @brief Newton's method: the step -f / f'. Needs fn and f'.
      *
      * On a bracket it is Brent's method with Newton's step in place of the interpolation, safeguarded the same way:
@@ -243,6 +278,19 @@ namespace nxx::roots {
     {
     };
 
+    /**
+     * @brief Steffensen's method: Newton's with the slope (f(z) - f(x)) / f(x) at z = x + f(x). Needs fn only; from a
+     * guess, 2 evaluations per iteration, at the first sign change continuing as Brent's method, as Secant.
+     *
+     * A teaching example: quadratic without a derivative, at the price of scale dependence. f(x) is added to x, so fn's
+     * scale sets the cost and even which root is found: 1000 (x^2 - 2) from 1 returns -sqrt 2 after 27 evaluations,
+     * where x^2 - 2 returns sqrt 2 after 10 (z = 1 - 1000 brackets the other root). From a far guess it is slow (x^2 - 2
+     * from 10: 39 evaluations, Secant 13). Prefer Secant.
+     */
+    struct Steffensen
+    {
+    };
+
     /** @cond INTERNAL */
     namespace detail {
 
@@ -252,14 +300,17 @@ namespace nxx::roots {
          */
         template<typename M>
         concept bracketing = std::same_as<M, Bisection> || std::same_as<M, Brent> || std::same_as<M, Toms748>
-                             || std::same_as<M, AndersonBjorck> || std::same_as<M, Newton> || std::same_as<M, Halley>;
+                             || std::same_as<M, AndersonBjorck> || std::same_as<M, Ridders>
+                             || std::same_as<M, RegulaFalsi> || std::same_as<M, Illinois> || std::same_as<M, Newton>
+                             || std::same_as<M, Halley>;
 
         /**
          * @brief The methods solve() accepts from a guess.
          * @tparam M The method.
          */
         template<typename M>
-        concept open = std::same_as<M, Newton> || std::same_as<M, Halley> || std::same_as<M, Secant>;
+        concept open = std::same_as<M, Newton> || std::same_as<M, Halley> || std::same_as<M, Secant>
+                       || std::same_as<M, Steffensen>;
 
         /**
          * @brief The number of values a method needs from fn at a point: the value, and the derivatives it uses.
@@ -1445,23 +1496,26 @@ namespace nxx::roots {
         }
 
         /**
-         * @brief Regula falsi with Anderson and Bjorck's rescaling (1973) on a validated bracket, guarded by a
+         * @brief False position on a validated bracket, the retained end's value scaled by M's factor, guarded by a
          * bisection after three consecutive steps that have not brought the bracket below half its width at the last
          * halving (a guard bisection counts as one); each point taken through enclose().
          *
          * b is the latest point and a the retained end, whose value is replaced by g_a. The point is the secant's
-         * zero through (a, g_a) and (b, f_b). Where f_c has f_b's sign, a is retained and g_a scaled by
-         * m = 1 - f_c / f_b, or 1/2 where m is not positive (formed only where |f_c| < |f_b|, so nothing overflows);
-         * otherwise b becomes the retained end with its true value. c becomes b.
+         * zero through (a, g_a) and (b, f_b). Where f_c has f_b's sign, a is retained and g_a scaled by M's factor:
+         * AndersonBjorck's m = 1 - f_c / f_b, or 1/2 where m is not positive (formed only where |f_c| < |f_b|, so
+         * nothing overflows; Anderson and Bjorck 1973); Illinois' 1/2; RegulaFalsi's 1. Otherwise b becomes the
+         * retained end with its true value. c becomes b. Nothing depends on the factor being below 1: g_a keeps its
+         * sign, so the step's ratio stays in (0, 1).
          *
+         * @tparam M AndersonBjorck, Illinois or RegulaFalsi.
          * @param fn The function.
          * @param start The start: a bracket in order with a sign change and no root found.
          * @param tolerance The tolerances.
          * @return The root, or error::non_finite if fn is not finite at a point.
          */
-        template<real T, typename F>
+        template<typename M, real T, typename F>
         constexpr std::expected<Root<T>, error>
-            anderson_bjorck(F &fn, Start<T, 1> const &start, Tolerance<T> const &tolerance)
+            false_position(F &fn, Start<T, 1> const &start, Tolerance<T> const &tolerance)
         {
             T retained = start.lower;
             T f_retained = start.at_lower[0];
@@ -1495,11 +1549,13 @@ namespace nxx::roots {
                     retained = latest;
                     f_retained = f_latest;
                     scaled = f_latest;
-                } else {
+                } else if constexpr (std::same_as<M, AndersonBjorck>) {
                     T const m = math::abs(step->fc) < math::abs(f_latest) ? T(T(1) - T(step->fc / f_latest))
                                                                           : T(T(1) / T(2));
                     scaled = T(scaled * m);
-                }
+                } else if constexpr (std::same_as<M, Illinois>) {
+                    scaled = T(scaled * T(T(1) / T(2)));
+                } // RegulaFalsi: the factor 1
                 latest = step->c;
                 f_latest = step->fc;
                 T const width = detail::distance_bound(retained < latest ? retained : latest,
@@ -1510,6 +1566,127 @@ namespace nxx::roots {
                 } else {
                     ++unhalved;
                 }
+            }
+        }
+
+        /**
+         * @brief The square root of x >= 0, faithful (within one ulp), from + - * /, the same at compile time and run time.
+         *
+         * x is scaled into [1/radix^2, 1] by even powers of the radix, squared up so that the scaling takes a number of
+         * steps logarithmic in the exponent (single factors would take about 10^9 in cpp_bin_float_50), then Newton's
+         * iteration runs from 1, above the root, in the correction form y + (s/y - y)/2, as root_epsilon, until rounding
+         * stops it, and the result is unscaled exactly. The textbook form (y + s/y)/2 is up to 3 ulps off in radix 10,
+         * where y + s/y falls in the decade above; the correction form stays within one (exhaustive in decimal at 4 to 6
+         * digits). Correct rounding would need the exact residual x - y^2, which Dekker's splitting gives in radix 2 but
+         * not for every nxx::real.
+         *
+         * @param x The value, not negative.
+         * @return sqrt x; x itself for 0, +inf and NaN, and for a negative x (a precondition, asserted), so that the
+         *         loops end.
+         */
+        template<real T>
+        constexpr T sqrt(T const &x)
+        {
+            assert(!(x < T(0)));
+            if (!(x > T(0)) || !math::isfinite(x)) return x;
+            T const r = static_cast<T>(std::numeric_limits<T>::radix);
+            T const r2 = T(r * r);
+            T const top = detail::largest<T>();
+            T s = x;
+            T scale = T(1);
+            // p = q^2 is squared up while it fits and keeps s on its side of the interval; s is scaled by p, scale by q.
+            while (s > T(1)) {
+                T p = r2;
+                T q = r;
+                while (p <= T(top / p) && T(s / p) > p) {
+                    p = T(p * p);
+                    q = T(q * q);
+                }
+                s = T(s / p);
+                scale = T(scale * q);
+            }
+            while (s < T(T(1) / r2)) {
+                T p = r2;
+                T q = r;
+                while (p <= T(top / p) && T(s * p) < T(T(1) / p)) {
+                    p = T(p * p);
+                    q = T(q * q);
+                }
+                s = T(s * p);
+                scale = T(scale / q);
+            }
+            T y = T(1);
+            while (true) {
+                T const next = T(y + T(T(T(s / y) - y) / T(2)));
+                if (!(next < y)) break;
+                y = next;
+            }
+            return T(y * scale);
+        }
+
+        /**
+         * @brief Ridders' point: the zero of the exponential fit through the old bracket's ends and its midpoint m,
+         * from the state after the midpoint step, whose bracket has m at one end and e at the other (e's value has the
+         * other sign than m's), and the dropped end d.
+         *
+         * x4 = m + (m - a) sign(f(a) - f(b)) f(m) / sqrt(f(m)^2 - f(a) f(b)) (Ridders 1979), written as
+         * x4 = e + w (m - e), w = 1 - |f(m)| / root = -g_e g_d / (root (root + |g_m|)), with g = f / s for
+         * s = max(|f(e)|, |f(d)|, |f(m)|), so that no square overflows (root is in [|g_m|, sqrt 2]). The textbook form
+         * rounds |f(m)| / root to 1 where f(e) f(d) is below eps of f(m)^2, which put the point on the end: x - 1e-300
+         * over [0, 1] bisected through 1922 evaluations, against 4.
+         *
+         * @param s The state after the midpoint step.
+         * @param m The midpoint.
+         * @param fm fn there.
+         * @return The point, or nothing where w cannot be formed (root underflows).
+         */
+        template<real T>
+        constexpr std::optional<T> ridders_point(Enclosure<T> const &s, T const &m, T const &fm)
+        {
+            bool const m_is_a = s.a == m;
+            T const e = m_is_a ? s.b : s.a;
+            T const fe = m_is_a ? s.fb : s.fa;
+            T scale = math::abs(fe);
+            if (math::abs(s.fd) > scale) scale = math::abs(s.fd);
+            if (math::abs(fm) > scale) scale = math::abs(fm);
+            T const ge = T(fe / scale);
+            T const gd = T(s.fd / scale);
+            T const gm = T(fm / scale);
+            T const root = detail::sqrt(T(T(gm * gm) - T(ge * gd)));
+            std::optional<T> const w = detail::quotient(T(-T(ge * gd)), T(root * T(root + math::abs(gm))));
+            if (!w) return std::nullopt;
+            return T(e + T(*w * T(m - e)));
+        }
+
+        /**
+         * @brief Ridders' method on a validated bracket: per iteration enclose() at the midpoint, then at Ridders' point
+         * from the state that step leaves. Each iteration halves the bracket, at most 2 evaluations.
+         * @param fn The function.
+         * @param start The start: a bracket in order with a sign change and no root found.
+         * @param tolerance The tolerances.
+         * @return The root, or error::non_finite if fn is not finite at a point.
+         */
+        template<real T, typename F>
+        constexpr std::expected<Root<T>, error> ridders(F &fn, Start<T, 1> const &start, Tolerance<T> const &tolerance)
+        {
+            T const lower = start.lower;
+            T const upper = start.upper;
+            T const f_lower = start.at_lower[0];
+            T const f_upper = start.at_upper[0];
+            if (std::optional<Root<T>> const r = detail::stop_at(lower, f_lower, upper, f_upper, tolerance)) return *r;
+            Enclosure<T> s{ lower, f_lower, upper, f_upper, upper, f_upper, upper, f_upper };
+            while (true) {
+                // The midpoint: enclose's point where none is proposed.
+                std::expected<Enclosed<T>, error> const half = detail::enclose(fn, s, std::optional<T>(), false, tolerance);
+                if (!half) return std::unexpected(half.error());
+                if (half->root) return *half->root;
+                std::optional<T> const proposed =
+                    detail::wide(half->next) ? std::optional<T>() : detail::ridders_point(half->next, half->c, half->fc);
+                std::expected<Enclosed<T>, error> const fit =
+                    detail::enclose(fn, half->next, proposed, false, tolerance);
+                if (!fit) return std::unexpected(fit.error());
+                if (fit->root) return *fit->root;
+                s = fit->next;
             }
         }
 
@@ -1597,6 +1774,34 @@ namespace nxx::roots {
         }
 
         /**
+         * @brief The secant's step from x: dx (f / (fp - f)), dx = x - xp, through (x, f) and (xp, fp) of one sign, at
+         * least tol(x) long, its direction from the signs of f, fp - f and dx in case the step underflowed. Secant's and
+         * Steffensen's.
+         * @param x The latest point.
+         * @param f fn there.
+         * @param dx x - xp.
+         * @param difference fp - f, of one sign's values (it cannot overflow).
+         * @param tolerance The tolerances.
+         * @return The move from x, or nothing where it cannot be formed (fp = f, a quotient or product out of range, or
+         *         x + move overflowing).
+         */
+        template<real T>
+        constexpr std::optional<T>
+            secant_move(T const &x, T const &f, T const &dx, T const &difference, Tolerance<T> const &tolerance)
+        {
+            if (difference == T(0)) return std::nullopt;
+            std::optional<T> const ratio = detail::quotient(f, difference);
+            if (!ratio) return std::nullopt;
+            std::optional<T> const step = detail::product(dx, *ratio);
+            if (!step) return std::nullopt;
+            T const tol = tolerance.at(x);
+            bool const upward = ((dx > T(0)) == (f > T(0))) == (difference > T(0));
+            T const move = math::abs(*step) > tol ? *step : (upward ? tol : T(-tol));
+            if (!detail::sum_fits(x, move)) return std::nullopt;
+            return move;
+        }
+
+        /**
          * @brief Secant from a guess: the step (x - xp) (f / (fp - f)) through the latest two iterates, at least tol(x)
          * long, until fn's values at two consecutive iterates have opposite signs; then Brent on them.
          *
@@ -1626,23 +1831,59 @@ namespace nxx::roots {
                 if (vx[0] == T(0)) return Root<T>{ x, tolerance.at(x) };
                 if (!detail::same_sign(vx[0], vp[0])) return detail::hand_over<Brent>(fn, xp, vp, x, vx, tolerance);
                 if (i == detail::iteration_cap<T>()) return std::unexpected(error::not_converged);
-                T const difference = T(vp[0] - vx[0]);
-                if (difference == T(0)) return std::unexpected(error::not_converged);
-                std::optional<T> const ratio = detail::quotient(vx[0], difference);
-                if (!ratio) return std::unexpected(error::not_converged);
-                std::optional<T> const step = detail::product(dx, *ratio);
+                std::optional<T> const step = detail::secant_move(x, vx[0], dx, T(vp[0] - vx[0]), tolerance);
                 if (!step) return std::unexpected(error::not_converged);
-                T const tol = tolerance.at(x);
-                // The step's sign is that of dx * f / (fp - f), taken from the signs in case the step underflowed.
-                bool const upward = ((dx > T(0)) == (vx[0] > T(0))) == (difference > T(0));
-                T const move = math::abs(*step) > tol ? *step : (upward ? tol : T(-tol));
-                if (!detail::sum_fits(x, move)) return std::unexpected(error::not_converged);
+                T const move = *step;
                 xp = x;
                 vp = vx;
                 x = T(x + move);
                 dx = move;
                 vx = detail::evaluate<1>(fn, x);
             }
+        }
+
+        /**
+         * @brief Steffensen from a guess: z = x + f(x), at least tol(x) away from x in f(x)'s direction; the secant's
+         * step through (x, f(x)) and (z, f(z)) (Steffensen's -f(x)^2 / (f(z) - f(x)) where z - x = f(x)); Brent at the
+         * first sign change, between x and z or x and the next iterate.
+         *
+         * z - x is taken as formed where it is exact (|z - x| <= |x|, by Sterbenz), else as the intended offset, where
+         * the difference could overflow.
+         *
+         * @param fn The function.
+         * @param guess The starting point.
+         * @param tolerance The tolerances.
+         * @return The root, error::non_finite or error::not_converged.
+         */
+        template<real T, typename F>
+        constexpr std::expected<Root<T>, error> open_steffensen(F &fn, T const &guess, Tolerance<T> const &tolerance)
+        {
+            if (!math::isfinite(guess)) return std::unexpected(error::non_finite);
+            T x = guess;
+            std::array<T, 1> vx = detail::evaluate<1>(fn, x);
+            if (!math::isfinite(vx[0])) return std::unexpected(error::non_finite);
+            if (vx[0] == T(0)) return Root<T>{ x, tolerance.at(x) };
+            for (int i = 0; i < detail::iteration_cap<T>(); ++i) {
+                T const tol = tolerance.at(x);
+                T const offset = math::abs(vx[0]) > tol ? vx[0] : (vx[0] > T(0) ? tol : T(-tol));
+                if (!detail::sum_fits(x, offset)) return std::unexpected(error::not_converged);
+                T const z = T(x + offset);
+                std::array<T, 1> const vz = detail::evaluate<1>(fn, z);
+                if (!math::isfinite(vz[0])) return std::unexpected(error::non_finite);
+                if (vz[0] == T(0)) return Root<T>{ z, tolerance.at(z) };
+                if (!detail::same_sign(vz[0], vx[0])) return detail::hand_over<Brent>(fn, x, vx, z, vz, tolerance);
+                T const width = math::abs(offset) <= math::abs(x) ? T(z - x) : offset;
+                std::optional<T> const move = detail::secant_move(x, vx[0], T(-width), T(vz[0] - vx[0]), tolerance);
+                if (!move) return std::unexpected(error::not_converged);
+                T const next = T(x + *move);
+                std::array<T, 1> const vn = detail::evaluate<1>(fn, next);
+                if (!math::isfinite(vn[0])) return std::unexpected(error::non_finite);
+                if (vn[0] == T(0)) return Root<T>{ next, tolerance.at(next) };
+                if (!detail::same_sign(vn[0], vx[0])) return detail::hand_over<Brent>(fn, x, vx, next, vn, tolerance);
+                x = next;
+                vx = vn;
+            }
+            return std::unexpected(error::not_converged);
         }
 
     } // namespace detail
@@ -1666,7 +1907,9 @@ namespace nxx::roots {
      * Choosing a method: Brent by default. Toms748 costs about the same, with a worst case of about 4 evaluations per
      * halving of the bracket where Brent's grows with the square of the halvings. AndersonBjorck where fn is strongly
      * curved near one end of the bracket (a logarithm, 1/x) or the sign change is at 0. Bisection where fn is rough
-     * and its count must be predictable. For a value-only fn, not a derivative method with a numerical derivative.
+     * and its count must be predictable. Ridders where the root has odd multiplicity or fn is flat ((x - 1)^3: 86
+     * evaluations against Brent's 156). RegulaFalsi, Illinois and Steffensen are teaching examples. For a value-only
+     * fn, not a derivative method with a numerical derivative.
      * Each returns a point and a bound on its distance to the sign change, not the final bracket.
      *
      * @code
@@ -1708,8 +1951,10 @@ namespace nxx::roots {
             return detail::bisection(fn, *start, *tolerance);
         else if constexpr (std::same_as<M, Toms748>)
             return detail::toms748(fn, *start, *tolerance);
-        else if constexpr (std::same_as<M, AndersonBjorck>)
-            return detail::anderson_bjorck(fn, *start, *tolerance);
+        else if constexpr (std::same_as<M, AndersonBjorck> || std::same_as<M, Illinois> || std::same_as<M, RegulaFalsi>)
+            return detail::false_position<M>(fn, *start, *tolerance);
+        else if constexpr (std::same_as<M, Ridders>)
+            return detail::ridders(fn, *start, *tolerance);
         else
             return detail::brent<M>(fn, *start, *tolerance);
     }
@@ -1753,6 +1998,8 @@ namespace nxx::roots {
         if (!tolerance) return std::unexpected(tolerance.error());
         if constexpr (std::same_as<M, Secant>)
             return detail::open_secant(fn, guess, *tolerance);
+        else if constexpr (std::same_as<M, Steffensen>)
+            return detail::open_steffensen(fn, guess, *tolerance);
         else
             return detail::open_derivative<M>(fn, guess, *tolerance);
     }
@@ -1767,12 +2014,12 @@ namespace nxx::roots {
      * bisection step, from a guess the method ends with error::not_converged, and Halley takes Newton's step where only
      * f'' failed. A numerical derivative fails where fn is not finite at a node or the stencil cannot be formed (a
      * point near max, a step below the resolution of x); a fn that stays finite outside its domain gives a finite,
-     * wrong derivative instead, so return NaN there. Only the value is read: Ridders' error estimate does not steer the
-     * search.
+     * wrong derivative instead, so return NaN there. Only the value is read: nxx::deriv::Ridders' error estimate does
+     * not steer the search.
      *
      * A numerical derivative is a convenience. With nxx::deriv's default `Central<2>` a point costs 3 calls of fn for
      * Newton and 6 for Halley, about twice Secant from a guess and two to three times Brent on a bracket for a
-     * value-only fn; with `Ridders`, 6 to 11 times Secant. The bound never depends on the derivative, but from a guess
+     * value-only fn; with nxx::deriv::Ridders, 6 to 11 times Secant. The bound never depends on the derivative, but from a guess
      * the iterates can: where |f'| is as small as the derivative's own error, at a multiple root or a stationary point,
      * Newton can stall into error::not_converged ((x - 1)^3 from 2) or jump far. A bracket always converges.
      *

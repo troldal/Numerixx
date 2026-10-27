@@ -105,7 +105,10 @@ namespace nxx::roots {
   (Boost.Math's default). Both stay, Brent first.
 - **AndersonBjorck** represents the false-position family, which GSL and most textbooks list; it is close to Brent in
   efficiency, so it is there for variety, at the user's choice (D8).
-- **Deferred** (later phases; the weaker ones are teaching examples, and their documentation says what they teach):
+- **Deferred** (later phases; the weaker ones are teaching examples, and their documentation says what they teach;
+  all four added in Phase 6, `PHASE6_API.md`, whose measurements correct this list: Ridders is the cheapest method on
+  odd multiple and flat roots, though dearer than Brent overall, 416 against 309 evaluations on 27 of Alefeld, Potra
+  and Shi's cases; RegulaFalsi and Illinois are guarded; Steffensen's scale changes even the root found):
   - `Ridders`: Brent beats it on every measure (index 1.41 against about 1.8, the same guarantee), and it is the only
     method that needs a `sqrt` beyond `+ - * /` and the only name shared with `nxx::deriv`.
   - `RegulaFalsi` (one end stalls, which Anderson-Bjorck fixes) and `Illinois` (the simplest fix, slightly weaker than

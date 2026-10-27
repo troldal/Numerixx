@@ -208,6 +208,17 @@ mostly Brent's; its own convergence shows from far guesses.
 - `demo/roots_demo.cpp`: the new tags in section 2's comparison, and Steffensen's scale in section 10's.
 - `docs/plan.md`: Phase 6's checkboxes.
 
+## Changes during implementation
+
+- No change to the API or the behaviour. Every count and root of the tables for `+ - * /` and sqrt is reproduced
+  exactly (`tests/test_roots_classic.cpp`), and Phase 2's Secant and Phase 4's AndersonBjorck counts are unchanged
+  (the shared `secant_move` and `false_position<M>`).
+- The prototype's Steffensen minimum-step direction was aligned with Secant's rule (the one the C++ shares) before its
+  counts became test data; no count changed.
+- The test of the minimum step with f(x) < 0 is not a separate case: the rule is Secant's `secant_move`, now shared.
+- `demo/roots_demo.cpp`: Ridders, RegulaFalsi and Illinois on (x - 1)^3 in section 2; Steffensen on x^2 - 2 and
+  1000 (x^2 - 2), with Secant's result, in section 10; section 11's label names `nxx::deriv`'s Ridders.
+
 ## Decisions for the user
 
 - **P1. Ridders as two `enclose` steps** (the midpoint, then the exponential fit's zero), in the cancellation-free

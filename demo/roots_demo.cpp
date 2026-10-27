@@ -92,6 +92,12 @@ namespace {
         count<rt::Brent>("ln(x / 1e-12): Brent", trace, { 1e-20, 1.0 });
         count<rt::Toms748>("ln(x / 1e-12): Toms748", trace, { 1e-20, 1.0 });
         count<rt::AndersonBjorck>("ln(x / 1e-12): AndersonBjorck", trace, { 1e-20, 1.0 });
+
+        // The teaching methods on the triple root: Ridders' exponential fit is the cheapest of all there; false position
+        // (RegulaFalsi) stalls at one end, which the bisection guard cuts off, and Illinois halves the stalled value.
+        count<rt::Ridders>("(x - 1)^3: Ridders", triple, { 0.0, 3.0 });
+        count<rt::RegulaFalsi>("(x - 1)^3: RegulaFalsi", triple, { 0.0, 3.0 });
+        count<rt::Illinois>("(x - 1)^3: Illinois", triple, { 0.0, 3.0 });
     }
 
     void kepler()
@@ -223,6 +229,14 @@ namespace {
         auto const cycle = [](double x) { return std::pair{ (x * x - 2.0) * x + 2.0, 3.0 * x * x - 2.0 }; };
         count<rt::Newton>("x^3 - 2x + 2: Newton from 0", cycle, 0.0);
         count<rt::Newton>("x^3 - 2x + 2: Newton, [-2, -1]", cycle, { -2.0, -1.0 });
+
+        // Steffensen: Newton without a derivative, at the price of scale dependence. f(x) is added to x, so scaling f
+        // changes the cost and even the root found (1000 (x^2 - 2) from 1: x + f(x) = -999 brackets -sqrt 2).
+        auto const sq = [](double x) { return x * x - 2.0; };
+        auto const sq1000 = [](double x) { return 1000.0 * (x * x - 2.0); };
+        count<rt::Steffensen>("x^2 - 2: Steffensen from 1", sq, 1.0);
+        count<rt::Steffensen>("1000 (x^2 - 2): Steffensen", sq1000, 1.0);
+        count<rt::Secant>("1000 (x^2 - 2): Secant", sq1000, 1.0);
     }
 
     void numerical_derivatives()
@@ -248,7 +262,7 @@ namespace {
         report("Kepler: Halley, Central<2>", r, n);
         n = 0;
         r = rt::solve<rt::Newton>(f, dv::derivative_of<dv::Ridders>(f), 1.0);
-        report("Kepler: Newton, Ridders", r, n);
+        report("Kepler: Newton, deriv Ridders", r, n);
         n = 0;
         r = rt::solve<rt::Secant>(f, 1.0);
         report("Kepler: Secant", r, n);

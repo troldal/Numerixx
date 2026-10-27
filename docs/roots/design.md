@@ -128,7 +128,7 @@ the phases in `docs/plan.md`, and each phase's specification and evidence in `PH
 - **The cost is documented, not prevented:** with `Central<2>` a point costs 3 calls of fn for Newton, 6 for Halley
   (f'' evaluates fn(x) again; sharing it is deferred, P6). Newton then costs 1.5 to 2.3 times Secant from the same
   guess and 1.7 to 3.5 times Brent on the same bracket (6.1 on ln(x / 1e-12) over [1e-20, 1]); Halley 1.5 to 4.2 times
-  Secant; with `Ridders` 6 to 11 times Secant.
+  Secant; with `nxx::deriv::Ridders` 6 to 11 times Secant.
 - **The bound never depends on the derivative; the iterates can.** `Central<2>`'s error is absolute (h^2 f''' / 6,
   h^2 = 3.7e-11 near |x| <= 1, plus rounding). Where |f'| is far above it a run takes as many points as the analytic one (they differ in their last bits); where
   comparable, the outcome changes either way: (x - 1)^3 from 2 and x^2 - 2 from 1e-12 become `not_converged`,
@@ -171,6 +171,21 @@ the phases in `docs/plan.md`, and each phase's specification and evidence in `PH
   step |x0| where denorm_min() is 0. What no outward search
   finds, and the documentation says: an even root, two roots within one step, a root beyond a non-finite region on
   the same side, a root beyond the cap; a pole brackets like a root.
+
+## The teaching methods (Phase 6)
+
+- **`Ridders`** (Ridders 1979; formula as pracma documents it): per iteration `enclose` at the midpoint, then at the
+  exponential fit's zero computed from the state that step leaves, in the cancellation-free form x4 = e + w (m - e),
+  w = -g_e g_d / (root (root + |g_m|)) (user decision P1; the textbook form bisected through 1922 evaluations on
+  x - 1e-300). Its square root is `detail::sqrt` (P5): faithful, from + - * /, Newton in the correction form (the
+  textbook form is 3 ulps off in radix 10). Not `nxx::deriv::Ridders` (P4).
+- **`RegulaFalsi`** and **`Illinois`**: `false_position<M>`, AndersonBjorck's loop with the factor 1 or 1/2, guarded
+  (P2): unguarded, regula falsi ran past 200,000 evaluations on x^20 - 1.
+- **`Steffensen`**: z = x + f(x) (at least tol(x) from x), the secant step through x and z shared with Secant
+  (`secant_move`), Brent at the first sign change between x and z or the next iterate (P3). f's scale changes the cost
+  and the root found (1000 (x^2 - 2) from 1: -sqrt 2).
+- The cost (`PHASE6_API.md`): on 27 of the paper's cases Brent 309, AndersonBjorck 327, Illinois 382, Ridders 416,
+  RegulaFalsi 645; Ridders 86 on (x - 1)^3 against Brent's 156. Teaching examples; Brent stays the default.
 
 ## Evidence (Phase 1)
 
@@ -225,7 +240,7 @@ the analytic counts in brackets):
 | sqrt x - 0.5 | x0 = 1: 15 / 30 (4 / 5) | [0, 1]: 12 / 24 (4 / 4) |
 | ln(x / 1e-12) | x0 = 1e-13: `not_converged` 3 / 6 (8 / 6) | [1e-20, 1]: 276 / 552 (20 / 18) |
 
-`Ridders` (the library's, measured, not a reference): Newton from a guess / on a bracket 53 / 58 calls on x^2 - 2,
+`nxx::deriv::Ridders` (the library's, measured, not a reference): Newton from a guess / on a bracket 53 / 58 calls on x^2 - 2,
 69 / 78 on cos x - x, 91 / 95 on e^x - 2, 107 / 112 on Kepler.
 
 ## Evidence (Phase 4)
@@ -258,6 +273,13 @@ of each end) for fn of `+ - * /` and sqrt: x^2 - 2 from 1 (19) and 0 (24); x^3 -
 max / 2 (22); sqrt x - 1e-3 from 1 (60, through a domain edge); van der Waals from 1e-3 (20), from 1e-4 and 5e-5
 around its pole (20, 12) and, with NaN outside v > b, to the root (29, 33); `no_sign_change` after 425 for x^2 - 2
 from 100, x^2 + 1, (x - 1)^2 and x - 1 from 1e-300.
+
+## Evidence (Phase 6)
+
+`.scratch/roots6/proto6.py` (with `detail::sqrt` ported step for step) gives the counts of `PHASE6_API.md`'s tables,
+which the C++ reproduces exactly for fn of `+ - * /` and sqrt: Ridders / Illinois / RegulaFalsi on x^2 - 2 12 / 11 /
+20, (x - 1)^3 86 / 148 / 145, x^20 - 1 18 / 30 / 45, the jump at 0 778 / 51 / 1076, and problems #2, #4, #7, #8, #9,
+#11; Steffensen 10 (sqrt 2) from 1, 39 from 10, 11 (-sqrt 2) from 0.5, 27 (-sqrt 2) on 1000 (x^2 - 2) from 1.
 
 ## Tests
 
