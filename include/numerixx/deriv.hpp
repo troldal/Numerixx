@@ -1844,6 +1844,17 @@ namespace nxx::deriv {
             G fn;
 
             /**
+             * @brief Direct-initialises fn, so that an explicit copy or move constructor of G is used, as
+             * derivative_of's constraint (std::constructible_from) promises; an aggregate's member would be
+             * copy-initialised (independent review of Phase 3).
+             * @tparam H The argument's type.
+             * @param f The function.
+             */
+            template<typename H>
+            constexpr DerivativeOf(std::in_place_t, H &&f) : fn(std::forward<H>(f))
+            {}
+
+            /**
              * @brief derivative<M, N>(fn, x), with the default step.
              * @tparam Self The callable's own type, with its constness and value category.
              * @tparam T The real type, deduced from @p x.
@@ -1897,7 +1908,7 @@ namespace nxx::deriv {
     template<typename M = Central<2>, auto N = 1, typename F>
     requires detail::method<M> && detail::valid_order<N> && std::constructible_from<std::decay_t<F>, F>
     [[nodiscard]] constexpr auto derivative_of(F &&fn)
-    { return detail::DerivativeOf<M, static_cast<int>(N), std::decay_t<F>>{ std::forward<F>(fn) }; }
+    { return detail::DerivativeOf<M, static_cast<int>(N), std::decay_t<F>>{ std::in_place, std::forward<F>(fn) }; }
 
 } // namespace nxx::deriv
 

@@ -125,7 +125,7 @@ the phases in `docs/plan.md`, and each phase's specification and evidence in `PH
   guess and 1.7 to 3.5 times Brent on the same bracket (6.1 on ln(x / 1e-12) over [1e-20, 1]); Halley 1.5 to 4.2 times
   Secant; with `Ridders` 6 to 11 times Secant.
 - **The bound never depends on the derivative; the iterates can.** `Central<2>`'s error is absolute (h^2 f''' / 6,
-  h^2 = 3.7e-11 near |x| <= 1, plus rounding). Where |f'| is far above it the points are the analytic ones; where
+  h^2 = 3.7e-11 near |x| <= 1, plus rounding). Where |f'| is far above it a run takes as many points as the analytic one (they differ in their last bits); where
   comparable, the outcome changes either way: (x - 1)^3 from 2 and x^2 - 2 from 1e-12 become `not_converged`,
   x^3 - 1e-3 from 0 converges. A bracket always converges.
 - **The default step assumes fn varies on the scale max(|x|, 1):** ln(x / 1e-12) from 1e-13 has a failed f' at the

@@ -93,8 +93,9 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
   - [x] Tests: `derivative_of` against `derivative` bit for bit; the equivalences and the partial failure; the
     prototype's `Central<2>` counts exactly; the types; constant evaluation; the constraints; a demo section (five
     toolchains and WSL GCC and Clang, locally)
-  - [ ] CI passes on all five toolchains
-  - [ ] The independent review (Codex) and its adopted findings
+  - [x] CI passes on all five toolchains (2292381: run 40499775174)
+  - [x] The independent review (Codex, and Kimi K3.1 Pro through Cline) and its adopted findings: six, all
+    reproduced and fixed (`docs/roots/PHASE3_API.md`)
 - Phase 4: `Toms748`, `AndersonBjorck`.
 - Phase 5: searching, `expand(fn, x0)`.
 - Phase 6, at the user's choice: `Ridders`, `RegulaFalsi`, `Illinois`, `Steffensen`.

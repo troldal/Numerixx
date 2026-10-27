@@ -34,7 +34,7 @@ auto const s = rt::solve<rt::Secant>(f, 1.0);              // 7 calls: the cheap
   takes Newton's step where only f'' failed (P2). It is not an error of `solve`.
 - `roots.hpp` and `deriv.hpp` still do not include each other; the user composes them.
 - **The cost is documented, not prevented:** with a `Central<2>` derivative a point costs 3 calls of fn for Newton and
-  6 for Halley, and the iterates are those of the analytic derivative in most cases; Newton then costs 1.5 to 2.3
+  6 for Halley, and a run takes as many points as with the analytic derivative in most cases; Newton then costs 1.5 to 2.3
   times Secant from the same guess, and 1.7 to 3.5 times Brent on the same bracket; with `Ridders`, 6 to 11 times
   Secant. Where |f'| is as small as the derivative's own error (a multiple root, a stationary point) the outcome
   itself can change, either way (B).
@@ -140,7 +140,8 @@ An expected without a value counts as a derivative that is not finite, so Phase 
   leaves fn's domain, which a bracketing method need not step from: sqrt x - 0.5 on [0, 1] with `derivative_of`
   evaluates a failed derivative at the end 0, and converges (12 calls); under the alternative, `non_finite`, it would
   fail where Brent succeeds.
-- **A failure needs a value that is not finite.** A stencil that leaves the domain of a fn which stays finite there
+- **A failure needs a value that is not finite, or a stencil that cannot be formed** (a point near max, a step below
+  the resolution of x). A stencil that leaves the domain of a fn which stays finite there
   (van der Waals' RT / (v - b) for v < b; 1/x across its pole) gives a finite, wrong derivative, which Newton uses as
   any other; the bound is still the bracket's. Documented, with the advice to return NaN outside fn's domain.
 - **Stored internally as a derivative of 0**, the only sentinel every `nxx::real` has (`real` requires neither a NaN
@@ -163,8 +164,8 @@ found today into errors.
   terminates for any finite step (its acceptance test and forced bisections do not depend on the derivative's
   values), and the open loop is capped.
 - **The iterates can.** `Central<2>`'s error is absolute: f' + h^2 f''' / 6 + rounding of about eps |f| / h, with
-  h^2 = 3.7e-11 near |x| <= 1. Where |f'| is far above it, Newton keeps its rate and the points are the analytic
-  ones (21 of the 24 runs per method of the first proposal's rows). Where |f'| is comparable, the outcome changes, either way:
+  h^2 = 3.7e-11 near |x| <= 1. Where |f'| is far above it, Newton keeps its rate and takes as many points as
+  with the analytic f' (21 of the 24 runs per method of the first proposal's rows), not the same points. Where |f'| is comparable, the outcome changes, either way:
   - (x - 1)^3 from 2: the computed f' is 3 e^2 + h^2 (e = x - 1), so below e = h Newton's step shrinks to e^3 / h^2,
     the iterates never cross 1, and the cap ends it, `not_converged` (639 calls), where analytic Newton converges in
     89 evaluations. On [0, 3] the bracket finishes it in 549 calls (analytic 91, Brent 156).
@@ -217,7 +218,8 @@ the libm cases; the `+ - * /` cases need none).
 | ln(x / 1e-12) | x0 = 1e-13 / [1e-20, 1] | 8 / `not_converged` (3), 20 / 276 | 6 / `not_converged` (6), 18 / 552 | 11, 45 |
 
 - The first proposal's rows (all but x^2 - 2 from 1e-12, (x - 1)^3 and x^3 - 1e-3), 24 runs per method: the
-  numerical iterates are the analytic ones in 21 for each method. The others: one point more for Newton on
+  numerical runs take as many points as the analytic ones in 21 for each method (the points themselves differ in
+  their last bits: `Central<2>` gives 10.000000000091671 for the Wallis cubic's f'(2) = 10). The others: one point more for Newton on
   sqrt x - 0.5 from 1 and for Halley on 1/x - 1 from 0.5, and the two ln runs, where the stencil leaves fn's domain.
 - Ratios, from the table: Newton with `Central<2>` costs 1.5 to 2.3 times Secant and 1.7 to 3.5 times Brent (6.1 on
   ln over [1e-20, 1]); Halley 1.5 to 4.2 times Secant and 3.3 to 6.5 times Brent (12 on ln).
@@ -355,6 +357,36 @@ From the usage sketch (7 snippets, 7 misuses):
   bracket loop's.
 - `demo/roots_demo.cpp` section 11: Kepler by Newton and Halley with `Central<2>`, Newton with `Ridders`, and Secant
   (21, 30, 107 and 10 calls); ln(x / 1e-12) from 1e-13 and on [1e-20, 1].
+
+## Independent reviews (OpenAI Codex and Kimi K3.1 Pro, 2292381)
+
+After the implementation (2292381, CI run 40499775174), two read-only reviews: OpenAI Codex, and, at the user's
+request, Kimi K3.1 Pro through the Cline CLI (plan mode), with the same brief. Kimi's four findings were four of
+Codex's six. Every finding was reproduced before it was acted on (`.scratch/roots3/codex/`); the user approved all
+six fixes.
+
+1. **The constraint admitted a conversion the body could not perform** (both). `derivative_valued` tested
+   `convertible_to<U, T>`, a conversion from an rvalue U, while `derivative_value` converted `*r` on a const copy: a
+   value that converts only as an rvalue (`operator double() &&`) passed the constraint and failed to compile inside.
+   Fixed: the constraint tests `*r` on the result as returned, and the body converts exactly that.
+2. **An expected returned by reference was copied** (both), so a non-copyable error type, never read, failed to
+   compile. Fixed with 1: the result is kept as returned (`decltype(auto)`) and forwarded.
+3. **`derivative_of` admitted a fn with an explicit copy constructor and then failed to copy it** (Codex): its
+   constraint, `std::constructible_from`, admits direct-initialisation, while the aggregate's member was
+   copy-initialised. Fixed: `detail::DerivativeOf` has a constructor tagged `std::in_place` that direct-initialises
+   fn, as `std::bind_front`'s result does.
+4. **"A numerical derivative fails only where fn is not finite" was false** (both): it also fails where the stencil
+   cannot be formed (`derivative_of(f)(max)` for a constant f). Reworded in `roots.hpp` and in A.
+5. **"The points are the analytic ones" was false** (Codex): the runs take as many points, and the points differ in
+   their last bits (`Central<2>` gives 10.000000000091671 for the Wallis cubic's f'(2) = 10). Reworded in B, the
+   results and `docs/roots/design.md`.
+6. **A test tolerance had no error estimate** (both): the lifetime test's 1e-9 is now 1.5e-10, derived in its comment
+   (fn's two roundings per value near 12 over the node distance 2.4e-5).
+
+The regression tests (`test_roots_numerical.cpp` and `test_deriv_of.cpp`, "The independent review of Phase 3") fail to
+compile on 2292381. Both reviews also checked and found correct: the constness and the copy of fn, `Joined`'s and
+`DerivativeOf`'s lifetimes, a failed derivative as 0 in both steps, the expression templates, the qualified calls,
+the constant-evaluation tests and the non-vacuity of the partial-failure tests.
 
 ## Deferred
 

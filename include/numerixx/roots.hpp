@@ -325,16 +325,19 @@ namespace nxx::roots {
          * @brief A separate derivative callable: one returning a value (value_valued), or a std::expected whose value
          * converts to T, such as nxx::deriv::derivative_of's callable. The expected's error is never read.
          *
+         * The value is the expression derivative_value converts, `*r` on the result as returned (by value: an rvalue;
+         * by reference: with its reference and constness), so that a conversion the constraint admits is the one the
+         * body performs (independent review of Phase 3).
+         *
          * @tparam D The callable type.
          * @tparam T The real type.
          */
-        // is_expected comes first, so that value_type is formed only for an expected.
+        // is_expected comes first, so that *r is formed only for an expected.
         template<typename D, typename T>
         concept derivative_valued =
             value_valued<D, T>
             || (std::invocable<D &, T const &> && is_expected<std::remove_cvref_t<std::invoke_result_t<D &, T const &>>>
-                && std::convertible_to<typename std::remove_cvref_t<std::invoke_result_t<D &, T const &>>::value_type,
-                    T>);
+                && std::convertible_to<decltype(*std::declval<std::invoke_result_t<D &, T const &>>()), T>);
 
         /**
          * @brief fn gives at least K values at a point: its value alone (K = 1, value_valued), or a tuple-like of at
@@ -664,10 +667,11 @@ namespace nxx::roots {
             if constexpr (value_valued<D, T>) {
                 return static_cast<T>(std::invoke(dfn, x));
             } else {
-                // Called once, and the result kept while it is read.
-                std::remove_cvref_t<std::invoke_result_t<D &, T const &>> const r = std::invoke(dfn, x);
+                // Called once, and the result kept as returned: a copy would require a copyable expected, and a const
+                // copy would refuse a value that converts only as an rvalue (independent review of Phase 3).
+                decltype(auto) r = std::invoke(dfn, x);
                 if (!r) return T(0);
-                return static_cast<T>(*r);
+                return static_cast<T>(*std::forward<decltype(r)>(r));
             }
         }
 
@@ -1243,8 +1247,10 @@ namespace nxx::roots {
      * as the callable nxx::deriv::derivative_of(fn) or a lambda around nxx::deriv::derivative(fn, x, h) with a step of
      * one's own. A std::expected without a value counts as a derivative that is not finite: on a bracket the step is a
      * bisection step, from a guess the method ends with error::not_converged, and Halley takes Newton's step where only
-     * f'' failed. A numerical derivative fails only where fn returns a value that is not finite: return NaN outside
-     * fn's domain. Only its value is read: Ridders' error estimate does not steer the search.
+     * f'' failed. A numerical derivative fails where fn is not finite at a node or the stencil cannot be formed (a
+     * point near max, a step below the resolution of x); a fn that stays finite outside its domain gives a finite,
+     * wrong derivative instead, so return NaN there. Only the value is read: Ridders' error estimate does not steer the
+     * search.
      *
      * A numerical derivative is a convenience. With nxx::deriv's default `Central<2>` a point costs 3 calls of fn for
      * Newton and 6 for Halley, about twice Secant from a guess and two to three times Brent on a bracket for a

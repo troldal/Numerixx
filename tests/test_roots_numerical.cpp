@@ -130,6 +130,35 @@ static_assert(!solvable_with<rt::Newton, ExpectedValue, Value, double>); // fn r
 static_assert(!solvable<rt::Brent, ExpectedValue, B>);
 static_assert(!solvable_with<rt::Brent, Value, ExpectedValue, B>); // a derivative only for Newton and Halley
 
+// The independent review of Phase 3: the constraint admitted conversions the body could not perform.
+namespace {
+    // Converts to double only as an rvalue: the body converted a const copy.
+    struct RvalueOnly
+    {
+        constexpr operator double() && { return 2.0; }
+    };
+
+    // Not copyable: an expected of it returned by reference was copied.
+    struct NoCopy
+    {
+        constexpr NoCopy() = default;
+        NoCopy(NoCopy const &) = delete;
+        constexpr NoCopy(NoCopy &&) = default;
+    };
+
+    struct ByReference
+    {
+        std::expected<double, NoCopy> e;
+        constexpr std::expected<double, NoCopy> const &operator()(double const &) const { return e; }
+    };
+} // namespace
+// f' = 2 everywhere: Newton on x^2 - 2 from 1 with that derivative, against the same constant derivative as a value.
+static_assert(rt::solve<rt::Newton>(sq, [](double) -> std::expected<RvalueOnly, int> { return RvalueOnly{}; }, 1.0)
+              == rt::solve<rt::Newton>(sq, [](double) { return 2.0; }, 1.0));
+static_assert(rt::solve<rt::Newton>(sq, ByReference{ 2.0 }, 1.0) == rt::solve<rt::Newton>(sq, [](double) { return 2.0; }, 1.0));
+// A value that converts only as an rvalue, returned by const reference: rejected by the constraint, as *r is const.
+static_assert(!solvable_with<rt::Newton, Value, std::expected<RvalueOnly, int> const &(*)(double), double>);
+
 TEST_CASE("roots:numerical: derivative_of, calls of f against the prototype")
 {
     auto const check = [](auto const &fn, auto start, int newton, int halley) {

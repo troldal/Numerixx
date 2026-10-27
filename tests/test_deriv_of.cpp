@@ -93,6 +93,21 @@ static_assert(std::is_invocable_v<Mutable &, double const &>);
 static_assert(!std::is_invocable_v<Mutable const &, double const &>);
 static_assert(std::is_invocable_v<decltype(derivative_of(cube)) const &, double const &>);
 
+// The independent review of Phase 3: a fn whose copy constructor is explicit, which std::constructible_from admits,
+// is copied by direct-initialisation (an aggregate's member was copy-initialised, and failed to compile).
+namespace {
+    struct ExplicitCopy
+    {
+        constexpr ExplicitCopy() = default;
+        constexpr explicit ExplicitCopy(ExplicitCopy const &) = default;
+        constexpr double operator()(double x) const { return x * x; }
+    };
+} // namespace
+static_assert([] {
+    ExplicitCopy const f;
+    return derivative_of(f)(3.0) == derivative(f, 3.0);
+}());
+
 // The constraint: a method and an order derivative accepts; a T fn accepts (the table's integers: test_callables).
 template<typename M, auto N>
 constexpr bool makes = requires { derivative_of<M, N>(cube); };
@@ -136,7 +151,10 @@ TEST_CASE("deriv:of: the copy of fn")
     auto const d = outlived(); // the lambda's scope has ended
     auto const r = d(2.0);
     REQUIRE(r.has_value());
-    CHECK(r->value == doctest::Approx(12.0).epsilon(1e-9)); // 6x at 2; Central<2> on a quadratic: rounding only
+    // 6x at 2. Central<2> is exact on a quadratic, and the actual node distance absorbs the nodes' rounding, so only
+    // fn's rounding remains: (3 x) x near 12 rounds twice, at most 1.8e-15 per value, 3.6e-15 for the difference,
+    // over the distance 2h = 4 eps^(1/3) = 2.4e-5: 1.5e-10.
+    CHECK(std::abs(r->value - 12.0) <= 1.5e-10);
 
     // A mutable fn through a non-const callable: its copy's state changes, the original's does not.
     int n = 0;
