@@ -122,6 +122,53 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
   - [x] The independent review (Codex; Kimi K3.1 Pro incomplete): three findings, all reproduced and fixed
     (`docs/roots/PHASE6_API.md`)
 
+## Milestone 3: user documentation (Doxygen, Breathe, Sphinx)
+
+A manual for library users, beside the API reference: Doxygen reads the headers and stays the gate that every public
+entity is documented; Sphinx with Breathe and MyST (Markdown) renders a getting-started page, a user guide and an API
+reference per module. The deriv book stays the theory and is linked, not repeated. Each phase gets its plan approved
+before it is written, and the pages get the reviews of a phase. A box is ticked when the docs build with no warning
+locally and in CI, and the examples' tests pass on all five toolchains.
+
+- Phase 1: spike. Render `roots.hpp`, `deriv.hpp` and `math.hpp` through Doxygen XML, Breathe and Sphinx in a scratch
+  folder, and list what the C++ domain misrenders or rejects (concepts, `requires` clauses, constrained `auto`,
+  `std::expected` return types, deduction guides, overloads of `solve<M>`), with the workaround for each or the
+  fallback (Doxygen HTML for the reference, Sphinx for the guides).
+  - [x] Findings reported (Doxygen 1.18.0, Sphinx 9.2.0, Breathe 5.1.0, myst-parser 5.1.0, Furo 2025.12.19): Breathe
+    parses `<requiresclause>` but drops it (breathe#482, open since 2020), although Sphinx accepts it since 5.2;
+    `doxygenconcept` shows no definition; `doxygennamespace` omits concepts; one overload is selected only by its full
+    parameter list. A patch in `conf.py` fixes the first two, and with it `sphinx-build -W` reports nothing. MkDocs
+    was rejected: MkDoxy 1.2.8 reads neither clauses nor concepts, and MkDocs is unmaintained
+  - [x] Toolchain chosen by the user (2026-10-27): Sphinx, Breathe and MyST for the guides and the full reference
+- Phase 2: skeleton. `docs/sphinx/` (`conf.py`, pinned `requirements.txt`, MyST pages), `GENERATE_XML` in the Doxyfile,
+  a `numerixx_sphinx` target after the Doxygen run, `-W --keep-going` and `nitpicky`.
+  - [ ] The Breathe patch in `conf.py`, with Breathe pinned: the `requires` clause appended to the template prefix
+    (`SphinxRenderer.create_template_prefix`), and a concept's `<initializer>` shown as a code block (the
+    `Node_compounddefType` entry of `SphinxRenderer.node_handlers`)
+  - [ ] Doxygen: `EXCLUDE_SYMBOLS = *::detail *::detail::*` (deriv's `detail` leaks into the public docs now) and
+    `GENERATE_DEPRECATEDLIST = NO`; Sphinx: `breathe_show_include = False`, `detail` and `std` names in clauses
+    ignored by `nitpick_ignore_regex`
+  - [ ] One reference page per namespace (`doxygennamespace`, a `doxygenconcept` per concept), no suppressed warning
+  - [ ] Checks that fail the build: every public symbol in Doxygen's `index.xml`, outside `detail`, appears in a
+    directive on some page; the rendered pages hold as many `requires` clauses as the XML, so that a Breathe upgrade
+    cannot drop them silently
+  - [ ] Examples as tests: pages show code only through `literalinclude` from `.cpp` files built into `numerixx_tests`
+    (`docs:*`); tables of counts and accuracy written by a program at build time, not typed
+  - [ ] The header `@code` blocks covered by tests that assert their claims (counts, accuracy)
+  - [ ] A CI job (pinned Doxygen 1.10 or later, Sphinx `-W`, `linkcheck`)
+- Phase 3: `nxx::roots`: getting started, the user guide (the result types, choosing a method, tolerances, errors,
+  user-defined types, derivatives), the API reference.
+  - [ ] Pages, examples and tests; docs build clean
+  - [ ] Reviews: the API statements against the code, numerics, a docs-only reader who writes client code that must
+    compile; then the independent review (Codex)
+- Phase 4: `nxx::deriv` and `nxx::math`, as Phase 3, from `docs/deriv/DERIV_TUTORIAL.md` and linking the book.
+  - [ ] Pages, examples and tests; docs build clean
+  - [ ] Reviews as in Phase 3
+
+Open decisions: hosting (GitHub Pages from CI, or Read the Docs) and versioning (one site per release, or `dev` only);
+whether the headers' `@code` blocks move to `@snippet` from tests (a change to `include/`); whether to offer the
+`requires` patch to Breathe upstream.
+
 ## Deferred
 
 ### Derivatives (`nxx::deriv`)
