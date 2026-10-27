@@ -136,8 +136,9 @@ namespace nxx::roots {
      * out to about 2 eps relative. They are also the minimum: smaller tolerances are raised to them, and larger ones
      * are capped at max / 4 and 1. Their cost falls on a sign change near 0 that fn does not evaluate to exactly 0: a
      * root that fn misses at 0, a tiny root or a jump at 0 is approached down to T's smallest numbers, about
-     * log2(width / denorm_min) halvings (about 1100 in double, but about 2e9 in a Boost.Multiprecision type, whose
-     * exponent range is much wider). Set abs_tol to the distance from 0 that is close enough there.
+     * log2(width / denorm_min) halvings: about 1100 in double, but far more in a Boost.Multiprecision type, whose
+     * exponent range is much wider (about 2e9 in cpp_bin_float_50, 2e8 in cpp_dec_float_50). Set abs_tol to the
+     * distance from 0 that is close enough there.
      *
      * @code
      * auto const r = nxx::roots::solve<nxx::roots::Brent>(fn, nxx::roots::Bracket{0.0, 1.0}, {.abs_tol = 1e-12});
@@ -211,10 +212,10 @@ namespace nxx::roots {
      * bracket. Not nxx::deriv::Ridders, the derivative method of the same author.
      *
      * Each iteration halves the bracket at a cost of 2 evaluations (so at most twice Bisection's count) and converges
-     * quadratically per iteration on a simple root. A teaching example; the cheapest method here on roots of odd
-     * multiplicity and on flat fn ((x - 1)^3: 86 evaluations against Brent's 156), dearer than Brent otherwise (416
-     * against 309 on 27 of Alefeld, Potra and Shi's test cases). The fit's zero is formed without the cancellation of
-     * the textbook formula, which loses roots near an end of the bracket.
+     * quadratically per iteration on a simple root. A teaching example; of the interpolating methods the cheapest on
+     * roots of odd multiplicity ((x - 1)^3: 86 evaluations against Brent's 156, though Bisection takes 54), dearer than
+     * Brent otherwise (416 against 309 on 27 of Alefeld, Potra and Shi's test cases). The fit's zero is formed without
+     * the cancellation of the textbook formula, which loses roots near an end of the bracket.
      */
     struct Ridders
     {
@@ -1907,16 +1908,18 @@ namespace nxx::roots {
      * fn, which then returns a std::pair, std::tuple or std::array of exactly T (the value, f', f''); the other methods
      * accept such a fn too and use its first element.
      *
-     * A pole inside the bracket changes sign like a root, and is returned as one: where fn may have poles, check
-     * |fn(value)| (a later version may report a pole as an error); a point that lands exactly on a pole, where fn is
-     * infinite, is error::non_finite. fn's exceptions pass through unchanged.
+     * A pole inside the bracket changes sign like a root, and is returned as one (a later version may report a pole as
+     * an error). |fn(value)| alone does not tell them apart: a well-conditioned root can have a large |fn| nearby, a
+     * pole a small one. Where fn may have poles, compare |fn(value)| with |fn| a little to each side, at value +-
+     * 1024 abs_error: it grows away from a root and falls away from a pole. A point that lands exactly on a pole, where
+     * fn is infinite, is error::non_finite. fn's exceptions pass through unchanged.
      *
      * Choosing a method: Brent by default. Toms748 costs about the same, with a worst case of about 4 evaluations per
      * halving of the bracket where Brent's grows with the square of the halvings. AndersonBjorck where fn is strongly
-     * curved near one end of the bracket (a logarithm, 1/x) or the sign change is at 0. Bisection where fn is rough
-     * and its count must be predictable. Ridders where the root has odd multiplicity or fn is flat ((x - 1)^3: 86
-     * evaluations against Brent's 156). RegulaFalsi, Illinois and Steffensen are teaching examples. For a value-only
-     * fn, not a derivative method with a numerical derivative.
+     * curved near one end of the bracket (a logarithm, 1/x) or the sign change is at 0. Bisection where fn is rough,
+     * its count must be predictable, or the root has odd multiplicity ((x - 1)^3: 54 evaluations, against Ridders' 86
+     * and Brent's 156). Ridders, RegulaFalsi and Illinois are teaching examples. For a value-only fn, not a derivative
+     * method with a numerical derivative.
      * Each returns a point and a bound on its distance to the sign change, not the final bracket.
      *
      * @code
@@ -2264,9 +2267,10 @@ namespace nxx::roots {
      * return NaN there, so that the search does not cross the edge: a pole at the edge, as van der Waals' at its
      * co-volume, would otherwise be bracketed.
      *
-     * What it cannot find: a root of even multiplicity, two roots within one step (x^2 - 2 from 100), a root beyond a
-     * region where fn is not finite on the same side, and a sign change beyond the cap. A pole brackets like a root (tan
-     * x from 1.4), and solve() then returns the pole: check |fn(value)|. The bracket need not hold the root nearest x0,
+     * What it cannot find: a root of even multiplicity (unless fn is exactly 0 at a point it tries), two roots within
+     * one step (x^2 - 2 from 100), a root beyond a region where fn is not finite on the same side, and a sign change
+     * beyond the cap. A pole brackets like a root (tan x from 1.4), and solve() then returns the pole; solve()'s
+     * comment says how to tell a pole from a root. The bracket need not hold the root nearest x0,
      * and where several roots lie in it, solve() returns one of them.
      *
      * @code

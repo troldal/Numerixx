@@ -183,7 +183,8 @@ independent review (Codex); every finding was reproduced or checked before it wa
   (2e-18), the pole's c 0, the tolerances header. Fixed; all within their bounds on every toolchain.
 - Inline code in prose (`search(fn, 0.0)`, a type name): allowed; the rule is that code blocks come only from programs.
 
-Proposed to the user (changes to `include/`), from the same findings:
+Approved by the user and made (changes to `include/`), from the same findings; the same two errors in `search`'s
+comment (an even root "cannot" be found; check |fn(value)|) were fixed with them:
 - `roots.hpp`, `Ridders`: "the cheapest method here on roots of odd multiplicity" is false (Bisection and Halley 54
   on (x - 1)^3, Ridders 86); and `solve`'s "Choosing a method" recommends Ridders there and lists Steffensen among the
   bracket overload's teaching examples.
