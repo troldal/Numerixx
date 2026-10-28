@@ -2,26 +2,22 @@
 
 ## How to read this document
 
+This is a walkthrough of the implementation: what each part of the code does, how the parts fit together, and why
+they are written the way they are. The mathematics behind the methods (finite differences, truncation and rounding,
+the choice of step, Richardson extrapolation) is in the book, and this document takes it as known.
+
 The header is 1951 lines (as of d89b50a). About two thirds of it is doc comments, and most of those record *why*
 something is the way it is: a bug that was found, a measurement from a prototype, a compiler that rejected the
-obvious form. This document explains the code in prose, in the order you need to understand it rather than the
-order of the file.
+obvious form. This document explains the code in the order you need to understand it rather than the order of the
+file.
 
-It has two parts.
-
-- **Part I, background (sections A to F),** explains the few ideas that nearly every line of the header depends on:
-    - what a finite difference is;
-    - why there are always two errors that pull in opposite directions;
-    - what "constant evaluation" demands of the code;
-    - what an expression template is.
-
-  If you know all of these, skip to Part II, but the last two explain most of the code's odd-looking habits.
-- **Part II, the code (sections 0 to 14),** goes through every declaration. Each section shows the exact code of every
-  function it explains, copied from the header with the doc comments removed (this text explains them; the `//`
-  comments in the code are kept), so you don't need the header open. The line numbers still name where it is. Inside
-  the explanations, some fragments are repeated in a shortened form; they are marked as such. Short notes marked **C++
-  note** explain a language feature where the code uses one that isn't everyday C++; **Numerics note** does
-  the same for a numerical idea.
+Two short sections come first, A and B, on two constraints that shape almost every line: the code must work in
+constant expressions, and with user-defined real types. Then sections 0 to 14 go through every declaration. Each
+section shows the exact code of every function it explains, copied from the header with the doc comments removed (this
+text explains them; the `//` comments in the code are kept), so you don't need the header open. The line
+numbers still name where it is. Inside the explanations, some fragments are repeated in a shortened form; they are
+marked as such. Short notes marked **C++ note** explain a language feature where the code uses one that isn't
+everyday C++.
 
 The numbers in the examples come from running the library (GCC 16, double). The tables that show the inside of
 Ridders' method, which the library doesn't expose, come from the Python prototype `.scratch/onesided/ridders5.py`,
@@ -29,129 +25,9 @@ which gives the same results bit for bit. I checked every example result against
 
 ---
 
-# Part I: Background
+# Before the code
 
-## A. What the header does
-
-You have a function `fn` that you can only *evaluate*: you give it an `x`, it returns `fn(x)`. You don't have a
-formula for its derivative. Perhaps it is a correlation fitted to data, a function that runs an iterative solver, or
-just code too long to differentiate by hand. You want `f'(x)`, or `f''(x)`, up to `f''''(x)`.
-
-The only information available is values of `fn` at points you choose. So every method in this header has the same
-shape:
-
-1. pick some points near `x`;
-2. evaluate `fn` there;
-3. combine the values with fixed weights;
-4. divide by a power of the step.
-
-What differs is which points, which weights, and whether the step is fixed or adapted.
-
-The public entry point is one function template:
-
-```cpp
-auto r = nxx::deriv::derivative<Method, N>(fn, x);      // the default step
-auto r = nxx::deriv::derivative<Method, N>(fn, x, h);   // your step
-```
-
-It returns `std::expected<Estimate<T>, error>`: either an estimate of the derivative (and for Ridders also an
-estimate of its error), or an error code. It never throws.
-
-## B. Finite differences from Taylor's theorem
-
-Taylor's theorem says that near `x`
-
-```
-f(x + h) = f(x) + h f'(x) + h^2/2 f''(x) + h^3/6 f'''(x) + h^4/24 f''''(x) + ...
-f(x - h) = f(x) - h f'(x) + h^2/2 f''(x) - h^3/6 f'''(x) + h^4/24 f''''(x) - ...
-```
-
-Subtract the second line from the first. The even terms cancel, and
-
-```
-(f(x + h) - f(x - h)) / (2h) = f'(x) + h^2/6 f'''(x) + h^4/120 f^(5)(x) + ...
-```
-
-The left side is the **central difference**. It equals the derivative plus an error that starts with `h^2`; that
-error is the **truncation error**, and because it starts with `h^2` the rule has **accuracy order 2**. This rule is
-`Central<2>` in the library: the `2` is the accuracy order, not the number of points.
-
-Add the two lines instead, and the odd terms cancel:
-
-```
-(f(x + h) - 2 f(x) + f(x - h)) / h^2 = f''(x) + h^2/12 f''''(x) + ...
-```
-
-That is `Central<2>` for the second derivative.
-
-Using only points on one side gives a **one-sided** rule. `(f(x + h) - f(x)) / h = f'(x) + h/2 f''(x) + ...` has an
-error that starts with `h^1`, so it has order 1. This is `Forward<1>`. It is less accurate, but it never evaluates
-`fn` below `x`, which matters when `fn` doesn't exist there (`sqrt` at 0, or the lower end of a correlation's range).
-
-More points allow more terms to cancel, which raises the order. Section 4 shows how the library finds the weights
-for any set of points.
-
-## C. The second error: rounding
-
-The truncation error says "make h small". If arithmetic were exact, you'd take h tiny and be done. It isn't.
-
-A `double` holds about 16 significant digits. The gap between 1 and the next double is **machine epsilon**,
-`eps = 2^-52 = 2.2e-16`. So `fn(x)` carries an error of about `eps |fn(x)|` even if `fn` is computed perfectly. A
-difference of two values that are nearly equal keeps those absolute errors while the difference itself gets small:
-this is cancellation. Dividing by `2h` then magnifies them. The **rounding error** of the central difference is
-therefore about `eps |f| / h`, and it *grows* as `h` shrinks.
-
-Here is `Central<2>` for f' of `exp` at `x = 1` (exact value e), at different steps:
-
-| h                              | error        |
-|--------------------------------|--------------|
-| 1e-1                           | +4.5e-3      |
-| 1e-2                           | +4.5e-5      |
-| 1e-3                           | +4.5e-7      |
-| 1e-4                           | +4.5e-9      |
-| 1e-5                           | +5.6e-11     |
-| **6.06e-6 (the default step)** | **-2.1e-12** |
-| 1e-6                           | -9.1e-11     |
-| 1e-8                           | -5.2e-9      |
-| 1e-10                          | -9.0e-7      |
-| 1e-12                          | +1.2e-4      |
-
-Down to about 1e-5 the error falls by 100 for every factor of 10 in h: that is the `h^2` truncation error, exactly
-`h^2/6 * e`. Below that, rounding takes over and the error grows again, by about 10 for every factor of 10. The best
-step balances the two errors.
-
-Setting `h^2/6 |f'''|` equal to `eps |f| / h` gives `h ~ eps^(1/3)`, about 6e-6, and an error of order
-`eps^(2/3)`, about 4e-11. The default step at 6.06e-6 got lucky and did better, 2e-12, but the order of magnitude is
-the point: **with a fixed step, a rule of order P for the N-th derivative can reach about `eps^(P/(P+N))` and no
-better.** Higher derivatives lose more digits, since their rounding error grows like `1/h^N`.
-
-Almost every design decision in the header follows from this trade-off:
-
-- **The default step formula** comes from it (section 5).
-- **The Ridders method** adapts the step and gives an error estimate (section 9).
-- **The "rounding floor"** that appears everywhere is the estimate of the rounding part of the error.
-- **The float warning** exists because in float, with `eps = 1.2e-7`, a second derivative keeps only about 3 to 4
-  correct digits (section 3).
-
-## D. Two families of methods
-
-**Fixed stencils: `Central<P>`, `Forward<P>`, `Backward<P>`.**
-
-- *What they do.* Evaluate a formula once at one step `h`: either yours, or a default that is right when `fn`
-  varies on a scale of about `max(|x|, 1)`.
-- *Cost and output.* They are cheap, 2 to 13 evaluations of `fn`, and return no error estimate.
-- *Their limit.* If `fn` varies much faster than the default assumes, the default step is wrong and you can't tell.
-
-**Ridders' extrapolation: `Ridders`, `ForwardRidders`, `BackwardRidders`.**
-
-- *What they do.* Evaluate a simple rule at a sequence of steps `h, h/2, h/4, ...` and combine the results to cancel
-  the truncation error term by term (Richardson extrapolation). They stop when rounding starts to win.
-- *Cost and output.* They cost more, typically 10 to 45 evaluations, but don't need a well-chosen step and they
-  return an estimate of their own error.
-- *The forms.* `Ridders` uses central rules. `ForwardRidders` and `BackwardRidders` use one-sided rules, for a `fn`
-  that exists on one side of `x` only.
-
-## E. Constant evaluation, and why the code checks before it computes
+## A. Constant evaluation, and why the code checks before it computes
 
 Every function in the header is `constexpr`, and some are `consteval`. That means a derivative can be computed while
 the program is compiled, as in
@@ -169,11 +45,11 @@ afterwards; it makes the expression non-constant, which is a **compile error**. 
 and you can test it; in a `static_assert` it fails the build.
 
 The library promises that every failure is an *error value* (`error::non_finite`), at run time and at compile time
-alike. Hence the habit you will see everywhere in Part II: **check whether an operation would overflow, and only then
+alike. Hence the habit you will see everywhere below: **check whether an operation would overflow, and only then
 do it**. Section 6 contains the helpers that answer "would `a + b` overflow?" without computing `a + b`. Without
 constant evaluation, half of that code would be unnecessary.
 
-## F. User-defined real types and expression templates
+## B. User-defined real types and expression templates
 
 The algorithms accept any type `T` that satisfies the concept `nxx::real` (`math.hpp:38`): `float`, `double`,
 `long double`, or a user type such as Boost.Multiprecision's `cpp_bin_float_50` (50 decimal digits). This shapes the
@@ -227,7 +103,7 @@ Qualifying the name prevents that.
 
 ---
 
-# Part II: The code
+# The code
 
 ## 0. The map
 
@@ -438,7 +314,7 @@ hard error. The test `tests/test_stencils.cpp:109-112` relies on exactly this. T
 defence for someone who creates an invalid tag object directly.
 
 **The doc comments are the user-facing specification.** The comments on these tags (accuracy, cost, default step,
-limits, examples) are what users read in the documentation. Part II explains the code that makes those statements
+limits, examples) are what users read in the documentation. This document explains the code that makes those statements
 true.
 
 ---
@@ -586,7 +462,7 @@ almost certainly a bug.
 return detail::derivative_with_step<M, static_cast<int>(N)>(fn, x, h);
 ```
 
-It is qualified (`detail::...`) because of ADL (section F).
+It is qualified (`detail::...`) because of ADL (section B).
 
 ### `derivative_default` (1695-1703): the overload without a step
 
@@ -605,7 +481,7 @@ constexpr std::expected<Estimate<T>, error> derivative_default(F &fn, T const &x
 This function computes the default step and passes it on. Two details matter.
 
 - **It checks `x` first.** The default step is computed from `|x|`, and for a NaN `x` it would be a NaN. Clang
-  refuses NaN-producing arithmetic in constant evaluation (section E), so without this check
+  refuses NaN-producing arithmetic in constant evaluation (section A), so without this check
   `derivative(fn, NaN)` in a `static_assert` would be a compile error rather than an error value.
 - **It calls the public `default_step`.** It doesn't compute the step privately. So `derivative(fn, x)` and
   `derivative(fn, x, default_step(x))` are the same computation by construction, a promise the documentation makes.
@@ -697,8 +573,8 @@ constexpr bool valid_central(int p) { return p >= 2 && p <= 10 && p % 2 == 0; }
 constexpr bool valid_one_sided(int p) { return p >= 1 && p <= 6; }
 ```
 
-**Why central orders are even.** Central rules use symmetric points, and their error expansion has only even powers
-of `h` (section B). So their order is always even.
+**Why central orders are even.** A central rule's error has even powers of `h` only, so its order is always
+even.
 
 **Why the caps.** They are design decisions backed by numbers, as the comments explain. A higher order needs more
 points and larger weights. The rounding error grows with the sum of the absolute weights, and beyond these caps the
@@ -990,26 +866,15 @@ consteval Table<Size> lagrange_table(std::array<int, Size> const &nodes, int n, 
 }
 ```
 
-**Numerics note: the idea.** Through `Size` points there is exactly one polynomial of degree `Size - 1` that passes
-through `fn`'s values at those points: the interpolating polynomial. Its n-th derivative at 0 is a combination of
-the values, `sum_k w_k fn(x + n_k h)`, and the `w_k` are the weights we want. They don't depend on `fn`, only on the
-points.
-
-Lagrange's formula writes the interpolating polynomial as `sum_k fn_k L_k(t)`, where `L_k` is 1 at node `k` and 0 at
-the others:
-
-```
-L_k(t) = prod_{j != k} (t - n_j) / (n_k - n_j)
-```
-
-The n-th derivative of `L_k` at 0 is `n!` times the coefficient of `t^n` in it. So
+**What it computes.** The weight of node k is the n-th derivative at 0 of the Lagrange polynomial of that node (the book
+derives it):
 
 ```
 w_k = n! * (coefficient of t^n in prod_{j != k} (t - n_j))  /  prod_{j != k} (n_k - n_j)
 ```
 
-The same weights also solve the "moment conditions" that come out of Taylor's theorem (section 8), and they agree
-with the textbook formulas (Chapra, Burden).
+The code computes this exactly, in integers: the numerator polynomial, the denominator product, then the reduced
+fraction.
 
 **The code, for each node `k`:**
 
@@ -1107,11 +972,8 @@ derivative gives it weight 0 anyway); for even N it is included. The code walks 
 | `Central<2>`, f'''' | 5     | -2 ... 2     | 1, -4, 6, -4, 1 / 1      |
 | `Central<4>`, f'    | 4     | -2, -1, 1, 2 | 1, -8, 8, -1 / 12        |
 
-Why `P + N - 1` points? A rule for the N-th derivative of order P must cancel all Taylor terms below `h^(N+P)` except
-the N-th. That takes `P + N` conditions, which normally means `P + N` points. Central rules get one condition free
-from symmetry, so `P + N - 1` points suffice.
-
-**`Forward<P>` (535-541)** uses the nodes `0, 1, ..., P + N - 1`: `P + N` points, with no symmetry bonus, and one of
+**`Forward<P>` (535-541)** uses the nodes `0, 1, ..., P + N - 1`: `P + N` points, one more than a central rule (symmetry
+saves a central rule one point), and one of
 them is `x` itself. `Forward<1>` gives the classic forward differences: {-1, 1}, {1, -2, 1}, {-1, 3, -3, 1},
 {1, -4, 6, -4, 1}, each over 1.
 
@@ -1151,33 +1013,18 @@ requires detail::method<M> && detail::valid_order<N>
 }
 ```
 
-Section C showed that the best step balances truncation against rounding. These functions compute the default step
-from that idea.
+These functions compute the default steps; the book explains how they were chosen.
 
-**`scale(x)` (569-571) = max (|x|, 1).** The default step is proportional to it, which makes the step relative to
+**`scale(x)` (569-571) returns max (|x|, 1).** The default step is proportional to it, which makes the step relative to
 `x` for large `|x|` (at `x = 1e6` a step of 6e-6 would be below the spacing of the doubles near `x`) and absolute
 near 0 (at `x = 1e-20` a relative step would be absurdly small). It encodes the assumption that `fn` varies on a
 scale of about `max(|x|, 1)`. When that is false, the user should pass a step.
 
-**`stencil_step<P+N>(x)` (593-595) = eps^ (1/ (P+N)) * scale (x).** This is the balance from section C, generalised:
-
-- truncation is about `C h^P |f^(P+N)|`;
-- rounding is about `S eps |f| / h^N`, where S is the sum of the absolute weights.
-
-The sum is smallest at `h ~ eps^(1/(P+N))` times constants that depend on `f`'s unknown derivatives. The library
-drops those constants. The long comment at 579-586 measures what that costs: at most a factor of about 1.6 in error
-for f', more by the model for higher N, but test functions that vary faster than `max(|x|, 1)` preferred the smaller
-step, so the convention was kept. In double, at `x = 1`:
-
-| Method, order     | default step                | its error for exp at 1 |
-|-------------------|-----------------------------|------------------------|
-| `Central<2>`, f'  | eps^(1/3) = 6.06e-6         | -2.1e-12               |
-| `Central<4>`, f'  | eps^(1/5) = 7.4e-4          | +1.1e-13               |
-| `Central<2>`, f'' | eps^(1/4) = 2^-13 = 1.22e-4 | +6.9e-9                |
-| `Forward<1>`, f'  | eps^(1/2) = 1.49e-8         | +3.7e-8                |
-
-You can see the pattern `eps^(P/(P+N))`: higher order helps, a higher derivative hurts, and one-sided first order is
-the weakest.
+**`stencil_step<P+N>(x)` (593-595) returns eps^ (1/ (P+N)) times `scale(x)`,** the step that balances truncation
+against rounding when `fn` varies on that scale, without the constant factors; the comment at 579-586 records what
+dropping them costs. The exponent `P + N` is a template parameter, because `root_epsilon` takes it as one. In double
+at `x = 1` this gives 6.06e-6 for `Central<2>` f' (eps^ (1/3)), 2^-13 for its f'' (eps^ (1/4)), 7.4e-4 for
+`Central<4>` f' (eps^ (1/5)) and 1.49e-8 for `Forward<1>` f' (eps^ (1/2)).
 
 **`math::root_epsilon<N, T>()` (`math.hpp:111-153`) computes `eps^(1/N)`.** It can't call `std::pow`, which isn't
 `constexpr` and doesn't exist for every `real` type, so it uses + - * / only, in two steps.
@@ -1545,11 +1392,11 @@ are deliberate.
   The computer can't represent most values of `x + h`; it stores the nearest double. So the point `fn` actually
   receives is slightly off, and the true spacing of the two points differs from `2h`. The comment gives the size: at
   `x = 1`, `h = 1e-5`, the spacing can differ from `2h` by about 1e-11 relative, which is as large as the error the
-  rule is aiming for (section C). Dividing by the true spacing makes this error disappear for a two-point rule: the
+  rule is aiming for. Dividing by the true spacing makes this error disappear for a two-point rule: the
   rule is then the exact slope of the line through the two points actually evaluated.
 - **The values are stored as `T const f_lo = static_cast<T>(std::invoke(fn, x_lo));`.**
     - `std::invoke` calls `fn` whether it is a function, a lambda or a member function pointer.
-    - `static_cast<T>` converts the result, which may be an expression template (section F), into a real `T` at once.
+  - `static_cast<T>` converts the result, which may be an expression template (section B), into a real `T` at once.
     - The comment at 922-923 makes the `auto` point: an unevaluated expression holding references can dangle.
 
 If the two points round to the same number (`dx == 0`), the step is below the resolution of `x`, and the function
@@ -1642,10 +1489,9 @@ With `h_lo = h_hi = h` it becomes the textbook `(f_hi - 2 f_mid + f_lo) / h^2`.
 the real offsets `h_lo` and `h_hi` usually differ slightly from `h` and from each other. Using the real offsets makes
 the formula exact for quadratics, whatever the rounding of the points.
 
-**Numerics note: Sterbenz's lemma.** This only works if the offsets themselves are computed exactly. Sterbenz's
-lemma says that if two floating-point numbers are within a factor of 2 of each other, their difference is exact, with
-no rounding at all. For `x_hi = fl(x + h)` with `0 < h <= |x|`, `x_hi` and `x` are within a factor of 2, so
-`h_hi = x_hi - x` is exact. The comment states the same conditions.
+**Why the offsets are exact.** By Sterbenz's lemma, the difference of two floating-point numbers within a factor of 2
+of each other is exact. For `x_hi = fl(x + h)` with `0 < h <= |x|`, `x_hi` and `x` are that close, so
+`h_hi = x_hi - x` has no rounding. The comment states the same conditions.
 
 **The checks before every step.** Two first differences that each overflow with the same sign would give
 `inf - inf`. So the function checks:
@@ -1844,17 +1690,8 @@ constexpr std::expected<T, error> stencil_derivative(F &fn, T const &x, T const 
 
 This is the engine for `Central<P>`, `Forward<P>` and `Backward<P>`. It applies one rule at one step.
 
-**Numerics note: why the weighted sum gives the derivative.** The comment at 1148-1151 states it in one line; here
-it is in more words. Expand each `f(x + n_k h)` by Taylor's theorem and collect terms by powers of `h`:
-
-```
-sum_k w_k f(x + n_k h) = sum_j (sum_k w_k n_k^j) h^j f^(j)(x) / j!  =  sum_j M_j h^j f^(j)(x) / j!
-```
-
-The numbers `M_j = sum_k w_k n_k^j` are the "moments" of the weights. The weights from section 4 make
-`M_N = N! * denominator` and make every other `M_j` zero up to `j = N + P - 1`. So the sum is
-`denominator * h^N * f^(N)(x)` plus terms in `h^(N+P)` and higher. Dividing by `denominator * h^N` leaves `f^(N)(x)`
-plus an error of order `h^P`.
+The comment at 1148-1151 summarises why the weighted sum, divided by `denominator * h^N`, is the derivative (the
+moment conditions; see the book).
 
 The code begins:
 
@@ -1909,62 +1746,31 @@ values. The rounding of the points adds about `S / 2 * eps * |x f'| / h^N`, the 
 
 ## 9. Ridders' extrapolation (lines 1221-1575)
 
-This is the most complex part of the file. The idea comes first, then the pieces, then the main function from top
-to bottom, then three worked examples.
+This is the most complex part of the file. A short summary of the tableau the code builds comes first, then the
+pieces, then the main function from top to bottom, then three worked examples.
 
-### The idea
+### What the code implements
 
-**Numerics note: Richardson extrapolation.** Let `D(h)` be the central difference for f'. From section B,
-
-```
-D(h)   = f' + c h^2      + d h^4      + ...
-D(h/2) = f' + c h^2 / 4  + d h^4 / 16 + ...
-```
-
-The constants `c` and `d` are unknown (they involve `f'''` and `f^(5)`), but they are the *same* in both lines.
-Multiply the second line by 4 and subtract the first: the `c` terms cancel.
-
-```
-(4 D(h/2) - D(h)) / 3  =  f' + O(h^4)
-```
-
-From two cheap second-order estimates we get a fourth-order one. Rewritten in the "difference form" the code uses,
-`(4 D(h/2) - D(h)) / 3` is
-
-```
-D(h/2) + (D(h/2) - D(h)) / (4 - 1)
-```
-
-the newer estimate plus a correction. The same trick applied to two fourth-order estimates, with the factor 16,
-removes the `h^4` term, and so on. Arranged as a triangle, this is **Richardson's tableau**:
+The engine builds Richardson's tableau. Row `i` is a **level**: the base rule `D` at the step `h_start / 2^i`, and
+the entries extrapolated from it:
 
 ```
 A[0][0]
 A[1][0]  A[1][1]
 A[2][0]  A[2][1]  A[2][2]
 A[3][0]  A[3][1]  A[3][2]  A[3][3]
+
+A[i][0] = D(h_start / 2^i)
+A[i][j] = A[i][j-1] + (A[i][j-1] - A[i-1][j-1]) / (r - 1),     r = 4^j (central) or 2^j (one-sided)
 ```
 
-- **Column 0 holds the base rule:** `A[i][0] = D(h_start / 2^i)`, one new **level** per halving of the step.
-- **Every other entry** combines its left neighbour and the entry diagonally up-left:
+Each entry needs only its left neighbour, in the same row, and the entry diagonally up-left, its **diagonal parent**,
+in the previous row. That is why the code keeps just two rows. The last entry of a row, `A[i][i]`, is its **diagonal
+entry**, the most extrapolated one. The factor is `4^j` for the central base, whose error has even powers
+of `h` only, and `2^j` for the forward base, whose error has every power.
 
-```
-A[i][j] = A[i][j-1] + (A[i][j-1] - A[i-1][j-1]) / (r - 1),     r = 4^j
-```
-
-Column j has had `j` error terms removed. If truncation were the only error, the bottom-right entries would be
-extremely accurate.
-
-**Rounding sets the limit.** Each halving of `h` multiplies the rounding error of `D` by `2^N` (by 2 for f', 4 for
-f''). As the tableau grows downward, truncation shrinks but rounding grows. Ridders' method watches the entries,
-estimates the error of each, keeps the one with the smallest estimated error, and stops once going further only
-adds rounding. That gives both a value and an error estimate, without choosing the step carefully.
-
-**The one-sided variant.** The forward rule's error has *every* power of `h`: `D(h) = f' + c h + d h^2 + ...`.
-Halving gives `c h / 2`, so the combination is `(2 D(h/2) - D(h)) / 1`, with `r = 2^j`, and each column removes only
-one power of `h` instead of two. More levels are needed for the same accuracy, and rounding gets more chances to
-grow. That is why `ForwardRidders` is less accurate than `Ridders`, and why `ridders()` has a couple of one-sided
-special cases.
+The method estimates the error of every entry, keeps the entry with the smallest estimate, and stops when further
+levels only add rounding. Each halving of `h` multiplies the base rule's rounding by `2^N`.
 
 ### The constants (1221-1265)
 
@@ -2385,7 +2191,8 @@ for (j = 1; j <= i; ++j) {
 }
 ```
 
-This is exactly the tableau formula from "The idea". Level `i` has `i + 1` entries, `row[0]` to `row[i]`. Both the
+This is exactly the tableau formula from "What the code implements". Level `i` has `i + 1` entries, `row[0]` to
+`row[i]`. Both the
 difference and the sum are checked first: entries of opposite sign can be far apart.
 
 **Step 4: a non-finite level restarts the tableau (1504-1508)**
@@ -2416,10 +2223,8 @@ for (j = 1; j <= i; ++j) {
 For each new extrapolated entry, the method estimates its error and remembers the entry with the smallest estimate
 seen in this tableau.
 
-- **The estimate is the change from the diagonal parent**, `|A[i][j] - A[i-1][j-1]|`. Numerics note: the parent is
-  the less accurate of the two, so the change is roughly the parent's error, which overestimates the new entry's
-  error. That makes it a safe, if pessimistic, estimate. It is the textbook a-posteriori estimate for Richardson
-  extrapolation.
+- **The estimate is the change from the diagonal parent**, `|A[i][j] - A[i-1][j-1]|`. It is the textbook
+  a-posteriori estimate, and pessimistic: the parent is the less accurate of the two.
 - **The estimate is never below the floor.** The rounding noise in an entry is about its floor, so no estimate
   smaller than that can be trusted. And the method picks the *smallest* of many noisy estimates, which biases the
   choice towards estimates that are too low by chance. The comment gives the measurement: without the floor, the
@@ -2818,13 +2623,13 @@ This lets you print an error: `std::println("no estimate: {}", r.error())` print
 
 | Habit                                                | Why                                                                                                                                       |
 |------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
-| `T(1)`, `T(2)`, never `1.0`                          | a `double` literal would silently reduce a 50-digit `T` to 53 bits (section F)                                                            |
-| `T const v = T(a + b)`, never `auto`                 | Boost.Multiprecision returns an expression template from `a + b`; `auto` would store an unevaluated object holding references (section F) |
+| `T(1)`, `T(2)`, never `1.0`                          | a `double` literal would silently reduce a 50-digit `T` to 53 bits (section B)                                                            |
+| `T const v = T(a + b)`, never `auto`                 | Boost.Multiprecision returns an expression template from `a + b`; `auto` would store an unevaluated object holding references (section B) |
 | `static_cast<T>(std::invoke(fn, p))`                 | `std::invoke` handles member pointers like `&Real::square`; the cast evaluates an expression-template result at once                      |
 | points stored as named `T const` before calling `fn` | `fn` always receives a `T const` lvalue, the exact form `callable` checks, so a callable that rejects temporaries works                   |
 | `(std::numeric_limits<T>::max)()`                    | the parentheses stop a `max` macro (from `<windows.h>`) from expanding                                                                    |
-| `detail::...`, `math::...` written out               | ADL can't pick a same-named function from the namespace of a user's `T` or `F` (section F)                                                |
-| check, *then* compute                                | in constant evaluation an overflow or NaN is a compile error, not a value (section E)                                                     |
+| `detail::...`, `math::...` written out               | ADL can't pick a same-named function from the namespace of a user's `T` or `F` (section B)                                                |
+| check, *then* compute                                | in constant evaluation an overflow or NaN is a compile error, not a value (section A)                                                     |
 | `!(h > T(0))` instead of `h <= T(0)`                 | every comparison with NaN is false, so this form rejects a NaN as well                                                                    |
 | `if constexpr` dispatch, no virtual functions        | each method and order is a separate function, with no run-time choice                                                                     |
 | `constexpr auto table = make_table<N>(S{})`          | each table is built by the compiler; the run-time code only reads integers                                                                |
@@ -2929,13 +2734,8 @@ compile error if it overflowed.
 
 | Term                     | Meaning here                                                                                                |
 |--------------------------|-------------------------------------------------------------------------------------------------------------|
-| **eps, machine epsilon** | the gap between 1 and the next number of the type: 2.2e-16 for double, 1.2e-7 for float                     |
-| **ulp**                  | "unit in the last place": the gap between a number and the next one; about `eps                             |x|` |
-| **accuracy order P**     | the truncation error of a rule is proportional to `h^P`                                                     |
 | **node**                 | a point of a rule in units of the step: node `k` is `x + k h`                                               |
 | **stencil**              | a rule with fixed nodes and weights, applied at one step                                                    |
-| **truncation error**     | the error from the Taylor terms a rule doesn't cancel; shrinks as `h` shrinks                               |
-| **rounding error**       | the error from the finite precision of `fn`'s values and the points; grows as `h` shrinks                   |
 | **rounding floor**       | the library's estimate of the rounding error of a value or an entry                                         |
 | **level**                | one evaluation of the base rule at one step in Ridders' method: column 0 of a tableau row                   |
 | **tableau, entry**       | Richardson's triangle of extrapolated values; an entry is one value in it                                   |
