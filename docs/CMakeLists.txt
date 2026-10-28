@@ -37,11 +37,14 @@ numerixx_write_doxyfile(numerixx_docs
         "XML_PROGRAMLISTING = NO"
         "EXCLUDE_SYMBOLS = *::detail *::detail::*"
         "GENERATE_DEPRECATEDLIST = NO")
-# -E re-reads every page, so that -W sees every warning on a rebuild too.
+# The site is written afresh: an old search index or a removed page would otherwise survive (sphinx_immaterial reads
+# the search index it finds). -E re-reads every page, so that -W sees every warning on a rebuild too.
+# --managed-python: uv's own Python, whose environment holds only requirements.txt, never a package installed globally.
 add_custom_target(numerixx_docs
         COMMAND Doxygen::doxygen ${numerixx_docs_doxyfile}
+        COMMAND ${CMAKE_COMMAND} -E rm -rf ${html}
         COMMAND ${CMAKE_COMMAND} -E env NUMERIXX_DOXYGEN_XML=${xml}
-                ${NUMERIXX_UV} run --no-project --python 3.14
+        ${NUMERIXX_UV} run --no-project --managed-python --python 3.14
                 --with-requirements ${PROJECT_SOURCE_DIR}/docs/sphinx/requirements.txt
                 python -m sphinx -E -W -b html ${PROJECT_SOURCE_DIR}/docs/sphinx ${html}
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}

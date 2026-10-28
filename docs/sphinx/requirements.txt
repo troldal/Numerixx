@@ -1,37 +1,35 @@
-# The documentation's Python packages: pip freeze of the environment the Breathe patch in conf.py was verified in.
-# Every package is pinned, transitive ones included, so that a new release cannot change the build under -W.
-accessible-pygments==0.0.5
+# The documentation's Python packages, pinned with every transitive one, so that a new release cannot change the build
+# under -W. Taken from the isolated environment the build was verified in (uv's own Python, no global packages).
 alabaster==1.0.0
 babel==2.18.0
-beautifulsoup4==4.15.0
 breathe==5.1.0
 certifi==2026.10.23
 charset-normalizer==3.5.2
 colorama==0.4.6
 docutils==0.22.4
-furo==2025.12.19
 idna==3.20
 imagesize==2.0.1
-Jinja2==3.1.6
+jinja2==3.1.6
 markdown-it-py==4.2.0
-MarkupSafe==3.0.4
+markupsafe==3.0.4
 mdit-py-plugins==0.6.1
 mdurl==0.1.2
 myst-parser==5.1.0
 packaging==26.3
-Pygments==2.21.0
-PyYAML==6.0.3
+pygments==2.21.0
+pyyaml==6.0.3
 requests==2.34.2
 roman-numerals==4.1.0
 snowballstemmer==3.1.1
-soupsieve==3.0.4
-Sphinx==9.2.0
-sphinx-basic-ng==1.0.0b2
+sphinx-design==0.7.0
+sphinx-last-updated-by-git==0.3.8
+sphinx-lumina-theme==2.12.0
+sphinx-sitemap==2.9.0
+sphinx==9.2.0
 sphinxcontrib-applehelp==2.0.0
 sphinxcontrib-devhelp==2.0.0
 sphinxcontrib-htmlhelp==2.1.0
 sphinxcontrib-jsmath==2.0.0
 sphinxcontrib-qthelp==2.0.0
 sphinxcontrib-serializinghtml==2.0.0
-typing_extensions==4.16.0
 urllib3==2.8.0
