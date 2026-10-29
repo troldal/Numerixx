@@ -9,11 +9,11 @@ next.
 Each error suggests a next step:
 
 - {cpp:enumerator}`nxx::roots::error::no_sign_change`: the bracket shows no sign change. Widen it, or search from a
-  guess ([Find a bracket](roots-find-a-bracket.md)). From `search` itself, try another guess, or check that fn changes
+  guess ([Find a bracket](find-a-bracket.md)). From `search` itself, try another guess, or check that fn changes
   sign at all: an even root never does.
 - {cpp:enumerator}`nxx::roots::error::not_converged`: an open method found no root from its guess. Give it a bracket.
 - {cpp:enumerator}`nxx::roots::error::non_finite`: a value was not finite, often a point outside fn's domain ([Solve
-  on a restricted domain](roots-restricted-domain.md)), or a start or tolerance was not finite, or a tolerance was
+  on a restricted domain](restricted-domain.md)), or a start or tolerance was not finite, or a tolerance was
   negative.
 
 `or_else` runs its fallback only on failure. Here Newton from 0 cycles on x^3 - 2x + 2 and gives `not_converged`;

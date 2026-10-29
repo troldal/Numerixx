@@ -35,7 +35,7 @@ found a bracket, and either error comes through.
   step of each other, and a root beyond a region where fn is not finite; it brackets a pole like a root. When it finds
   no sign change it returns {cpp:enumerator}`nxx::roots::error::no_sign_change`: try another guess, or check that fn
   changes sign at all. The reference for {cpp:func}`nxx::roots::search` lists its limits.
-- Where fn is defined on part of the line only, see [Solve on a restricted domain](roots-restricted-domain.md).
+- Where fn is defined on part of the line only, see [Solve on a restricted domain](restricted-domain.md).
 
 The program needs:
 

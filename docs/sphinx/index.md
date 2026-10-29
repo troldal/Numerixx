@@ -11,43 +11,21 @@ library, and most run in constant expressions. Numerixx itself never throws: a f
 | `nxx::deriv` | `numerixx/deriv.hpp` | Derivatives of order 1 to 4 of a scalar function, by finite differences and by Ridders' extrapolation with an error estimate |
 | `nxx::real`, `nxx::math` | `numerixx/math.hpp` | What the modules share: the concept of a real type, and constexpr helpers |
 
-The documentation has a part for each need: tutorials to learn by doing, how-to guides for a task at hand, the
-reference for the exact behaviour of each name, and explanations of the ideas behind the methods.
+The documentation has a chapter for each module, with an overview, a tutorial, guide pages for single tasks, and
+the reference.
 
 ```{toctree}
-:caption: Tutorials
-:maxdepth: 2
+:caption: Start here
+:maxdepth: 1
 
-tutorials/getting-started
-tutorials/roots-kepler
+getting-started
+core
 ```
 
 ```{toctree}
-:caption: "How-to: roots"
+:caption: Modules
 :maxdepth: 2
 
-how-to/roots-choose-a-method
-how-to/roots-tolerances
-how-to/roots-find-a-bracket
-how-to/roots-restricted-domain
-how-to/roots-derivatives
-how-to/roots-other-types
-how-to/roots-handle-failures
-```
-
-```{toctree}
-:caption: Reference
-:maxdepth: 2
-
-reference/roots
-reference/roots-costs
-reference/deriv
-reference/core
-```
-
-```{toctree}
-:caption: Explanation
-:maxdepth: 2
-
-explanation/derivatives
+roots/index
+deriv/index
 ```

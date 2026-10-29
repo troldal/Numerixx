@@ -1,4 +1,4 @@
-// The program of docs/sphinx/how-to/roots-handle-failures.md: reacting to a failed solve. The page shows the parts
+// The program of docs/sphinx/roots/handle-failures.md: reacting to a failed solve. The page shows the parts
 // between the markers; main returns non-zero unless what the page says holds, against closed forms and mpmath, and
 // the independent prototypes' outcomes (docs/roots/design.md, Evidence, Phases 2 and 6).
 

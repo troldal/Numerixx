@@ -1,4 +1,4 @@
-// The program of docs/sphinx/how-to/roots-other-types.md: float, long double, Boost.Multiprecision and constant
+// The program of docs/sphinx/roots/other-types.md: float, long double, Boost.Multiprecision and constant
 // expressions. The page shows the parts between the markers; main returns non-zero unless what the page says holds,
 // against sqrt(2) to 70 digits (mpmath).
 

@@ -1,4 +1,4 @@
-// The program of docs/sphinx/tutorials/getting-started.md: a root by Brent's method and a derivative by Ridders'
+// The program of docs/sphinx/getting-started.md: a root by Brent's method and a derivative by Ridders'
 // method. The page shows the parts between the markers; main returns non-zero unless what the page says about the
 // results holds, checked against closed forms by the bounds of the tests (tests/roots_check.hpp,
 // tests/test_ridders.cpp).

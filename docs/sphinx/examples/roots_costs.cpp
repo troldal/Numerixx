@@ -1,4 +1,4 @@
-// The program of docs/sphinx/reference/roots-costs.md: the evaluations per method in the page's tables. It asserts
+// The program of docs/sphinx/roots/costs.md: the evaluations per method in the page's tables. It asserts
 // each count, typed here from the independent prototypes (docs/roots/design.md, Evidence, Phases 1 to 4 and 6, and
 // docs/roots/PHASE6_API.md; Bisection on 1/x - 1 derived: half the width 2.5 * 2^-(k+1) against tol near 1, about
 // 2^-51, gives k = 52, so 54, which .scratch/roots1/proto3.py also gives), each value within abs_error + c of its

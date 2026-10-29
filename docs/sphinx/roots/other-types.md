@@ -41,7 +41,7 @@ The root comes out to the 50 digits of the type. Three rules make a multiprecisi
 
 - Call mathematical functions unqualified, after `using std::sin;`, so that the type's own `sin` is found.
 - Set `abs_tol` where a sign change may lie near 0: with the default, the method approaches it through the type's
-  whole exponent range ([Set tolerances](roots-tolerances.md)). The open methods' iteration cap also grows with the
+  whole exponent range ([Set tolerances](tolerances.md)). The open methods' iteration cap also grows with the
   type's precision.
 
 ## At compile time

@@ -1,4 +1,4 @@
-// The program of docs/sphinx/how-to/roots-derivatives.md: giving f' and f'' to Newton and Halley. The page shows the
+// The program of docs/sphinx/roots/derivatives.md: giving f' and f'' to Newton and Halley. The page shows the
 // parts between the markers; main returns non-zero unless what the page says holds. Counts are the independent
 // prototypes' (docs/roots/design.md, Evidence, Phases 2 and 3: .scratch/roots2/proto2.py, .scratch/roots3/proto3.py),
 // for fn written as here and builds without FMA contraction.

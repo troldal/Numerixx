@@ -3,7 +3,7 @@
 This tutorial solves an equation that has no closed-form solution, step by step: Kepler's equation, which gives a
 planet's position in its orbit. You will write the function, find a bracket for its root, solve it, read the result
 and its error bound, handle a failure, and solve it again from a guess with Newton's method. It continues where
-[Getting started](getting-started.md) ends.
+[Getting started](../getting-started.md) ends.
 
 ## The equation
 
@@ -73,7 +73,7 @@ Give a bracket that does not contain the root, [2, 3], where the function is pos
 ```
 
 The result holds an error instead of a root, {cpp:enumerator}`nxx::roots::error::no_sign_change`, which formats as its
-name. Numerixx never throws; every failure comes back this way. [Handle failures](../how-to/roots-handle-failures.md)
+name. Numerixx never throws; every failure comes back this way. [Handle failures](handle-failures.md)
 shows how to recover.
 
 ## From a guess, with Newton's method
@@ -93,6 +93,6 @@ that bracket, so its result carries the same kind of bound as Brent's. It gives 
 
 ## Next
 
-- [Choose a method](../how-to/roots-choose-a-method.md) for the other methods, and what each costs.
-- [Give derivatives](../how-to/roots-derivatives.md) for the other ways to pass f', including a numerical one.
-- [Find a bracket](../how-to/roots-find-a-bracket.md) when no bracket is known.
+- [Choose a method](choose-a-method.md) for the other methods, and what each costs.
+- [Give derivatives](derivatives.md) for the other ways to pass f', including a numerical one.
+- [Find a bracket](find-a-bracket.md) when no bracket is known.

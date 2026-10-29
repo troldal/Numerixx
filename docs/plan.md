@@ -125,9 +125,9 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
 ## Milestone 3: user documentation (Doxygen, Breathe, Sphinx)
 
 A manual for library users, beside the API reference: Doxygen reads the headers and stays the gate that every public
-entity is documented; Sphinx with Breathe and MyST (Markdown) renders the site. The site follows Diataxis (the user's
-choice, 2026-10-27): tutorials, how-to guides, reference and explanation, each page doing one of the four jobs. The
-deriv book stays the long explanation of `nxx::deriv` and is offered as its PDF, not repeated. `numerixx_docs_all`
+entity is documented; Sphinx with Breathe and MyST (Markdown) renders the site. The site is organised by module (the
+user's choice, 2026-10-29, replacing Diataxis at the top level chosen 2026-10-27), with Diataxis's four kinds of writing
+inside each module: an overview, a tutorial, guide pages, reference. The deriv book stays the long explanation of `nxx::deriv` and is offered as its PDF, not repeated. `numerixx_docs_all`
 builds the whole documentation: the site, Doxygen's internal HTML and the book. Each phase gets its plan approved
 before it is written, and the pages get the reviews of a phase. A box is ticked when the docs build with no warning
 locally and in CI, and the examples' tests pass on all five toolchains.
@@ -177,13 +177,17 @@ locally and in CI, and the examples' tests pass on all five toolchains.
   - [x] Reviews: `docs-reviewer`, numerics, a docs-only reader whose four programs compiled and ran correctly; then
     the independent review (Codex). Findings reproduced and fixed (dbab9db: run 40586125853), and the header comment
     fixes the user approved (`docs/sphinx/PHASE3_PLAN.md`)
-- Phase 4: `nxx::roots`, the explanations: bracketing and open methods; what a result means.
-  - [ ] Pages; docs build clean
-  - [ ] Reviews as in Phase 3
-- Phase 5: `nxx::deriv` and `nxx::math`, in the same parts, from `docs/deriv/DERIV_TUTORIAL.md`; the explanation part
-  summarises the book and points into it.
+- Phase 4: the site organised by module, in a teaching voice (the user's request, 2026-10-29). Plan approved:
+  `docs/sphinx/PHASE4_PLAN.md`, with the guide kept as seven pages. It absorbs the old Phase 4 (the roots explanations
+  move into the roots overview).
+  - [ ] 4a: the pages moved into the module layout, links and toctrees fixed, no prose changed; docs build clean
+  - [ ] 4b: `index.md`, `basics.md`, the roots chapter and deriv's short page in the new voice; docs build clean;
+    programs pass on all five toolchains
+  - [ ] 4b reviews: `docs-reviewer`, numerics, a docs-only reader; then the independent review (Codex)
+- Phase 5: the `nxx::deriv` chapter in the same shape, from `docs/deriv/DERIV_TUTORIAL.md`, with deriv examples in
+  `basics.md`.
   - [ ] Pages, examples and tests; docs build clean
-  - [ ] Reviews as in Phase 3
+  - [ ] Reviews as in Phase 4b
 
 Open decisions: hosting (GitHub Pages from CI, or Read the Docs) and versioning (one site per release, or `dev` only),
 with `linkcheck` and the install section of getting-started;

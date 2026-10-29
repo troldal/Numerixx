@@ -1,4 +1,4 @@
-// The program of docs/sphinx/how-to/roots-restricted-domain.md: a fn defined on part of the line. The page shows the
+// The program of docs/sphinx/roots/restricted-domain.md: a fn defined on part of the line. The page shows the
 // parts between the markers; main returns non-zero unless what the page says holds, against closed forms, mpmath, or
 // the independent prototype's search (.scratch/roots5/proto5d.py, as in tests/test_roots_search.cpp).
 

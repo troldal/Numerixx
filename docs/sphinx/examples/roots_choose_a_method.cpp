@@ -1,4 +1,4 @@
-// The program of docs/sphinx/how-to/roots-choose-a-method.md: measuring the evaluations of fn per method. The page
+// The program of docs/sphinx/roots/choose-a-method.md: measuring the evaluations of fn per method. The page
 // shows the parts between the markers; main returns non-zero unless the counts the page states hold. They are the
 // independent prototypes' (docs/roots/design.md, Evidence, Phases 1 and 4), valid for fn written as here and builds
 // without FMA contraction.

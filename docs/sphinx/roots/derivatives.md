@@ -51,7 +51,7 @@ costs 6 calls (30 from the guess 2 on x^3 - 2x - 5). On x^3 - 2x - 5, Newton wit
 3] and 18 from 2, where {cpp:struct}`nxx::roots::Secant` makes 8 from 2 without any derivative. For a fn of value only,
 Brent or Secant is usually cheaper; the numerical derivative is a convenience. The bound on the result never depends on
 the derivative. Near the edge of fn's domain the derivative can fail: see [Solve on a restricted
-domain](roots-restricted-domain.md).
+domain](restricted-domain.md).
 
 The program needs:
 

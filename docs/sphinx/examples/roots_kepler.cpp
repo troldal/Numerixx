@@ -1,4 +1,4 @@
-// The program of docs/sphinx/tutorials/roots-kepler.md: Kepler's equation E - e sin E = M solved step by step. The page
+// The program of docs/sphinx/roots/tutorial.md: Kepler's equation E - e sin E = M solved step by step. The page
 // shows the parts between the markers; main returns non-zero unless what the page says about the results holds,
 // checked against an independent reference.
 

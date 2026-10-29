@@ -32,8 +32,9 @@ A module may use another module's public API, never its `detail`.
 - `CMakePresets.json` one preset per toolchain, used locally and in CI (`.github/workflows/ci.yml`)
 - `docs/plan.md` the plan; `docs/design.md` the decisions for every module; `docs/<module>/` per module (above)
 - `docs/Doxyfile` the API documentation settings, used by the docs targets in `docs/CMakeLists.txt`
-- `docs/sphinx/` the documentation site, in Diataxis parts (`tutorials/`, `how-to/`, `reference/`, `explanation/`;
-  MyST pages), with `conf.py`, the local extension `_ext/numerixx_breathe.py` (the Breathe patch and the checks) and
+- `docs/sphinx/` the documentation site, organised by module (`roots/`, `deriv/`, each with its overview, tutorial,
+  guide pages and reference; `getting-started.md` and `core.md` beside them; MyST pages; Breathe directives only on the
+  reference pages), with `conf.py`, the local extension `_ext/numerixx_breathe.py` (the Breathe patch and the checks) and
   the pinned `requirements.txt`; a page shows code only from `docs/sphinx/examples/`, programs built and run as tests
   (`numerixx_docs_example_<name>`, a glob in `tests/CMakeLists.txt`), each checking its page's claims;
   `docs-reviewer` reviews the pages

@@ -1,4 +1,4 @@
-// The program of docs/sphinx/how-to/roots-find-a-bracket.md: search for a bracket from a guess, then solve in it. The
+// The program of docs/sphinx/roots/find-a-bracket.md: search for a bracket from a guess, then solve in it. The
 // page shows the parts between the markers; main returns non-zero unless what the page says holds. The count and the
 // bracket are the independent prototype's (.scratch/roots5/proto5d.py, as in tests/test_roots_search.cpp), for fn
 // written as here and builds without FMA contraction.
