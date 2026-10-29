@@ -1,0 +1,12 @@
+/* Lumina's wide layout gives code blocks about 870 px (in a 60rem column); the examples' longest shown lines, up to
+   112 columns of 14 px JetBrains Mono, need about 1010 px. A 70rem column gives blocks 1030 px (measured in Chrome at
+   1920 px), and the page frame grows by the same 10rem, so that the sidebar and the page's table of contents keep
+   their width. */
+[data-layout="wide"] .lumina-wrapper,
+[data-layout="wide"] .lumina-header-inner {
+    max-width: 100rem;
+}
+
+[data-layout="wide"] #lumina-content {
+    max-width: 70rem;
+}
