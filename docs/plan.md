@@ -204,7 +204,7 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
 
 - Phase 1: the core, `Integral`, `Failure`, `error`, `Criteria`, `integrate<M>(fn, a, b[, criteria])`; the fixed rule
   `GaussLegendre<N>` with the arithmetic-only node generator and compile-time tables; `Romberg`.
-  - [ ] API approved: `docs/quadrature/PHASE1_API.md`
+  - [x] API approved: `docs/quadrature/PHASE1_API.md` (2026-10-30, Q1 to Q7 as recommended)
   - [ ] `quadrature.hpp`, constexpr; tests on float, double, long double and Boost.Multiprecision; docs build clean
   - [ ] CI passes on all five toolchains
   - [ ] The independent review (Codex) and its adopted findings
