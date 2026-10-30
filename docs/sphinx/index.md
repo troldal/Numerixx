@@ -45,4 +45,5 @@ core
 
 roots/index
 deriv/index
+quadrature/reference
 ```

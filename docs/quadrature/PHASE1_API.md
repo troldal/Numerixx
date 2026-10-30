@@ -141,6 +141,10 @@ template<nxx::real T> struct std::formatter<nxx::quadrature::Failure<T>>;       
   overflows the sum of the values on fn = 1e308 over [0, 1e-10] (true integral 1e298); and `hw = (b - a) / 2` rounds
   a subnormal width ([0, 3 denorm_min]: hw = 1.5 denorm_min rounds to 2, a 33 % error in the result), while
   `(b - a)` is exact there and `w_i / 2` exact in radix 2.
+  Implementation note (2026-10-30): the scale is applied to fn's value, not formed first: `(b - a) ((w_i / 2) f)` and
+  `(b - a) (f / 2^k)`, or `hw (w_i f)` and `hw (f / 2^(k-1))` where b - a overflows. Formed first, `(b - a) / 2^k`
+  rounds to 0 on [0, 3 denorm_min] by level 3, and `2 hw` and `hw w_1` overflow on [-max, max]; in the normal range
+  the two orders give the same results bit for bit.
 - **What no map avoids, documented:** an interval narrow against its position (c far larger than hw) rounds each node
   by about eps |c|, so fn's argument errs by that and the result by about eps |c| times the integral of |f'|; this is
   fn's conditioning, as in roots, not part of the estimate. On an interval a few ulps wide a Gauss node can round onto
@@ -164,7 +168,8 @@ template<nxx::real T> struct std::formatter<nxx::quadrature::Failure<T>>;       
   makes its sum non-finite (Neumaier's correction too), so each of Romberg's level sums and L1, and the fixed rule's
   result, is checked once: `non_finite`. That covers fn's own NaN and infinities and an overflow of the sum (1e308 sin x
   on [0, 2 pi]) alike, and keeps N branches out of the fixed rule's loop, which runs inside root finders.
-- **Samples that are all 0** give {0, 0} even for a positive integral ((x (1 - x) prod_(j=1..15) (16 x - j))^2 on
+- **Samples that are all 0** give {0, 50 denorm_min}, the floor (corrected in the implementation: draft 2 said {0, 0},
+  against its own rule that abs_error is never below the floor), even for a positive integral ((x (1 - x) prod_(j=1..15) (16 x - j))^2 on
   [0, 1] vanishes at every point through level 4); an exact-zero result is a sampling artefact, documented with the
   narrow-peak warning.
 
@@ -313,7 +318,7 @@ between 1/3 and 2/3, both giving the trapezoid error (2/9) h^2 exactly, which Ri
   1e308 sin x on [0, 2 pi] (`non_finite`); fn = 1e308 on [0, 1e-10] (1e298, no overflow); [-max, max] with fn = 0 and
   fn = 1e-300; [0, 3 denorm_min] with fn = 1e300 (the subnormal width); 1e-320 e^x on [0, 1] (the denorm_min floor
   ends it); sqrt x and the kink at 1e-14 (`not_converged` at 65,537 evaluations, best present and within its own
-  estimate); the all-zero samples (documented behaviour, {0, 0}).
+  estimate); the all-zero samples (documented behaviour, {0, 50 denorm_min}).
 - **Types:** double for the edges; float, long double, `cpp_bin_float_50` with and without expression templates and
   `cpp_dec_float_50` (radix 10) for a few accuracy cases with fn of `+ - * /`; `static_assert`s for the built-in
   types only (Boost's are not literal).
@@ -364,7 +369,7 @@ From the numerics review (all adopted):
 - The kink at 1/3 is degenerate: 1/5 (prototype table).
 - Subnormal widths and an intermediate overflow: the scale per term (B); the floor's denorm_min term (C).
 - 4^m - 1 is not exact in float beyond m = 12 (E).
-- All-zero samples give {0, 0} (C, documented).
+- All-zero samples give the floor, {0, 50 denorm_min} (C, documented).
 - Romberg's accuracy test: the closed-form bound, not the estimate (Tests).
 - Confirmed: the Sturm count's direction and its handling of zero terms; the weight formula's amplification; the
   truncation formula; the map's overflow cases; the level formula and Richardson; the diagonal estimate (the
