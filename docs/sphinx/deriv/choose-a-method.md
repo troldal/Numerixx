@@ -18,8 +18,8 @@ examples write `dv` for `nxx::deriv`.
 | More digits at a fixed cost, `fn` smooth on the scale $\max(|x|, 1)$ | `Central<4>` or `Central<6>` | 4 or 6 evaluations; one to three digits more |
 | The most digits, or an error estimate | {cpp:struct}`nxx::deriv::Ridders` | Typically 13 to 15 digits, with `abs_error`; typically 10 to 16 evaluations for $f'$ |
 | `fn` defined on one side of $x$ only, $x$ at the edge | {cpp:struct}`nxx::deriv::ForwardRidders` or {cpp:struct}`nxx::deriv::BackwardRidders` | An error estimate, from points on one side; see [Near the edge of a domain](one-sided.md) |
-| $x$ near the edge of `fn`'s domain | `Ridders` and the one-sided Ridders method | Try both, keep the smaller estimate; see [Near the edge](one-sided.md#near-the-edge) |
-| The same at a fixed cost | {cpp:struct}`nxx::deriv::Forward` or {cpp:struct}`nxx::deriv::Backward` | `Forward<2>`: 3 evaluations; fewer digits than `Central<2>` |
+| $x$ near the edge of `fn`'s domain | `Ridders` and the one-sided Ridders method | Try both, and compare; see [Near the edge](one-sided.md#near-the-edge) |
+| The same at a fixed cost | {cpp:struct}`nxx::deriv::Forward` or {cpp:struct}`nxx::deriv::Backward` | `Forward<2>`: 3 evaluations; typically fewer digits than `Central<2>` |
 | `fn` varying faster than $\max(|x|, 1)$ | `Ridders`, or a stencil with a step of your own | See [Choose a step](step.md) |
 
 The higher-order stencils are not always better. They assume that `fn` is smooth across all their points, which spread
@@ -58,7 +58,7 @@ It prints
 Each higher-order stencil gains about two digits over `Central<2>`, though `Central<6>` is no better than `Central<4>`
 here, and Ridders' method a little more, with an error estimate besides, for 14 evaluations. Where `fn` is cheap, that
 is a good trade; where one evaluation takes a simulation run, a stencil's fixed cost may matter more. The [accuracy
-table](accuracy.md) compares every method on three functions.
+table](accuracy.md) compares the main methods on three functions.
 
 ## More digits than a `double`
 

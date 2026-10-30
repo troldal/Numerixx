@@ -14,6 +14,7 @@
 // </includes>
 // clang-format on
 
+#include <format>
 int main()
 {
     namespace dv = nxx::deriv;
@@ -64,9 +65,10 @@ int main()
     // The references: the closed forms at the solved E, which is within about 1.6e-15 of the exact root (Brent's
     // bound, 1.3e-15, plus the 2.3e-16 shift of roots/tutorial.md); that moves dE/dM by |d2E/dM2| 1.6e-15 = 9e-16
     // and d2E/dM2 by |d3E/dM3| 1.6e-15, about 3e-15 (|d3E/dM3| < 2 here), far below the errors checked.
-
-    // "dE/dM = 1.0373620219" (to 10 decimals): the closed form, which mpmath gives as 1.03736202189364...
-    if (!(std::abs(exact - 1.0373620219) < 5e-11)) return 7;
+    // "The first ten [decimals] are 1.0373620219": the printed slope and the closed form (mpmath: 1.03736202189364...)
+    // both round to it.
+    if (!(std::format("{:.10f}", slope->value) == "1.0373620219" && std::format("{:.10f}", exact) == "1.0373620219"))
+        return 7;
     // The central difference: "far below 1e-9" relative. eccentric's values are E to within about 1.6e-15
     // (above), so the rounding part is at most 2 * 1.6e-15 / 2h with h = eps^(1/3) = 6.06e-6: 2.64e-10 absolute; the
     // truncation part is h^2 / 6 |E'''|, below 1.3e-11 (|E'''| = 0.855). The page says the error is far below 1e-9.

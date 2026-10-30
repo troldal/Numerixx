@@ -71,7 +71,8 @@ with h = x / 8:  1.581139e+05, abs_error 5.0e-07
     // At 1e-12 the method gives up: 70% off, and its estimate at least a quarter of the value, its own flag.
     auto const gave_up = dv::derivative<dv::ForwardRidders>(fn, 1e-12);
     double const exact12 = 0.5 / std::sqrt(1e-12);
-    if (!gave_up || !gave_up->abs_error || !(std::abs(gave_up->value - exact12) / exact12 > 0.6)
+    if (!gave_up || !gave_up->abs_error || !(std::abs(gave_up->value - exact12) / exact12 > 0.65)
+        || !(std::abs(gave_up->value - exact12) / exact12 < 0.75)
         || !(*gave_up->abs_error >= std::abs(gave_up->value) / 4))
         return 8;
     // A step below the resolution of x is an error too: x + h rounds to x.

@@ -72,7 +72,8 @@ The results:
 ```
 
 ```{note}
-A step that is too small for $x$, so that $x + h$ rounds to $x$, gives the error `non_finite`; so does a step that is
+A step that is too small for $x$, so that the method's points round to the same number (at 1, $h = 10^{-300}$ does),
+gives the error `non_finite`; so does a step that is
 not positive and finite. Below the balanced step, rounding grows as $1/h$ long before that.
 ```
 

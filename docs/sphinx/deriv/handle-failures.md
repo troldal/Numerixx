@@ -18,7 +18,8 @@ test the result; this page is about what the errors mean. Today there is one,
   usual cause is a point outside `fn`'s domain: use a one-sided method there ([Near the edge of a
   domain](one-sided.md)).
 - `x` is not finite, or a step you gave is not positive and finite.
-- The step is below the resolution of `x`: $x + h$ rounds to $x$, as $h = 10^{-300}$ does at 1.
+- The step is below the resolution of `x`: the method's points round to the same number, as they do for $h = 10^{-300}$
+  at 1.
 - An intermediate value would overflow: a point $x + kh$, a difference of values, or the result.
 
 Here the central difference's points reach below 0, where $\sqrt x$ is NaN:

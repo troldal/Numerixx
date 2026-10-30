@@ -6,8 +6,9 @@ table of a function's slope over a range. When you have no formula for the deriv
 
 ## A derivative you can call
 
-`derivative_of<Method, N>(fn)` takes the same method and order as `derivative`, and returns a function object. Called at
-$x$, it gives exactly what `derivative<Method, N>(fn, x)` gives, with the default step:
+`derivative_of<Method, N>(fn)` takes the same method and order as `derivative`, and returns a function object. The
+examples write `dv` for `nxx::deriv`. Called at $x$, it gives exactly what `derivative<Method, N>(fn, x)` gives, with
+the default step:
 
 ```{literalinclude} ../examples/deriv_derivative_of.cpp
 :start-after: // <callable>
@@ -35,7 +36,8 @@ derivatives](../roots/derivatives.md#numerically) shows it, with what it costs.
 returned from a function or stored. For most functions that is what you want. Two cases are different. A function object
 that is expensive to copy, such as one that holds a large table, is copied too. And a function object that changes its
 own state, such as a counter of its calls, changes only its copy. Pass `std::ref(fn)` in both cases: the result then
-calls the original.
+calls the original, which must then outlive it. The copy does not extend anything `fn` refers to, either: a lambda that
+captures locals by reference still needs them alive when the derivative is called.
 
 ```{literalinclude} ../examples/deriv_derivative_of.cpp
 :start-after: // <state>

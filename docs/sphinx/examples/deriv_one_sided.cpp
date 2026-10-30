@@ -120,6 +120,19 @@ ForwardRidders: -1.000000000, abs_error 4.8e-12
     auto const g_stencil = dv::derivative<dv::Backward<2>>(g, close);
     double const g_close = 1.0 - 0.5 / std::sqrt(1.0 - close);
     if (!g_stencil || !(std::abs(g_stencil->value - g_close) > 0.1 * std::abs(g_close))) return 14;
+    // "On a function whose values happen to vanish at the points a method tries, [the estimate] can even be 0 for a
+    // wrong result" (Codex's case): u (1 - (64 u)^2) (1 - (128 u)^2), u = t - 1/64, NaN below 0, at 1/64, where the
+    // derivative is 1. Ridders' first step 1/32 reaches below 0; its next steps, 1/64 and 1/128, land on zeros of the
+    // polynomial, so it returns 0 with an estimate of 0. ForwardRidders returns 1.
+    auto const vanishing = [](double t) {
+        if (t < 0.0) return std::numeric_limits<double>::quiet_NaN();
+        double const u = t - 1.0 / 64.0;
+        return u * (1.0 - (64.0 * u) * (64.0 * u)) * (1.0 - (128.0 * u) * (128.0 * u));
+    };
+    auto const fooled = dv::derivative<dv::Ridders>(vanishing, 1.0 / 64.0);
+    auto const right = dv::derivative<dv::ForwardRidders>(vanishing, 1.0 / 64.0);
+    if (!fooled || !fooled->abs_error || !(fooled->value == 0.0 && *fooled->abs_error == 0.0)) return 15;
+    if (!right || !right->abs_error || !(std::abs(right->value - 1.0) <= *right->abs_error)) return 16;
     // The kink: Ridders returns about the mean of the slopes -3 and -1, wrong, with a small estimate; ForwardRidders
     // sees only the right-hand formula and returns -1 within its estimate.
     if (!both_sides || !both_sides->abs_error || !one_side || !one_side->abs_error) return 9;

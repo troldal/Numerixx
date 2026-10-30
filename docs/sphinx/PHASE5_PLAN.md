@@ -48,7 +48,7 @@ then Codex on the commit.
 
 - [x] The pages and programs; every quoted output compared by its program, every number asserted or linked; the docs
   build clean; all programs pass on the five toolchains, locally and in CI
-- [ ] The reviews and Codex, with the adopted findings recorded here
+- [x] The reviews and Codex, with the adopted findings recorded here
 
 ## What was done, and the reviews
 
@@ -87,4 +87,20 @@ each finding reproduced or derived, all adopted unless noted:
   `roots.hpp:1730` start a line with "129." and "0.", which Doxygen reads as an ordered list (the Ridders reference
   loses "129." and a paragraph renders as a list item); `ForwardRidders`' "where fn is defined on both sides, use
   `Ridders`, also near a domain edge" is not borne out on 1/(1 + x) at 1e-6.
+
+The independent review (Codex, on 4393031; eight findings, each reproduced or checked, all adopted):
+
+- "Keep the result with the smaller estimate" near an edge can pick a wrong result: on u (1 - (64u)^2) (1 - (128u)^2),
+  u = t - 1/64, NaN below 0, Ridders at 1/64 returns 0 with an estimate of 0 (its steps land on the polynomial's
+  zeros), ForwardRidders 1, the derivative. The page now says to compare, keep the smaller estimate only when the two
+  agree, and that an estimate is not a proof; the case is asserted in `deriv_one_sided.cpp`.
+- `derivative_of(std::ref(fn))`: the original must outlive the callable, and the copy does not extend what `fn`
+  captures by reference.
+- The `dv` alias named on `higher-derivatives.md` and `derivative-of.md`.
+- The accuracy table's coverage check now requires the Ridders rows to have an estimate.
+- The tutorial's ten decimals are checked on the computed slope, not only the reference; "70% off" checked as
+  65% to 75%; the Ridders cost ranges linked to `nxx::deriv::Ridders`.
+- A step "so that x + h rounds to x" does not always fail (the two-point rules need only their two points to differ:
+  h = 0x1.8p-54 at 1 succeeds): the pages now say "the method's points round to the same number".
+- "Fewer digits than `Central<2>`" for `Forward<2>` is "typically"; the accuracy table compares "the main methods".
 

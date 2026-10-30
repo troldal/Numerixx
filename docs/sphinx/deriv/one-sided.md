@@ -56,8 +56,10 @@ steps, and finds the derivative:
 Its estimate, about $10^{-9}$, is larger than usual: to stay inside the domain its steps must stay below $10^{-6}$,
 where rounding, which grows as $1/h$, is larger. A one-sided method can take larger steps away from the edge, and on
 this function `ForwardRidders` is more accurate at $10^{-6}$; on a function that changes fast near its edge, such as
-$\sqrt{1 - x}$ near 1, Ridders' method can be the more accurate one. So close to an edge, try both, and keep the result
-with the smaller estimate.
+$\sqrt{1 - x}$ near 1, Ridders' method can be the more accurate one. So close to an edge, try both. If they agree to
+within their estimates, keep the one with the smaller estimate; if they do not, trust neither until you have checked,
+for example at another step. An estimate is not a proof: on a function whose values happen to vanish at the points a
+method tries, it can even be 0 for a wrong result.
 
 A one-sided *stencil* with its default step is riskier near an edge where `fn` changes fast: its step,
 $\varepsilon^{1/(P+1)} \max(|x|, 1)$, does not shrink with the distance to the edge, and it has no estimate to warn you.

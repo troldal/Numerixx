@@ -10,6 +10,7 @@
 #include "printed.hpp"
 
 #include <cmath>
+#include <concepts>
 #include <format>
 #include <print>
 #include <string>
@@ -31,6 +32,8 @@ namespace {
     template<typename M>
     std::string cell(double (*fn)(double), double x, double exact)
     {
+        constexpr bool extrapolates =
+            std::same_as<M, dv::Ridders> || std::same_as<M, dv::ForwardRidders> || std::same_as<M, dv::BackwardRidders>;
         int calls = 0;
         auto const counted = [&](double t) {
             ++calls;
@@ -38,7 +41,7 @@ namespace {
         };
         auto const d = dv::derivative<M>(counted, x);
         if (!d) return "failed";
-        if (d->abs_error && !(std::abs(d->value - exact) <= *d->abs_error)) covered = false;
+        if (extrapolates && !(d->abs_error && std::abs(d->value - exact) <= *d->abs_error)) covered = false;
         return std::format("{:>3} {:.0e}", calls, std::abs(d->value - exact) / std::abs(exact));
     }
 
@@ -81,7 +84,7 @@ ForwardRidders     10 2e-13    9 2e-13   21 2e-13
 BackwardRidders    10 2e-13    9 1e-13   21 8e-13
 )";
     if (!(docs::printed() == docs::quoted(output))) return 1;
-    // The Ridders methods' estimates cover their actual errors on these functions.
+    // The Ridders methods' estimates are there and cover their actual errors on these functions.
     if (!covered) return 2;
     return 0;
 }

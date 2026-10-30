@@ -7,9 +7,9 @@ ask for them, how accurate they are, and why `float` is not enough.
 
 ## Asking for the N-th derivative
 
-The order is the second template argument of `derivative`, after the method: an integer from 1 to 4, or a name from the
-enumeration {cpp:enum}`nxx::deriv::order` (`order::second` is 2), whichever reads better. Here are $f''$ and $f''''$ of
-$1/x$ at 2, which are $2/x^3 = 0.25$ and $24/x^5 = 0.75$:
+The examples write `dv` for `nxx::deriv`. The order is the second template argument of `derivative`, after the method:
+an integer from 1 to 4, or a name from the enumeration {cpp:enum}`nxx::deriv::order` (`order::second` is 2), whichever
+reads better. Here are $f''$ and $f''''$ of $1/x$ at 2, which are $2/x^3 = 0.25$ and $24/x^5 = 0.75$:
 
 ```{literalinclude} ../examples/deriv_higher.cpp
 :start-after: // <orders>
@@ -41,8 +41,8 @@ and Ridders' method on $1/x$ at 2 show the fall:
 ```
 
 Ridders' method keeps far more digits at every order, with an error estimate, but it costs more: typically 13 to 23
-evaluations for $f''$ and 25 to 45 for $f'''$ and $f''''$, against 3, 4 and 5 for `Central<2>`. Above the first
-derivative, it is the method to use unless evaluations are expensive.
+evaluations for $f''$ and 25 to 45 for $f'''$ and $f''''$ ({cpp:struct}`nxx::deriv::Ridders`), against 3, 4 and 5 for
+`Central<2>`. Above the first derivative, it is the method to use unless evaluations are expensive.
 
 ## Not in `float`
 

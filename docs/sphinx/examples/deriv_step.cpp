@@ -98,5 +98,7 @@ Ridders from a / 8: relative error 5.0e-14
         x, a / 8);
     if (!(calls == 14 && started && from_step == started)) return 8;
     if (!(std::abs(started->value - exact) <= *started->abs_error && *started->abs_error < 1e-12 * -exact)) return 9;
+    // "A step so small that the method's points round to the same number gives non_finite": 1e-300 at 1.
+    if (!(dv::derivative(fn, 1.0, 1e-300) == std::unexpected(dv::error::non_finite))) return 10;
     return 0;
 }
