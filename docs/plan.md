@@ -197,6 +197,23 @@ with `linkcheck` and the install section of getting-started;
 whether the headers' `@code` blocks move to `@snippet` from tests (a change to `include/`); whether to offer the
 `requires` patch to Breathe upstream.
 
+## Milestone 4: integrals of a function of one variable (`nxx::quadrature`)
+
+Architecture approved: `docs/quadrature/BRIEF.md` (2026-10-30, D1 to D14 as recommended). Each phase gets its API
+approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milestones 1 and 2.
+
+- Phase 1: the core, `Integral`, `Failure`, `error`, `Criteria`, `integrate<M>(fn, a, b[, criteria])`; the fixed rule
+  `GaussLegendre<N>` with the arithmetic-only node generator and compile-time tables; `Romberg`.
+  - [ ] API approved: `docs/quadrature/PHASE1_API.md`
+  - [ ] `quadrature.hpp`, constexpr; tests on float, double, long double and Boost.Multiprecision; docs build clean
+  - [ ] CI passes on all five toolchains
+  - [ ] The independent review (Codex) and its adopted findings
+- Phase 2: adaptive `GaussKronrod<15>`, the default (the heap, the floor, final panels, stagnation, the cap, the
+  initial mesh, compensated sums; the node cache for types that are not literal).
+- Phase 3: exp (internal) and `TanhSinh` on finite intervals, with the endpoint handling and the end-term test.
+- Phase 4: `TanhSinh` on half lines and the line (exp-sinh, sinh-sinh).
+- The milestone ends with its chapter on the documentation site, as Milestone 3 did for roots and deriv.
+
 ## Deferred
 
 ### Derivatives (`nxx::deriv`)

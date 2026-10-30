@@ -13,7 +13,8 @@ locally and in CI.
 | Module | Header | Documents | Test cases | Status |
 |---|---|---|---|---|
 | `nxx::deriv`: derivatives of a scalar function | `deriv.hpp` | `docs/deriv/` | `deriv:*`, `orders:*`, `ridders:*`, `onesided:*` | Milestone 1, done |
-| `nxx::roots`: roots of a real function of one variable | `roots.hpp` | `docs/roots/` | `roots:*` | Milestone 2, current |
+| `nxx::roots`: roots of a real function of one variable | `roots.hpp` | `docs/roots/` | `roots:*` | Milestone 2, done |
+| `nxx::quadrature`: integrals of a function of one variable | `quadrature.hpp` | `docs/quadrature/` | `quadrature:*` | Milestone 4, current |
 
 A module's folder holds its design record (`design.md`: the decisions in force for the module, its primary sources
 and its test rules), its phase specifications (`PHASE<n>_API.md`) and its briefs and surveys. Read the module's
