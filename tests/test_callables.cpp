@@ -1,15 +1,23 @@
 // derivative() calls fn exactly as its constraint std::invocable<F &, T const &> promises: through std::invoke, with a
 // T const lvalue, for every stencil. Regression tests: the evaluator for more than two nodes used to pass a temporary,
-// and every branch called fn(...) directly, which rejects member-function pointers.
+// and every branch called fn(...) directly, which rejects member-function pointers. At the end, the rule for fn's
+// result (nxx::detail::value_of), in nxx::deriv and nxx::roots alike: for a class type T, T, not an expression.
 
 #include <numerixx/deriv.hpp>
+#include <numerixx/roots.hpp>
+
+#include <boost/multiprecision/cpp_bin_float.hpp>
+#include <boost/multiprecision/cpp_dec_float.hpp>
 
 #include <doctest/doctest.h>
 
 #include <compare>
 #include <concepts>
+#include <expected>
 #include <limits>
+#include <optional>
 #include <type_traits>
+#include <utility>
 
 using nxx::deriv::Backward;
 using nxx::deriv::Central;
@@ -298,3 +306,158 @@ TEST_CASE("deriv: a user type with numeric_limits written member by member")
     REQUIRE(d.has_value());
     CHECK(d->value.v == doctest::Approx(6.0).epsilon(2e-10));
 }
+
+namespace {
+
+    namespace mp = boost::multiprecision;
+    namespace rt = nxx::roots;
+    using bin50 = mp::cpp_bin_float_50;                            // expression templates off
+    using bin50_et = mp::number<mp::cpp_bin_float<50>, mp::et_on>; // on
+    using dec50 = mp::cpp_dec_float_50;                            // on by default
+
+    // The defect: with expression templates, y * y - 2 is an object holding references to y, a local destroyed when
+    // fn returns, before the library converts it to T (stack-use-after-return under AddressSanitizer).
+    template<typename T>
+    struct ExpressionOfLocal
+    {
+        auto operator()(T const &x) const
+        {
+            T const y = x * 2;
+            return y * y - 2;
+        }
+    };
+
+    // The same with a by-value parameter: its lifetime ends when fn returns or at the end of the full-expression that
+    // calls fn ([expr.call]), which is inside std::invoke, so before the library converts the result on every ABI.
+    template<typename T>
+    struct ExpressionOfParameter
+    {
+        auto operator()(T x) const { return x * x - 2; }
+    };
+
+    // What the rule asks for: T itself.
+    template<typename T>
+    struct ValueOfT
+    {
+        T operator()(T const &x) const { return T(x * x - 2); }
+    };
+
+    // A built-in result holds no references, and converts implicitly to a Boost type.
+    template<typename T, typename B>
+    struct BuiltIn
+    {
+        B operator()(T const &) const { return B(1); }
+    };
+
+    // A reference to fn's own member.
+    template<typename T>
+    struct Member
+    {
+        T cached;
+        T const &operator()(T const &) const { return cached; }
+    };
+
+    // nxx::deriv's estimate, as a fn around derivative() returns it.
+    template<typename T>
+    struct EstimateOf
+    {
+        nxx::deriv::Estimate<T> operator()(T const &x) const { return { x, std::nullopt }; }
+    };
+
+    // A class type that converts to T without being T: bin50 from bin50_et, a number, not an expression.
+    template<typename T, typename U>
+    struct Other
+    {
+        U operator()(T const &x) const { return U(x); }
+    };
+
+    // Separate derivatives returning a std::expected: of T, and of an expression.
+    template<typename T>
+    struct ExpectedValue
+    {
+        std::expected<T, int> operator()(T const &x) const { return T(2 * x); }
+    };
+
+    template<typename T>
+    struct ExpectedExpression
+    {
+        auto operator()(T const &x) const -> std::expected<decltype(2 * x), int> { return 2 * x; }
+    };
+
+    template<typename F, typename T>
+    constexpr bool differentiable = requires(F const &fn, T const &x) {
+        nxx::deriv::derivative(fn, x);
+        nxx::deriv::derivative(fn, x, x);
+        nxx::deriv::derivative<nxx::deriv::Ridders>(fn, x);
+    };
+
+    template<typename F, typename T>
+    constexpr bool solvable = requires(F const &fn, T const &x) {
+        rt::solve<rt::Brent>(fn, rt::Bracket<T>{ x, x });
+        rt::solve<rt::Secant>(fn, x);
+        rt::search(fn, x);
+    };
+
+    template<typename F, typename D, typename T>
+    constexpr bool solvable_with = requires(F const &fn, D const &dfn, T const &x) {
+        rt::solve<rt::Newton>(fn, dfn, x);
+        rt::solve<rt::Halley>(fn, dfn, dfn, rt::Bracket<T>{ x, x });
+    };
+
+    template<typename F>
+    using derivative_of_t = decltype(nxx::deriv::derivative_of(std::declval<F>()));
+
+} // namespace
+
+// The results are expressions: Boost's type, holding its operands by reference (expression_storage in
+// boost/multiprecision/detail/number_base.hpp), not T.
+static_assert(mp::is_number_expression<std::invoke_result_t<ExpressionOfLocal<dec50> const &, dec50 const &>>::value);
+static_assert(
+    mp::is_number_expression<std::invoke_result_t<ExpressionOfParameter<bin50_et> const &, bin50_et const &>>::value);
+
+// The rule on result types. For a class type T: T by value or reference, or a built-in type; never an expression or
+// another class type, even one that converts to T (an Estimate<T> too: write .value). For a built-in T: anything
+// convertible to T.
+static_assert(nxx::detail::value_of<dec50, dec50> && nxx::detail::value_of<dec50 const &, dec50>);
+static_assert(nxx::detail::value_of<double, dec50> && nxx::detail::value_of<int, bin50_et>);
+static_assert(!nxx::detail::value_of<nxx::deriv::Estimate<dec50>, dec50>);
+// Lvalue operands: on rvalues, Boost's operators reuse an operand's storage and return a number.
+static_assert(!nxx::detail::value_of<decltype(std::declval<dec50 const &>() * std::declval<dec50 const &>()), dec50>);
+static_assert(!nxx::detail::value_of<decltype(std::declval<bin50_et const &>() - 2), bin50_et>);
+static_assert(std::convertible_to<bin50_et, bin50> && !nxx::detail::value_of<bin50_et, bin50>);
+static_assert(nxx::detail::value_of<float, double> && nxx::detail::value_of<nxx::deriv::Estimate<double>, double>);
+static_assert(nxx::detail::value_of<double const &, double> && !nxx::detail::value_of<dec50, double>);
+
+// derivative() rejects a fn returning an expression, for each type with expression templates, and accepts T, a
+// built-in result and a reference to a member; a bare estimate is another class type, rejected.
+static_assert(!differentiable<ExpressionOfLocal<dec50>, dec50> && !differentiable<ExpressionOfParameter<dec50>, dec50>);
+static_assert(!differentiable<ExpressionOfLocal<bin50_et>, bin50_et>
+              && !differentiable<ExpressionOfParameter<bin50_et>, bin50_et>);
+static_assert(differentiable<ValueOfT<dec50>, dec50> && differentiable<ValueOfT<bin50_et>, bin50_et>);
+static_assert(differentiable<BuiltIn<dec50, double>, dec50> && differentiable<Member<dec50>, dec50>);
+static_assert(!differentiable<EstimateOf<bin50_et>, bin50_et> && !differentiable<Other<bin50, bin50_et>, bin50>);
+// Without expression templates, x * x - 2 is a bin50, so the same fn is accepted.
+static_assert(differentiable<ExpressionOfLocal<bin50>, bin50> && differentiable<ExpressionOfParameter<bin50>, bin50>);
+// A built-in T keeps the old rule: a float, or a class that converts to double.
+static_assert(differentiable<BuiltIn<double, float>, double> && differentiable<EstimateOf<double>, double>);
+static_assert(differentiable<Other<double, nxx::deriv::Estimate<double>>, double>);
+
+// derivative_of's callable: not invocable for an expression fn, so not a derivative for Newton either.
+static_assert(!std::is_invocable_v<derivative_of_t<ExpressionOfLocal<dec50>> const &, dec50 const &>);
+static_assert(std::is_invocable_v<derivative_of_t<ValueOfT<dec50>> const &, dec50 const &>);
+
+// nxx::roots: the value-only methods and search(), and Newton and Halley with separate derivatives, where fn and each
+// derivative obey the rule; a std::expected's value only converts to T, since the expected stores it (derivative_of's
+// Estimate<T>). An expected of an expression is not caught: it has to be spelled on purpose (docs/design.md).
+static_assert(!solvable<ExpressionOfLocal<dec50>, dec50> && !solvable<ExpressionOfParameter<bin50_et>, bin50_et>);
+static_assert(solvable<ValueOfT<dec50>, dec50> && solvable<BuiltIn<bin50_et, double>, bin50_et>);
+static_assert(solvable<Member<dec50>, dec50> && !solvable<Other<bin50, bin50_et>, bin50>);
+static_assert(solvable<ExpressionOfLocal<bin50>, bin50> && solvable<BuiltIn<double, float>, double>);
+static_assert(solvable_with<ValueOfT<dec50>, ValueOfT<dec50>, dec50>);
+static_assert(!solvable_with<ExpressionOfLocal<dec50>, ValueOfT<dec50>, dec50>);
+static_assert(!solvable_with<ValueOfT<dec50>, ExpressionOfParameter<dec50>, dec50>);
+static_assert(solvable_with<ValueOfT<dec50>, ExpectedValue<dec50>, dec50>);
+static_assert(solvable_with<ValueOfT<dec50>, ExpectedExpression<dec50>, dec50>);
+static_assert(solvable_with<ValueOfT<dec50>, derivative_of_t<ValueOfT<dec50>>, dec50>);
+static_assert(!solvable_with<ValueOfT<dec50>, derivative_of_t<ExpressionOfLocal<dec50>>, dec50>);
+static_assert(solvable_with<ValueOfT<double>, ExpectedValue<double>, double>);

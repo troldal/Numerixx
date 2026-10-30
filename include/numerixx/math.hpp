@@ -55,8 +55,32 @@ namespace nxx {
     namespace detail {
 
         /**
-         * @brief A function the algorithms can evaluate at a T: invocable with a T const lvalue, with a result
-         * convertible to T.
+         * @brief A result of fn that the algorithms may convert to T: return T, not an expression.
+         *
+         * For a class type T, the result must be T itself (by value or by reference) or a built-in arithmetic type. For
+         * a built-in T, anything convertible to T, as a float for a double.
+         *
+         * A class-type result that only converts to T may be an expression template, such as Boost.Multiprecision's
+         * with et_on (cpp_dec_float_50), which holds references to its operands. Returned from fn, it can refer to
+         * fn's locals or to a by-value parameter, which are gone when the library converts it: a parameter's lifetime
+         * ends when fn returns or at the end of the full-expression that calls fn ([expr.call]), and that call is in
+         * std::invoke, so on every ABI. Nothing could catch that at run time, so the rule rejects it at compile time.
+         * A built-in result holds no references. A reference to T is admitted, as for a built-in T: it is in fn's
+         * signature, compilers warn when it refers to a local or a parameter, and a reference to fn's own member is
+         * valid. The rule applies to a value fn returns directly; a value held inside a std::expected that a module
+         * accepts (nxx::roots' separate derivatives) is stored by value and only needs to convert to T.
+         *
+         * @tparam R The result type, as returned (with its reference and constness).
+         * @tparam T The real type.
+         */
+        template<typename R, typename T>
+        concept value_of = std::convertible_to<R, T>
+                           && (!std::is_class_v<T> || std::same_as<std::remove_cvref_t<R>, T>
+                               || std::is_arithmetic_v<std::remove_cvref_t<R>>); // return T, not an expression
+
+        /**
+         * @brief A function the algorithms can evaluate at a T: invocable with a T const lvalue, with a result the
+         * algorithms may convert to T (value_of: return T, not an expression).
          *
          * F & in the constraint, because fn is called as a named reference, an lvalue, through std::invoke with a T
          * const lvalue: member pointers work, and so does a callable that rejects rvalues. Spelled
@@ -66,8 +90,7 @@ namespace nxx {
          * @tparam T The real type.
          */
         template<typename F, typename T>
-        concept callable =
-            std::invocable<F &, T const &> && std::convertible_to<std::invoke_result_t<F &, T const &>, T>;
+        concept callable = std::invocable<F &, T const &> && value_of<std::invoke_result_t<F &, T const &>, T>;
 
     } // namespace detail
     /** @endcond */

@@ -12,8 +12,27 @@ decisions are in `docs/<module>/design.md` (`docs/deriv/design.md`).
 - Numerixx never throws and never catches: an exception thrown by fn or by T's operations passes through unchanged.
   Catching would break builds without exceptions, such as Emscripten's default.
 - fn is constrained by `nxx::detail::callable<F, T>` in `math.hpp` (invocable with a `T const` lvalue, its result
-  convertible to T), shared by the modules since `nxx::roots` was the second to need it; spelled with `nxx::` in the
-  modules, whose own `detail` namespaces would otherwise hide it.
+  admitted by `nxx::detail::value_of<R, T>`), shared by the modules since `nxx::roots` was the second to need it;
+  spelled with `nxx::` in the modules, whose own `detail` namespaces would otherwise hide it.
+- fn returns T, not an expression. For a class type T, `value_of` admits T itself (by value or by reference), a
+  built-in arithmetic type; for a built-in T, anything convertible to T, as a `float` for a `double`. The same rule
+  holds for every user callable whose value the library converts to T, such as `nxx::roots`' separate derivatives;
+  the value inside a `std::expected` they return only needs to convert to T, because the expected stores it by value
+  (`nxx::deriv::derivative_of`'s `Estimate<T>`), and an expected of an expression type has to be spelled on purpose.
+  `math.hpp` names no module's type (user decision, 2026-10-30). Why: a result that only converts to T may be
+  an expression template (Boost.Multiprecision with `et_on`, such as `cpp_dec_float_50`), which holds references to
+  its operands. Returned from fn, it refers to fn's locals, or to a by-value parameter, whose lifetime ends when fn
+  returns or at the end of the full-expression that calls fn ([expr.call]: which one is implementation-defined; the
+  MSVC ABI destroys it in the callee, the Itanium ABI in the caller). That call is inside `std::invoke`, so on either
+  ABI the parameter is gone before the library converts the result. The conversion then reads destroyed objects:
+  wrong values or a crash, and AddressSanitizer's stack-use-after-return, with clang-cl, GCC and Clang. Nothing can
+  catch it at run time, so the rule is checked at compile time. A built-in result holds no references. A fn that
+  returns an `nxx::deriv::Estimate<T>` directly for a class type T is rejected too; it writes `.value`. A reference
+  result is
+  admitted: it is in fn's signature, compilers warn when it refers to a local or a parameter, and a reference to fn's
+  own member is valid. Another class type that converts to T, even one that holds no references, is rejected, since
+  no trait tells it from an expression. The tuple form of `nxx::roots` was already stricter: every element exactly T,
+  no reference (`docs/roots/BRIEF.md` 3.4).
 
 ## Real types (`math.hpp`)
 

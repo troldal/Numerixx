@@ -73,8 +73,11 @@ module (the library, real types, the general test rules) is in `docs/design.md`;
   in constant evaluation on GCC it is a compile error rather than an error value. Overflow is detected, not avoided:
   halving the operands would make it impossible, but halving is not exact in decimal types and a step near max has no
   numerical meaning.
-- `fn` must be invocable with `T const &` and return something convertible to `T`; the result is converted with
-  `static_cast<T>` before any arithmetic, so expression templates do not escape. Every call is
+- `fn` must be invocable with `T const &` and return T, not an expression (`nxx::detail::value_of`, `docs/design.md`:
+  for a class type T, T or a built-in type; for a built-in T, anything convertible to T); the result
+  is converted with `static_cast<T>` before any arithmetic, so the library's own expressions do not escape. An
+  expression returned by fn would already refer to fn's destroyed locals, which the conversion cannot repair, hence
+  the rule. Every call is
   `std::invoke(fn, point)` with `point` a `T const` lvalue, exactly what the constraint promises: member-function
   pointers work, and so do callables that reject rvalues.
 - The default-step overload rejects a non-finite x before computing the step, so that it is an error value in

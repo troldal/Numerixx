@@ -52,6 +52,21 @@ namespace {
     static_assert(!solvable_with_deduced_pair<boost::multiprecision::cpp_dec_float_50>);
     static_assert(solvable_with_deduced_pair<double>);
 
+    // A fn returning x * x - 2 compiles in cpp_bin_float_50, where that is a number, not in cpp_dec_float_50, where
+    // it is an expression; nor does a separate derivative returning 2 * x there.
+    template<typename T>
+    constexpr bool solvable_returning_arithmetic = requires(T const &x0) {
+        rt::solve<rt::Brent>([](T const &x) { return x * x - 2; }, rt::Bracket<T>{x0, x0});
+    };
+    template<typename T>
+    constexpr bool solvable_with_derivative_returning_arithmetic = requires(T const &x0) {
+        rt::solve<rt::Newton>([](T const &x) { return T(x * x - 2); }, [](T const &x) { return 2 * x; }, x0);
+    };
+    static_assert(solvable_returning_arithmetic<boost::multiprecision::cpp_bin_float_50>
+                  && !solvable_returning_arithmetic<boost::multiprecision::cpp_dec_float_50>);
+    static_assert(solvable_with_derivative_returning_arithmetic<boost::multiprecision::cpp_bin_float_50>
+                  && !solvable_with_derivative_returning_arithmetic<boost::multiprecision::cpp_dec_float_50>);
+
     // cpp_dec_float_50 uses expression templates, cpp_bin_float_50 does not.
     static_assert(boost::multiprecision::cpp_dec_float_50::et == boost::multiprecision::et_on
                   && boost::multiprecision::cpp_bin_float_50::et == boost::multiprecision::et_off);

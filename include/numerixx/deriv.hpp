@@ -1728,7 +1728,8 @@ namespace nxx::deriv {
      *           `ForwardRidders` or `BackwardRidders`.
      * @tparam N The derivative order: 1 (the default) to 4, an integer or an `order`.
      * @tparam T The real type, deduced from @p x.
-     * @tparam F A callable taking T const & and returning something convertible to T.
+     * @tparam F A callable taking T const & and returning T (for a class type T, T itself or a built-in arithmetic
+     *           type, not an expression template; for a built-in T, anything convertible to T).
      * @param fn The function to differentiate.
      * @param x The point.
      * @param h The step of a stencil, or the initial step of an extrapolation method; it converts to T, so a
@@ -1764,7 +1765,8 @@ namespace nxx::deriv {
      *           `ForwardRidders` or `BackwardRidders`.
      * @tparam N The derivative order: 1 (the default) to 4, an integer or an `order`.
      * @tparam T The real type, deduced from @p x.
-     * @tparam F A callable taking T const & and returning something convertible to T.
+     * @tparam F A callable taking T const & and returning T (for a class type T, T itself or a built-in arithmetic
+     *           type, not an expression template; for a built-in T, anything convertible to T).
      * @param fn The function to differentiate.
      * @param x The point.
      * @return The estimate of the derivative, with an error estimate for the extrapolation methods, or

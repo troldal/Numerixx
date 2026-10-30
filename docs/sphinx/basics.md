@@ -53,8 +53,13 @@ The three differences are these.
 
 - **Return the type, not the expression.** Some Boost types, `cpp_dec_float_50` among them, use *expression templates*:
   `cos(x) - x` is not a number but an object that records the operation and evaluates it later, and it may refer to
-  `fn`'s locals, which are gone once `fn` returns. Converting it to the type, `dec50(cos(x) - x)`, makes `fn` return a
-  number. Types without expression templates, such as `cpp_bin_float_50`, do not need this, but it does no harm.
+  `fn`'s locals or to a parameter taken by value, which are gone before Numerixx reads it. Converting it to the type,
+  `dec50(cos(x) - x)`, makes `fn` return a number. This is a rule, checked when the call compiles: for a type that is a
+  class, `fn` must return the type itself (or a reference to it), or a built-in number such as a `double`, and a call
+  whose `fn` returns an expression does not compile. Types without expression templates, such as `cpp_bin_float_50`,
+  return the type from `cos(x) - x` already, so the conversion there, `bin50(cos(x) - x)`, is a harmless habit. For
+  the built-in types the rule is looser: a `fn` for `double` may return anything that converts to `double`, such as a
+  `float`.
 - **Call mathematical functions unqualified.** `std::cos` is only for the built-in types, and `std::cos(x)` does not
   compile for a Boost number. Write `using std::cos;` and then `cos(x)`, with a using-declaration for each function you
   call (`using std::sin;` for `sin`): the call finds Boost's function for a Boost type and the standard one for a

@@ -383,8 +383,9 @@ namespace nxx::roots {
                 std::make_index_sequence<std::tuple_size_v<std::remove_cv_t<std::invoke_result_t<F &, T const &>>>>{});
 
         /**
-         * @brief A function returning one value: its result converts to T and is not a std::pair, std::tuple or
-         * std::array (a tuple-like result is never read as a value, even where T converts from it).
+         * @brief A function returning one value: nxx::detail::callable (for a class type T, the result is T, not an
+         * expression), and not a std::pair, std::tuple or std::array (a tuple-like result is never read as a value,
+         * even where T converts from it).
          *
          * @tparam F The callable type.
          * @tparam T The real type.
@@ -409,8 +410,11 @@ namespace nxx::roots {
         inline constexpr bool is_expected<std::expected<U, E>> = true;
 
         /**
-         * @brief A separate derivative callable: one returning a value (value_valued), or a std::expected whose value
-         * converts to T, such as nxx::deriv::derivative_of's callable. The expected's error is never read.
+         * @brief A separate derivative callable: one returning a value (value_valued, so T and not an expression for a
+         * class type T), or a std::expected whose value converts to T, such as nxx::deriv::derivative_of's callable,
+         * whose value is an nxx::deriv::Estimate<T>. The expected's error is never read. The expected holds its value,
+         * so the value need not be T: it outlives the callable, unless it is itself an expression type, which only a
+         * deliberately spelled std::expected of one can be.
          *
          * The value is the expression derivative_value converts, `*r` on the result as returned (by value: an rvalue;
          * by reference: with its reference and constness), so that a conversion the constraint admits is the one the
@@ -1933,9 +1937,10 @@ namespace nxx::roots {
      * @tparam M The method: `Bisection`, `Brent`, `Toms748`, `AndersonBjorck`, `Ridders`, `RegulaFalsi`, `Illinois`,
      *           `Newton` or `Halley`.
      * @tparam T The real type, deduced from @p bracket.
-     * @tparam F A callable taking T const & and returning something convertible to T, or (for Newton and Halley, which
-     *           need it) a std::pair, std::tuple or std::array of exactly T: the value and the derivatives. For Newton
-     *           on a fn without a derivative, pass the derivative as a callable after fn, use
+     * @tparam F A callable taking T const & and returning T (for a class type T, T itself or a built-in arithmetic
+     *           type, not an expression template; for a built-in T, anything convertible to T), or (for Newton and
+     *           Halley, which need it) a std::pair, std::tuple or std::array of exactly T: the value and the
+     *           derivatives. For Newton on a fn without a derivative, pass the derivative as a callable after fn, use
      *           nxx::deriv::derivative_of, or use Secant or Brent.
      * @param fn The function.
      * @param bracket An interval in which fn changes sign.
@@ -1990,10 +1995,11 @@ namespace nxx::roots {
      *
      * @tparam M The method: `Newton`, `Halley`, `Secant` or `Steffensen`.
      * @tparam T The real type, deduced from @p guess.
-     * @tparam F A callable taking T const &: for Secant and Steffensen returning something convertible to T, for Newton
-     *           and Halley a std::pair, std::tuple or std::array of exactly T (the value, f', f''). For Newton on a fn
-     *           without a derivative, pass the derivative as a callable after fn, use nxx::deriv::derivative_of, or use
-     *           Secant.
+     * @tparam F A callable taking T const &: for Secant and Steffensen returning T (for a class type T, T itself or a
+     *           built-in arithmetic type, not an expression template; for a built-in T, anything convertible to T),
+     *           for Newton and Halley a std::pair, std::tuple or std::array of exactly T (the value, f', f''). For
+     *           Newton on a fn without a derivative, pass the derivative as a callable after fn, use
+     *           nxx::deriv::derivative_of, or use Secant.
      * @param fn The function.
      * @param guess The starting point.
      * @param criteria When to stop; it converts to T.
@@ -2020,9 +2026,10 @@ namespace nxx::roots {
      * @brief Newton on @p bracket with the derivative as a separate callable: the same as Newton on a fn returning
      * (f, f'), with each callable evaluated once per point.
      *
-     * The derivative may return a value, or a std::expected whose value converts to T (its error is never read), such
-     * as the callable nxx::deriv::derivative_of(fn) or a lambda around nxx::deriv::derivative(fn, x, h) with a step of
-     * one's own. A std::expected without a value counts as a derivative that is not finite: on a bracket the step is a
+     * The derivative may return a value, as fn does, or a std::expected whose value converts to T (its error is never
+     * read), such as the callable nxx::deriv::derivative_of(fn) or a lambda around nxx::deriv::derivative(fn, x, h)
+     * with a step of one's own. A std::expected without a value counts as a derivative that is not finite: on a
+     * bracket the step is a
      * bisection step, from a guess the method ends with error::not_converged, and Halley takes Newton's step where only
      * f'' failed. A numerical derivative fails where fn is not finite at a node or the stencil cannot be formed (a
      * point near max, a step below the resolution of x); a fn that stays finite outside its domain gives a finite,
@@ -2052,7 +2059,8 @@ namespace nxx::roots {
      * detail::open (the method and the start).
      * @tparam M Newton.
      * @tparam T The real type, deduced from @p bracket.
-     * @tparam F A callable taking T const & and returning something convertible to T.
+     * @tparam F A callable taking T const & and returning T (for a class type T, T itself or a built-in arithmetic
+     *           type, not an expression template; for a built-in T, anything convertible to T).
      * @tparam D The derivative: a callable as F, or one returning a std::expected whose value converts to T.
      * @param fn The function.
      * @param dfn Its derivative.
@@ -2074,7 +2082,8 @@ namespace nxx::roots {
      * @brief Newton from @p guess with the derivative as a separate callable.
      * @tparam M Newton.
      * @tparam T The real type, deduced from @p guess.
-     * @tparam F A callable taking T const & and returning something convertible to T.
+     * @tparam F A callable taking T const & and returning T (for a class type T, T itself or a built-in arithmetic
+     *           type, not an expression template; for a built-in T, anything convertible to T).
      * @tparam D The derivative: a callable as F, or one returning a std::expected whose value converts to T.
      * @param fn The function.
      * @param dfn Its derivative.
@@ -2096,7 +2105,8 @@ namespace nxx::roots {
      * @brief Halley on @p bracket with the first and second derivatives as separate callables.
      * @tparam M Halley.
      * @tparam T The real type, deduced from @p bracket.
-     * @tparam F A callable taking T const & and returning something convertible to T.
+     * @tparam F A callable taking T const & and returning T (for a class type T, T itself or a built-in arithmetic
+     *           type, not an expression template; for a built-in T, anything convertible to T).
      * @tparam D The first derivative: a callable as F, or one returning a std::expected whose value converts to T.
      * @tparam D2 The second derivative: as D.
      * @param fn The function.
@@ -2124,7 +2134,8 @@ namespace nxx::roots {
      * @brief Halley from @p guess with the first and second derivatives as separate callables.
      * @tparam M Halley.
      * @tparam T The real type, deduced from @p guess.
-     * @tparam F A callable taking T const & and returning something convertible to T.
+     * @tparam F A callable taking T const & and returning T (for a class type T, T itself or a built-in arithmetic
+     *           type, not an expression template; for a built-in T, anything convertible to T).
      * @tparam D The first derivative: a callable as F, or one returning a std::expected whose value converts to T.
      * @tparam D2 The second derivative: as D.
      * @param fn The function.
@@ -2281,8 +2292,9 @@ namespace nxx::roots {
      * @endcode
      *
      * @tparam T The real type, deduced from @p x0 (search(fn, 0) deduces int: write 0.0).
-     * @tparam F A callable taking T const & and returning something convertible to T, or a std::pair, std::tuple or
-     *           std::array of exactly T, whose first element is used.
+     * @tparam F A callable taking T const & and returning T (for a class type T, T itself or a built-in arithmetic
+     *           type, not an expression template; for a built-in T, anything convertible to T), or a std::pair,
+     *           std::tuple or std::array of exactly T, whose first element is used.
      * @param fn The function.
      * @param x0 The start.
      * @return The bracket, its ends in order; error::non_finite if x0 or fn(x0) is not finite; error::no_sign_change

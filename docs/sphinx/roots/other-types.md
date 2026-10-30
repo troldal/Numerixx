@@ -42,10 +42,12 @@ digits:
 ```
 
 The root comes out to all 50 digits. `fn` returns `bin50(x * x - 2)`, the type itself rather than the arithmetic
-expression, as every `fn` in a Boost type should ([Multiprecision types](../basics.md#multiprecision-types) explains
-why).
+expression. In a type with expression templates this is required, and a `fn` that returns the expression does not
+compile; in `cpp_bin_float_50`, which has none, it is a habit that costs nothing ([Multiprecision
+types](../basics.md#multiprecision-types) explains why).
 
-The same holds for the derivatives that Newton's and Halley's methods take. Name the element types of the pair or tuple,
+The same holds for the derivatives that Newton's and Halley's methods take, whether `fn` returns them or they are
+separate functions. Name the element types of the pair or tuple,
 `std::pair<T, T>`, so that each element is converted to the type before `fn` returns. `cpp_dec_float_50`, a decimal
 type, uses expression templates, where it matters most:
 

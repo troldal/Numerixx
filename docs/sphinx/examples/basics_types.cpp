@@ -35,6 +35,19 @@ namespace {
     constexpr bool differentiable = requires(T const x) { nxx::deriv::derivative([](double t) { return t; }, x); };
     static_assert(differentiable<double> && !differentiable<int>);
 
+    // A fn that returns the expression cos(x) - x does not compile in a type with expression templates, for solve and
+    // derivative alike; the same fn compiles for double, and for dec50 once it returns dec50(cos(x) - x).
+    constexpr auto expression_fn = [](auto const &x) {
+        using std::cos;
+        return cos(x) - x;
+    };
+    template<typename T>
+    constexpr bool accepts_expression = requires(T const x) {
+        rt::solve<rt::Brent>(expression_fn, rt::Bracket{x, x});
+        nxx::deriv::derivative(expression_fn, x);
+    };
+    static_assert(accepts_expression<double> && !accepts_expression<boost::multiprecision::cpp_dec_float_50>);
+
     // long double's precision as the page states it: double's with MSVC and clang-cl, x87 extended (a 64-bit
     // significand) with GCC and Clang on x86-64, quadruple (113 bits) with Emscripten.
 #if defined(_MSC_VER)

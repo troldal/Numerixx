@@ -120,7 +120,10 @@ the phases in `docs/plan.md`, and each phase's specification and evidence in `PH
 
 - **A separate derivative may return a std::expected** whose value converts to T (user decision P3): any
   `std::expected<U, E>`, so `nxx::roots` names no type of `nxx::deriv`; `nxx::deriv::derivative_of`'s callable and a
-  lambda around `derivative(fn, x, h)` are the uses. fn itself still returns a value or a tuple (deferred).
+  lambda around `derivative(fn, x, h)` are the uses. fn itself still returns a value or a tuple (deferred). Since the
+  rule on fn's result (`docs/design.md`, "fn returns T, not an expression"), a derivative returning a value follows
+  fn's rule; the value inside a returned expected only needs to convert to T, since the expected stores it (so
+  `derivative_of`'s `Estimate<T>` is accepted for every T).
 - **A failed derivative counts as one that is not finite** (P2, superseding `BRIEF.md` 3.4's `non_finite`): on a
   bracket a bisection step, from a guess `not_converged`, for Halley's f'' Newton's step. Stored as 0, which every
   `nxx::real` has and which has the same effect in both steps (tested against a derivative returning infinity, bit for
