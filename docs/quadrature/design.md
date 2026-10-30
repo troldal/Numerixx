@@ -38,8 +38,13 @@ every module (the library, real types, the general test rules) is in `docs/desig
   to at most 1), the ends (NaN or infinite: `non_finite`), a == b (0, or `{0, 0}`, without calling fn). b < a negates
   through the signed scale.
 - **The interval** (`detail::Interval`, built once by `detail::interval_of` and used by both methods): the nodes
-  `c + hw u`, c = a / 2 + b / 2, hw = b / 2 - a / 2 (no overflow on [-max, max]); Romberg evaluates its ends as fn(a)
-  and fn(b).
+  `c + hw u`, c = a / 2 + b / 2, hw = b / 2 - a / 2 (no overflow on [-max, max]), each clamped into
+  [min(a, b), max(a, b)] by comparisons (`Interval::point`): where the halves round (on [D, 3D], D = denorm_min,
+  c = hw = 2D) the map left the interval, reaching 0 and 4D (independent review, finding 2). A point may coincide with
+  an end, as on any interval a few ulps wide. Romberg evaluates its ends as fn(a) and fn(b).
+- **Whether b - a overflows** is decided before it is formed, since constant evaluation rejects the overflow: ends of
+  opposite signs with `|a| / 2 + |b| / 2 > max / 2`. In radix 2 the halves are exact and the rounded half-sum exceeds
+  max / 2 exactly when the rounded |a| + |b| exceeds max (finding 3).
 - **The scale of each term** (B), formed before the sum, as `term(w, y)` = hw w y, w the weight relative to the
   half-width (a Gauss weight; Romberg's 2^(1-k), 1 for T_0's terms). The order of the products is chosen so that an
   intermediate is subnormal or overflows only if the term itself is:
@@ -47,18 +52,29 @@ every module (the library, real types, the general test rules) is in `docs/desig
     wide interval (1e-310 on [0, 1e10]: 1e-300) is not made subnormal first, which would cost about 1000 eps.
   - b - a finite, |b - a| < 1: `(b - a)((w / 2) y)`, the value first, so that a subnormal scale is never formed
     ([0, 3 denorm_min]: `(b - a) / 2^k` rounds 1.5 denorm_min to 2 and 3/8 denorm_min to 0 by level 3).
-  - b - a overflows: `hw (w y)`, the value first, since `hw w` overflows for w > 1 (w_1 = 2 at N = 1; fn = 1e-300 on
-    [-max, max] would give infinity, fn = 0 NaN). The one case left: a value of fn below about 1e-292 on a near-max
-    interval makes `w y` subnormal and loses digits, though the term is normal.
+  - b - a overflows, so |hw| > max / 2: `(hw y) w` for |y| <= 1, where `hw y` cannot overflow and is normal unless
+    y = 0; `hw (w y)` for |y| > 1, where |w y| >= w is normal; never `hw w`, which overflows for w > 1 (w_1 = 2 at
+    N = 1). The first version formed `hw (w y)` for every y, which made the constant denorm_min on [-max, max]
+    integrate to 0 (finding 1).
 
-  The specification writes the scales as `s_i = (b - a)(w_i / 2)` and `h_k = (b - a) / 2^k`; in the normal range both
-  orders round alike. A clarification of B, recorded for the review (the review round adopted this rule). w / 2 and
-  2^(1-k) are exact in radix 2; in radix 10 they round, which Romberg's 14 eps L1 allowance covers.
+  The specification writes the scales as `s_i = (b - a)(w_i / 2)` and `h_k = (b - a) / 2^k`; the orders are
+  algebraically equal and round differently in the normal range (by an ulp for a Gauss weight; Romberg's powers of 2
+  are exact in radix 2, so its terms agree there). A clarification of B, adopted in the review round and completed by
+  the independent review (findings 1 and 6). w / 2 and 2^(1-k) are exact in radix 2; in radix 10 they round, which
+  Romberg's 14 eps L1 allowance covers.
 - **Sums** (C): value sums Neumaier-compensated (`detail::Sum<T>`), Romberg's L1 sums plain. Finiteness is checked
   once per sum: GaussLegendre's result; Romberg's L1 per level (a non-finite value of fn makes it non-finite) and the
   estimate (R(k-1, k-1) is finite, so an overflow of T_k or of the extrapolation, values near max of alternating signs,
   makes it non-finite; `BRIEF.md` 3.6). A test shows both overflows of the extrapolation caught there: in the estimate
   at level 1, and in R(2, 2) at level 2.
+- **Constant evaluation** (finding 3): an overflow, or arithmetic on a NaN, is not a constant expression, and GCC and
+  Clang reject them at different operations, so a check after the arithmetic cannot report them. Under
+  `if consteval` only, each value of fn is checked for finiteness, and each product of a term (`small_product`), each
+  partial sum, L1 and Romberg's extrapolated values are kept within max / 2 (`large`) before the operation that could
+  overflow, else `non_finite`. Conservative: a term or sum above max / 2 is `non_finite` in constant evaluation where
+  run time gives the value (0.8 max on [0, 1]). At run time nothing changes: one check per sum.
+- **No default constructor** is assumed: every array element is constructed from T(0) (`detail::zeros`), as
+  `nxx::real` does not require T() (finding 4).
 - **The floor** is `50 max(eps L1, denorm_min)`, L1 Romberg's trapezoid sum of |fn| at the level reached (for x^2 on
   [0, 3] at level 4, 9 + 9 / 512, not 9); abs_error = max(estimate, floor).
 - **Samples that all vanish** give the value 0 with abs_error the floor, 50 denorm_min in double, as fn = 0 on
@@ -126,8 +142,8 @@ every module (the library, real types, the general test rules) is in `docs/desig
 mirroring the header's operation order (`detail::Interval::term`, the Neumaier sum, the level and Richardson updates,
 the checks), so that the counts check a transliteration, as in `nxx::roots`; references from mpmath at 60 digits. The
 C++ reproduces its evaluation counts exactly for fn of `+ - * /` and sqrt (`quadrature: romberg: evaluation counts in
-double`); the rows with libm functions are checked for accuracy, not counts. The scale order of the review round
-changed no row.
+double`); the rows with libm functions are checked for accuracy, not counts. Neither the scale order of the review
+round nor the fixes of the independent review (the clamp, the order where b - a overflows) changed an earlier row.
 
 | Case | Criteria | Status | Level | Evaluations | abs_error | Actual error |
 |---|---|---|---|---|---|---|
@@ -156,6 +172,8 @@ changed no row.
 | 0 on [-max, max] | default | ok | 4 | 17 | 2.47e-322 (50 denorm_min) | 0 |
 | 1e-300 on [-max, max] | default | ok | 4 | 17 | 4.0e-6 | 1.1e-8 (3e-17 relative) |
 | 1e300 on [0, 3 denorm_min] | default | ok | 4 | 17 | 1.65e-37 | 7.8e-40 |
+| denorm_min on [-max, max] | default | ok | 4 | 17 | 1.97e-29 | 0 |
+| 0 on [D, 3D], 1e300 outside (D = denorm_min) | default | ok, 0 | 4 | 17 | 2.47e-322 | 0 |
 | 1e-320 e^x on [0, 1] | default | ok (the denorm_min floor) | 4 | 17 | 2.47e-322 | 1.1e-323 |
 | 1e308 sin x on [0, 2 pi] | default | non_finite (L1 overflows) | 2 | 5 | | |
 | -0.9 max at 0, 1; 0.9 max at 1/2 | default | non_finite (the estimate overflows) | 1 | 3 | | |

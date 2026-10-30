@@ -52,8 +52,10 @@ namespace {
     double truncation(int k, double width, double log_max_derivative)
     {
         double const m = static_cast<double>(k);
-        return std::exp((2.0 * m + 3.0) * std::log(width) - m * (m + 1.0) * std::log(2.0)
-                        + std::log(bernoulli_over_factorial[k]) + log_max_derivative);
+        double const bound = std::exp((2.0 * m + 3.0) * std::log(width) - m * (m + 1.0) * std::log(2.0)
+                                      + std::log(bernoulli_over_factorial[k]) + log_max_derivative);
+        REQUIRE(std::isfinite(bound)); // a bound that overflowed would pass every check
+        return bound;
     }
 
     // log max |f^(2k+2)| for 1 / (1 + x^2): at most log (2k + 2)! (f = Im 1 / (x - i), |x - i| >= 1).
@@ -62,7 +64,11 @@ namespace {
 
     // Romberg's rounding: 14 eps L1 of its own, and fn's rho L1 through weights whose absolute values sum below 1.97.
     double rounding(double eps, double rho, double l1)
-    { return (14.0 * eps + 1.97 * rho) * l1; }
+    {
+        double const bound = (14.0 * eps + 1.97 * rho) * l1;
+        REQUIRE(std::isfinite(bound));
+        return bound;
+    }
 
     // A run with its evaluations counted.
     template<typename T, typename F>
@@ -121,6 +127,35 @@ static_assert(qd::integrate<qd::Romberg>(square, dnan, 1.0)
 static_assert(qd::integrate<qd::Romberg>(square, 0.0, 1.0, { .abs_tol = -1.0 })
               == std::unexpected(qd::Failure<double>{ qd::error::non_finite, std::nullopt }));
 
+// The independent review's constant-evaluation cases (PHASE1_API.md, "Independent review"), run-time twins in
+// "quadrature: romberg: constant evaluation of the edges".
+namespace {
+    constexpr auto zero_fn = [](double) { return 0.0; };
+    constexpr auto nan_fn = [](double) { return dnan; };
+    constexpr auto inf_fn = [](double x) { return x == 0.5 ? dinf : x; };
+    constexpr auto max_fn = [](double) { return dmax; };
+    constexpr auto large_fn = [](double) { return 0.8 * dmax; };
+    constexpr auto wrapped_one = [](Wrapped const &) { return Wrapped(1); };
+} // namespace
+// A zero fn on [-max, max], where b - a overflows and is not formed: 0 with the floor 50 denorm_min, at level 4.
+static_assert(qd::integrate<qd::Romberg>(zero_fn, -dmax, dmax) == qd::Integral<double>{ 0.0, 50.0 * dmin });
+// A value of fn that is not finite, at an end and inside, and a sum that overflows: non_finite, as at run time.
+static_assert(qd::integrate<qd::Romberg>(nan_fn, 0.0, 1.0)
+              == std::unexpected(qd::Failure<double>{ qd::error::non_finite, std::nullopt }));
+static_assert(qd::integrate<qd::Romberg>(inf_fn, 0.0, 1.0)
+              == std::unexpected(qd::Failure<double>{ qd::error::non_finite, std::nullopt }));
+static_assert(qd::integrate<qd::Romberg>(max_fn, 0.0, 3.0)
+              == std::unexpected(qd::Failure<double>{ qd::error::non_finite, std::nullopt }));
+// Conservative in constant evaluation: T_0 = 0.8 max lies above max / 2, so the extrapolation is refused there, where
+// run time gives 0.8 max.
+static_assert(qd::integrate<qd::Romberg>(large_fn, 0.0, 1.0)
+              == std::unexpected(qd::Failure<double>{ qd::error::non_finite, std::nullopt }));
+// A real type without a default constructor: 1 on [0, 1], every sample and sum exact (dyadic weights), so 1 exactly
+// with the floor 50 eps.
+static_assert(qd::integrate<qd::Romberg>(wrapped_one, Wrapped(0), Wrapped(1)).value().value == Wrapped(1));
+static_assert(
+    qd::integrate<qd::Romberg>(wrapped_one, Wrapped(0), Wrapped(1)).value().abs_error == Wrapped(50.0 * deps));
+
 // The defaults, and the overload's constraint: only Romberg takes criteria, and both ends deduce T.
 static_assert(qd::Criteria<double>{} == qd::Criteria<double>{ 0.0, nxx::math::root_epsilon<2, double>() });
 static_assert(qd::Criteria<double>{}.rel_tol > 1.49e-8 && qd::Criteria<double>{}.rel_tol < 1.50e-8);
@@ -163,6 +198,9 @@ TEST_CASE("quadrature: romberg: evaluation counts in double")
         { "nan inside", counted([](double x) { return x == 0.5 ? dnan : x; }, 0.0, 1.0), false, 3 },
         { "inf at an end", counted([](double x) { return x == 1.0 ? dinf : x; }, 0.0, 1.0), false, 2 },
         { "estimate overflows", counted(estimate_overflow, 0.0, 1.0), false, 3 },
+        { "denorm_min [-max,max]", counted([](double) { return dmin; }, -dmax, dmax), true, 17 },
+        { "0 inside [D,3D], 1e300 outside",
+          counted([](double x) { return x < dmin || x > 3.0 * dmin ? 1e300 : 0.0; }, dmin, 3.0 * dmin), true, 17 },
         { "R(2,2) overflows", counted(diagonal_overflow, 0.0, 1.0), false, 5 },
     };
     for (Case const &c : cases) {
@@ -313,6 +351,44 @@ TEST_CASE("quadrature: romberg: other types")
     CHECK(error_of(r->value, pi_over_4) <= truncation(k, 1.0, runge_derivative(k)) + rounding(eps, 2.0 * eps, 0.7854));
 }
 
+TEST_CASE("quadrature: romberg: constant evaluation of the edges")
+{
+    // The run-time twins of the independent review's static_asserts.
+    qd::Failure<double> const invalid{ qd::error::non_finite, std::nullopt };
+    CHECK(qd::integrate<qd::Romberg>(zero_fn, -dmax, dmax) == qd::Integral<double>{ 0.0, 50.0 * dmin });
+    CHECK(qd::integrate<qd::Romberg>(nan_fn, 0.0, 1.0) == std::unexpected(invalid));
+    CHECK(qd::integrate<qd::Romberg>(inf_fn, 0.0, 1.0) == std::unexpected(invalid));
+    CHECK(qd::integrate<qd::Romberg>(max_fn, 0.0, 3.0) == std::unexpected(invalid));
+    // At run time the conservative case gives its value: 0.8 max, every sample and sum exact (power-of-2 weights).
+    auto const large = qd::integrate<qd::Romberg>(large_fn, 0.0, 1.0);
+    REQUIRE(large.has_value());
+    CHECK(error_of(large->value, bin100(0.8 * dmax)) <= 0.0);
+    auto const w = qd::integrate<qd::Romberg>(wrapped_one, Wrapped(0), Wrapped(1));
+    REQUIRE(w.has_value());
+    CHECK(w->value == Wrapped(1));
+    CHECK(w->abs_error == Wrapped(50.0 * deps));
+}
+
+TEST_CASE("quadrature: romberg: points stay inside the interval")
+{
+    // Subnormal widths, where c + hw u would leave the interval without the clamp (on [D, 3D], D = denorm_min,
+    // c = hw = 2D), and [-max, max]; both orientations. Romberg's ends are fn(a) and fn(b) themselves.
+    double const D = dmin;
+    for (auto const &[a, b] : { std::pair{ D, 3.0 * D }, std::pair{ 3.0 * D, D }, std::pair{ 0.0, 3.0 * D },
+                                std::pair{ D, 2.0 * D }, std::pair{ -3.0 * D, D }, std::pair{ -dmax, dmax },
+                                std::pair{ dmax, -dmax }, std::pair{ 0.0, dmax } }) {
+        INFO("[" << a << ", " << b << "]");
+        int outside = 0;
+        auto const fn = Confined{ [](double x) { return x / 2; }, std::min(a, b), std::max(a, b), &outside };
+        (void)qd::integrate<qd::Romberg>(fn, a, b);
+        (void)qd::integrate<qd::Romberg>(fn, a, b, { .rel_tol = 0.0 });
+        CHECK(outside == 0);
+    }
+    // The review's counterexample: 0 on [D, 3D], 1e300 outside it; the integral 0, with the floor 50 denorm_min.
+    auto const r = qd::integrate<qd::Romberg>([D](double x) { return x < D || x > 3.0 * D ? 1e300 : 0.0; }, D, 3.0 * D);
+    CHECK(r == qd::Integral<double>{ 0.0, 50.0 * dmin });
+}
+
 TEST_CASE("quadrature: romberg: edges")
 {
     // a == b: {0, 0}, fn not called; NaN and infinite ends and invalid tolerances: non_finite, fn not called.
@@ -366,6 +442,12 @@ TEST_CASE("quadrature: romberg: edges")
     auto const wide_tiny = qd::integrate<qd::Romberg>([](double) { return 1e-300; }, -dmax, dmax);
     REQUIRE(wide_tiny.has_value());
     CHECK(error_of(wide_tiny->value, "359538626.972463141629054847463") <= rounding(deps, 0.0, 3.6e8));
+    // The constant denorm_min on [-max, max]: 2 max denorm_min = 1.78e-15, with (hw y) w formed for |y| <= 1, where
+    // hw (w y) underflowed (then not_converged with 3.3e-20). Every sample and sum is exact here: the value exactly.
+    auto const smallest = qd::integrate<qd::Romberg>([](double) { return dmin; }, -dmax, dmax);
+    REQUIRE(smallest.has_value());
+    CHECK(error_of(smallest->value, bin100(2) * bin100(dmax) * bin100(dmin)) <= 0.0);
+
     // [0, 3 denorm_min] with fn = 1e300: 1.48e-23, fn's value multiplied first, where (b - a) 2^-k would round
     // 1.5 denorm_min to 2 and 3/8 denorm_min to 0 by level 3.
     auto const subnormal = qd::integrate<qd::Romberg>([](double) { return 1e300; }, 0.0, 3.0 * dmin);

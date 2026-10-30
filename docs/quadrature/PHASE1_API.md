@@ -144,7 +144,8 @@ template<nxx::real T> struct std::formatter<nxx::quadrature::Failure<T>>;       
   Implementation note (2026-10-30): the scale is applied to fn's value, not formed first: `(b - a) ((w_i / 2) f)` and
   `(b - a) (f / 2^k)`, or `hw (w_i f)` and `hw (f / 2^(k-1))` where b - a overflows. Formed first, `(b - a) / 2^k`
   rounds to 0 on [0, 3 denorm_min] by level 3, and `2 hw` and `hw w_1` overflow on [-max, max]; in the normal range
-  the two orders give the same results bit for bit.
+  the two orders are algebraically equal but rounded differently (for a Gauss weight they can differ by an ulp; for
+  Romberg's powers of 2 they agree in radix 2). The final rule is in the independent review below (findings 1 and 6).
 - **What no map avoids, documented:** an interval narrow against its position (c far larger than hw) rounds each node
   by about eps |c|, so fn's argument errs by that and the result by about eps |c| times the integral of |f'|; this is
   fn's conditioning, as in roots, not part of the estimate. On an interval a few ulps wide a Gauss node can round onto
@@ -391,6 +392,50 @@ From the usage sketch:
 - Raised separately, not for this phase: fn returning `std::expected` (an integral as fn of a root finder or of an
   outer integral now needs `.value_or(nan)`, and the cause is lost). It concerns every module's `callable`
   (`math.hpp`), as roots' separate derivatives already accept it.
+
+## Independent review (OpenAI Codex, 5f38606)
+
+After the implementation (5f38606, CI run 41051017542), a read-only review by OpenAI Codex. Every finding was
+reproduced before it was acted on (`scratchpad/codex_repro/`: `repro.cpp`, `ct.cpp` with `-DF3A`, `-DF3B`, `-DF4`);
+the user approved all six fixes (2026-10-30).
+
+1. **A normal integral could vanish on [-max, max].** Where b - a overflows, the term was `hw (w y)`, and `w y`
+   underflows for a tiny y: `GaussLegendre<10>` of the constant denorm_min over [-max, max] returned 0 (exact
+   2 max denorm_min = 1.78e-15), and Romberg ended `not_converged` with 3.3e-20. Fixed: in that branch `(hw y) w` for
+   |y| <= 1, where `hw y` cannot overflow and, since |hw| > max / 2, is normal unless y = 0; `hw (w y)` otherwise, where
+   |w y| >= w. Now 1.7763568394002497e-15 (GaussLegendre<10>, within its rounding bound) and, for Romberg, exactly
+   2 max denorm_min after 17 evaluations.
+2. **The node map could leave the interval.** On [D, 3D] (D = denorm_min) a / 2 = 0 and b / 2 = 2D, so
+   c = hw = 2D and the nodes reached 0 and 4D: `GaussLegendre<10>` of `x < D || x > 3D ? 1e300 : 0` returned 2.1e-24
+   for an integral of 0, and Romberg sampled outside too. Fixed: every point of both methods is clamped into
+   [min(a, b), max(a, b)] by comparisons; a point may then coincide with an end, as the documentation already allowed
+   on an interval a few ulps wide. Tests count the samples outside the interval on subnormal widths and [-max, max], in
+   both orientations: none.
+3. **Constant evaluation failed where run time returned a result.** (a) GCC rejected `b - a` on [-max, max] before
+   the fallback was chosen (`constexpr integrate<GaussLegendre<1>>(zero, -max, max)`); (b) Clang rejected arithmetic on
+   a NaN from fn (`GaussLegendre<1>` of quiet_NaN on [0, 1]) before the check. Fixed: (a) the overflow of b - a is
+   decided before the subtraction, by opposite signs and `|a| / 2 + |b| / 2 > max / 2`, exact in radix 2; (b) under
+   `if consteval` only, each value of fn is checked for finiteness, and each product of a term, each partial sum, L1
+   and Romberg's extrapolated values are kept within max / 2 before the operation that could overflow, else
+   `non_finite`; at run time the one check per sum is unchanged. So in constant evaluation a term or sum above max / 2
+   reports `non_finite` (conservative: `GaussLegendre<1>` of 0.8 max on [0, 1] is `non_finite` there and 0.8 max at
+   run time), documented.
+4. **Both methods required a default constructor**, which `nxx::real` does not: `Rule<T, N> rule{}` and Romberg's two
+   value-initialised rows. Fixed: every element is constructed from T(0) (`detail::zeros`). Test: a literal wrapper
+   of double with `R() = delete` integrates 1 over [0, 1] by both methods in a `static_assert`.
+5. **A test bound was infinite.** `rounding_bound` formed `hw w_i f_i` in double, which overflows for N = 1 on
+   [-max, max] (max times 2), so the check there could not fail. Fixed: the bound is accumulated in
+   `cpp_bin_float_100`, and every bound the tests use is required finite.
+6. **A claim of bit-for-bit equality.** The implementation note above and `design.md` said the two orders of a term's
+   products give the same results in the normal range; they are algebraically equal and round differently
+   (w = `gauss_legendre_table<10, double>.w[0]`: `(0.3 (w / 2)) 0.7` and `0.3 ((w / 2) 0.7)` differ by an ulp).
+   Reworded; no test relied on the equality (Romberg's counts come from a prototype with the same order).
+
+Codex found correct: the generator (the Sturm count, the isolation and its cap, the orientation from the index, the
+Newton safeguards), Romberg's arithmetic (the levels, the Richardson rows, the estimate, the floor, the cap), the
+validation order, the rules for user types (`+ - * /`, `T(1)`, no `auto` on arithmetic, qualified calls), and the
+tests' references (Boost.Math's tables and mpmath's Golub-Welsch values); all 4,043 quadrature assertions passed on
+cl, clang-cl, GCC and Clang. After the fixes every reproduction gives the right result on all five toolchains.
 
 ## Deferred
 

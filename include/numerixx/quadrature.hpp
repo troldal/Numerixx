@@ -28,6 +28,7 @@
 #include <optional>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 
 /** @brief Integrals of real functions of one variable. */
 namespace nxx::quadrature {
@@ -220,6 +221,45 @@ namespace nxx::quadrature {
         { return a < b ? b : a; }
 
         /**
+         * @brief Whether |@p x| > max / 2: the constant-evaluation guard, below which a sum of two such values, or a
+         * difference, cannot overflow.
+         * @param x A finite value.
+         * @return |x| > max / 2.
+         */
+        template<real T>
+        constexpr bool large(T const &x)
+        { return nxx::math::abs(x) > T(T((std::numeric_limits<T>::max)()) / T(2)); }
+
+        /**
+         * @brief Whether |@p a b| <= max / 2, decided without an overflow: for |a| <= 1 the product, at most |b|, is
+         * formed and compared; else |b| <= (max / 2) / |a|, which bounds the product by (max / 2)(1 + eps) < max.
+         * @param a A finite value.
+         * @param b A finite value.
+         * @return Whether a b is safe for the constant-evaluation guard.
+         */
+        template<real T>
+        constexpr bool small_product(T const &a, T const &b)
+        {
+            T const m = nxx::math::abs(a);
+            T const half_max = T(T((std::numeric_limits<T>::max)()) / T(2));
+            if (m <= T(1)) return T(m * nxx::math::abs(b)) <= half_max;
+            return nxx::math::abs(b) <= T(half_max / m);
+        }
+
+        /**
+         * @brief An array of M elements, each T(0): nxx::real does not require T to be default constructible.
+         * @tparam M The size.
+         * @return The array.
+         */
+        template<real T, std::size_t M>
+        constexpr std::array<T, M> zeros()
+        {
+            return []<std::size_t... I>(std::index_sequence<I...>) {
+                return std::array<T, M>{ ((void)I, T(0))... };
+            }(std::make_index_sequence<M>{});
+        }
+
+        /**
          * @brief fn at @p x, converted to T.
          * @param fn The function.
          * @param x The point, a T const lvalue as the constraint promises.
@@ -291,6 +331,25 @@ namespace nxx::quadrature {
             /** @brief Whether |b - a| >= 1. */
             bool wide;
 
+            /** @brief min(a, b). */
+            T lo;
+
+            /** @brief max(a, b). */
+            T hi;
+
+            /**
+             * @brief The point @p x, clamped into [lo, hi].
+             *
+             * c + hw u can leave the interval where the halves round: on [denorm_min, 3 denorm_min], a / 2 = 0 and
+             * b / 2 = 2 denorm_min, so c = hw = 2 denorm_min and the points reach 0 and 4 denorm_min. Clamped, a point
+             * may coincide with an end, as it may anyway on an interval a few ulps wide.
+             *
+             * @param x A point.
+             * @return x, or the nearer end.
+             */
+            constexpr T point(T const &x) const
+            { return x < lo ? lo : (hi < x ? hi : x); }
+
             /**
              * @brief The term hw w y, formed before it is summed (a sum of values formed first could overflow).
              *
@@ -298,7 +357,9 @@ namespace nxx::quadrature {
              * is finite, the term is (b - a) (w / 2) y: with |b - a| >= 1 the scale (b - a) (w / 2) is formed first,
              * which lies between w / 2 and max (w / 2 <= 1), so that a tiny y on a wide interval is not made subnormal
              * first; with |b - a| < 1 the value is multiplied first, so that a subnormal scale (b - a) w / 2 is never
-             * formed. Where b - a overflows, hw (w y), since hw w overflows for w > 1. w / 2 is exact in radix 2.
+             * formed. Where b - a overflows, |hw| > max / 2: (hw y) w for |y| <= 1, where hw y cannot overflow and is
+             * normal unless y is 0, else hw (w y), where |w y| >= w is normal (hw w would overflow for w > 1). w / 2
+             * is exact in radix 2.
              *
              * @param w The weight relative to the half-width: a Gauss weight on [-1, 1], or Romberg's 2^(1-k).
              * @param y fn's value.
@@ -306,10 +367,44 @@ namespace nxx::quadrature {
              */
             constexpr T term(T const &w, T const &y) const
             {
-                if (!finite) return T(hw * T(w * y));
+                if (!finite) {
+                    if (nxx::math::abs(y) <= T(1)) return T(T(hw * y) * w);
+                    return T(hw * T(w * y));
+                }
                 T const half = T(w / T(2));
                 if (wide) return T(T(width * half) * y);
                 return T(width * T(half * y));
+            }
+
+            /**
+             * @brief The term, or nothing where constant evaluation could not form it within max / 2.
+             *
+             * In constant evaluation an overflow, or arithmetic on a NaN, is not a constant expression (GCC and Clang
+             * reject them at different operations), so a value of fn that is not finite, or a product of term() that
+             * could exceed max / 2, gives nothing, and the method error::non_finite: conservative, where run time
+             * would give the value. At run time the term is always formed, and the caller checks its sum once.
+             *
+             * @param w The weight relative to the half-width.
+             * @param y fn's value.
+             * @return The term, or std::nullopt.
+             */
+            constexpr std::optional<T> checked_term(T const &w, T const &y) const
+            {
+                if consteval {
+                    if (!nxx::math::isfinite(y)) return std::nullopt;
+                    bool fits = false;
+                    T const half = T(w / T(2));
+                    if (!finite && nxx::math::abs(y) <= T(1))
+                        fits = detail::small_product(hw, y) && detail::small_product(T(hw * y), w);
+                    else if (!finite)
+                        fits = detail::small_product(w, y) && detail::small_product(hw, T(w * y));
+                    else if (wide)
+                        fits = detail::small_product(width, half) && detail::small_product(T(width * half), y);
+                    else
+                        fits = detail::small_product(half, y) && detail::small_product(width, T(half * y));
+                    if (!fits) return std::nullopt;
+                }
+                return term(w, y);
             }
         };
 
@@ -322,10 +417,21 @@ namespace nxx::quadrature {
         template<real T>
         constexpr Interval<T> interval_of(T const &a, T const &b)
         {
-            T const width = T(b - a);
-            bool const finite = nxx::math::isfinite(width);
-            return Interval<T>{ T(T(a / T(2)) + T(b / T(2))), T(T(b / T(2)) - T(a / T(2))), width, finite,
-                                finite && nxx::math::abs(width) >= T(1) };
+            // Whether b - a overflows, decided before it is formed (constant evaluation rejects the overflow): ends of
+            // one sign never overflow; ends of opposite signs do exactly when |a| / 2 + |b| / 2 > max / 2. In radix 2
+            // the halves of such ends are exact, and the rounded half-sum exceeds max / 2 exactly when the rounded
+            // |a| + |b| exceeds max: the same rounding, scaled by 2.
+            bool const opposite = (a < T(0)) != (b < T(0));
+            T const half_sum = T(T(nxx::math::abs(a) / T(2)) + T(nxx::math::abs(b) / T(2)));
+            bool const finite = !opposite || !(half_sum > T(T((std::numeric_limits<T>::max)()) / T(2)));
+            T const width = finite ? T(b - a) : T(0);
+            return Interval<T>{ T(T(a / T(2)) + T(b / T(2))),
+                                T(T(b / T(2)) - T(a / T(2))),
+                                width,
+                                finite,
+                                finite && nxx::math::abs(width) >= T(1),
+                                a < b ? a : b,
+                                a < b ? b : a };
         }
 
         /**
@@ -514,7 +620,7 @@ namespace nxx::quadrature {
             // The isolation's cap: a type with few digits could miscount near a zero forever; after it the bracket is
             // used as it is.
             int const cap = detail::significand_bits<T>() + 8;
-            Rule<T, N> rule{};
+            Rule<T, N> rule{ detail::zeros<T, Rule<T, N>::size>(), detail::zeros<T, Rule<T, N>::size>() };
             T upper = T(1); // above the k-th largest zero x_k and below x_(k-1)
             for (int k = 1; k <= m; ++k) {
                 T lo = T(0);
@@ -566,20 +672,29 @@ namespace nxx::quadrature {
         constexpr std::expected<T, error> apply(Rule<T, N> const &rule, F &fn, Interval<T> const &interval)
         {
             Sum<T> sum;
+            // Adds hw w fn(x); false only in constant evaluation, where a term or the sum could leave max / 2
+            // (Interval::checked_term).
+            auto const add = [&](T const &w, T const &x) {
+                std::optional<T> const t = interval.checked_term(w, detail::evaluate(fn, interval.point(x)));
+                if (!t) return false;
+                if consteval {
+                    if (detail::large(sum.sum)) return false;
+                }
+                sum.add(*t);
+                return true;
+            };
             std::size_t first = 0;
             if constexpr (N % 2 == 1) {
-                sum.add(interval.term(rule.w[0], detail::evaluate(fn, interval.c)));
+                if (!add(rule.w[0], interval.c)) return std::unexpected(error::non_finite);
                 first = 1;
             }
             for (std::size_t j = first; j < Rule<T, N>::size; ++j) {
                 T const d = T(interval.hw * rule.x[j]);
-                T const right = T(interval.c + d);
-                T const left = T(interval.c - d);
-                sum.add(interval.term(rule.w[j], detail::evaluate(fn, right)));
-                sum.add(interval.term(rule.w[j], detail::evaluate(fn, left)));
+                if (!add(rule.w[j], T(interval.c + d)) || !add(rule.w[j], T(interval.c - d)))
+                    return std::unexpected(error::non_finite);
             }
-            // Every scale is finite and nonzero, so a non-finite value of fn, or an overflow, makes the sum non-finite:
-            // one check, outside the loop.
+            // At run time every scale is finite and nonzero, so a non-finite value of fn, or an overflow, makes the sum
+            // non-finite: one check, outside the loop.
             T const result = sum.value();
             if (!nxx::math::isfinite(result)) return std::unexpected(error::non_finite);
             return result;
@@ -608,14 +723,17 @@ namespace nxx::quadrature {
 
             // h_k = hw w, w relative to the half-width: T_0's h_0 / 2 and level 1's h_1 are hw itself (w = 1), level
             // k's h_k is hw 2^(1-k). A non-finite value of fn makes L1 non-finite, so L1 is the check per level.
+            // In constant evaluation every term, sum, L1 and extrapolated value is kept within max / 2 before the
+            // operation that could overflow (Interval::checked_term); at run time L1 and the estimate are checked.
             T weight = T(1);
-            T const ta = interval.term(weight, detail::evaluate(fn, a));
-            T const tb = interval.term(weight, detail::evaluate(fn, b));
-            T l1 = T(nxx::math::abs(ta) + nxx::math::abs(tb));
+            std::optional<T> const ta = interval.checked_term(weight, detail::evaluate(fn, a));
+            std::optional<T> const tb = interval.checked_term(weight, detail::evaluate(fn, b));
+            if (!ta || !tb) return std::unexpected(overflow);
+            T l1 = T(nxx::math::abs(*ta) + nxx::math::abs(*tb));
             if (!nxx::math::isfinite(l1)) return std::unexpected(overflow);
-            std::array<T, row_size> previous{};
-            std::array<T, row_size> row{};
-            previous[0] = T(ta + tb);
+            std::array<T, row_size> previous = detail::zeros<T, row_size>();
+            std::array<T, row_size> row = detail::zeros<T, row_size>();
+            previous[0] = T(*ta + *tb);
 
             Integral<T> best{ T(0), T(0) };
             for (int k = 1; k <= cap; ++k) {
@@ -626,9 +744,17 @@ namespace nxx::quadrature {
                 for (int j = 1; j <= m; ++j) {
                     // The new midpoints u_j = (2j - 1 - m) / m, exact (at most 16 bits).
                     T const u = T(T(2 * j - 1 - m) / T(m));
-                    T const t = interval.term(weight, detail::evaluate(fn, T(interval.c + T(interval.hw * u))));
-                    sum.add(t);
-                    abs_sum = T(abs_sum + nxx::math::abs(t));
+                    T const x = interval.point(T(interval.c + T(interval.hw * u)));
+                    std::optional<T> const t = interval.checked_term(weight, detail::evaluate(fn, x));
+                    if (!t) return std::unexpected(overflow);
+                    if consteval {
+                        if (detail::large(sum.sum) || detail::large(abs_sum)) return std::unexpected(overflow);
+                    }
+                    sum.add(*t);
+                    abs_sum = T(abs_sum + nxx::math::abs(*t));
+                }
+                if consteval {
+                    if (detail::large(sum.value()) || detail::large(abs_sum)) return std::unexpected(overflow);
                 }
                 row[0] = T(T(previous[0] / T(2)) + sum.value());
                 l1 = T(T(l1 / T(2)) + abs_sum);
@@ -639,6 +765,10 @@ namespace nxx::quadrature {
                 T power = T(1);
                 for (int i = 1; i <= k; ++i) {
                     std::size_t const s = static_cast<std::size_t>(i);
+                    if consteval {
+                        if (detail::large(row[s - 1]) || detail::large(previous[s - 1]))
+                            return std::unexpected(overflow);
+                    }
                     power = T(power * T(4));
                     row[s] = T(row[s - 1] + T(T(row[s - 1] - previous[s - 1]) / T(power - T(1))));
                 }
@@ -647,6 +777,9 @@ namespace nxx::quadrature {
                 // pessimistic for R(k, k) on smooth fn, and stays honest where Richardson's assumptions fail (sqrt x),
                 // where the subdiagonal |R(k, k) - R(k, k-1)| would claim 4^k - 1 times too little. An overflow of
                 // T_k or of the extrapolation reaches it (R(k-1, k-1) is finite), so it is checked once.
+                if consteval {
+                    if (detail::large(row[diagonal])) return std::unexpected(overflow);
+                }
                 T const estimate = nxx::math::abs(T(row[diagonal] - previous[diagonal - 1]));
                 if (!nxx::math::isfinite(estimate)) return std::unexpected(overflow);
                 T const floor = T(T(50) * detail::larger(T(eps * l1), tiny));

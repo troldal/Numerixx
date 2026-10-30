@@ -74,7 +74,49 @@ namespace quadrature_check {
         }
     };
 
+    // fn wrapped to count its samples outside [lo, hi], the interval's ends in order.
+    template<typename F>
+    struct Confined
+    {
+        F fn;
+        double lo;
+        double hi;
+        int *outside;
+        double operator()(double x) const
+        {
+            if (x < lo || hi < x) ++*outside;
+            return fn(x);
+        }
+    };
+
     constexpr auto square = [](double x) { return x * x; };
     constexpr auto cube = [](double x) { return x * x * x; };
 
+    // A literal real type without a default constructor (the independent review's case): nxx::real does not require
+    // one, so neither may the methods.
+    struct Wrapped
+    {
+        double v;
+        Wrapped() = delete;
+        constexpr Wrapped(int i) : v(i) {}
+        constexpr Wrapped(double d) : v(d) {}
+        friend constexpr Wrapped operator+(Wrapped x, Wrapped y) { return Wrapped(x.v + y.v); }
+        friend constexpr Wrapped operator-(Wrapped x, Wrapped y) { return Wrapped(x.v - y.v); }
+        friend constexpr Wrapped operator*(Wrapped x, Wrapped y) { return Wrapped(x.v * y.v); }
+        friend constexpr Wrapped operator/(Wrapped x, Wrapped y) { return Wrapped(x.v / y.v); }
+        friend constexpr Wrapped operator-(Wrapped x) { return Wrapped(-x.v); }
+        friend constexpr bool operator==(Wrapped, Wrapped) = default;
+        friend constexpr auto operator<=>(Wrapped x, Wrapped y) { return x.v <=> y.v; }
+    };
+
 } // namespace quadrature_check
+
+template<>
+struct std::numeric_limits<quadrature_check::Wrapped> : std::numeric_limits<double>
+{
+    static constexpr quadrature_check::Wrapped epsilon() { return std::numeric_limits<double>::epsilon(); }
+    static constexpr quadrature_check::Wrapped max() { return (std::numeric_limits<double>::max)(); }
+    static constexpr quadrature_check::Wrapped denorm_min() { return std::numeric_limits<double>::denorm_min(); }
+};
+
+static_assert(nxx::real<quadrature_check::Wrapped>);

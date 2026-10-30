@@ -206,9 +206,10 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
   `GaussLegendre<N>` with the arithmetic-only node generator and compile-time tables; `Romberg`.
   - [x] API approved: `docs/quadrature/PHASE1_API.md` (2026-10-30, Q1 to Q7 as recommended)
   - [x] `quadrature.hpp`, constexpr; tests on float, double, long double and Boost.Multiprecision; docs build clean
-    (all five presets and `numerixx_docs` locally, 2026-10-30; commit to be added)
-  - [ ] CI passes on all five toolchains
-  - [ ] The independent review (Codex) and its adopted findings
+    (all five presets and `numerixx_docs` locally, 2026-10-30)
+  - [x] CI passes on all five toolchains (5f38606: run 41051017542)
+  - [x] The independent review (Codex) and its adopted findings (six findings, all adopted:
+    `docs/quadrature/PHASE1_API.md`)
 - Phase 2: adaptive `GaussKronrod<15>`, the default (the heap, the floor, final panels, stagnation, the cap, the
   initial mesh, compensated sums; the node cache for types that are not literal).
 - Phase 3: exp (internal) and `TanhSinh` on finite intervals, with the endpoint handling and the end-term test.

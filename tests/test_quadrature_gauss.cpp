@@ -174,36 +174,45 @@ namespace {
         return full;
     }
 
-    // The per-node rounding bound of D for a rule on [a, b], in double:
+    // A bound, required finite: a bound that overflowed would pass every check.
+    double finite_bound(double bound)
+    {
+        REQUIRE(std::isfinite(bound));
+        return bound;
+    }
+
+    // The per-node rounding bound of D for a rule on [a, b]:
     //   |hw| sum_i (|dw_i| |f_i| + w_i |f'_i| (|hw| |dx_i| + eps (|c| + 1.5 |hw x_i|))),
     // the errors of the weights and of the nodes, and the rounding of fn's argument (of c, hw, hw x_i and c + hw x_i,
     // u each); plus the rounding of each term t_i, three operations (w_i / 2 and two products), and of fn's value, rho
     // relative; plus the compensated sum's, u |I| + 2 N u^2 sum |t_i| (Neumaier): (2 eps + rho + 2 N eps^2) sum |t_i|.
+    // Accumulated in bin100, whose range holds every product (hw w_i f_i overflows double on [-max, max] at N = 1).
     template<typename F, typename D>
     double rounding_bound(std::vector<Node> const &nodes, F f, D df, double a, double b, double eps, double rho)
     {
-        double const hw = std::abs(b / 2 - a / 2);
         double const c = a / 2 + b / 2;
-        double weights = 0.0;
-        double terms = 0.0;
+        bin100 const hw = abs(bin100(bin100(b) - bin100(a)) / 2);
+        bin100 weights = 0;
+        bin100 terms = 0;
         for (Node const &n : nodes) {
             double const x = c + (b / 2 - a / 2) * n.x;
-            double const fx = std::abs(f(x));
-            // 1.5 eps first: 1.5 hw |x_i| can overflow on [-max, max].
-            double const argument = hw * n.dx + eps * std::abs(c) + 1.5 * eps * (hw * std::abs(n.x));
+            bin100 const fx(std::abs(f(x)));
+            bin100 const argument = hw * n.dx + eps * std::abs(c) + 1.5 * eps * hw * std::abs(n.x);
             weights += n.dw * fx + n.w * std::abs(df(x)) * argument;
             terms += hw * n.w * fx;
         }
         double const count = static_cast<double>(nodes.size());
-        return hw * weights + (2.0 * eps + rho + 2.0 * count * eps * eps) * terms;
+        bin100 const bound = hw * weights + (2.0 * eps + rho + 2.0 * count * eps * eps) * terms;
+        return finite_bound(static_cast<double>(bound));
     }
 
     // The truncation bound of D, (b - a)^(2N+1) (N!)^4 / ((2N + 1) ((2N)!)^3) max |f^(2N)|, through logarithms.
     double truncation(int n, double width, double log_max_derivative)
     {
         double const m = static_cast<double>(n);
-        return std::exp((2.0 * m + 1.0) * std::log(width) + 4.0 * std::lgamma(m + 1.0)
-                        - 3.0 * std::lgamma(2.0 * m + 1.0) - std::log(2.0 * m + 1.0) + log_max_derivative);
+        return finite_bound(std::exp((2.0 * m + 1.0) * std::log(width) + 4.0 * std::lgamma(m + 1.0)
+                                     - 3.0 * std::lgamma(2.0 * m + 1.0) - std::log(2.0 * m + 1.0)
+                                     + log_max_derivative));
     }
 
     // x^p by p - 1 products, so fn rounds by at most about (p / 2) eps relative.
@@ -420,6 +429,32 @@ concept integrable_et = requires(F fn) { qd::integrate<qd::GaussLegendre<5>>(fn,
 static_assert(!integrable_et<decltype([](bin50_et const &x) { return x * x; })>); // an expression template
 static_assert(integrable_et<decltype([](bin50_et const &x) { return bin50_et(x * x); })>);
 
+// The independent review's constant-evaluation cases (PHASE1_API.md, "Independent review"), run-time twins in
+// "quadrature: gauss: constant evaluation of the edges". A zero fn on [-max, max], where b - a overflows and is not
+// formed: every term is exactly 0, so is the result.
+namespace {
+    constexpr auto zero_fn = [](double) { return 0.0; };
+    constexpr auto nan_fn = [](double) { return dnan; };
+    constexpr auto inf_fn = [](double x) { return x > 0.9 ? dinf : x; };
+    constexpr auto max_fn = [](double) { return dmax; };
+    constexpr auto large_fn = [](double) { return 0.8 * dmax; };
+    constexpr auto wrapped_one = [](Wrapped const &) { return Wrapped(1); };
+} // namespace
+static_assert(qd::integrate<qd::GaussLegendre<1>>(zero_fn, -dmax, dmax).value() == 0.0);
+static_assert(qd::integrate<qd::GaussLegendre<10>>(zero_fn, -dmax, dmax).value() == 0.0);
+static_assert(qd::integrate<qd::GaussLegendre<10>>(zero_fn, dmax, -dmax).value() == 0.0);
+// A value of fn that is not finite, and a sum that overflows (max on [0, 3]: 3 max): non_finite, as at run time.
+static_assert(qd::integrate<qd::GaussLegendre<1>>(nan_fn, 0.0, 1.0) == std::unexpected(qd::error::non_finite));
+static_assert(qd::integrate<qd::GaussLegendre<10>>(inf_fn, 0.0, 1.0) == std::unexpected(qd::error::non_finite));
+static_assert(qd::integrate<qd::GaussLegendre<2>>(max_fn, 0.0, 3.0) == std::unexpected(qd::error::non_finite));
+// Conservative in constant evaluation: a term above max / 2 is non_finite there, where run time gives 0.8 max.
+static_assert(qd::integrate<qd::GaussLegendre<1>>(large_fn, 0.0, 1.0) == std::unexpected(qd::error::non_finite));
+// A real type without a default constructor: 1 on [0, 1] within the rounding bound of the 3-point rule (2.2 eps,
+// checked at run time; the generator runs in Wrapped as in double).
+static_assert(
+    nxx::math::abs(qd::integrate<qd::GaussLegendre<3>>(wrapped_one, Wrapped(0), Wrapped(1)).value().v - 1.0)
+    <= 2.0 * deps);
+
 TEST_CASE("quadrature: gauss: nodes and weights against Boost.Math and mpmath")
 {
     auto const all = std::make_index_sequence<std::size(references)>{};
@@ -492,6 +527,51 @@ TEST_CASE("quadrature: gauss: constant evaluation")
     CHECK(std::abs(*qd::integrate<qd::GaussLegendre<7>>(square, 0.0, 3.0) - 9.0) <= tol_gl7);
     CHECK(std::abs(*qd::integrate<qd::GaussLegendre<64>>(power127, 0.0, 1.0) - 1.0 / 128) <= tol_gl64);
     CHECK(std::abs(*qd::integrate<qd::GaussLegendre<7>>(square, 3.0, 0.0) + 9.0) <= tol_gl7);
+}
+
+TEST_CASE("quadrature: gauss: constant evaluation of the edges")
+{
+    // The run-time twins of the independent review's static_asserts.
+    CHECK(*qd::integrate<qd::GaussLegendre<1>>(zero_fn, -dmax, dmax) == 0.0);
+    CHECK(*qd::integrate<qd::GaussLegendre<10>>(zero_fn, -dmax, dmax) == 0.0);
+    CHECK(*qd::integrate<qd::GaussLegendre<10>>(zero_fn, dmax, -dmax) == 0.0);
+    CHECK(qd::integrate<qd::GaussLegendre<1>>(nan_fn, 0.0, 1.0) == std::unexpected(qd::error::non_finite));
+    CHECK(qd::integrate<qd::GaussLegendre<10>>(inf_fn, 0.0, 1.0) == std::unexpected(qd::error::non_finite));
+    CHECK(qd::integrate<qd::GaussLegendre<2>>(max_fn, 0.0, 3.0) == std::unexpected(qd::error::non_finite));
+    // At run time the conservative case gives its value: 0.8 max, one term (w / 2 = 1) exact.
+    auto const large = qd::integrate<qd::GaussLegendre<1>>(large_fn, 0.0, 1.0);
+    REQUIRE(large.has_value());
+    CHECK(error_of(*large, bin100(0.8 * dmax)) <= 0.0);
+    // Wrapped: its tolerance against the bound.
+    auto const one = [](double) { return 1.0; };
+    auto const zero = [](double) { return 0.0; };
+    CHECK(2.0 * deps <= rounding_bound(nodes_of<double, 3>(), one, zero, 0.0, 1.0, deps, 0.0));
+    CHECK(std::abs(qd::integrate<qd::GaussLegendre<3>>(wrapped_one, Wrapped(0), Wrapped(1))->v - 1.0) <= 2.0 * deps);
+}
+
+TEST_CASE("quadrature: gauss: points stay inside the interval")
+{
+    // Subnormal widths, where c + hw x_i would leave the interval without the clamp (on [D, 3D], D = denorm_min,
+    // c = hw = 2D and the nodes reach 0 and 4D), and [-max, max]; both orientations.
+    double const D = dmin;
+    for (auto const &[a, b] : { std::pair{ D, 3.0 * D }, std::pair{ 3.0 * D, D }, std::pair{ 0.0, 3.0 * D },
+                                std::pair{ D, 2.0 * D }, std::pair{ -3.0 * D, D }, std::pair{ -dmax, dmax },
+                                std::pair{ dmax, -dmax }, std::pair{ 0.0, dmax } }) {
+        INFO("[" << a << ", " << b << "]");
+        int outside = 0;
+        auto const fn = Confined{ [](double x) { return x; }, std::min(a, b), std::max(a, b), &outside };
+        (void)qd::integrate<qd::GaussLegendre<1>>(fn, a, b);
+        (void)qd::integrate<qd::GaussLegendre<2>>(fn, a, b);
+        (void)qd::integrate<qd::GaussLegendre<7>>(fn, a, b);
+        (void)qd::integrate<qd::GaussLegendre<10>>(fn, a, b);
+        (void)qd::integrate<qd::GaussLegendre<64>>(fn, a, b);
+        CHECK(outside == 0);
+    }
+    // The review's counterexample: 0 on [D, 3D], 1e300 outside it. The integral is 0; unclamped, 2.1e-24.
+    auto const g = qd::integrate<qd::GaussLegendre<10>>([D](double x) { return x < D || x > 3.0 * D ? 1e300 : 0.0; },
+                                                       D, 3.0 * D);
+    REQUIRE(g.has_value());
+    CHECK(error_of(*g, "0") <= 0.0);
 }
 
 TEST_CASE("quadrature: gauss: internals")
@@ -576,6 +656,14 @@ TEST_CASE("quadrature: gauss: edges")
     REQUIRE(t1.has_value());
     CHECK(error_of(*t10, wide_ref) <= rounding_bound(nodes_of<double, 10>(), tiny, zero, -dmax, dmax, deps, 0.0));
     CHECK(error_of(*t1, wide_ref) <= rounding_bound(nodes_of<double, 1>(), tiny, zero, -dmax, dmax, deps, 0.0));
+
+    // The constant denorm_min on [-max, max]: 2 max denorm_min = 1.78e-15, with (hw y) w formed for |y| <= 1, where
+    // hw (w y) underflowed to 0 in every term.
+    auto const smallest = [](double) { return dmin; };
+    auto const sm = qd::integrate<qd::GaussLegendre<10>>(smallest, -dmax, dmax);
+    REQUIRE(sm.has_value());
+    CHECK(error_of(*sm, bin100(2) * bin100(dmax) * bin100(dmin))
+          <= rounding_bound(nodes_of<double, 10>(), smallest, zero, -dmax, dmax, deps, 0.0));
 
     // [0, 3 denorm_min] with fn = 1e300: 3 denorm_min 1e300 = 1.48e-23, with fn's value multiplied first, where
     // (b - a) w_i / 2 would round in the subnormals (by up to 33 %). The bound is linear in the scale of a constant fn:
