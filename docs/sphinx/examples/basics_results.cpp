@@ -1,10 +1,11 @@
-// The program of docs/sphinx/basics.md, its section on results: testing a std::expected before reading it, printing
-// its error, and composing steps with and_then, transform, or_else and value_or. The page shows the parts between the
-// markers and the output in the raw string; main returns non-zero unless the program prints that output and what the
-// page says holds, against closed forms.
+// The program of docs/sphinx/basics.md, its section on results: testing a std::expected before reading it, printing its
+// error, composing steps with and_then, transform, or_else and value_or, and reading a derivative's Estimate. The page
+// shows the parts between the markers and the output in the raw string; main returns non-zero unless the program prints
+// that output and what the page says holds, against closed forms.
 
 // clang-format off
 // <includes>
+#include <numerixx/deriv.hpp>
 #include <numerixx/roots.hpp>
 
 #include <limits>
@@ -14,8 +15,6 @@
 // clang-format on
 
 #include "printed.hpp"
-
-#include <numerixx/deriv.hpp>
 
 #include <cmath>
 #include <expected>
@@ -57,6 +56,14 @@ int main(int, char **argv)
     });
     if (s) std::println("s = {:.6f}", s->value);
     // </or-else>
+
+    // <estimate>
+    namespace dv = nxx::deriv;
+    auto const d = dv::derivative<dv::Ridders>([](double t) { return 1.0 / t; }, 2.0); // -1/4
+    if (d && d->abs_error) std::println("f'(2) = {:.12f}, abs_error {:.1e}", d->value, *d->abs_error);
+    auto const c = dv::derivative([](double t) { return 1.0 / t; }, 2.0); // Central<2>: no estimate
+    if (c && !c->abs_error) std::println("f'(2) = {:.12f}, no estimate", c->value);
+    // </estimate>
     // clang-format on
 
     constexpr std::string_view test_output = R"(
@@ -67,8 +74,13 @@ no root: no_sign_change
 x = 1.414214
 s = 1.414214
 )";
-    if (!(docs::printed() == std::string(docs::quoted(test_output)) + std::string(docs::quoted(compose_output))))
-        return 1;
+    constexpr std::string_view estimate_output = R"(
+f'(2) = -0.250000000000, abs_error 2.8e-14
+f'(2) = -0.250000000009, no estimate
+)";
+    std::string const expected = std::string(docs::quoted(test_output)) + std::string(docs::quoted(compose_output))
+                                 + std::string(docs::quoted(estimate_output));
+    if (!(docs::printed() == expected)) return 1;
 
     // x and s are sqrt(2) within abs_error + c (tests/roots_check.hpp's bound for x^2 - 2: c = 8e-17 for x * x
     // rounding over |f'| = 2.83, plus 1.2e-16 for the reference in a double). Newton from 0 fails at once (f'(0) = 0),
@@ -80,5 +92,8 @@ s = 1.414214
     if (!r || !(x == r->value) || !(std::abs(x - sqrt2) <= r->abs_error + 8e-17 + 1.2e-16)) return 2;
     if (!(rt::solve<rt::Newton>(fdf, 0.0) == std::unexpected(rt::error::not_converged))) return 3;
     if (!s || !(std::abs(s->value - sqrt2) <= s->abs_error + 8e-17 + 1.2e-16)) return 4;
+    // Ridders' estimate covers its error from -1/4; the central difference is within its model's 1e-10.
+    if (!d || !d->abs_error || !(std::abs(d->value + 0.25) <= *d->abs_error)) return 5;
+    if (!c || c->abs_error || !(std::abs(c->value + 0.25) < 1e-10 * 0.25)) return 6;
     return 0;
 }

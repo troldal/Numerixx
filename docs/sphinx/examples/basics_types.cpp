@@ -17,6 +17,8 @@
 
 #include "printed.hpp"
 
+#include <numerixx/deriv.hpp>
+
 #include <limits>
 
 namespace {
@@ -28,6 +30,10 @@ namespace {
     constexpr bool bracketable = requires(T const a) { rt::Bracket{a, a}; };
     static_assert(nxx::real<float> && nxx::real<long double> && !nxx::real<int>);
     static_assert(bracketable<double> && !bracketable<int>);
+    // Nor does a derivative at an int point: derivative(fn, 2) deduces T = int.
+    template<typename T>
+    constexpr bool differentiable = requires(T const x) { nxx::deriv::derivative([](double t) { return t; }, x); };
+    static_assert(differentiable<double> && !differentiable<int>);
 
     // long double's precision as the page states it: double's with MSVC and clang-cl, x87 extended (a 64-bit
     // significand) with GCC and Clang on x86-64, quadruple (113 bits) with Emscripten.

@@ -23,10 +23,9 @@ nxx::math](core.md)).
 
 Start with [Getting started](getting-started.md), which adds Numerixx to a project and runs a first program, and
 [Working with Numerixx](basics.md), which explains what every module has in common: real types, results and errors, and
-compile-time use. Then go to the chapter of the module you need. The chapter on roots opens with an overview of its
-problem and its methods, and holds a tutorial that solves one problem step by step, a guide of pages that each solve one
-task, and the reference generated from the headers. The chapter on derivatives holds, for now, the book on `nxx::deriv`
-and the reference.
+compile-time use. Then go to the chapter of the module you need. Each chapter opens with an overview of its problem and
+its methods, and holds a tutorial that solves one problem step by step, a guide of pages that each solve one task, and
+the reference generated from the headers.
 
 Every piece of code on this site comes from a program that is built and run as a test, and that program checks the
 results and the output the page quotes from it.

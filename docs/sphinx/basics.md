@@ -4,8 +4,9 @@ Each module of Numerixx solves its own kind of problem, but they all work the sa
 a lambda or any other callable and called `fn` throughout this documentation, together with the numbers that start the
 computation. The type of those numbers sets the type of the whole computation. You get back a result or the reason there
 is none, never an exception. And you can run the same call at compile time. This page explains these conventions once,
-so the module chapters need not repeat them. Its examples use `nxx::roots`, shortened to `rt` by
-`namespace rt = nxx::roots;`; the same rules hold for `nxx::deriv`.
+so the module chapters need not repeat them. Most of its examples use `nxx::roots`, shortened to `rt` by
+`namespace rt = nxx::roots;`; the same rules hold for `nxx::deriv`, shortened to `dv`, whose examples come at the end of
+[Results](#results).
 
 ## Real types
 
@@ -68,13 +69,21 @@ A type of your own works if it satisfies the concept {cpp:concept}`nxx::real`: i
 bounded, inexact, non-integer type, is constructible from `int`, is totally ordered, and has `+ - * /`. The [core
 reference](core.md) lists every requirement. When a type does not satisfy it, the call does not compile, and the
 compiler's message names the constraint that failed. Look for `nxx::real` in it. The most common case is a start written
-as integers: `Bracket{1, 2}` asks for a bracket of `int`s, which is not a real type.
+as integers: `Bracket{1, 2}` asks for a bracket of `int`s, and `derivative(fn, 2)` for a derivative at an `int` point,
+and `int` is not a real type.
 
 ## Results
 
 Every algorithm returns a [`std::expected`](https://en.cppreference.com/w/cpp/utility/expected): either the result, or
 an error saying why there is none. Test it before you read it. Here the first bracket holds the root of $x^2 - 2$ and
 the second does not:
+
+The program includes both modules' headers:
+
+```{literalinclude} examples/basics_results.cpp
+:start-after: // <includes>
+:end-before: // </includes>
+```
 
 ```{literalinclude} examples/basics_results.cpp
 :start-after: // <test>
@@ -142,9 +151,23 @@ module's description of it.
   a point where `fn`, as computed, changes sign. [Roots of functions](roots/index.md#what-you-get-back) explains what it
   covers.
 - **A derivative** ({cpp:struct}`nxx::deriv::Estimate`): `abs_error` is an *estimate* of the error, not a guarantee, and
-  a `std::optional`, empty for the plain finite differences. An `Estimate` converts to its value, so it can be used
-  where a number is expected. That has a trap: for a result `d`, `if (*d)` compiles, and tests whether the derivative is
-  0. Test `d` itself.
+  a `std::optional`: Ridders' methods fill it, the plain finite differences leave it empty, so test it before reading it
+  with `*`. An `Estimate` converts to its value, so it can be used where a number is expected. That has a trap: for a
+  result `d`, `if (*d)` compiles, and tests whether the derivative is 0. Test `d` itself.
+
+Here are both kinds of derivative of $1/x$ at 2, which is $-1/4$:
+
+```{literalinclude} examples/basics_results.cpp
+:start-after: // <estimate>
+:end-before: // </estimate>
+:dedent:
+```
+
+```{literalinclude} examples/basics_results.cpp
+:language: text
+:start-after: estimate_output = R"(
+:end-before: )";
+```
 
 Read the members by name, not with a structured binding: a later version may add members.
 

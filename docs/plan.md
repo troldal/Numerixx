@@ -188,8 +188,8 @@ locally and in CI, and the examples' tests pass on all five toolchains.
     (Codex): seven findings, all adopted (`docs/sphinx/PHASE4_PLAN.md`)
 - Phase 5: the `nxx::deriv` chapter in the same shape, from `docs/deriv/DERIV_TUTORIAL.md`, with deriv examples in
   `basics.md`.
-  - [ ] Pages, examples and tests; docs build clean
-  - [ ] Reviews as in Phase 4b
+  - [x] Pages, examples and tests; docs build clean; programs pass on all five toolchains (`docs/sphinx/PHASE5_PLAN.md`)
+  - [ ] Reviews as in Phase 4b: `docs-reviewer`, numerics and a docs-only reader done and fixed; Codex after the commit
 
 Open decisions: hosting (GitHub Pages from CI, or Read the Docs) and versioning (one site per release, or `dev` only),
 with `linkcheck` and the install section of getting-started;
