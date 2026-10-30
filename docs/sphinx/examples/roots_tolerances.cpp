@@ -1,5 +1,6 @@
 // The program of docs/sphinx/roots/tolerances.md: abs_tol and rel_tol. The page shows the parts between the
-// markers; main returns non-zero unless what the page says holds. Counts are the independent prototypes'
+// markers and the output in the raw strings; main returns non-zero unless the program prints that output and what the
+// page says holds. Counts are the independent prototypes'
 // (docs/roots/design.md, Evidence) or derived in a comment, for fn written as here and builds without FMA contraction.
 // x - 1e-300 and x - 1e-9 are exact near their roots, so their error is bounded by abs_error alone; x^2 - 2 adds a
 // conditioning term, derived where it is checked.
@@ -12,9 +13,14 @@
 // </includes>
 // clang-format on
 
+#include "printed.hpp"
+
+#include <boost/multiprecision/cpp_bin_float.hpp>
+
 #include <cmath>
 #include <expected>
 #include <limits>
+#include <string>
 #include <utility>
 
 namespace {
@@ -36,6 +42,11 @@ namespace {
         return {r, calls};
     }
 
+    // The walk to 0 in cpp_bin_float_50: one halving per bit from a width of about 1 down to denorm_min, about
+    // 2^min_exponent, so about 2e9 halvings.
+    static_assert(std::numeric_limits<boost::multiprecision::cpp_bin_float_50>::min_exponent < -2000000000
+                  && std::numeric_limits<boost::multiprecision::cpp_bin_float_50>::min_exponent > -2200000000);
+
     // The contract every result keeps: abs_error <= 2 tol(value).
     bool within_contract(rt::Root<double> const &r, rt::Criteria<double> const &criteria)
     {
@@ -44,8 +55,10 @@ namespace {
 
 } // namespace
 
-int main()
+int main(int, char **argv)
 {
+    if (!docs::capture(argv[0])) return 100;
+
     // clang-format off
     // <near-zero>
     auto const tiny = [](double x) { return x - 1e-300; };
@@ -69,6 +82,21 @@ int main()
     if (coarse) std::println("{:.10f} +- {:.1e}", coarse->value, coarse->abs_error);
     // </fewer-digits>
     // clang-format on
+
+    constexpr std::string_view near_zero_output = R"(
+default:        1.000e-300 +- 3.3e-316
+abs_tol 1e-12:  9.095e-13 +- 9.1e-13
+)";
+    constexpr std::string_view every_magnitude_output = R"(
+1.000000e-09 +- 1.0e-12
+)";
+    constexpr std::string_view fewer_digits_output = R"(
+1.4142141342 +- 9.5e-07
+)";
+    std::string const expected = std::string(docs::quoted(near_zero_output))
+                                 + std::string(docs::quoted(every_magnitude_output))
+                                 + std::string(docs::quoted(fewer_digits_output));
+    if (!(docs::printed() == expected)) return 17;
 
     if (!full || !enough || !capped || !coarse) return 1;
     rt::Criteria<double> const defaults{};
@@ -102,6 +130,17 @@ int main()
     double const sqrt2 = 1.4142135623730950488;
     if (!(std::abs(coarse->value - sqrt2) <= coarse->abs_error + 8e-17 + 1.2e-16)) return 13;
     if (!within_contract(*coarse, {.rel_tol = 1e-6})) return 14;
+
+    // From a guess, Newton on the triple root of x^3 at 0: not_converged with the default abs_tol (x shrinks by 2/3 per
+    // step until x^3 underflows, past the iteration cap; tests/test_roots_open.cpp), a root within 2 tol of 0 with
+    // abs_tol = 1e-12. Brent finds the root 1e-9 of x - 1e-9 "to the last digit": within 2 eps relative (measured:
+    // an ulp, 2.1e-16 relative).
+    auto const cubed = [](double x) { return std::pair{x * x * x, 3.0 * x * x}; };
+    if (!(rt::solve<rt::Newton>(cubed, 1.0) == std::unexpected(rt::error::not_converged))) return 18;
+    auto const cubed_tol = rt::solve<rt::Newton>(cubed, 1.0, {.abs_tol = 1e-12});
+    if (!cubed_tol || !(std::abs(cubed_tol->value) <= cubed_tol->abs_error && within_contract(*cubed_tol, abs12)))
+        return 19;
+    if (!(std::abs(capped->value - 1e-9) <= 2 * std::numeric_limits<double>::epsilon() * 1e-9)) return 20;
 
     // Tolerances below the minimum are raised to it, giving the default result; a negative one is non_finite.
     if (!(rt::solve<rt::Brent>(square, rt::Bracket{1.0, 2.0}, {.abs_tol = 0.0, .rel_tol = 1e-20})

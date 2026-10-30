@@ -1,6 +1,8 @@
 // The program of docs/sphinx/roots/restricted-domain.md: a fn defined on part of the line. The page shows the
-// parts between the markers; main returns non-zero unless what the page says holds, against closed forms, mpmath, or
-// the independent prototype's search (.scratch/roots5/proto5d.py, as in tests/test_roots_search.cpp).
+// parts between the markers and the output in the raw strings; main returns non-zero unless the program prints that
+// output and what the page says holds, against closed forms, mpmath, or the independent prototype's search
+// (.scratch/roots5/proto5d.py, as in tests/test_roots_search.cpp). The roots print to fewer digits than they hold,
+// so that std::log's last digits, which differ between platforms, do not show.
 
 // clang-format off
 // <includes>
@@ -14,11 +16,15 @@
 // </includes>
 // clang-format on
 
+#include "printed.hpp"
+
 #include <algorithm>
 #include <numbers>
+#include <string>
 
-int main()
+int main(int, char **argv)
 {
+    if (!docs::capture(argv[0])) return 100;
     namespace rt = nxx::roots;
     double const eps = std::numeric_limits<double>::epsilon();
 
@@ -32,7 +38,7 @@ int main()
     auto const brent = rt::search(fn, 20.0).and_then([&](rt::Bracket<double> const &b) {
         return rt::solve<rt::Brent>(fn, b);
     });
-    if (brent) std::println("search and Brent from 20: {:.17g}", brent->value);
+    if (brent) std::println("search and Brent from 20: {:.12f}", brent->value);
     // </leave>
 
     // <nan>
@@ -55,9 +61,34 @@ int main()
     auto const from_guess = rt::solve<rt::Newton>(g, nxx::deriv::derivative_of(g), 1e-13);
     auto const in_bracket = rt::solve<rt::Newton>(g, nxx::deriv::derivative_of(g), rt::Bracket{1e-20, 1.0});
     if (!from_guess) std::println("Newton from 1e-13: {}", from_guess.error());
-    if (in_bracket) std::println("Newton in [1e-20, 1]: {:.17g}", in_bracket->value);
+    if (in_bracket) std::println("Newton in [1e-20, 1]: {:.6e}", in_bracket->value);
     // </stencil>
+
+    // <one-sided>
+    // A forward difference evaluates fn only at x and above it, so it stays inside a domain that starts at 0.
+    auto const forward = rt::solve<rt::Newton>(g, nxx::deriv::derivative_of<nxx::deriv::Forward<2>>(g), 1e-13);
+    if (forward) std::println("Newton, forward difference, from 1e-13: {:.6e}", forward->value);
+    // </one-sided>
     // clang-format on
+
+    constexpr std::string_view leave_output = R"(
+Newton from 20: non_finite
+search and Brent from 20: 2.718281828459
+)";
+    constexpr std::string_view nan_output = R"(
+v = 4.366581e-04 m^3/mol
+)";
+    constexpr std::string_view stencil_output = R"(
+Newton from 1e-13: not_converged
+Newton in [1e-20, 1]: 1.000000e-12
+)";
+    constexpr std::string_view one_sided_output = R"(
+Newton, forward difference, from 1e-13: 1.000000e-12
+)";
+    std::string const expected = std::string(docs::quoted(leave_output)) + std::string(docs::quoted(nan_output))
+                                 + std::string(docs::quoted(stencil_output))
+                                 + std::string(docs::quoted(one_sided_output));
+    if (!(docs::printed() == expected)) return 10;
 
     // Newton's first step from 20 is -(ln 20 - 1) / (1/20) = -39.9, to x = 20 - 20 (ln 20 - 1) = -19.9146, where fn
     // is NaN: the lowest point it evaluates.
@@ -102,5 +133,24 @@ int main()
     if (!in_bracket || !(std::abs(in_bracket->value - 1e-12) <= in_bracket->abs_error + 2e-28)) return 6;
     if (!(in_bracket->abs_error <= 2 * (std::numeric_limits<double>::denorm_min() + 2 * eps * in_bracket->value)))
         return 7;
+    // "The numerical derivative's step, about 6e-6": Central<2>'s default step at x is eps^(1/3) max(|x|, 1)
+    // (nxx::deriv::Central), 6.06e-6 at x = 1e-13, so the lower node lies below 0.
+    if (!(std::cbrt(eps) > 6e-6 && std::cbrt(eps) < 6.1e-6)) return 11;
+    // The forward difference from the guess: the root 1e-12 within abs_error + 2e-28, as in the bracket.
+    if (!forward || !(std::abs(forward->value - 1e-12) <= forward->abs_error + 2e-28)) return 12;
+
+    // Van der Waals' critical temperature T_c = 8a / (27 R b) = 303.8 K: below it the equation can have three roots
+    // for v. At 280 K and 4 MPa it has one: the cubic p v^3 - (p b + R T) v^2 + a v - a b has a negative
+    // discriminant. Its five terms, about 1e6 each, sum to -857: a cancellation of about 3 digits, far within the
+    // precision of long double (at least a double's), and of the constants' rounding to it.
+    double const tc = 8.0 * 0.364 / (27.0 * 8.314 * 4.27e-5);
+    if (!(tc > 303.0 && tc < 305.0)) return 13;
+    long double const A = 4e6L;
+    long double const B = -(4e6L * 4.27e-5L + 8.314L * 280.0L);
+    long double const C = 0.364L;
+    long double const D = -0.364L * 4.27e-5L;
+    long double const discriminant =
+        18 * A * B * C * D - 4 * B * B * B * D + B * B * C * C - 4 * A * C * C * C - 27 * A * A * D * D;
+    if (!(discriminant < 0)) return 14;
     return 0;
 }

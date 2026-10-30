@@ -102,7 +102,8 @@ int main()
     calls = 0;
     (void)rt::solve<rt::Newton>(counted_f, nxx::deriv::derivative_of(counted_f), 2.0);
     if (!(calls == 18)) return 8;
-    // Halley with f' and f'' both numerical, Central<2>: 6 calls per point (3 for f', 3 for f''), 30 from 2.
+    // Halley with f' and f'' both numerical, Central<2>: 6 calls per point (the value, 2 for f', and 3 for f'', which
+    // evaluates fn at the point again), 30 from 2.
     calls = 0;
     (void)rt::solve<rt::Halley>(counted_f, nxx::deriv::derivative_of(counted_f),
                                 nxx::deriv::derivative_of<nxx::deriv::Central<2>, 2>(counted_f), 2.0);

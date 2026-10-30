@@ -30,6 +30,10 @@ html_css_files = ["numerixx.css"]
 suppress_warnings = ["sitemap.configuration"]
 extensions = ["breathe", "myst_parser", "numerixx_breathe"]
 exclude_patterns = ["PHASE*.md", "examples", "_ext"]
+# Formulas in $...$ and $$...$$, rendered by MathJax from its CDN (a site read offline shows the TeX); anchors on
+# headings down to level 3, so that links such as basics.md#results resolve.
+myst_enable_extensions = ["dollarmath"]
+myst_heading_anchors = 3
 
 breathe_projects = {"numerixx": os.environ["NUMERIXX_DOXYGEN_XML"]}
 breathe_default_project = "numerixx"

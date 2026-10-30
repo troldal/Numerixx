@@ -1,6 +1,7 @@
 // The program of docs/sphinx/roots/handle-failures.md: reacting to a failed solve. The page shows the parts
-// between the markers; main returns non-zero unless what the page says holds, against closed forms and mpmath, and
-// the independent prototypes' outcomes (docs/roots/design.md, Evidence, Phases 2 and 6).
+// between the markers and the output in the raw strings; main returns non-zero unless the program prints that output
+// and what the page says holds, against closed forms and mpmath, and the independent prototypes' outcomes
+// (docs/roots/design.md, Evidence, Phases 2 and 6).
 
 // clang-format off
 // <includes>
@@ -12,6 +13,10 @@
 #include <utility>
 // </includes>
 // clang-format on
+
+#include "printed.hpp"
+
+#include <string>
 
 // clang-format off
 // <pole-test>
@@ -27,8 +32,9 @@ bool looks_like_a_pole(F const &fn, nxx::roots::Root<double> const &r)
 // </pole-test>
 // clang-format on
 
-int main()
+int main(int, char **argv)
 {
+    if (!docs::capture(argv[0])) return 100;
     namespace rt = nxx::roots;
 
     // clang-format off
@@ -66,14 +72,24 @@ int main()
     // </pole>
     // clang-format on
 
+    constexpr std::string_view react_output = R"(
+x = -1.7692923542386314
+)";
+    constexpr std::string_view pole_output = R"(
+0.33333333333333309 is a pole, not a root
+)";
+    if (!(docs::printed() == std::string(docs::quoted(react_output)) + std::string(docs::quoted(pole_output))))
+        return 8;
+
     // Newton alone from 0 gives not_converged (Phase 2's prototype: 213 evaluations, its cap).
     if (!(rt::solve<rt::Newton>(fdf, 0.0) == std::unexpected(rt::error::not_converged))) return 1;
     // The recovered root -1.769292354238631415 (mpmath) within abs_error + c: fn's rounding near the root (x * x,
     // * x; - 2 and + 2 exact) about 8e-16 over |f'| = 7.4, 1.1e-16, plus half an ulp of the root, 1.1e-16.
     if (!r || !(std::abs(r->value + 1.769292354238631415) <= r->abs_error + 2.5e-16)) return 2;
     if (!(x == r->value)) return 3;
-    // Brent returns the pole (Phase 6's prototype: 55 evaluations): fl(1/3) exactly, where t - fl(1/3) is 0 (Sterbenz),
-    // so within abs_error of the double 1/3 with no further term; the test calls it a pole.
+    // Brent returns the pole (Phase 6's prototype: 55 evaluations). g's computed sign change lies exactly at the double
+    // 1/3, since t - fl(1/3) is exact near it (Sterbenz), so the result is within abs_error of that double with no
+    // further term; the test calls it a pole.
     if (!p || !(std::abs(p->value - 1.0 / 3.0) <= p->abs_error) || !looks_like_a_pole(g, *p)) return 4;
 
     // The test on docs/roots/PHASE1_API.md E's cases, where a test on |fn(value)| alone fails both ways:

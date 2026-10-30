@@ -30,8 +30,14 @@ int main()
     // E for e = 0.5, M = 1: mpmath's findroot at 100 digits, and the Bessel series E = M + sum 2/n J_n(n e) sin(n M)
     // as a second, independent computation (they agree to 1e-101). Held as two doubles, reference + below, so that
     // the printed error is not rounded to 0: reference is the nearest double, below the rest (-7.99e-17).
+    // clang-format off
+    // <reference>
+    // E for e = 0.5 and M = 1 is 1.49870113351784831405798549725623990159... (to 100 digits), held as the nearest
+    // double and the rest, so that a root's difference from it is not rounded away
     constexpr double reference = 1.498701133517848314057985497256239901590695552547389812626730414735991;
     constexpr double below = -7.9892103805705475e-17;
+    // </reference>
+    // clang-format on
 
     // clang-format off
     // <function>
@@ -85,6 +91,8 @@ int main()
         if (!(std::abs((root.value - reference) - below) <= root.abs_error + c)) return 2;
         if (!(root.abs_error <= bound)) return 3;
     }
+    // The overview: for Kepler's equation the shift from fn's rounding, at most c, is smaller than Brent's bound.
+    if (!(r->abs_error > c)) return 6;
     // "kepler(E) is close to 0": |fn(value)| <= max |f'| (1.5) times the distance to the exact root, plus fn's own
     // rounding (2.2e-16).
     if (!(std::abs(kepler(r->value)) <= 1.5 * (r->abs_error + c) + 2.2e-16)) return 4;

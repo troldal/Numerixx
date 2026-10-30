@@ -1,6 +1,6 @@
-// The program of docs/sphinx/roots/other-types.md: float, long double, Boost.Multiprecision and constant
-// expressions. The page shows the parts between the markers; main returns non-zero unless what the page says holds,
-// against sqrt(2) to 70 digits (mpmath).
+// The program of docs/sphinx/roots/other-types.md: float, long double and Boost.Multiprecision. The page shows the
+// parts between the markers and the output in the raw string; main returns non-zero unless the program prints that
+// output and what the page says holds, against sqrt(2) to 70 digits (mpmath).
 
 // clang-format off
 // <includes>
@@ -15,6 +15,8 @@
 // </includes>
 // clang-format on
 
+#include "printed.hpp"
+
 #include <cmath>
 #include <expected>
 
@@ -24,40 +26,44 @@ namespace {
 
     constexpr char const *sqrt2_70 = "1.414213562373095048801688724209698078569671875376948073176679737990732";
 
-    // clang-format off
-    // <constexpr>
-    constexpr auto square = [](double x) { return x * x - 2.0; };
-    constexpr auto root = rt::solve<rt::Brent>(square, rt::Bracket{1.0, 2.0});
-    static_assert(root.has_value());
-    // </constexpr>
-    // clang-format on
-
-    // long double's precision as the page states it: double's with MSVC and clang-cl, x87 extended with GCC and Clang
-    // on x86-64, quadruple with Emscripten.
-#if defined(_MSC_VER)
-    static_assert(std::numeric_limits<long double>::digits == 53);
-#elif defined(__EMSCRIPTEN__)
-    static_assert(std::numeric_limits<long double>::digits == 113);
-#elif defined(__x86_64__)
-    static_assert(std::numeric_limits<long double>::digits == 64);
-#endif
-
     // Within abs_error + c of sqrt(2), and abs_error <= 2 tol(value), in T. c = eps sqrt(2): x * x rounds by half an
     // ulp of 2 (eps) over |f'| = 2.83, plus half an ulp of sqrt(2) for a reference held in T (0.7 eps).
     template<typename T>
     bool accurate(std::expected<rt::Root<T>, rt::error> const &r, T const &reference)
     {
         using std::abs;
+        if (!r) return false;
         T const eps = std::numeric_limits<T>::epsilon();
         T const bound = T(2) * T(T(std::numeric_limits<T>::denorm_min()) + T(T(2) * eps * abs(r->value)));
-        return r.has_value() && abs(T(r->value - reference)) <= T(r->abs_error + T(eps * reference))
-               && r->abs_error <= bound;
+        return abs(T(r->value - reference)) <= T(r->abs_error + T(eps * reference)) && r->abs_error <= bound;
     }
+
+    // The open methods' iteration cap, 4 times the bits of T (nxx::roots::Newton): 212 for a double.
+    static_assert(4 * std::numeric_limits<double>::digits == 212);
+
+    // The walk to 0 in cpp_bin_float_50: from a bracket of width about 1 down to denorm_min = 2^min_exponent (about),
+    // one halving per bit, about 2e9 halvings.
+    static_assert(std::numeric_limits<boost::multiprecision::cpp_bin_float_50>::min_exponent < -2000000000
+                  && std::numeric_limits<boost::multiprecision::cpp_bin_float_50>::min_exponent > -2200000000);
+
+    // A pair deduced from cpp_dec_float_50 arithmetic holds expressions, not numbers, and solve rejects it.
+    template<typename T>
+    constexpr bool solvable_with_deduced_pair = requires(T const &x0) {
+        rt::solve<rt::Newton>([](T const &x) { return std::pair{x * x - 2, 2 * x}; }, x0);
+    };
+    static_assert(!solvable_with_deduced_pair<boost::multiprecision::cpp_dec_float_50>);
+    static_assert(solvable_with_deduced_pair<double>);
+
+    // cpp_dec_float_50 uses expression templates, cpp_bin_float_50 does not.
+    static_assert(boost::multiprecision::cpp_dec_float_50::et == boost::multiprecision::et_on
+                  && boost::multiprecision::cpp_bin_float_50::et == boost::multiprecision::et_off);
 
 } // namespace
 
-int main()
+int main(int, char **argv)
 {
+    if (!docs::capture(argv[0])) return 100;
+
     // clang-format off
     // <float>
     auto const in_float = rt::solve<rt::Brent>([](float x) { return x * x - 2.0f; }, rt::Bracket{1.0f, 2.0f});
@@ -79,12 +85,28 @@ int main()
     // </expression-templates>
     // clang-format on
 
+    constexpr std::string_view output = R"(
+1.4142135623730950488016887242096980785696718753769
+)";
+    if (!(docs::printed() == docs::quoted(output))) return 7;
+
     if (!accurate(in_float, 1.41421356f)) return 1;
     if (!accurate(in_long_double, 1.414213562373095048801688724209698078570L)) return 2;
     if (!accurate(in_bin50, bin50(sqrt2_70))) return 3;
     if (!accurate(in_dec50, dec50(sqrt2_70))) return 4;
-    // The constant expression gives what a run gives (on builds without FMA contraction), and sqrt(2).
-    if (!(root == rt::solve<rt::Brent>(square, rt::Bracket{1.0, 2.0}))) return 5;
-    if (!accurate(root, 1.4142135623730950488)) return 6;
+
+    // A float fn with a double bracket compiles, but its root is only float-accurate while abs_error is a double's
+    // bound: x * x - 2.0f rounds x to float, so the computed sign change lies at the float nearest sqrt(2) (or a
+    // neighbour), 3.5e-8 from sqrt(2), far beyond abs_error <= 2 tol, about 9e-16.
+    // The lambda rounds x to float as a float parameter would, without the conversion warning MSVC gives for one.
+    auto const mixed = rt::solve<rt::Brent>(
+        [](double x) {
+            float const y = static_cast<float>(x);
+            return y * y - 2.0f;
+        },
+        rt::Bracket{1.0, 2.0});
+    if (!mixed || !(std::abs(mixed->value - 1.4142135623730950488) > 2e-8
+                    && std::abs(mixed->value - 1.4142135623730950488) < 5e-8 && mixed->abs_error < 1e-15))
+        return 5;
     return 0;
 }

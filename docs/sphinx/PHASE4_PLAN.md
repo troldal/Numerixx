@@ -1,6 +1,7 @@
 # Milestone 3, Phase 4: a site organised by module, in a teaching voice
 
-Status: approved by the user (2026-10-29), with the guide kept as seven pages; revised after the reviews of the plan (`simplicity-critic`, `docs-reviewer`, `numerics-reviewer`;
+Status: approved by the user (2026-10-29), with the guide kept as seven pages; revised after the reviews of the plan
+(`simplicity-critic`, `docs-reviewer`, `numerics-reviewer`;
 the record is at the end). It replaces the planned Phase 4 (the roots explanations), whose two topics move into the
 roots overview.
 
@@ -95,7 +96,8 @@ program or linked to what asserts it; the reference generated from the headers):
 - MyST `dollarmath` with MathJax, for the formulas (tol(x), Kepler's equation, Newton's step, the conditioning terms).
   MathJax loads from a CDN, so a site read offline shows the TeX; accepted. The reference keeps the header comments'
   plain-text formulas.
-- `myst_heading_anchors = 2`, so that links to a section (`basics.md#results`) resolve under `-W`.
+- `myst_heading_anchors = 3` (planned as 2; the links to `basics.md`'s level-3 sections need 3), so that links to a
+  section (`basics.md#results`) resolve under `-W`.
 - No `colon_fence`: the backtick form of `{note}` needs no extension.
 
 ## Phases
@@ -147,7 +149,8 @@ derivative; a root in `cpp_dec_float_50` with expression templates), then Codex.
 
 Every number is asserted by an existing program or by the new `roots_overview.cpp` (the expanded cubic: measured
 2026-10-29, Brent returns a point 4.2e-6 from 1 with `abs_error` 4.4e-16, the factored form within 1e-16; the computed
-sign changes lie within about 5e-6 of 1).
+sign changes lie within about 5e-6 of 1). Phase 4b measured the noise width on a grid of step 1e-10 as 7.2e-6 (a
+running error analysis bounds it by 8.2e-6), and the page says "about 7e-6".
 
 ````markdown
 # Roots of functions
@@ -271,3 +274,46 @@ After (`roots/tolerances.md`):
   the intro's examples (fixed); `long double` as "the tested toolchains", "Numerixx itself never throws" (adopted).
   To check in 4b: a long compile-time walk against MSVC's constexpr step limit before `basics.md` promises
   compile-time use of every call.
+
+## Phase 4b: what was done, and the reviews
+
+Done as planned, with these additions:
+
+- **Quoted output.** `examples/printed.hpp` sends a program's stdout to a file and reads it back; the program compares
+  it with raw strings, which the page includes (`:start-after: <name>_output = R"(`). Output through libm
+  (`std::sin`, `std::log`) is printed to fewer digits than it holds, or described with the bounds the program asserts
+  (the tutorial).
+- **`basics.md`** with `basics_types.cpp` and `basics_results.cpp`; the generic parts of other-types (`long double` by
+  platform, compile time) moved there.
+- **A long constant-expression solve** (the plan's open question): Brent's 1076 evaluations on a jump at 0, Bisection's
+  1049 and Brent's 156 on (x - 1)^3 compile with cl, clang-cl, GCC and Clang at their default limits; `basics.md`
+  names each compiler's limit flag instead of promising every call.
+
+Reviews of the rewritten pages (`docs-reviewer`, `numerics-reviewer`, a docs-only reader), every finding reproduced
+or checked, all adopted unless noted:
+
+- False statements fixed: the derivative's error estimate described as always present (empty for the stencils);
+  "the Boost.Multiprecision types are not literal types" (narrowed to the two types on the site); Halley's 6 calls per
+  point split as 3 + 3 (it is 1 + 2 + 3; the program's comment too); "each chapter holds a tutorial and a guide" (only
+  roots does); sqrt(2) "to the last digit" (one ulp off; now asserted within an ulp against a two-double reference);
+  the search's points described as cumulative steps.
+- Halley dropped as the method for a root of odd multiplicity (it only ties bisection at m = 3, worse above); the
+  teaching-methods note names Ridders' win on x^20 - 1 among the value-only methods.
+- The pole test called a heuristic, unreliable where fn cancels (reproduced: on the expanded cubic it happened to call
+  none of 90 results a pole, but the three values are rounding noise there).
+- Undefined behaviour in `roots_other_types.cpp`'s check (`r->value` read before `r` was tested), fixed.
+- New assertions for numbers that were stated unchecked: the walk of about 2e9 halvings in `cpp_bin_float_50`
+  (`min_exponent`), the iteration cap 212, the stencil step 6.06e-6, which Boost types use expression templates,
+  Kepler's `abs_error` above the 2.3e-16 shift, the x^3 not_converged/abs_tol claim, a deduced pair of
+  `cpp_dec_float_50` expressions rejected, a `float` fn with a `double` bracket 3.5e-8 off, van der Waals' single root
+  at 280 K and 4 MPa (negative discriminant) and its critical temperature 304 K.
+- Added from the reader's report: the tutorial shows its reference constants; `abs_error` at an exact zero; the
+  residual's bound derived; the van der Waals three-root note; a using-declaration per function and printing a Boost
+  number with `str()`; `derivative_of`'s copy of fn when counting calls; the FMA trigger and remedy; the one-sided
+  derivative (`Forward<2>`) near a domain edge, asserted; the multiprecision includes on `basics.md`; how to add the
+  library in CMake and the tested compilers.
+- Voice: f in mathematics and `fn` in code where they were mixed; terms defined at first use on each page; text after
+  code blocks that had none.
+- Not adopted: quoting getting-started's output (its second line goes through `std::exp`); an install section (still
+  deferred).
+

@@ -180,7 +180,8 @@ locally and in CI, and the examples' tests pass on all five toolchains.
 - Phase 4: the site organised by module, in a teaching voice (the user's request, 2026-10-29). Plan approved:
   `docs/sphinx/PHASE4_PLAN.md`, with the guide kept as seven pages. It absorbs the old Phase 4 (the roots explanations
   move into the roots overview).
-  - [ ] 4a: the pages moved into the module layout, links and toctrees fixed, no prose changed; docs build clean
+  - [x] 4a: the pages moved into the module layout, links and toctrees fixed, no prose changed; docs build clean
+    (ff7ab73: run 40965441740)
   - [ ] 4b: `index.md`, `basics.md`, the roots chapter and deriv's short page in the new voice; docs build clean;
     programs pass on all five toolchains
   - [ ] 4b reviews: `docs-reviewer`, numerics, a docs-only reader; then the independent review (Codex)

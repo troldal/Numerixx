@@ -1,7 +1,8 @@
 // The program of docs/sphinx/roots/find-a-bracket.md: search for a bracket from a guess, then solve in it. The
-// page shows the parts between the markers; main returns non-zero unless what the page says holds. The count and the
-// bracket are the independent prototype's (.scratch/roots5/proto5d.py, as in tests/test_roots_search.cpp), for fn
-// written as here and builds without FMA contraction.
+// page shows the parts between the markers and the output in the raw strings; main returns non-zero unless the
+// program prints that output and what the page says holds. The count and the bracket are the independent
+// prototype's (.scratch/roots5/proto5d.py, as in tests/test_roots_search.cpp), for fn written as here and builds
+// without FMA contraction.
 
 // clang-format off
 // <includes>
@@ -11,8 +12,11 @@
 // </includes>
 // clang-format on
 
+#include "printed.hpp"
+
 #include <cmath>
 #include <limits>
+#include <string>
 
 namespace {
 
@@ -25,8 +29,9 @@ namespace {
 
 } // namespace
 
-int main()
+int main(int, char **argv)
 {
+    if (!docs::capture(argv[0])) return 100;
     // clang-format off
     // <search>
     namespace rt = nxx::roots;
@@ -43,6 +48,15 @@ int main()
     else std::println("no root: {}", root.error());
     // </chain>
     // clang-format on
+
+    constexpr std::string_view search_output = R"(
+[1.7299511718750002, 2.5949267578125004]
+)";
+    constexpr std::string_view chain_output = R"(
+2.0945514815423265 +- 8.9e-16
+)";
+    if (!(docs::printed() == std::string(docs::quoted(search_output)) + std::string(docs::quoted(chain_output))))
+        return 6;
 
     if (!bracket || !root) return 1;
 

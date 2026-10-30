@@ -1,7 +1,7 @@
 // The program of docs/sphinx/roots/choose-a-method.md: measuring the evaluations of fn per method. The page
-// shows the parts between the markers; main returns non-zero unless the counts the page states hold. They are the
-// independent prototypes' (docs/roots/design.md, Evidence, Phases 1 and 4), valid for fn written as here and builds
-// without FMA contraction.
+// shows the parts between the markers and the output in the raw string; main returns non-zero unless the program
+// prints that output, whose counts are the independent prototypes' (docs/roots/design.md, Evidence, Phases 1 and 4),
+// valid for fn written as here and builds without FMA contraction.
 
 // clang-format off
 // <includes>
@@ -25,8 +25,12 @@ int evaluations(F const &fn, nxx::roots::Bracket<double> const &bracket)
 // </count>
 // clang-format on
 
-int main()
+#include "printed.hpp"
+
+int main(int, char **argv)
 {
+    if (!docs::capture(argv[0])) return 100;
+
     // clang-format off
     // <compare>
     namespace rt = nxx::roots;
@@ -41,6 +45,9 @@ int main()
     // </compare>
     // clang-format on
 
-    if (!(bisection == 51 && brent == 8 && toms748 == 9 && anderson_bjorck == 9)) return 1;
+    constexpr std::string_view output = R"(
+Bisection 51, Brent 8, Toms748 9, AndersonBjorck 9
+)";
+    if (!(docs::printed() == docs::quoted(output))) return 1;
     return 0;
 }
