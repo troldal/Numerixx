@@ -81,21 +81,27 @@ factored: 0.99999999999999989, abs_error 3.3e-16
     // below 1, x - 3 and t * x round by up to 2.2e-16 each (an ulp of 2 and of 1, halved), + 3 is exact (Sterbenz),
     // * x rounds by 1.1e-16 and - 1 is exact, so at most 5.5e-16; above 1, 3.3e-16. |(x - 1)^3| exceeds that beyond
     // (5.5e-16)^(1/3) = 8.2e-6 below 1 and 6.9e-6 above: no computed sign change lies farther from 1. The page says
-    // "within about 7e-6", the grid's farthest wrong sign, and "over and over".
-    double farthest = 0.0;
+    // "0 or with the wrong sign ... within about 7e-6", the grid's farthest such point, and "over and over".
+    // Zeros and wrong signs are measured apart: the farthest zero lies 7.24e-6 from 1, the farthest wrong sign 6.03e-6.
+    double farthest_zero = 0.0;
+    double farthest_wrong = 0.0;
     int changes = 0;
     bool positive = expanded(1.0 - 1e-5) > 0.0;
     for (int k = -100000; k <= 100000; ++k) {
         double const x = 1.0 + k * 1e-10;
         double const y = expanded(x);
-        if (!((y > 0.0) == (x > 1.0)) || y == 0.0) farthest = std::max(farthest, std::abs(x - 1.0));
+        if (y == 0.0) farthest_zero = std::max(farthest_zero, std::abs(x - 1.0));
+        else if (!((y > 0.0) == (x > 1.0))) farthest_wrong = std::max(farthest_wrong, std::abs(x - 1.0));
         if (!((y > 0.0) == positive)) ++changes;
         positive = y > 0.0;
     }
-    if (!(farthest >= 6.5e-6 && farthest <= 7.5e-6 && farthest <= 8.2e-6 && changes > 1000)) return 5;
-    // Brent's point: about 4e-6 from 1, inside the noise and within the rounding bound, with abs_error about 4e-16.
+    double const farthest = std::max(farthest_zero, farthest_wrong);
+    if (!(farthest >= 6.5e-6 && farthest <= 7.5e-6 && farthest_wrong >= 5e-6 && farthest <= 8.2e-6 && changes > 1000))
+        return 5;
+    // Brent's point: about 4e-6 from 1, inside the noise, where the computed value is exactly 0, so that abs_error is
+    // the tolerance there, tol(value) = denorm_min + 2 eps |value|, about 4e-16.
     double const distance = std::abs(e->value - 1.0);
-    if (!(distance >= 4e-6 && distance <= 4.5e-6 && within_contract(*e)))
-        return 6;
+    double const tol = std::numeric_limits<double>::denorm_min() + 2 * eps * std::abs(e->value);
+    if (!(distance >= 4e-6 && distance <= 4.5e-6 && expanded(e->value) == 0.0 && e->abs_error == tol)) return 6;
     return 0;
 }

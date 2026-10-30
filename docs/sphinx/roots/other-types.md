@@ -66,7 +66,8 @@ Two things change in a multiprecision type, because of its precision and its ran
   tolerances](tolerances.md#a-root-near-zero-set-abs_tol) shows how.
 - **The open methods try longer.** From a guess, Newton's, Halley's, the secant and Steffensen's methods give up with
   `not_converged` after a number of steps that grows with the type's precision: 4 times its number of bits, 212 for a
-  `double`. A solve that fails in a multiprecision type therefore takes longer to fail.
+  `double` ({cpp:struct}`nxx::roots::Newton`). A solve that fails in a multiprecision type therefore takes longer to
+  fail.
 
 A solve in a multiprecision type also cannot run at compile time, since those types are not literal types ([Compile
 time](../basics.md#compile-time)).

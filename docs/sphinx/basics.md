@@ -91,9 +91,9 @@ the second does not:
 After the test, read the result with `->` or `*`. An error formats as its name, so you can print or log it directly, as
 the second line shows. Each module has its own error enumeration, listed in its reference.
 
-Numerixx itself never throws. Two exceptions can still reach you, both from outside the library. An exception thrown by
-`fn` passes through unchanged. And `value()`, the standard library's checked access, throws `std::bad_expected_access`
-when there is no result, which is why you test first.
+Numerixx itself never throws, and never catches. Exceptions can still reach you from outside the library. An exception
+thrown by `fn`, or by the operations of a real type of your own, passes through unchanged. And `value()`, the standard
+library's checked access, throws `std::bad_expected_access` when there is no result, which is why you test first.
 
 ```{note}
 More errors may be added in a later version, and a cause may move from one error to another. Test for success rather

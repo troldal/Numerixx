@@ -6,7 +6,9 @@ number that means nothing. This page shows how to keep a solve inside the domain
 steps outside.
 
 Numerixx reads a value of `fn` that is not finite, NaN or infinite, as a sign that the point lies outside the domain.
-`search` then steps back towards the last point where `fn` was finite; `solve` stops with an error.
+`search` then steps back towards the last point where `fn` was finite; `solve` stops with an error. (One point is
+exempt: `solve` first tries 0 in a bracket around 0, and skips it where `fn` is not finite there, as $\sin x / x$ is
+not.)
 
 ## Return NaN outside the domain
 

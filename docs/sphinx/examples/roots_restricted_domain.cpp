@@ -133,9 +133,10 @@ Newton, forward difference, from 1e-13: 1.000000e-12
     if (!in_bracket || !(std::abs(in_bracket->value - 1e-12) <= in_bracket->abs_error + 2e-28)) return 6;
     if (!(in_bracket->abs_error <= 2 * (std::numeric_limits<double>::denorm_min() + 2 * eps * in_bracket->value)))
         return 7;
-    // "The numerical derivative's step, about 6e-6": Central<2>'s default step at x is eps^(1/3) max(|x|, 1)
-    // (nxx::deriv::Central), 6.06e-6 at x = 1e-13, so the lower node lies below 0.
-    if (!(std::cbrt(eps) > 6e-6 && std::cbrt(eps) < 6.1e-6)) return 11;
+    // "The numerical derivative's step, about 6e-6": the step derivative_of uses, Central<2>'s default for f' at
+    // 1e-13, eps^(1/3) max(|x|, 1) = 6.06e-6, so the lower node lies below 0.
+    double const step = nxx::deriv::default_step<nxx::deriv::Central<2>, 1>(1e-13);
+    if (!(step > 6e-6 && step < 6.1e-6 && 1e-13 - step < 0.0)) return 11;
     // The forward difference from the guess: the root 1e-12 within abs_error + 2e-28, as in the bracket.
     if (!forward || !(std::abs(forward->value - 1e-12) <= forward->abs_error + 2e-28)) return 12;
 

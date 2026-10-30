@@ -86,7 +86,7 @@ int main()
     // (exact) 1.1e-16; E - e sin E rounds by half an ulp of 1 (1.1e-16), and - M is exact; the budget 2.2e-16 over
     // f' = 1 - e cos E = 0.964 is 2.3e-16. The difference (value - reference) is exact (Sterbenz), and subtracting
     // below adds at most half an ulp of it.
-    double const c = 2.3e-16 + 1e-31;
+    double const c = 2.31e-16 + 1e-31; // 2^-52 / 0.96398 = 2.3034e-16, rounded up
     for (auto const &root : {*r, *n}) {
         if (!(std::abs((root.value - reference) - below) <= root.abs_error + c)) return 2;
         if (!(root.abs_error <= bound)) return 3;

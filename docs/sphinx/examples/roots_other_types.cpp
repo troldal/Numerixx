@@ -38,8 +38,6 @@ namespace {
         return abs(T(r->value - reference)) <= T(r->abs_error + T(eps * reference)) && r->abs_error <= bound;
     }
 
-    // The open methods' iteration cap, 4 times the bits of T (nxx::roots::Newton): 212 for a double.
-    static_assert(4 * std::numeric_limits<double>::digits == 212);
 
     // The walk to 0 in cpp_bin_float_50: from a bracket of width about 1 down to denorm_min = 2^min_exponent (about),
     // one halving per bit, about 2e9 halvings.
@@ -108,5 +106,15 @@ int main(int, char **argv)
     if (!mixed || !(std::abs(mixed->value - 1.4142135623730950488) > 2e-8
                     && std::abs(mixed->value - 1.4142135623730950488) < 5e-8 && mixed->abs_error < 1e-15))
         return 5;
+
+    // The open methods' iteration cap, 4 times the bits of T: 212 steps for a double. Newton from 0 on x^3 - 2x + 2
+    // cycles between 0 and 1 and never brackets the root, so it evaluates fn at the guess and at each of 212 steps.
+    int calls = 0;
+    auto const cycle = [&](double x) {
+        ++calls;
+        return std::pair{(x * x - 2.0) * x + 2.0, 3.0 * x * x - 2.0};
+    };
+    if (!(rt::solve<rt::Newton>(cycle, 0.0) == std::unexpected(rt::error::not_converged))) return 6;
+    if (!(calls == 1 + 4 * std::numeric_limits<double>::digits && calls == 213)) return 8;
     return 0;
 }

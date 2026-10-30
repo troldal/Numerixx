@@ -98,21 +98,29 @@ x = -1.7692923542386314
         double const d = t * t - 2.0;
         return d / (d * d + 1e-24);
     };
+    // Each result is first checked against its sign change, so that the test is not passed by a NaN or a stray point:
+    // here sqrt(2), within abs_error + 8e-17 (t * t - 2 rounds by half an ulp of 2, over |d'| = 2.83) + 1.2e-16 (the
+    // reference in a double).
     auto const r1 = rt::solve<rt::Brent>(resonance, rt::Bracket{1.0, 2.0});
-    if (!r1 || looks_like_a_pole(resonance, *r1)) return 5;
+    if (!r1 || !(std::abs(r1->value - 1.4142135623730950488) <= r1->abs_error + 8e-17 + 1.2e-16)) return 9;
+    if (looks_like_a_pole(resonance, *r1)) return 5;
     // a pole whose |fn| is far below its size at the ends;
     auto const hidden = [](double t) {
         double const d = t - 1.0 / 3.0;
         return 1.0 / d + 1e20 * d * d * d;
     };
+    // Its sign is d's, which is exact near fl(1/3) (Sterbenz): the pole is at that double.
     auto const r2 = rt::solve<rt::Brent>(hidden, rt::Bracket{0.0, 1.0});
-    if (!r2 || !looks_like_a_pole(hidden, *r2)) return 6;
+    if (!r2 || !(std::abs(r2->value - 1.0 / 3.0) <= r2->abs_error)) return 10;
+    if (!looks_like_a_pole(hidden, *r2)) return 6;
     // a root at 1/3 whose |fn| at the ends is 2e-49, far below its size near the root.
     auto const narrow = [](double t) {
         double const d = t - 1.0 / 3.0;
         return d * std::exp(-1000.0 * d * d);
     };
+    // Its sign is d's again (the exponential is positive), so the root is at fl(1/3).
     auto const r3 = rt::solve<rt::Brent>(narrow, rt::Bracket{0.0, 1.0});
-    if (!r3 || looks_like_a_pole(narrow, *r3)) return 7;
+    if (!r3 || !(std::abs(r3->value - 1.0 / 3.0) <= r3->abs_error)) return 11;
+    if (looks_like_a_pole(narrow, *r3)) return 7;
     return 0;
 }

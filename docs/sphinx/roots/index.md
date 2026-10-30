@@ -86,11 +86,12 @@ Take $(x - 1)^3$, written out and written as a product:
 ```
 
 Written out as $x^3 - 3x^2 + 3x - 1$, the function is a sum of terms near 1 that cancel to almost nothing, and the
-rounding in that sum is larger than $(x - 1)^3$ itself near the root. As computed, it changes sign over and over
-anywhere within about $7 \times 10^{-6}$ of 1. Brent's method finds one of those sign changes, $4 \times 10^{-6}$ from
-1, and its bound of $4 \times 10^{-16}$ is true of that sign change, not of the root. Written as a product, the same
-function is computed with the right sign everywhere, and the root comes out within its bound of 1. When a root matters
-to many digits, write $f$ so that it does not cancel near the root.
+rounding in that sum is larger than $(x - 1)^3$ itself near the root. As computed, it comes out as 0 or with the wrong
+sign, over and over, anywhere within about $7 \times 10^{-6}$ of 1. Brent's method lands on one of those points,
+$4 \times 10^{-6}$ from 1, where the computed value is exactly 0, and returns it with `abs_error` $4 \times 10^{-16}$,
+the tolerance there: a statement about $f$ as computed, not about the root. Written as a product, the same function is
+computed with the right sign everywhere, and the root comes out within its bound of 1. When a root matters to many
+digits, write $f$ so that it does not cancel near the root.
 
 ## Where to go next
 

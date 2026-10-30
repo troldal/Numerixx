@@ -182,9 +182,10 @@ locally and in CI, and the examples' tests pass on all five toolchains.
   move into the roots overview).
   - [x] 4a: the pages moved into the module layout, links and toctrees fixed, no prose changed; docs build clean
     (ff7ab73: run 40965441740)
-  - [ ] 4b: `index.md`, `basics.md`, the roots chapter and deriv's short page in the new voice; docs build clean;
-    programs pass on all five toolchains
-  - [ ] 4b reviews: `docs-reviewer`, numerics, a docs-only reader; then the independent review (Codex)
+  - [x] 4b: `index.md`, `basics.md`, the roots chapter and deriv's short page in the new voice; docs build clean;
+    programs pass on all five toolchains (83afe10: run 41019005701)
+  - [x] 4b reviews: `docs-reviewer`, numerics, a docs-only reader (fixed in 83afe10); then the independent review
+    (Codex): seven findings, all adopted (`docs/sphinx/PHASE4_PLAN.md`)
 - Phase 5: the `nxx::deriv` chapter in the same shape, from `docs/deriv/DERIV_TUTORIAL.md`, with deriv examples in
   `basics.md`.
   - [ ] Pages, examples and tests; docs build clean

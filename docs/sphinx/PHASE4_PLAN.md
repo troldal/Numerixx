@@ -317,3 +317,17 @@ or checked, all adopted unless noted:
 - Not adopted: quoting getting-started's output (its second line goes through `std::exp`); an install section (still
   deferred).
 
+The independent review (Codex, on 83afe10; seven findings, each reproduced, all adopted):
+
+- The expanded cubic's result is a point where the computed value is exactly 0, so its `abs_error` is the tolerance
+  there, not a bound on a sign reversal; the page says so, and the program checks it (`expanded(value) == 0`,
+  `abs_error == tol(value)`) and measures zeros (farthest 7.24e-6) apart from wrong signs (6.03e-6).
+- The pole-test checks on the resonance, hidden-pole and narrow cases first check each result against its sign change,
+  so that a NaN or a stray point cannot pass them.
+- `solve` skips a non-finite value at the point 0 it tries first in a bracket around 0 (a removable singularity); the
+  restricted-domain page names that exception.
+- The iteration cap is checked through Numerixx (Newton's 213 calls on a cycle), not by arithmetic alone, and the page
+  links to `Newton`'s reference; the stencil step through `nxx::deriv::default_step`.
+- `basics.md`: exceptions from a user type's operations pass through too (`docs/design.md`).
+- Kepler's conditioning allowance rounded up to its own budget, 2^-52 / 0.964 = 2.3034e-16 (2.31e-16).
+
