@@ -274,9 +274,9 @@ namespace nxx::deriv {
      * smallest step it tried.
      *
      * It costs 2 evaluations of fn per level for f' and f'', 4 for f''' and f'''', plus fn(x) once for f'' and f'''':
-     * typically 10 to 16 for f' in double, 13 to 23 for f'', 25 to 45 for f''' and f'''', and at most 64, 65, 128 and
-     * 129. The result's abs_error is the change of the best entry from its parent, but at least the rounding error of
-     * the difference it came from and at least its distance to the latest diagonal entry. It assumes that fn is
+     * typically 10 to 16 for f' in double, 13 to 23 for f'', 25 to 45 for f''' and f'''', and at most 64, 65, 128
+     * and 129. The result's abs_error is the change of the best entry from its parent, but at least the rounding error
+     * of the difference it came from and at least its distance to the latest diagonal entry. It assumes that fn is
      * accurate to about epsilon, and is optimistic for a noisier fn. Like the stencils, it runs in constant
      * expressions.
      *
@@ -298,7 +298,8 @@ namespace nxx::deriv {
      * below x), the lower end of a correlation's range, or the right-hand derivative at a kink. The rule's error has
      * every power of h, so each column of the tableau gains one order rather than two: it is less accurate than
      * `Ridders`, typically 2e-13 relative for f' in double, 1e-10 for f'', 4e-8 for f''' and 2e-6 for f'''', against
-     * 1e-14 to 7e-10. Where fn is defined on both sides, use `Ridders`, also near a domain edge.
+     * 1e-14 to 7e-10. Close to a domain edge, where fn is still defined on both sides of x, either method can be the
+     * more accurate: try both, and trust a result only when the two agree.
      *
      * The tableau, its stopping rules and restarts are those of `Ridders`, with the initial step max(|x|, 1) / 32 for
      * every order; the error estimate also covers the rounding that the tableau amplifies. From the default step the

@@ -1730,8 +1730,8 @@ namespace nxx::roots {
          * @brief Newton or Halley from a guess: the method's step, at least tol(x) long, until fn's values at two
          * consecutive iterates have opposite signs; then the bracket loop on them (the hand-over).
          *
-         * The minimum step takes its direction from the signs of f and f', not from a step that may have underflowed to
-         * 0. An x + step that would overflow, or a step that cannot be formed, is error::not_converged.
+         * The minimum step takes its direction from the signs of f and f', not from a step that may have underflowed
+         * to 0. An x + step that would overflow, or a step that cannot be formed, is error::not_converged.
          *
          * @tparam M The method, Newton or Halley.
          * @param fn The function, giving the values M needs.

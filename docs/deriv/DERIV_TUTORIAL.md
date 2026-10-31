@@ -674,8 +674,9 @@ A one-sided method never sees the NaN beyond an edge, so near one it learns only
 restarting below the smallest step tried is what lets it reach the scale of fn. From the default step
 `max(|x|, 1) / 32` it handles sqrt or log down to about 1e-9 from 0; closer, its result is wrong but flagged (an
 estimate of at least |value| / 4): pass a step on fn's own scale, such as `x / 8`. `BackwardRidders` is
-`ForwardRidders` applied to fn(-t) at -x, which gives exactly the points x - k h. Where fn is defined on both sides,
-use `Ridders`, also near an edge.
+`ForwardRidders` applied to fn(-t) at -x, which gives exactly the points x - k h. Close to an edge, where fn is still
+defined on both sides of x, either method can be the more accurate (`ForwardRidders` on 1/(1 + x) at 1e-6 from it,
+`Ridders` on sqrt(1 - x) near 1): try both, and trust a result only when the two agree.
 
 ### The low-precision warning
 
