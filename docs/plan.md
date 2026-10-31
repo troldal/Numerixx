@@ -213,7 +213,8 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
 - Phase 2: adaptive `GaussKronrod<15>`, the default (the heap, the floor, final panels, stagnation, the cap, the
   initial mesh, compensated sums; the node cache for types without a table; the README example and the demo).
   - [x] API approved: `docs/quadrature/PHASE2_API.md` (2026-10-31, Q1 to Q12 as recommended)
-  - [ ] `GaussKronrod<15>` and the default method, constexpr; tests in every type; docs build clean
+  - [x] `GaussKronrod<15>` and the default method, constexpr; tests in every type; docs build clean
+    (all five presets, `numerixx_docs` and the demo locally, 2026-10-31)
   - [ ] CI passes on all five toolchains
   - [ ] The independent review (Codex) and its adopted findings
 - Phase 3: exp (internal) and `TanhSinh` on finite intervals, with the endpoint handling and the end-term test.

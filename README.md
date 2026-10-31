@@ -9,7 +9,8 @@ Numerixx 2 is in development on the `dev` branch and currently provides numerica
 finite differences of orders up to 10, and Ridders' extrapolation with an error estimate, central or one-sided, for
 the first to the fourth derivative; and roots of a function of one variable, in a bracket by bisection, Brent's method
 or a safeguarded Newton or Halley, or from a guess by Newton, Halley or the secant method, each with a bound on its
-error. Numerixx 1.x is at the tag `v1.1.0-legacy`.
+error; and integrals of a function of one variable, by adaptive Gauss-Kronrod (the default), Romberg's method or a
+fixed Gauss-Legendre rule, with an error estimate. Numerixx 1.x is at the tag `v1.1.0-legacy`.
 
 ```cpp
 #include <numerixx/deriv.hpp>
@@ -45,6 +46,13 @@ auto f = [](double x) { return x * x - 2.0; };
 auto m = rt::solve<rt::Newton>(f, nxx::deriv::derivative_of(f), 1.0); // f' numerically (#include <numerixx/deriv.hpp>)
 
 auto s = rt::search(f, 1.0).and_then([&](rt::Bracket<double> b) { return rt::solve<rt::Brent>(f, b); }); // no bracket
+```
+
+```cpp
+#include <numerixx/quadrature.hpp>
+
+auto q = nxx::quadrature::integrate([](double x) { return std::exp(x); }, 0.0, 1.0); // adaptive G7-K15, 150 evaluations
+if (q) { /* q->value is e - 1 to a few eps (2.2e-16); q->abs_error, 1.9e-14, estimates its error */ }
 ```
 
 The default tolerances give the full precision of the type at every magnitude: a root at 1e-12 keeps its digits, with

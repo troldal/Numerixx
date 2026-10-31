@@ -23,3 +23,9 @@ endfunction()
 
 numerixx_add_demo(deriv)
 numerixx_add_demo(roots)
+numerixx_add_demo(quadrature)
+# The multiprecision case, where the tests' standalone Boost.Multiprecision is there.
+if (TARGET boost_multiprecision)
+    target_link_libraries(numerixx_quadrature_demo PRIVATE boost_multiprecision)
+    target_compile_definitions(numerixx_quadrature_demo PRIVATE NUMERIXX_DEMO_MULTIPRECISION)
+endif ()

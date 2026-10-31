@@ -17,20 +17,26 @@ every module (the library, real types, the general test rules) is in `docs/desig
 - Neumaier's compensated sum (1974); the rounding floor's constant 50 from QUADPACK (Piessens et al. 1983, the book);
   the running error analysis of the tests' error model after Higham (2002), Accuracy and Stability of Numerical
   Algorithms, ch. 3.
+- Gauss-Kronrod (Phase 2): Kronrod, A. S. (1965), Nodes and Weights of Quadrature Formulas; Laurie, D. P. (1997),
+  Calculation of Gauss-Kronrod quadrature rules, Math. Comp. 66 (the Stieltjes polynomial and the interpolatory
+  weights); Adams' closed form for the integral of three Legendre polynomials; the global adaptive loop after Malcolm
+  and Simpson (1975), Piessens et al. (1983, QUADPACK's QAG) and Shampine (2008, `quadgk`'s mesh of 10); Kahaner's
+  21 problems (Kahaner 1971) as Gander and Gautschi (2000) list them, for the battery. Boost.Math's 115-digit G7-K15
+  table (BSL-1.0, values only) as the tests' reference.
 - Not used: GSL, QUADPACK's Fortran (no licence on netlib), Numerical Recipes. Numerixx 1.x's `integrate/` was
   surveyed (`BRIEF.md` 2.1); none of its code is kept.
 
 ## The interface (`quadrature.hpp`)
 
 - `integrate<M>(fn, a, b)` for the fixed rule `GaussLegendre<N>`, 1 <= N <= 64, returning `std::expected<T, error>`;
-  `integrate<M>(fn, a, b, criteria = {})` for `Romberg`, returning `std::expected<Integral<T>, Failure<T>>`. Each
-  overload is constrained to its methods (`detail::fixed_rule<M>`, `std::same_as<M, Romberg>`), so criteria for the
-  fixed rule do not compile (`PHASE1_API.md`).
+  `integrate<M = GaussKronrod<15>>(fn, a, b, criteria = {})` for the methods with an estimate (`GaussKronrod<15>`,
+  the default, and `Romberg`), returning `std::expected<Integral<T>, Failure<T>>`. Each overload is constrained to its
+  methods (`detail::fixed_rule<M>`, `detail::estimating<M>`), so criteria for the fixed rule do not compile.
+  `GaussKronrod<N>` requires N == 15 on the type, so `GaussKronrod<21>` fails where it is named (Phase 2, Q11).
 - Both ends deduce T; criteria as `Criteria<std::type_identity_t<T>>`. fn as in every module (`nxx::detail::callable`).
 - `Integral<T>{value, abs_error}`, `Failure<T>{reason, best}` (best present for `not_converged`),
   `Criteria<T>{abs_tol = 0, rel_tol = sqrt(eps)}`, `error{non_finite, not_converged}`; `error` and `Failure` format as
   the enumerator's name (Q7), through one `detail::name`.
-- No default method until `GaussKronrod<15>` exists (Phase 2).
 
 ## Behaviour
 
@@ -86,7 +92,7 @@ every module (the library, real types, the general test rules) is in `docs/desig
   from the largest. Each is isolated by bisection on the Sturm count `detail::zeros_above` in [0, upper], capped at
   `digits log2(radix) + 8` steps; upper is 1 for x_1, then the previous isolation's lower end, whose count is exactly
   k - 1, so that x_k <= upper < x_(k-1) by counting alone (the previous computed zero only where the cap ended that
-  isolation). Then `detail::legendre_zero`: Newton on P_N safeguarded by bisection, the bracket's orientation from the
+  isolation). Then `detail::bracketed_zero`: Newton on P_N safeguarded by bisection, the bracket's orientation from the
   zero's index (P_N > 0 above x_1, sign (-1)^k on (x_(k+1), x_k)); the first iterate, the midpoint, checked strictly
   inside the bracket; a Newton step taken only where |P| < |P'| (hi - lo), so that it cannot overflow and P' != 0
   (both needed in constant evaluation), and only where it lands strictly inside the bracket or rounds back to x
@@ -260,6 +266,187 @@ if __name__ == '__main__':
             print(n, i, mp.nstr(x, 60, min_fixed=-1, max_fixed=-1), mp.nstr(w, 60, min_fixed=-1, max_fixed=-1))
 ```
 
+## Gauss-Kronrod (Phase 2, `PHASE2_API.md`)
+
+- **The rule** (`detail::gauss_kronrod_rule<T>`, + - * / in T): GaussLegendre<7>'s nodes and weights, and the 8
+  Kronrod nodes, the zeros of the Stieltjes polynomial E_8 = sum_k a_k P_k (`detail::stieltjes`: Adams' closed form,
+  a triangular system with no linear solve; the conditions with even j vanish, condition j fixes a_(7-j)), each found
+  by Phase 1's safeguarded Newton (`detail::bracketed_zero`, now generic in the polynomial) between two Gauss nodes or
+  between the largest and 1, oriented by the index. Weights from the interpolatory formulas, 2 / (8 P_7 E_8') and
+  w_G + 2 / (8 P_7' E_8). `detail::Kronrod<T>` stores the non-negative half, Gauss nodes at the even indices.
+- **Tables** for float, double and long double (`detail::gauss_kronrod_table`); for every other T a **node cache**,
+  for both rules (`with_gauss_legendre`, `with_gauss_kronrod`, through one `with_generated<generate>`: the generator
+  in constant evaluation, else `cached<generate>()`), one function-local static per generator, so per rule and T
+  whatever fn is (the first version's static lay in a function templated on fn's closure type, so each lambda
+  regenerated), initialised once by the language and never changed. Safe because no `nxx::real` type changes its precision
+  at run time (Boost's variable-precision types do not specialise `numeric_limits`; documented for user types).
+- **A panel** (`detail::sample`, returning `std::expected<Panel<T>, fault>`): K15 and G7 on the same 15
+  evaluations, two Neumaier sums, D = |K - G| (no difference weights, Q10), L1_p the plain sum of |term|, floor_p =
+  `rounding_floor(L1_p)` = 50 max(eps L1_p, denorm_min) (shared with Romberg), e_p = max(D, floor_p), the excess
+  e_p - floor_p stored with the panel. The order of evaluation: the centre, then c + d and c - d for the nodes
+  ascending. One finiteness check per panel, on L1; a value or difference that overflows with L1 finite is
+  `non_finite` (the prototype's check, kept; an implementation note of `PHASE2_API.md`).
+- **The loop** (`detail::gauss_kronrod`): integrated over [min(a, b), max(a, b)] and negated where b < a (exactly);
+  the mesh of 10 equal panels (empty ones skipped); a panel is final at creation if D <= floor or it cannot be split
+  (`detail::splittable`: the midpoint, and both children's outer nodes, strictly inside); the heap by D, ties in
+  creation order, growing on demand; three running Neumaier sums K, F, X with E = F + X, a parent's contribution
+  subtracted with the same bits that were added; the stop test E <= max(abs_tol, rel_tol |K|, 2F); then the heap
+  empty, the cap (64 b bisections and descent splits, b = digits times the bits of a digit rounded up, 12,800 in
+  `cpp_dec_float_50`) and stagnation (32 bisections without a new minimum of X), each `not_converged` with best
+  {K, max(E, F)}; the result {K, max(E, F)} (E can sit a hair below F through a Neumaier residue, so the max keeps
+  abs_error at the floor or above exactly).
+- **Values that are not finite** (D): a panel whose L1 is not finite is split, iteratively, at most 2 levels below
+  the panel that started the descent, each split counted against the cap; a descent left with such a piece is undone
+  (the parent stays, final, with its own estimate), and the run is tainted: it can no longer end ok. A mesh panel with
+  no finite estimate is `non_finite`.
+- **Constant evaluation**: a value or product `checked_term` refuses, or a sum above max / 2 (`detail::fits`), is
+  `non_finite`, with no descent; so a `static_assert` and its run-time twin agree wherever both succeed. The tests run
+  the bisection loop at compile time (a kink, 7 bisections) and check the run-time result equal to it bit for bit.
+- **A gap:** no test has a descent that reaches the cap (a descent split when `work` is already at the cap), a path
+  the prototype did not meet either.
+- **The Gauss-Legendre tables are unchanged** by the generic `bracketed_zero` and the shared recurrence step: every
+  rule, N = 1 to 64 in float, double and long double, is identical bit for bit to 930bb49's, on GCC (80-bit long
+  double), clang-cl and em++ (binary128).
+- **The stagnation stop of the Newton iteration** (Phase 1) is shared by the Kronrod zeros; it does not fire there
+  either.
+
+### The tests' error model of the K15 rule
+
+As Phase 1's for Gauss-Legendre (`tests/test_quadrature_kronrod.cpp`, `kronrod_model`): a Kronrod node errs by at
+most (|E_8 computed| + error_e) / |E_8'|, error_e the coefficients' errors against the exact rationals times |P_k|,
+the computed P_k's running bounds times |a_k|, and the series' own operations; its weight c / (P_7 E_8') by the
+node's error times |w'| plus the relative errors of P_7 and E_8'; at a Gauss node, Phase 1's model plus the same for
+the term c / (P_7' E_8). Against Boost's 115-digit table the largest ratios of actual error to bound are, nodes and
+weights: float 0.27 and 0.077, double 0.10 and 0.060, long double (80-bit) 0.17 and 0.061, `cpp_bin_float_50` (with
+or without expression templates) 0.22 and 0.12, `cpp_dec_float_50` 4e-23 and 9e-24 (its guard digits). The sum of
+|dw_K| over the 15 points is 3.7 (float), 2.9 (double), 3.1 (long double) and 6.1 (`cpp_bin_float_50`) eps; the
+largest |dx| 0.44, 0.17, 0.33 and 0.44 eps.
+
+The smooth-case bound (`kronrod_bound`): every panel lies in a mesh panel at most (b - a) / 10 wide, and K15, exact
+to degree 23 with positive weights, errs on a panel of width L by at most 2 L E_23(f) <= 2 L (L / 2)^24
+max |f^(24)| / (2^23 24!) (Chebyshev); plus the weights' errors sum |dw| max |f| (b - a) / 2, the nodes' and the
+arguments' rounding max |f'| (b - a) ((b - a) / 20 max |dx| + eps (max(|a|, |b|) + 1.5 (b - a) / 20)), and
+(4 eps + rho) L1 for the terms, fn's own rounding and the sums.
+
+## Evidence (Phase 2)
+
+### The prototype, with the C++ table
+
+`scratchpad/gk-proto/gk3.py` (session scratchpad, not kept): the loop of `PHASE2_API.md` C to E in Python floats,
+mirroring the header operation for operation (the order of evaluation, `Interval::term`, the Neumaier sums, the heap
+order, E = F + X, the running K as the value), with the C++ generator's double table loaded (`dump_k15.cpp`). Its
+results equal the C++'s bit for bit, values and estimates, on every case the tests count:
+
+| Case | Criteria | Status | Evaluations |
+|---|---|---|---|
+| 1 / (1 + x^2) on [0, 1] | default; 1e-14 | ok (the mesh alone) | 150 |
+| \|x - 0.37\| on [0, 1] | default | ok | 360 |
+| \|x - 0.37\| on [0, 1] | rel 0 | ok (the 2F test) | 660 |
+| 1 / sqrt\|x\| on [-1, 3] | default | ok (one descent split) | 2,550 |
+| sqrt(x - 0.5) on [0, 1] | default | non_finite (the bounded descent) | 105 |
+| sqrt x on [0, 1] | default | ok | 360 |
+| x^-0.75 on [0, 1] | default | ok | 2,790 |
+| x^-0.875 on [0, 1] | default; 1e-12 | ok | 5,520; 10,710 |
+| 1 / x^2 and 1 / (x - 0.5)^2 on [0, 1] | default | not_converged (stagnation) | 1,140 |
+| 1 / (1e-4 + (x - 0.42)^2), NaN on \|x - 0.48753\| < 7.86e-5 | 1e-10 | not_converged (the taint; ok without it) | 630 |
+| the same | 1e-12 | not_converged (final panels, with or without the taint) | 960 |
+| \|127 x - floor(127 x) - 1/2\| on [0, 1] | rel 0 | not_converged (the cap, 3,392 bisections) | 101,910 |
+| x^-(127/128) on [0, 1], 7 nested sqrt | default | not_converged (the heap empty: final panels) | 92,130 |
+| max on \|x - 2.5\| < 0.25, 0 elsewhere, on [0, 50] | default | non_finite (L1 finite, G7's term overflows) | 15 |
+
+`counts3.py` holds every case, and reruns the holed ones without the taint rule. The counted powers are x^-0.75,
+x^-0.875 and x^-(127/128), written with sqrt, in place of the spec's x^-0.9, which needs pow (a libm function, whose
+last bits could move a decision). The cap is reached by the comb above, not by x^-0.9, which at rel_tol 0 in double
+ends ok at the floor (17,460 evaluations). The cap's justification in `cpp_bin_float_50` holds: at its default,
+x^-0.9 (by pow) takes 3,550 bisections of its 10,752 (the prototype at 168 bits: 3,472) and ends ok, x^-0.875 (by
+sqrt) 2,820; the tests run the second.
+
+### The battery (the prototype with its own double rule, `final2.py`; the tables `PHASE2_API.md` F summarises)
+
+710 cases at four tolerances (Kahaner's 21, 200 Lyness-Kaganove peaks, 350 rational and Gaussian peaks, 21 powers,
+50 kinks, 50 jumps, edge cases, noisy fn; references from closed forms or mpmath at 60 digits). False positives (the
+estimate below the error) and false successes (ok, the error above both the tolerance and the estimate), and the
+percentiles of log10(estimate / error), excluding the Gaussian peaks of width 1e-4 (narrower than the points'
+spacing, every sample 0):
+
+| rel_tol | ok | FP | FS | p5 | p25 | p50 | p75 | p95 |
+|---|---|---|---|---|---|---|---|---|
+| 1e-6 | 606 | 31 (5.1 %) | 11 (1.8 %) | -0.03 | 3.00 | 6.03 | 6.65 | 7.84 |
+| 1.5e-8 (default) | 606 | 35 (5.8 %) | 12 (2.0 %) | -0.04 | 2.76 | 5.58 | 6.33 | 7.16 |
+| 1e-12 | 603 | 31 (5.1 %) | 14 (2.3 %) | -0.00 | 1.33 | 2.43 | 2.88 | 3.69 |
+| 0 | 591 | 28 (4.7 %) | 28 (4.7 %) | 0.02 | 0.74 | 1.50 | 1.85 | 2.65 |
+
+The false successes are kinks and steps in a panel's unsampled outer 0.43 % (the worst: a step at 0.599763, estimate
+4.4e-15, error 2.4e-4), the peaks of width 1e-3 at rel_tol 0, and powers beyond x^-0.65. Kahaner's 21 (status,
+evaluations, estimate / actual error):
+
+| Problem | 1.5e-8 | 1e-12 | rel 0 |
+|---|---|---|---|
+| K01 e^x [0,1] | ok 150, 1.9e-14 / 5.2e-16 | ok 150, 1.9e-14 / 5.2e-16 | ok 150, 1.9e-14 / 5.2e-16 |
+| K02 step 0.3 [0,1] | ok 150, 7.8e-15 / 1.7e-16 | ok 150, 7.8e-15 / 1.7e-16 | ok 150, 7.8e-15 / 1.7e-16 |
+| K03 sqrt x [0,1] | ok 360, 5.1e-09 / 2.9e-10 | ok 630, 4.5e-13 / 2.5e-14 | ok 810, 1.3e-14 / 3.0e-16 |
+| K04 23/25 cosh - cos [-1,1] | ok 150, 6.0e-15 / 1.4e-16 | ok 150, 6.0e-15 / 1.4e-16 | ok 150, 6.0e-15 / 1.4e-16 |
+| K05 1/(x^4+x^2+0.9) [-1,1] | ok 150, 1.8e-14 / 3.6e-16 | ok 150, 1.8e-14 / 3.6e-16 | ok 150, 1.8e-14 / 3.6e-16 |
+| K06 x^1.5 [0,1] | ok 180, 2.0e-09 / 9.6e-12 | ok 330, 3.5e-13 / 1.5e-15 | ok 420, 6.4e-15 / 7.8e-17 |
+| K07 1/sqrt x [0,1] | ok 1350, 2.1e-08 / 1.4e-08 | ok 2370, 1.8e-12 / 3.0e-13 | ok 3150, 4.2e-14 / 2.7e-15 |
+| K08 1/(1+x^4) [0,1] | ok 150, 9.6e-15 / 2.0e-16 | ok 150, 9.6e-15 / 2.0e-16 | ok 150, 9.6e-15 / 2.0e-16 |
+| K09 2/(2+sin 10pi x) [0,1] | ok 300, 2.6e-09 / 5.9e-16 | ok 900, 1.1e-12 / 3.7e-16 | ok 1350, 1.4e-14 / 1.5e-16 |
+| K10 1/(1+x) [0,1] | ok 150, 7.7e-15 / 2.0e-16 | ok 150, 7.7e-15 / 2.0e-16 | ok 150, 7.7e-15 / 2.0e-16 |
+| K11 1/(1+e^x) [0,1] | ok 150, 4.2e-15 / 1.1e-16 | ok 150, 4.2e-15 / 1.1e-16 | ok 150, 4.2e-15 / 1.1e-16 |
+| K12 x/(e^x-1) [0,1] | ok 150, 8.6e-15 / 1.8e-16 | ok 150, 8.6e-15 / 1.8e-16 | ok 150, 8.6e-15 / 1.8e-16 |
+| K13 sin(100 pi x)/(pi x) [0.1,1] | ok 2220, 1.0e-10 / 3.5e-17 | ok 4560, 8.6e-15 / 1.2e-16 | ok 4560, 8.6e-15 / 1.2e-16 |
+| K14 sqrt50 e^(-50 pi x^2) [0,10] | ok 240, 3.3e-10 / 2.1e-16 | ok 330, 3.1e-13 / 1.0e-16 | ok 390, 1.0e-14 / 1.0e-16 |
+| K15 25 e^(-25x) [0,10] | ok 210, 2.9e-09 / 4.4e-16 | ok 300, 4.3e-13 / 4.4e-16 | ok 420, 1.2e-14 / 2.2e-16 |
+| K16 50/(pi(2500x^2+1)) [0,10] | ok 330, 2.1e-11 / 1.3e-16 | ok 510, 1.3e-13 / 1.3e-16 | ok 600, 9.6e-15 / 1.3e-16 |
+| K17 50 sinc^2(50 pi x) [0.01,1] | ok 1110, 1.2e-09 / 4.4e-18 | ok 2340, 1.0e-13 / 4.4e-18 | ok 4140, 2.4e-15 / 4.4e-18 |
+| K18 cos(cos x + ...) [0,pi] | ok 150, 1.6e-10 / 2.6e-16 | ok 330, 8.0e-13 / 1.5e-16 | ok 450, 1.9e-14 / 3.7e-16 |
+| K19 log x [0,1] | ok 630, 1.5e-08 / 2.6e-09 | ok 1080, 8.6e-13 / 7.9e-14 | ok 1470, 2.1e-14 / 3.3e-16 |
+| K20 1/(1.005+x^2) [-1,1] | ok 150, 1.7e-14 / 4.1e-16 | ok 150, 1.7e-14 / 4.1e-16 | ok 150, 1.7e-14 / 4.1e-16 |
+| K21 sum sech(20^i (x - i/5)) [0,1] | ok 870, 1.5e-09 / 2.0e-17 | ok 1290, 1.3e-13 / 3.6e-17 | ok 1770, 3.0e-15 / 7.7e-18 |
+
+### The parameter studies (prototype; the decisions in `PHASE2_API.md`)
+
+- The mesh (Q1): false successes on 100 Gaussian peaks of width 1e-3 at the default: 36 with 1 panel, 2 with 2, 1 with
+  4, none with 10; Kahaner's 21st missed with 1 or 2.
+- The stop test (Q4): at rel_tol 0 the brief's test (E <= F) ended 32 of 50 kinks and 42 of 50 jumps
+  `not_converged`; with 2F, 50 and 38 end ok with 4 times fewer evaluations.
+- Stagnation (Q2), against the brief's rule on E and draft 1's reset on a tenfold rise: no false trip over the battery
+  at four tolerances and five combs of 40 peaks; 1/x^2 and 1/(x - 0.5)^2 stop at 1,140 evaluations in double and 168
+  bits; e^x (1 + 1e-10 h(x)) at 1,620 with an honest best, where it ran to the cap without a rule.
+- The descent (Q8): unbounded, sqrt(x - 0.5) walked 1,063 levels (101,775 evaluations) in double; bounded at 2,
+  `non_finite` in 105. The undo against carrying the ancestor's estimate: equal on the battery; on a NaN region the
+  carried estimate was 3.4 times below the error, the undone one honest.
+- Difference weights (Q10): no status changed and one count by 30 evaluations over the battery; |D| / (eps L1_p) on
+  narrow panels of 1, e^x and 1 / (1 + x^2) at most 1.28, 1.62 and 1.52, 30 times below the floor's 50.
+
+### Constant evaluation
+
+The smallest passing limit (bisection to 1 %) for `integrate` in a `constexpr` variable, cheap fn: the mesh alone
+(1 / (1 + x^2) on [0, 1], 150 evaluations) and a kink at 0.37 at rel_tol 0 (660 evaluations, 17 bisections); the
+steps per bisection (30 evaluations) from the difference, and the bisections that fit the default limits after the
+mesh:
+
+| Compiler (default limit) | The mesh | Per bisection | Bisections that fit |
+|---|---|---|---|
+| GCC 16 (33,554,432 operations) | 365,649 | 76,478 | about 430 |
+| Clang 22 (1,048,576 steps) | 44,136 | 9,064 | about 110 |
+| em++ (1,048,576 steps) | 44,205 | 9,000 | about 110 |
+| clang-cl (1,048,576 steps) | 33,915 | 6,965 | about 145 |
+| cl (1,048,576 steps) | 25,329 | 5,155 | about 195 |
+
+So a compile-time integral of a cheap fn reaches about 110 bisections (3,450 evaluations) on every compiler; a fn
+dearer than a few operations proportionally fewer. The K15 table itself is computed separately, once: 12,130 steps on
+em++ in binary128 long double (9,261 in double), 55,429 operations on GCC in 80-bit long double, 1.2 % and 0.2 % of
+the limits.
+
+### The node cache
+
+`cpp_bin_float_50`, GCC 16 -O2: the generator costs 0.32 ms for G7-K15 and 1.0 ms for GaussLegendre<20>, which every
+call paid before the cache. With it, and one cache per rule and T, a call of `integrate` on 1 / (1 + x^2) over [0, 1]
+with a lambda of its own (50 distinct closure types, the cache built once beforehand by another) costs 0.435 ms (the
+default method, 420 evaluations: 1.7 times faster than with the generator per call) and 0.012 ms (GaussLegendre<20>:
+81 times faster). The first version's cache, per closure type, saved nothing on each lambda's first call.
+
 ## Tests
 
 - References from closed forms at 70 digits (mpmath at 80), never Numerixx; Boost's and mpmath's nodes and weights
@@ -277,3 +464,13 @@ if __name__ == '__main__':
   against the prototype; the floors of x^2 and x^3 exactly (every sample and sum is exact in double).
 - `static_assert` for N = 1, 2, 7, 64 (and 7 in float and long double) and Romberg's x^2 on [0, 3], with tolerances
   that a run-time test checks against the rounding bound; the failures in constant expressions.
+- Gauss-Kronrod (`tests/test_quadrature_kronrod.cpp`): the rule against Boost's table within the error model, in
+  every type; smooth cases within `kronrod_bound` in double and both 50-digit types, with the honesty check beside;
+  Kahaner's 21 at the default, honest, the non-smooth ones within rel_tol |ref|; the counts above; the cap, stagnation
+  (the hash noise, 1/x^2), the heap empty (x^-(127/128)), the 2F test, D14 on [-1, 3], the bounded descent (also in
+  `cpp_bin_float_50`), the taint, the check of G7's overflow, each with its status, evaluations and best estimate in
+  one table; the cap's justification in `cpp_bin_float_50`; the substitution x = u^10 for x^-0.9 cos x; static_asserts
+  within their bounds, the bisection loop among them.
+- The edge cases of both methods with an estimate as one template (`quadrature: estimating methods: edges`):
+  orientation, a == b, NaN and infinite ends, tolerances, [-max, max], subnormal widths, the domain-checking callback,
+  the scales 1e-300 and 1e300, x^3 with abs_error the floor, overflow, and the constant-evaluation cases.

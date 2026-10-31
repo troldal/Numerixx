@@ -1,12 +1,19 @@
 /**
  * @file
- * @brief Integrals of a real function of one variable over a finite interval: the fixed Gauss-Legendre rule and
- * Romberg's method.
+ * @brief Integrals of a real function of one variable over a finite interval: adaptive Gauss-Kronrod, the default;
+ * Romberg's method; and the fixed Gauss-Legendre rule.
  *
- * integrate<M>(fn, a, b) integrates fn from a to b by a method M: `GaussLegendre<N>`, a fixed rule that returns a
- * plain number, or `Romberg`, which returns an Integral with an estimate of its error, or a Failure. Every method
- * returns a std::expected; Numerixx itself never throws, but the result's own value() throws
+ * integrate(fn, a, b) integrates fn from a to b by adaptive Gauss-Kronrod, the default method, and integrate<M>(fn, a,
+ * b) by a method M: `GaussKronrod<15>`, the default named; `Romberg`; or `GaussLegendre<N>`, a fixed rule that returns
+ * a plain number. The methods with an estimate return an Integral, the value and an estimate of its error, or a
+ * Failure. Every method returns a std::expected; Numerixx itself never throws, but the result's own value() throws
  * std::bad_expected_access on a failure, so test the result and read it with `->` or `*`.
+ *
+ * @code
+ * namespace qd = nxx::quadrature;
+ * auto const r = qd::integrate([](double x) { return std::exp(x); }, 0.0, 1.0); // e - 1, 150 evaluations
+ * if (r) use(r->value, r->abs_error);
+ * @endcode
  *
  * The ends are oriented: b < a gives the negated integral, and a == b gives 0 without calling fn. An interval narrow
  * against its position (|a + b| far above |b - a|) rounds each point at which fn is evaluated by about eps |a + b| / 2,
@@ -17,6 +24,7 @@
 
 #include <numerixx/math.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <concepts>
@@ -29,6 +37,7 @@
 #include <string_view>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 /** @brief Integrals of real functions of one variable. */
 namespace nxx::quadrature {
@@ -42,11 +51,18 @@ namespace nxx::quadrature {
     enum class error {
         /**
          * An end is NaN or infinite (an infinite interval is for a later method, TanhSinh), a tolerance is negative or
-         * not finite, fn returned a value that is not finite, or a sum overflowed.
+         * not finite, fn returned a value that is not finite (for GaussKronrod: on a panel of its initial mesh that no
+         * short bisection avoids, such as a region where fn is NaN), or a sum overflowed.
          */
         non_finite,
 
-        /** The tolerance was not met within the method's cap. */
+        /**
+         * The tolerance was not met: within the method's cap; or, for GaussKronrod, by stagnation, when its
+         * bisections stop lowering the estimate's excess over the floor (fn noisier than the request, or a divergent
+         * integral); or with every panel final and their errors above the tolerance (a strong endpoint singularity,
+         * or a piece where fn is not finite that a short bisection did not avoid). Failure::best then holds the
+         * estimate reached and its error estimate.
+         */
         not_converged
     };
 
@@ -99,11 +115,12 @@ namespace nxx::quadrature {
      * @brief When to stop: when the error estimate is at most max(abs_tol, rel_tol |value|), or at the rounding floor.
      *
      * The rounding floor is 50 max(eps L1, denorm_min), L1 the integral of |fn| by the same method on the same
-     * evaluations: the scale of the sum's own rounding. It is the effective minimum of every request (about 1e-14
-     * relative in double), and it ends an integral that cancels to 0, so abs_tol = 0 works there. The defaults ask
-     * for sqrt(eps) relative, not full precision: no estimate from samples certifies the last digits. A caller who
-     * chose a 50-digit type for its digits sets rel_tol. nxx::roots::Criteria asks for full precision by default;
-     * under using-directives for both namespaces the two names collide, so qualify them.
+     * evaluations (for GaussKronrod the sum of every panel's): the scale of the sum's own rounding. It is the effective
+     * minimum of every request (about 1e-14 relative in double): GaussKronrod accepts at twice the floor, Romberg at
+     * the floor, and either ends an integral that cancels to 0 there, so abs_tol = 0 works. The defaults ask for
+     * sqrt(eps) relative, not full precision: no estimate from samples certifies the last digits. A caller who chose a
+     * 50-digit type for its digits sets rel_tol. nxx::roots::Criteria asks for full precision by default; under
+     * using-directives for both namespaces this name and `error` collide with nxx::roots', so qualify them.
      *
      * Every estimate assumes fn accurate to about eps: noise in fn above the floor is invisible to the samples before
      * it shows, so a noisy fn can stop early with an estimate below its true error, or run to the cap.
@@ -137,8 +154,9 @@ namespace nxx::quadrature {
      * (b - a)^(2N+1) (N!)^4 / ((2N + 1) ((2N)!)^3) f^(2N)(xi) for some xi in (a, b).
      *
      * The nodes and weights come from the three-term recurrence, + - * / in T: for float, double and long double at
-     * compile time, once per program; for every other type, such as a Boost.Multiprecision number, at the start of
-     * each call, a cost that grows with N^2.
+     * compile time, once per program; for every other type, such as a Boost.Multiprecision number, at its first use,
+     * and then kept (a function-local static, initialised once by the language; a type that changed its precision at
+     * run time would see the nodes of its first).
      *
      * @tparam N The number of points, 1 to 64.
      */
@@ -158,6 +176,28 @@ namespace nxx::quadrature {
      * evaluations than a Gauss rule for the same accuracy; its uses are teaching and equally spaced data.
      */
     struct Romberg
+    {
+    };
+
+    /**
+     * @brief The G7-K15 Gauss-Kronrod pair, globally adaptive: the default method. Only N = 15 exists.
+     *
+     * The interval starts as 10 equal panels, 150 evaluations of fn (for an expensive fn that must cost less, use
+     * GaussLegendre<N>, which has no estimate, or Romberg); then the panel with the largest estimate is bisected
+     * until the sum of the estimates meets the criteria. A panel's estimate is |K15 - G7| on its 15 points, or its
+     * floor if larger: it estimates the 7-point rule's error, not the returned 15-point result's, so it usually
+     * overstates the error by orders of magnitude, but it is not a bound. What it misses: a feature narrower than the
+     * spacing of the points (a narrow peak between them), and a kink or a step near a panel's ends, outside the
+     * outermost points, which neither rule samples. An endpoint singularity stronger than about (x - a)^-0.65 is
+     * underestimated by a ratio that bisection does not change; substitute x = a + u^k with k (1 + alpha) >= 1 for
+     * (x - a)^alpha (and u = b - x for the other end) until TanhSinh. Full precision in a 50-digit type is costly:
+     * the estimate converges at the 7-point rule's order.
+     *
+     * @tparam N The number of Kronrod points: 15.
+     */
+    template<int N>
+    requires(N == 15)
+    struct GaussKronrod
     {
     };
 
@@ -184,6 +224,13 @@ namespace nxx::quadrature {
          */
         template<typename M>
         concept fixed_rule = gauss_points<M> >= 1 && gauss_points<M> <= 64;
+
+        /**
+         * @brief The methods with an estimate that integrate() accepts: GaussKronrod<15> and Romberg.
+         * @tparam M The method.
+         */
+        template<typename M>
+        concept estimating = std::same_as<M, GaussKronrod<15>> || std::same_as<M, Romberg>;
 
         /**
          * @brief The types whose Gauss-Legendre rules are computed at compile time: float, double and long double,
@@ -244,6 +291,23 @@ namespace nxx::quadrature {
             T const half_max = T(T((std::numeric_limits<T>::max)()) / T(2));
             if (m <= T(1)) return T(m * nxx::math::abs(b)) <= half_max;
             return nxx::math::abs(b) <= T(half_max / m);
+        }
+
+        /**
+         * @brief Whether @p a + @p b may be formed: at run time always (an overflow is found by a later check of the
+         * sum); in constant evaluation, where an overflow is not a constant expression, only if neither exceeds
+         * max / 2.
+         * @param a A finite value.
+         * @param b A finite value.
+         * @return Whether the sum is safe to form.
+         */
+        template<real T>
+        constexpr bool fits(T const &a, T const &b)
+        {
+            if consteval {
+                return !detail::large(a) && !detail::large(b);
+            }
+            return true;
         }
 
         /**
@@ -409,6 +473,45 @@ namespace nxx::quadrature {
         };
 
         /**
+         * @brief a / 2 + b / 2, which cannot overflow: the centre of an interval, and where a panel is bisected.
+         * @param a An end.
+         * @param b The other end.
+         * @return The midpoint.
+         */
+        template<real T>
+        constexpr T midpoint(T const &a, T const &b)
+        { return T(T(a / T(2)) + T(b / T(2))); }
+
+        /**
+         * @brief The rounding floor of an estimate: 50 max(eps L1, denorm_min), QUADPACK's constant.
+         * @param l1 The integral of |fn| by the method on the same evaluations.
+         * @return The floor.
+         */
+        template<real T>
+        constexpr T rounding_floor(T const &l1)
+        {
+            T const eps = T(std::numeric_limits<T>::epsilon());
+            T const tiny = T(std::numeric_limits<T>::denorm_min());
+            return T(T(50) * detail::larger(T(eps * l1), tiny));
+        }
+
+        /**
+         * @brief The estimate a method accepts: max(abs_tol, rel_tol |value|, floor), with the floor its own
+         * (Romberg's, or twice Gauss-Kronrod's).
+         * @param abs_tol The absolute tolerance.
+         * @param rel_tol The relative tolerance, at most 1.
+         * @param value The integral.
+         * @param floor The floor the method accepts at.
+         * @return The largest estimate accepted.
+         */
+        template<real T>
+        constexpr T wanted(T const &abs_tol, T const &rel_tol, T const &value, T const &floor)
+        {
+            T const relative = T(rel_tol * nxx::math::abs(value));
+            return detail::larger(detail::larger(abs_tol, relative), floor);
+        }
+
+        /**
          * @brief The interval [a, b] for the methods.
          * @param a The lower end, finite.
          * @param b The upper end, finite, not a.
@@ -425,7 +528,7 @@ namespace nxx::quadrature {
             T const half_sum = T(T(nxx::math::abs(a) / T(2)) + T(nxx::math::abs(b) / T(2)));
             bool const finite = !opposite || !(half_sum > T(T((std::numeric_limits<T>::max)()) / T(2)));
             T const width = finite ? T(b - a) : T(0);
-            return Interval<T>{ T(T(a / T(2)) + T(b / T(2))),
+            return Interval<T>{ detail::midpoint(a, b),
                                 T(T(b / T(2)) - T(a / T(2))),
                                 width,
                                 finite,
@@ -466,6 +569,31 @@ namespace nxx::quadrature {
         };
 
         /**
+         * @brief P_(k+1)(x) from P_k(x) and P_(k-1)(x): (k + 1) P_(k+1) = (2k + 1) x P_k - k P_(k-1).
+         * @param k The degree of p1, at least 1.
+         * @param x The point.
+         * @param p1 P_k(x).
+         * @param p0 P_(k-1)(x).
+         * @return P_(k+1)(x).
+         */
+        template<real T>
+        constexpr T next_legendre(int k, T const &x, T const &p1, T const &p0)
+        { return T(T(T(T(T(2 * k + 1) * x) * p1) - T(T(k) * p0)) / T(k + 1)); }
+
+        /**
+         * @brief P'_(k+1)(x), the recurrence differentiated: (k + 1) P'_(k+1) = (2k + 1) (P_k + x P'_k) - k P'_(k-1).
+         * @param k The degree of p1, at least 1.
+         * @param x The point.
+         * @param p1 P_k(x).
+         * @param d1 P'_k(x).
+         * @param d0 P'_(k-1)(x).
+         * @return P'_(k+1)(x).
+         */
+        template<real T>
+        constexpr T next_derivative(int k, T const &x, T const &p1, T const &d1, T const &d0)
+        { return T(T(T(T(2 * k + 1) * T(p1 + T(x * d1))) - T(T(k) * d0)) / T(k + 1)); }
+
+        /**
          * @brief P_n(x) and P_n'(x) by the three-term recurrence and its derivative.
          * @param n The degree, at least 1.
          * @param x The point, in [-1, 1].
@@ -474,15 +602,14 @@ namespace nxx::quadrature {
         template<real T>
         constexpr Legendre<T> legendre(int n, T const &x)
         {
-            // (k + 1) P_(k+1) = (2k + 1) x P_k - k P_(k-1), and its derivative in x,
-            // (k + 1) P'_(k+1) = (2k + 1) (P_k + x P'_k) - k P'_(k-1). |P_k| <= 1 on [-1, 1], so nothing overflows.
+            // |P_k| <= 1 on [-1, 1], so nothing overflows.
             T p0 = T(1);
             T p1 = x;
             T d0 = T(0);
             T d1 = T(1);
             for (int k = 1; k < n; ++k) {
-                T const p2 = T(T(T(T(T(2 * k + 1) * x) * p1) - T(T(k) * p0)) / T(k + 1));
-                T const d2 = T(T(T(T(2 * k + 1) * T(p1 + T(x * d1))) - T(T(k) * d0)) / T(k + 1));
+                T const p2 = detail::next_legendre(k, x, p1, p0);
+                T const d2 = detail::next_derivative(k, x, p1, d1, d0);
                 p0 = p1;
                 p1 = p2;
                 d0 = d1;
@@ -518,7 +645,7 @@ namespace nxx::quadrature {
             T p1 = x;
             count(p1);
             for (int k = 1; k < n; ++k) {
-                T const p2 = T(T(T(T(T(2 * k + 1) * x) * p1) - T(T(k) * p0)) / T(k + 1));
+                T const p2 = detail::next_legendre(k, x, p1, p0);
                 p0 = p1;
                 p1 = p2;
                 count(p1);
@@ -527,19 +654,20 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The zero of P_n in (@p lower, @p upper) by Newton's method, safeguarded by bisection.
+         * @brief The zero of a polynomial in (@p lower, @p upper) by Newton's method, safeguarded by bisection: P_n for
+         * the Gauss nodes, the Stieltjes polynomial for the Kronrod nodes.
          *
-         * The orientation of the bracket is given, not computed: a computed P_n of exactly 0 at an end would turn it
+         * The orientation of the bracket is given, not computed: a computed value of exactly 0 at an end would turn it
          * around. The result lies strictly inside the bracket: every iterate does.
          *
-         * @param n The degree.
+         * @param polynomial Its value and derivative at a point, as a Legendre<T>.
          * @param lower The lower end of a bracket that holds one zero.
          * @param upper The upper end.
-         * @param negative_below Whether P_n < 0 between lower and the zero.
+         * @param negative_below Whether the polynomial is negative between lower and the zero.
          * @return The zero.
          */
-        template<real T>
-        constexpr T legendre_zero(int n, T const &lower, T const &upper, bool negative_below)
+        template<real T, typename P>
+        constexpr T bracketed_zero(P const &polynomial, T const &lower, T const &upper, bool negative_below)
         {
             T const eps = T(std::numeric_limits<T>::epsilon());
             T const sqrt_eps = nxx::math::root_epsilon<2, T>();
@@ -553,7 +681,7 @@ namespace nxx::quadrature {
             T previous = T(0);
             bool previous_newton = false;
             for (int i = 0; i < cap; ++i) {
-                Legendre<T> const e = detail::legendre(n, x);
+                Legendre<T> const e = polynomial(x);
                 if (e.p == T(0)) break;
                 if ((e.p < T(0)) == negative_below) lo = x;
                 else hi = x;
@@ -574,12 +702,12 @@ namespace nxx::quadrature {
                 x = next;
                 if (newton && step <= T(T(T(2) * eps) * nxx::math::abs(x))) break;
                 // A step that no longer shrinks is rounding, but only once it is small: two growing steps near an
-                // extremum of P_n are not convergence.
+                // extremum of the polynomial are not convergence.
                 if (newton && previous_newton && step >= previous && step <= T(sqrt_eps * nxx::math::abs(x))) break;
                 previous = step;
                 previous_newton = newton;
             }
-            assert(lower < x && x < upper && "a Legendre zero must lie strictly inside its bracket");
+            assert(lower < x && x < upper && "a zero must lie strictly inside its bracket");
             return x;
         }
 
@@ -605,7 +733,7 @@ namespace nxx::quadrature {
          * @brief The N-point Gauss-Legendre rule, from + - * / in T alone (no pi, no cos).
          *
          * The positive zeros of P_N are isolated one by one, from the largest, by bisection on zeros_above(), then
-         * found by legendre_zero(); the negative nodes are their mirror images, and 0 is a node for odd N. The weights
+         * found by bracketed_zero(); the negative nodes are their mirror images, and 0 is a node for odd N. The weights
          * are 2 / ((1 - x)(1 + x) P_N'(x)^2).
          *
          * @tparam N The number of points.
@@ -637,7 +765,8 @@ namespace nxx::quadrature {
                     else hi = mid;
                 }
                 // P_N > 0 above its largest zero x_1, and its sign between x_(k+1) and x_k is (-1)^k: lo lies there.
-                T const x = detail::legendre_zero(N, lo, hi, k % 2 == 1);
+                auto const p = [](T const &v) { return detail::legendre(N, v); };
+                T const x = detail::bracketed_zero(p, lo, hi, k % 2 == 1);
                 rule.x[static_cast<std::size_t>(odd + m - k)] = x;
                 // lo's count is exactly k, so x_(k+1) <= lo < x_k: an end found by counting, where the computed zero
                 // could lie on either side of x_k. The computed zero only where the cap ended the isolation.
@@ -660,6 +789,199 @@ namespace nxx::quadrature {
          */
         template<int N, typename T>
         inline constexpr Rule<T, N> gauss_legendre_table = detail::gauss_legendre_rule<N, T>();
+
+        /**
+         * @brief The rule @p generate makes, built at its first use and kept: one function-local static per generator,
+         * so per rule and T, whatever fn is (initialised once, thread-safely, by the language; never changed). Not
+         * for constant evaluation.
+         * @tparam generate The generator, such as gauss_legendre_rule<N, T>.
+         * @return The rule.
+         */
+        template<auto generate>
+        auto const &cached()
+        {
+            static auto const rule = generate();
+            return rule;
+        }
+
+        /**
+         * @brief @p use applied to the rule @p generate makes for a type without a compile-time table: the generator
+         * itself in constant evaluation, the cached rule at run time.
+         * @tparam generate The generator.
+         * @param use A callable taking the rule.
+         * @return What use returns.
+         */
+        template<auto generate, typename U>
+        constexpr decltype(auto) with_generated(U &&use)
+        {
+            if consteval {
+                return use(generate());
+            }
+            else {
+                return use(detail::cached<generate>());
+            }
+        }
+
+        /**
+         * @brief @p use applied to the N-point rule in T: the compile-time table for float, double and long double,
+         * with_generated() for every other T.
+         * @param use A callable taking the rule.
+         * @return What use returns.
+         */
+        template<int N, real T, typename U>
+        constexpr decltype(auto) with_gauss_legendre(U &&use)
+        {
+            if constexpr (tabled<T>) return use(detail::gauss_legendre_table<N, T>);
+            else return detail::with_generated<&detail::gauss_legendre_rule<N, T>>(use);
+        }
+
+        /**
+         * @brief The coefficients of the Stieltjes polynomial E_8 of the G7-K15 pair in the Legendre basis:
+         * E_8 = sum_k a_k P_k, a_8 = 1, orthogonal to P_7 P_j for every j < 8.
+         *
+         * The integrals of three Legendre polynomials have Adams' closed form,
+         * int_{-1}^{1} P_a P_b P_c = 2 A(s - a) A(s - b) A(s - c) / ((2s + 1) A(s)), a + b + c = 2s, with
+         * A(m) = (2m - 1)!! / (2m)!!, and 0 where a + b + c is odd or the triangle inequality fails. E_8 is even, so
+         * the conditions with even j vanish identically (7 + k + j odd); the condition with odd j involves a_k for
+         * k >= 7 - j only (the triangle inequality), and fixes a_(7-j) from the coefficients above it: a triangular
+         * system, solved from the top, with no linear solve.
+         *
+         * @return a_0 ... a_8 (the odd ones 0).
+         */
+        template<real T>
+        constexpr std::array<T, 9> stieltjes()
+        {
+            constexpr int n = 7;
+            constexpr int smax = (3 * n + 1) / 2; // the largest s = (7 + k + j) / 2 asked for
+            std::array<T, smax + 1> A = detail::zeros<T, smax + 1>();
+            A[0] = T(1);
+            for (int i = 1; i <= smax; ++i) {
+                std::size_t const u = static_cast<std::size_t>(i);
+                A[u] = T(T(A[u - 1] * T(2 * i - 1)) / T(2 * i));
+            }
+            auto const at = [&A](int i) -> T const & { return A[static_cast<std::size_t>(i)]; };
+            auto const triple = [&at](int a, int b, int c) {
+                int const half_sum = (a + b + c) / 2;
+                return T(T(T(T(T(2) * at(half_sum - a)) * at(half_sum - b)) * at(half_sum - c))
+                         / T(T(2 * half_sum + 1) * at(half_sum)));
+            };
+            std::array<T, 9> a = detail::zeros<T, 9>();
+            a[8] = T(1);
+            for (int j = 1; j <= n; j += 2) {
+                int const k0 = n - j;
+                T sum = T(0);
+                for (int k = k0 + 2; k <= n + 1; k += 2)
+                    sum = T(sum + T(a[static_cast<std::size_t>(k)] * triple(n, k, j)));
+                a[static_cast<std::size_t>(k0)] = T(T(-sum) / triple(n, k0, j));
+            }
+            return a;
+        }
+
+        /**
+         * @brief sum_k a_k P_k(x) and its derivative, by the three-term recurrence.
+         * @param a The coefficients a_0 ... a_8.
+         * @param x The point, in [-1, 1].
+         * @return The value and the derivative.
+         */
+        template<real T>
+        constexpr Legendre<T> legendre_series(std::array<T, 9> const &a, T const &x)
+        {
+            T p0 = T(1);
+            T p1 = x;
+            T d0 = T(0);
+            T d1 = T(1);
+            T sum = T(a[0] + T(a[1] * p1));
+            T derivative = a[1];
+            for (int k = 1; k < 8; ++k) {
+                std::size_t const next = static_cast<std::size_t>(k + 1);
+                T const p2 = detail::next_legendre(k, x, p1, p0);
+                T const d2 = detail::next_derivative(k, x, p1, d1, d0);
+                p0 = p1;
+                p1 = p2;
+                d0 = d1;
+                d1 = d2;
+                sum = T(sum + T(a[next] * p1));
+                derivative = T(derivative + T(a[next] * d1));
+            }
+            return Legendre<T>{ sum, derivative };
+        }
+
+        /**
+         * @brief The non-negative half of the G7-K15 pair: the 8 nodes ascending, the 7-point Gauss nodes at the even
+         * indices (x[0] = 0), the Kronrod nodes at the odd ones, with both rules' weights (the Gauss weight 0 where a
+         * node is Kronrod's only).
+         * @tparam T The real type.
+         */
+        template<real T>
+        struct Kronrod
+        {
+            /** @brief The number of non-negative nodes. */
+            static constexpr std::size_t size = 8;
+
+            /** @brief The non-negative nodes, ascending. */
+            std::array<T, size> x;
+
+            /** @brief The 15-point Kronrod weights. */
+            std::array<T, size> wk;
+
+            /** @brief The 7-point Gauss weights at the even indices, 0 at the odd ones. */
+            std::array<T, size> wg;
+        };
+
+        /**
+         * @brief The G7-K15 pair, from + - * / in T alone.
+         *
+         * The Gauss part is GaussLegendre<7>'s. The Kronrod nodes are the zeros of E_8, each between two Gauss nodes or
+         * between the largest one and 1, found by bracketed_zero() with the orientation from the node's index (E_8 > 0
+         * above its largest zero, sign (-1)^k between its k-th and (k+1)-th largest). The weights are the interpolatory
+         * formulas, 2 / (8 P_7 E_8') at a Kronrod node and w_G + 2 / (8 P_7' E_8) at a Gauss node.
+         *
+         * @return The non-negative half of the pair.
+         */
+        template<real T>
+        constexpr Kronrod<T> gauss_kronrod_rule()
+        {
+            Rule<T, 7> const gauss = detail::gauss_legendre_rule<7, T>();
+            std::array<T, 9> const a = detail::stieltjes<T>();
+            auto const e8 = [&a](T const &x) { return detail::legendre_series(a, x); };
+            T const c = T(T(1) / T(4)); // 2 / (n + 1), n = 7
+            Kronrod<T> rule{ detail::zeros<T, 8>(), detail::zeros<T, 8>(), detail::zeros<T, 8>() };
+            for (std::size_t k = 1; k <= 4; ++k) {
+                T const lo = gauss.x[4 - k];
+                T const hi = k == 1 ? T(1) : gauss.x[5 - k];
+                rule.x[2 * (4 - k) + 1] = detail::bracketed_zero(e8, lo, hi, k % 2 == 1);
+            }
+            for (std::size_t j = 0; j < 4; ++j) {
+                rule.x[2 * j] = gauss.x[j];
+                rule.wg[2 * j] = gauss.w[j];
+            }
+            for (std::size_t i = 0; i < Kronrod<T>::size; ++i) {
+                Legendre<T> const e = e8(rule.x[i]);
+                Legendre<T> const p = detail::legendre(7, rule.x[i]);
+                if (i % 2 == 0) rule.wk[i] = T(rule.wg[i] + T(c / T(p.dp * e.p)));
+                else rule.wk[i] = T(c / T(p.p * e.dp));
+            }
+            return rule;
+        }
+
+        /**
+         * @brief The G7-K15 pair for float, double and long double, computed at compile time once per program.
+         * @tparam T float, double or long double.
+         */
+        template<typename T>
+        inline constexpr Kronrod<T> gauss_kronrod_table = detail::gauss_kronrod_rule<T>();
+
+        /**
+         * @brief @p use applied to the G7-K15 pair in T, as with_gauss_legendre(): the table, or with_generated().
+         * @param use A callable taking the pair.
+         * @return What use returns.
+         */
+        template<real T, typename U>
+        constexpr decltype(auto) with_gauss_kronrod(U &&use)
+        {
+            if constexpr (tabled<T>) return use(detail::gauss_kronrod_table<T>);
+            else return detail::with_generated<&detail::gauss_kronrod_rule<T>>(use);
+        }
 
         /**
          * @brief A rule applied to fn on an interval: sum over the nodes of hw w_i fn(c + hw x_i), compensated.
@@ -716,8 +1038,6 @@ namespace nxx::quadrature {
             constexpr int cap = 16;      // 2^16 + 1 evaluations; fixed, not from T (docs/quadrature/design.md)
             constexpr int min_level = 4; // 17 evaluations: fewer samples of sin^2 on [0, 2 pi] all vanish
             constexpr std::size_t row_size = cap + 1;
-            T const eps = T(std::numeric_limits<T>::epsilon());
-            T const tiny = T(std::numeric_limits<T>::denorm_min());
             Failure<T> const overflow{ error::non_finite, std::nullopt };
             Interval<T> const interval = detail::interval_of(a, b);
 
@@ -782,14 +1102,305 @@ namespace nxx::quadrature {
                 }
                 T const estimate = nxx::math::abs(T(row[diagonal] - previous[diagonal - 1]));
                 if (!nxx::math::isfinite(estimate)) return std::unexpected(overflow);
-                T const floor = T(T(50) * detail::larger(T(eps * l1), tiny));
+                T const floor = detail::rounding_floor(l1);
                 best = Integral<T>{ row[diagonal], detail::larger(estimate, floor) };
-                T const relative = T(rel_tol * nxx::math::abs(row[diagonal]));
-                T const wanted = detail::larger(detail::larger(abs_tol, relative), floor);
-                if (k >= min_level && estimate <= wanted) return best;
+                if (k >= min_level && estimate <= detail::wanted(abs_tol, rel_tol, row[diagonal], floor)) return best;
                 previous = row;
             }
             return std::unexpected(Failure<T>{ error::not_converged, best });
+        }
+
+        /**
+         * @brief A panel of the adaptive Gauss-Kronrod loop, with its 15-point value and its estimate.
+         * @tparam T The real type.
+         */
+        template<real T>
+        struct Panel
+        {
+            /** @brief The lower end. */
+            T lo;
+
+            /** @brief The upper end. */
+            T hi;
+
+            /** @brief The 15-point Kronrod value. */
+            T value;
+
+            /** @brief |K15 - G7|, which orders the heap. */
+            T difference;
+
+            /** @brief The rounding floor, 50 max(eps L1, denorm_min), L1 the panel's integral of |fn|. */
+            T floor;
+
+            /** @brief The estimate's excess over the floor, max(difference, floor) - floor. */
+            T excess;
+
+            /** @brief The order of creation: panels of equal difference leave the heap in it. */
+            std::size_t order;
+        };
+
+        /** @brief Why a panel has no estimate. */
+        enum class fault {
+            not_finite, ///< L1 not finite: fn not finite at a point of the panel (or an overflow of its terms)
+            overflow    ///< a finite L1 but a value or difference that overflowed, or (in constant evaluation) a value
+                        ///< or a sum the checks refuse: the run is non_finite
+        };
+
+        /**
+         * @brief The G7-K15 pair on [lo, hi], lo < hi: the two rules on the same 15 evaluations of fn, each a
+         * compensated sum, and L1, the plain sum of |term| (positive terms).
+         * @param rule The pair.
+         * @param fn The function.
+         * @param lo The lower end.
+         * @param hi The upper end.
+         * @param order The panel's order of creation.
+         * @return The panel, or why it has no estimate.
+         */
+        template<real T, typename F>
+        constexpr std::expected<Panel<T>, fault>
+            sample(Kronrod<T> const &rule, F &fn, T const &lo, T const &hi, std::size_t order)
+        {
+            Interval<T> const interval = detail::interval_of(lo, hi);
+            Sum<T> kronrod;
+            Sum<T> gauss;
+            T l1 = T(0);
+            bool refused = false;
+            auto const add = [&](std::size_t i, T const &x) {
+                if (refused) return;
+                T const y = detail::evaluate(fn, interval.point(x));
+                std::optional<T> const tk = interval.checked_term(rule.wk[i], y);
+                std::optional<T> const tg = i % 2 == 0 ? interval.checked_term(rule.wg[i], y) : std::optional<T>(T(0));
+                if (!tk || !tg || !detail::fits(kronrod.sum, *tk) || !detail::fits(gauss.sum, *tg)
+                    || !detail::fits(l1, *tk)) {
+                    refused = true;
+                    return;
+                }
+                kronrod.add(*tk);
+                l1 = T(l1 + nxx::math::abs(*tk));
+                if (i % 2 == 0) gauss.add(*tg);
+            };
+            add(0, interval.c);
+            for (std::size_t i = 1; i < Kronrod<T>::size; ++i) {
+                T const d = T(interval.hw * rule.x[i]);
+                add(i, T(interval.c + d));
+                add(i, T(interval.c - d));
+            }
+            if (refused) return std::unexpected(fault::overflow);
+            if (!nxx::math::isfinite(l1)) return std::unexpected(fault::not_finite);
+            T const k = kronrod.value();
+            T const g = gauss.value();
+            if (!detail::fits(k, g)) return std::unexpected(fault::overflow);
+            T const difference = nxx::math::abs(T(k - g));
+            // Beyond the spec's check of L1: a finite L1 whose value or difference overflows (the 7-point weights
+            // are larger than the 15-point ones at the Gauss nodes) ends the run non_finite.
+            if (!nxx::math::isfinite(k) || !nxx::math::isfinite(difference)) return std::unexpected(fault::overflow);
+            T const floor = detail::rounding_floor(l1);
+            return Panel<T>{ lo, hi, k, difference, floor, T(detail::larger(difference, floor) - floor), order };
+        }
+
+        /**
+         * @brief Whether [lo, hi] can be bisected: its midpoint lies strictly inside, and the outer nodes of both
+         * children lie strictly inside them (else the nodes round onto the ends).
+         * @param rule The pair.
+         * @param lo The lower end.
+         * @param hi The upper end.
+         * @return Whether the panel can be split.
+         */
+        template<real T>
+        constexpr bool splittable(Kronrod<T> const &rule, T const &lo, T const &hi)
+        {
+            T const mid = detail::midpoint(lo, hi);
+            if (!(lo < mid && mid < hi)) return false;
+            T const outer = rule.x[Kronrod<T>::size - 1];
+            auto const inside = [&outer](T const &p, T const &q) {
+                Interval<T> const child = detail::interval_of(p, q);
+                T const d = T(child.hw * outer);
+                return p < T(child.c - d) && T(child.c + d) < q;
+            };
+            return inside(lo, mid) && inside(mid, hi);
+        }
+
+        /**
+         * @brief A panel waiting in the descent, with its depth below the panel that started it.
+         * @tparam T The real type.
+         */
+        template<real T>
+        struct Pending
+        {
+            /** @brief The lower end. */
+            T lo;
+
+            /** @brief The upper end. */
+            T hi;
+
+            /** @brief The bisections below the panel that started the descent. */
+            int level;
+        };
+
+        /**
+         * @brief Adaptive Gauss-Kronrod on [a, b], a != b, both finite, with validated tolerances
+         * (docs/quadrature/PHASE2_API.md C to E).
+         * @param rule The G7-K15 pair.
+         * @param fn The function.
+         * @param a The lower end.
+         * @param b The upper end.
+         * @param abs_tol The absolute tolerance, finite and non-negative.
+         * @param rel_tol The relative tolerance, in [0, 1].
+         * @return The integral, or the Failure.
+         */
+        template<real T, typename F>
+        constexpr std::expected<Integral<T>, Failure<T>>
+            gauss_kronrod(Kronrod<T> const &rule, F &fn, T const &a, T const &b, T const &abs_tol, T const &rel_tol)
+        {
+            constexpr int mesh = 10;       // Shampine's quadgk: one panel cannot accept K = G on a peak it missed
+            constexpr int depth = 2;       // bisections below a panel whose L1 is not finite
+            constexpr int stagnation = 32; // bisections without a new minimum of the excess X
+            // Bisections and descent splits together, per bit of T: x^-0.9 on [0, 1] at cpp_bin_float_50's default
+            // needs 3,550 of its 10,752.
+            int const cap = 64 * detail::significand_bits<T>();
+            Failure<T> const invalid{ error::non_finite, std::nullopt };
+            // Integrated over [min, max] and negated, so that the panels' ends are in order.
+            bool const reversed = b < a;
+            T const lower = reversed ? b : a;
+            T const upper = reversed ? a : b;
+
+            // The running sums, compensated: the value K, the floor F and the excess X = sum (e_p - floor_p); the
+            // estimate is E = F + X. A panel's contribution is subtracted with the same bits that were added, so X,
+            // which panels at their floor leave at exactly 0, does not drift.
+            Sum<T> total;
+            Sum<T> floor;
+            Sum<T> excess;
+            bool refused = false; // a sum constant evaluation could not form within max / 2
+            auto const contribute = [&](Panel<T> const &p, bool add) {
+                T const v = add ? p.value : T(-p.value);
+                T const f = add ? p.floor : T(-p.floor);
+                T const x = add ? p.excess : T(-p.excess);
+                if (!detail::fits(total.sum, v) || !detail::fits(floor.sum, f) || !detail::fits(excess.sum, x)) {
+                    refused = true;
+                    return;
+                }
+                total.add(v);
+                floor.add(f);
+                excess.add(x);
+            };
+
+            // The active panels, a heap by difference (the same order as the estimate, since only panels above their
+            // floor enter it), growing on demand; final panels stay only in the sums.
+            std::vector<Panel<T>> heap;
+            auto const before = [](Panel<T> const &p, Panel<T> const &q) {
+                return p.difference < q.difference || (p.difference == q.difference && q.order < p.order);
+            };
+            std::size_t order = 0;
+            int work = 0; // bisections and descent splits
+            std::vector<Panel<T>> pieces;
+            std::vector<Pending<T>> stack;
+
+            // [p, q] sampled into pieces: the panel itself, or, where its L1 is not finite, the pieces of a descent of
+            // at most `depth` bisections below it, each counted against the cap, each child first its lower half.
+            // Returns the fault that remains, if any: overflow ends the run; not_finite, a piece the descent could not
+            // avoid.
+            auto const resolve = [&](T const &p, T const &q) -> std::optional<fault> {
+                stack.clear();
+                stack.push_back(Pending<T>{ p, q, 0 });
+                bool missing = false;
+                while (!stack.empty()) {
+                    Pending<T> const top = stack.back();
+                    stack.pop_back();
+                    std::expected<Panel<T>, fault> const s = detail::sample(rule, fn, top.lo, top.hi, order++);
+                    if (s) {
+                        pieces.push_back(*s);
+                        continue;
+                    }
+                    if (s.error() == fault::overflow) return fault::overflow;
+                    if (top.level < depth && detail::splittable(rule, top.lo, top.hi) && work < cap) {
+                        ++work;
+                        T const mid = detail::midpoint(top.lo, top.hi);
+                        stack.push_back(Pending<T>{ mid, top.hi, top.level + 1 });
+                        stack.push_back(Pending<T>{ top.lo, mid, top.level + 1 });
+                    }
+                    else missing = true;
+                }
+                if (missing) return fault::not_finite;
+                return std::nullopt;
+            };
+            // A piece enters the sums, and the heap unless it is final: at its floor (splitting cannot lower it below
+            // its floor, since L1 adds up), or not splittable.
+            auto const commit = [&]() {
+                for (Panel<T> const &piece : pieces) {
+                    contribute(piece, true);
+                    if (!(piece.difference <= piece.floor) && detail::splittable(rule, piece.lo, piece.hi)) {
+                        heap.push_back(piece);
+                        std::push_heap(heap.begin(), heap.end(), before);
+                    }
+                }
+            };
+
+            // The initial mesh of 10 equal panels; equal adjacent points (an interval too narrow for 10) give empty
+            // panels, which are skipped. A mesh panel with no finite estimate is non_finite.
+            Interval<T> const whole = detail::interval_of(lower, upper);
+            T left = lower;
+            for (int i = 1; i <= mesh; ++i) {
+                T const u = T(T(-1) + T(T(2 * i) / T(mesh)));
+                T const right = i == mesh ? upper : whole.point(T(whole.c + T(whole.hw * u)));
+                if (left < right) {
+                    pieces.clear();
+                    if (resolve(left, right)) return std::unexpected(invalid);
+                    commit();
+                    if (refused) return std::unexpected(invalid);
+                }
+                left = right;
+            }
+
+            bool tainted = false; // a piece no descent avoided was undone: the run cannot end ok
+            std::optional<T> least; // the least excess so far
+            int since = 0;          // bisections since the excess last reached a new minimum
+            while (true) {
+                T const value = total.value();
+                T const f = floor.value();
+                T const x = excess.value();
+                if (!detail::fits(f, x)) return std::unexpected(invalid);
+                T const estimate = T(f + x);
+                if (!nxx::math::isfinite(value) || !nxx::math::isfinite(estimate) || !nxx::math::isfinite(f))
+                    return std::unexpected(invalid);
+                // The result {K, E}, its estimate at least F: a Neumaier residue can leave E a hair below it.
+                auto const result = [&] {
+                    return Integral<T>{ reversed ? T(-value) : value, detail::larger(estimate, f) };
+                };
+                // Twice the floor: a kink or a jump never brings every panel to its floor (X = 0), and on a smooth fn
+                // the test cannot accept an error above max(request, 2 F).
+                if (estimate <= detail::wanted(abs_tol, rel_tol, value, T(T(2) * f))) {
+                    if (tainted) return std::unexpected(Failure<T>{ error::not_converged, result() });
+                    return result();
+                }
+                if (heap.empty() || work >= cap || since >= stagnation)
+                    return std::unexpected(Failure<T>{ error::not_converged, result() });
+
+                std::pop_heap(heap.begin(), heap.end(), before);
+                Panel<T> const parent = heap.back();
+                heap.pop_back();
+                T const mid = detail::midpoint(parent.lo, parent.hi);
+                ++work;
+                pieces.clear();
+                std::optional<fault> const lower_half = resolve(parent.lo, mid);
+                if (lower_half == fault::overflow) return std::unexpected(invalid);
+                std::optional<fault> const upper_half = resolve(mid, parent.hi);
+                if (upper_half == fault::overflow) return std::unexpected(invalid);
+                if (lower_half || upper_half) {
+                    // Undone: the parent stays, final, with its own estimate; the descent's pieces are dropped.
+                    tainted = true;
+                }
+                else {
+                    contribute(parent, false);
+                    commit();
+                    if (refused) return std::unexpected(invalid);
+                }
+                T const now = excess.value();
+                if (!least || now < *least) {
+                    least = now;
+                    since = 0;
+                }
+                else ++since;
+            }
         }
 
     } // namespace detail
@@ -827,24 +1438,26 @@ namespace nxx::quadrature {
         constexpr int N = detail::gauss_points<M>;
         // Qualified, so that argument-dependent lookup cannot pick a function from the namespace of T or F.
         detail::Interval<T> const interval = detail::interval_of(a, b);
-        if constexpr (detail::tabled<T>) return detail::apply(detail::gauss_legendre_table<N, T>, fn, interval);
-        else return detail::apply(detail::gauss_legendre_rule<N, T>(), fn, interval);
+        return detail::with_gauss_legendre<N, T>(
+            [&](detail::Rule<T, N> const &rule) { return detail::apply(rule, fn, interval); });
     }
 
     /**
-     * @brief The integral of @p fn from @p a to @p b by a method with an error estimate, @p M: Romberg.
+     * @brief The integral of @p fn from @p a to @p b by a method with an error estimate, @p M: GaussKronrod<15>, the
+     * default, or Romberg.
      *
      * The method stops when its error estimate meets max(criteria.abs_tol, criteria.rel_tol |value|), or the rounding
      * floor (see Criteria). The estimate is not a bound (see Integral). fn's exceptions pass through unchanged.
      *
      * @code
      * namespace qd = nxx::quadrature;
-     * auto const r = qd::integrate<qd::Romberg>([](double x) { return std::exp(x); }, 0.0, 1.0);
+     * auto const r = qd::integrate([](double x) { return std::exp(x); }, 0.0, 1.0);
+     * auto const s = qd::integrate<qd::Romberg>([](double x) { return std::exp(x); }, 0.0, 1.0, {.rel_tol = 1e-12});
      * if (r) use(r->value, r->abs_error);
      * else if (r.error().best) report(r.error().best->value, r.error().best->abs_error);
      * @endcode
      *
-     * @tparam M The method: `Romberg`.
+     * @tparam M The method: `GaussKronrod<15>` (the default) or `Romberg`.
      * @tparam T The real type, deduced from both ends, which must have the same type.
      * @tparam F A callable taking T const & and returning T, as for the fixed rule.
      * @param fn The function.
@@ -852,14 +1465,15 @@ namespace nxx::quadrature {
      * @param b The upper end.
      * @param criteria When to stop; it converts to T, so `{.rel_tol = 1e-12}` works for any T. Name the member: a
      *        braced `{1e-12}` sets abs_tol.
-     * @return The integral and an estimate of its error; or a Failure: error::non_finite if an end, a tolerance or a
-     *         value of fn is not finite, a tolerance is negative or a sum overflowed; error::not_converged, with the
-     *         best estimate, if the tolerance was not met within the cap.
+     * @return The integral and an estimate of its error, returned when the request is met or the estimate is at the
+     *         floor, so a caller who needs the request compares abs_error with it; or a Failure: error::non_finite if
+     *         an end, a tolerance or a value of fn is not finite, a tolerance is negative or a sum overflowed;
+     *         error::not_converged, with the best estimate, if the tolerance was not met (see error).
      */
     // criteria is a non-deduced context (type_identity_t), so T comes from the ends alone and a braced list of doubles
     // converts to a multiprecision T.
-    template<typename M, real T, typename F>
-    requires std::same_as<M, Romberg> && nxx::detail::callable<F, T>
+    template<typename M = GaussKronrod<15>, real T, typename F>
+    requires detail::estimating<M> && nxx::detail::callable<F, T>
     [[nodiscard]] constexpr std::expected<Integral<T>, Failure<T>>
         integrate(F &&fn, T const &a, T const &b, Criteria<std::type_identity_t<T>> const &criteria = {})
     {
@@ -873,7 +1487,11 @@ namespace nxx::quadrature {
         T const rel_tol = criteria.rel_tol > T(1) ? T(1) : criteria.rel_tol;
         if (!nxx::math::isfinite(a) || !nxx::math::isfinite(b)) return std::unexpected(invalid);
         if (a == b) return Integral<T>{ T(0), T(0) };
-        return detail::romberg(fn, a, b, criteria.abs_tol, rel_tol);
+        if constexpr (std::same_as<M, Romberg>) return detail::romberg(fn, a, b, criteria.abs_tol, rel_tol);
+        else
+            return detail::with_gauss_kronrod<T>([&](detail::Kronrod<T> const &rule) {
+                return detail::gauss_kronrod(rule, fn, a, b, criteria.abs_tol, rel_tol);
+            });
     }
 
 } // namespace nxx::quadrature

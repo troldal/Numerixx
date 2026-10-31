@@ -286,6 +286,14 @@ From the usage sketch:
 - Not adopted now: `Failure<T>` for the fixed rule (BRIEF.md D4, approved); a value of its own for stagnation (Q12);
   combining `Integral`s of pieces (with break points, deferred); a nested-integral guide (the site's chapter).
 
+## Implementation notes
+
+Two deviations of the implementation, accepted by the implementation's review round: a panel whose L1 is finite but
+whose 15-point value or difference K - G overflows (the 7-point weights exceed the 15-point ones at the Gauss nodes)
+makes the run `non_finite`, a check beside D's one per panel on L1_p (tested: max on |x - 2.5| < 0.25 over [0, 50]);
+and the cap's b counts the bits of a digit rounded up, as Phase 1's isolation cap does, so in radix 10 it is 64 x 4
+bits per digit (`cpp_dec_float_50`: 12,800 against E's about 10,630).
+
 ## Deferred
 
 - K21 ... K61 (Q7); QUADPACK's scaled estimator and the epsilon algorithm (BRIEF.md 6).
