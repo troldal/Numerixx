@@ -23,7 +23,7 @@ static_assert(!nxx::real<mp::cpp_rational>);
 // nxx::real requires every numeric_limits member the headers read (U-5). Own wraps a double; its numeric_limits is
 // written member by member, not inherited from numeric_limits<double>, so that a missing member is not hidden. Variant
 // 0 is complete; 1 to 5 each lack one member (radix, digits, denorm_min, epsilon, max); 6 has radix 1, under which
-// root_epsilon's scaling would never end.
+// root_epsilon's scaling would never end; 7 has one digit, so its epsilon would be 1.
 namespace {
 
     template<int V>
@@ -74,7 +74,7 @@ struct std::numeric_limits<Own<V>>
     static constexpr bool is_bounded = true;
     static constexpr bool is_exact = false;
     static constexpr int radix = V == 6 ? 1 : 2;
-    static constexpr int digits = 53;
+    static constexpr int digits = V == 7 ? 1 : 53;
     static constexpr Own<V> epsilon() { return Own<V>(std::numeric_limits<double>::epsilon()); }
     static constexpr Own<V> max() { return Own<V>((std::numeric_limits<double>::max)()); }
     static constexpr Own<V> denorm_min() { return Own<V>(std::numeric_limits<double>::denorm_min()); }
@@ -144,6 +144,10 @@ static_assert(!nxx::real<Own<3>>, "no denorm_min");
 static_assert(!nxx::real<Own<4>>, "no epsilon");
 static_assert(!nxx::real<Own<5>>, "no max");
 static_assert(!nxx::real<Own<6>>, "radix 1");
+static_assert(!nxx::real<Own<7>>, "one digit");
+// 2 bits, the least the concept admits. Boost's 1-bit cpp_bin_float, the type that showed the gap, is not asserted:
+// its exponent_nan overflows int, and cl reports that as a hard error even inside the concept's check.
+static_assert(nxx::real<mp::number<mp::cpp_bin_float<2, mp::digit_base_2>>>);
 static_assert(!nxx::real<NoCopy<>>, "not copyable");
 
 static_assert(nxx::math::abs(-2.5) == 2.5 && nxx::math::abs(2.5) == 2.5 && nxx::math::abs(0.0) == 0.0);

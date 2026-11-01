@@ -36,9 +36,10 @@ step of another type converts to T, so \code{0.01} is a valid step for a 50-digi
 \code{float} holds it exactly. \code{fn} is any callable\mnote{A \emph{callable} is anything \code{std::invoke} can
 call: a function, a lambda, a function object, or a pointer to a const member function of T itself. For a member
 function of your model, capture the object: \code{[&m](double t) { return m.H(t); }}.} that takes a T and returns
-something convertible to T. The call of \cref{ch:why}, \code{derivative(H, T0)}, is the shortest form. It means
-\code{Central<2>}, the first derivative and the default step. \Cref{sec:api-derivative} shows one call of each form,
-compiled.
+a T. For a built-in T, anything that converts to T will do, such as a \code{float} for a \code{double}; for a class
+type, see \cref{sb:expression-templates}. The call of \cref{ch:why}, \code{derivative(H, T0)}, is the shortest
+form. It means \code{Central<2>}, the first derivative and the default step. \Cref{sec:api-derivative} shows one call
+of each form, compiled.
 
 A stencil calls \code{fn} once per node. So \code{Central<2>} costs two evaluations for $f'$, and three for $f''$.
 Ridders' method costs two or four evaluations per level, that is, for each step that it tries. In the random study
@@ -328,9 +329,10 @@ a relative estimate of \num{\valMpRiddersRelEstimate}, after \num{\valMpRiddersE
 $\mathrm{e}^x$ at 1). \code{Central<2>} would stop at \num{\valMpCentralTwoRelError}. A wide type is where the higher
 orders pay (\cref{tab:accuracy-matrix}). Two rules apply with every Boost type. First, in arithmetic, write
 \code{mp50(*r)} or \code{r->value}, because Boost's operators do not see the conversion of an \code{Estimate}.
-Second, give a lambda an explicit return type, \code{-> mp50}. The library converts a result at once, so an
-expression over the parameter alone is safe. But an expression over the lambda's own locals would refer to destroyed
-values (\cref{sb:expression-templates}). The explicit type is always safe.
+Second, give a lambda an explicit return type, \code{-> mp50}. With expression templates, \code{-> mp50} or a
+result wrapped in \code{mp50(...)} is required: an \code{fn} that returns an expression object instead of a number
+does not compile (\cref{sb:expression-templates}). \code{cpp_bin_float_50} has none, but the explicit type keeps the
+code right if you change the type.
 
 \begin{sidebar}[label=sb:expression-templates]{Expression templates and user-defined real types}
 \code{nxx::real<T>} asks for the following. \code{std::numeric_limits<T>} must be specialised as bounded, inexact and
@@ -342,13 +344,23 @@ these members. Exact types such as rationals are rejected, since \code{numeric_l
 unbounded). Their epsilon is 0, and they have no largest value, so neither the step nor the overflow checks would mean
 anything.
 
-The results of the operators need not \emph{be} T. Boost.Multiprecision with expression templates (\code{et_on})
-returns from \code{a + b} an expression object, not a number. The object refers to its operands, and it dangles once
-they are gone: it then refers to values that no longer exist. The library never writes \code{auto} for an arithmetic
-result, and it converts the value of \code{fn} with \code{static_cast<T>} at once. In user code, \code{-> T} on a
-lambda does the same. Boost's arithmetic operators are templates that do not consider the conversion of an
-\code{Estimate<T>}. So \code{abs(*r - e)} does not compile, with or without expression templates, while
-\code{abs(T(*r) - e)} and \code{r->value - e} do.
+The results of the operators need not \emph{be} T. Boost.Multiprecision with expression templates (\code{et_on}, the
+default of \code{cpp_dec_float_50}) returns from \code{a + b} an expression object, not a number. The object refers
+to its operands, and it dangles once they are gone: it then refers to values that no longer exist. The library
+never writes \code{auto} for an arithmetic result, so its own expressions never outlive their operands.
+
+The value of \code{fn} is another matter. An expression returned by \code{fn} may refer to the locals of \code{fn},
+or to a parameter taken by value, and these are gone before the library can convert it to T. Nothing at run time can
+detect that, and no type tells a safe expression from a dangling one. So the rule is checked at compile time. For a
+class type T, \code{fn} must return T itself (by value or by reference) or a built-in number such as \code{double}.
+An \code{fn} whose result is an expression object does not compile. Write \code{-> T} on the lambda, or return
+\code{T(...)} (\code{code/07-using-multiprecision-et.cpp}):
+\snippet{07-using-multiprecision-et}{et-rule}
+A built-in value holds no references, so for a built-in T anything that converts to T is accepted.
+
+Boost's arithmetic operators are templates that do not consider the conversion of an \code{Estimate<T>}. So
+\code{abs(*r - e)} does not compile, with or without expression templates, while \code{abs(T(*r) - e)} and
+\code{r->value - e} do.
 
 \end{sidebar}
 

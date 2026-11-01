@@ -81,9 +81,11 @@ Each has a twin with the additional constraint \code{detail::noisy<N, T>}, marke
     multiprecision \code{T}. The conversion is implicit. So for a \code{float} \code{x}, write the step as
     \code{1e-3f}: a \code{double} step is diagnosed under \code{-Wconversion} unless \code{float} holds it exactly.
   \item \code{F}, the callable. The constraint \code{nxx::detail::callable<F, T>} is
-    \code{std::invocable<F &, T const &>}, with a result convertible to \code{T}. \code{fn} is called as a named
-    lvalue\mnote{An \emph{lvalue} is an expression that names an object, such as a variable. An \emph{rvalue} is one
-    that does not, such as a temporary, or one that may be moved from, such as \code{std::move(v)}.} through \code{std::invoke}, with a \code{T const} lvalue. So a callable that rejects rvalues
+    \code{std::invocable<F &, T const &>}, with a result that \code{nxx::detail::value_of<R, T>} admits. For a
+    built-in \code{T}, that is anything that converts to \code{T}. For a class type, it is \code{T} itself (by value
+    or by reference) or a built-in arithmetic type, never an expression object (\cref{sb:expression-templates}).
+    \code{fn} is called as a named lvalue\mnote{An \emph{lvalue} is an expression that names an object, such as a
+    variable. An \emph{rvalue} is one that does not, such as a temporary, or one that may be moved from, such as \code{std::move(v)}.} through \code{std::invoke}, with a \code{T const} lvalue. So a callable that rejects rvalues
     works, and so does a pointer to a const member function of \code{T} itself. For a member function of your own
     model, capture the object in a lambda.
 \end{itemize}
@@ -278,13 +280,16 @@ The result is the same with or without the warning. Its accuracy is discussed in
 \code{real<T>} holds when four things are true. First, the class template \code{std::numeric_limits<T>} is
 specialised with \code{is_integer} false, \code{is_bounded} true and \code{is_exact} false, so that \code{max()} is finite and
 \code{epsilon()} positive. Second, it has the members that the algorithms read: \code{radix} (at least 2) and
-\code{digits} (at least 1) as constant expressions, \code{epsilon()} and \code{max()} convertible to \code{T}, and
-\code{denorm_min()}, from which \code{T} can be constructed. Third, \code{T} is constructible from \code{int},
-copyable and totally ordered. Fourth, $a + b$, $a - b$, $a \times b$, $a / b$ and $-a$ convert to \code{T}, which
-admits expression templates (\cref{sb:expression-templates}). The tests check that \code{float}, \code{double},
-\code{long double}, \code{cpp_bin_float_50} with and without expression templates, and \code{cpp_dec_float_50}
-satisfy it. They also check that these do not: \code{int}, \code{unsigned}, \code{cpp_rational}, a type missing any
-one of the five members, one with radix 1, and one that cannot be copied. A type of your own needs exactly the
+\code{digits} (at least 2) as constant expressions, \code{epsilon()} and \code{max()} convertible to \code{T}, and
+\code{denorm_min()}, from which \code{T} can be constructed. Why two digits? With one, epsilon is
+$\code{radix}^{1 - 1} = 1$: the gap between 1 and the next number is 1 itself, so the type cannot express any relative
+accuracy. Third, \code{T} is constructible from \code{int}, copyable and totally ordered. Fourth, $a + b$, $a - b$,
+$a \times b$, $a / b$ and $-a$ convert to \code{T}, which admits expression templates. The result of \code{fn} is
+held to more: for a class type it must be \code{T}, not an expression (\cref{sb:expression-templates}). The tests
+check that \code{float}, \code{double}, \code{long double}, \code{cpp_bin_float_50} with and without expression
+templates, and \code{cpp_dec_float_50} satisfy it. They also check that these do not: \code{int}, \code{unsigned},
+\code{cpp_rational}, a type missing any one of the five members, one with radix 1, one with a single digit, and one
+that cannot be copied. A type of your own needs exactly the
 members below. Here the type is a wrapper of \code{double} with the arithmetic, a total order and construction from
 \code{int}, and no default constructor (\code{code/07-using-usertype.cpp}, which differentiates $\mathrm{e}^x$ with
 it):
@@ -308,4 +313,5 @@ way (\cref{sec:api-methods}).
 Nor does a call compile that gives a type explicitly as the second template argument, as in
 \code{derivative<Ridders, double>(fn, x)}, because that argument is the order. \code{T} is deduced from \code{x},
 never from \code{h}, unless it is given as the third template argument. A callable that cannot be called with a
-\code{T const} lvalue, or whose result does not convert to \code{T}, fails \code{nxx::detail::callable}.
+\code{T const} lvalue, or whose result is not admitted (the parameter \code{F} in \cref{sec:api-derivative}), fails
+\code{nxx::detail::callable}.

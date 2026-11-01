@@ -39,7 +39,7 @@ decisions are in `docs/<module>/design.md` (`docs/deriv/design.md`).
 - `nxx::real<T>` accepts a type that specialises `std::numeric_limits` as non-integer, is constructible from `int`, is
   copyable and totally ordered, and has `+ - * /` and unary minus whose results convert to `T`. This admits the
   built-in floating types and Boost.Multiprecision types, with or without expression templates. It also requires the
-  `numeric_limits` members the code reads: `radix` (at least 2) and `digits` (at least 1) as constant expressions,
+  `numeric_limits` members the code reads: `radix` and `digits` (each at least 2; one digit makes `epsilon()` 1) as constant expressions,
   `epsilon()` and `max()` convertible to `T`, and `denorm_min()` from which `T` can be constructed, so that a type
   lacking one fails at the concept instead of inside the header. `denorm_min()` need only construct `T` because the
   code reads it as `T(denorm_min())`; a type that inherits `numeric_limits<double>` and constructs from `double`

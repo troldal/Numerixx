@@ -18,8 +18,8 @@ int main()
     // clang-format off
 // <multiprecision>
 using mp50 = boost::multiprecision::cpp_bin_float_50;
-// -> mp50 matters for types with expression templates
-// (et_on); cpp_bin_float_50 has none: a safe habit.
+// -> mp50 is required with expression templates
+// (et_on); cpp_bin_float_50 has none, but keep it.
 auto const f = [](mp50 const &x) -> mp50 { return exp(x); };
 mp50 const x = 1;
 auto const d = derivative<Central<6>>(f, x);
