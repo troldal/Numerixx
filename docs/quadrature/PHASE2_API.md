@@ -122,8 +122,11 @@ refuse (`checked_term`) is `non_finite`, as in Phase 1: the descent of D is a ru
   reserve from the cap would allocate about 1.7 MB per call in `cpp_bin_float_50`), and the largest is bisected.
 - **Three running sums, Neumaier-compensated** (simplicity review): the value K, the floor F, and the excess
   X = sum (e_p - floor_p) over all panels, active and final, each updated by subtracting a parent's contribution
-  and adding its children's; the estimate is E = F + X. Panels at their floor add exactly 0 to X, and the same bits
-  are subtracted that were added, so X does not drift. The result's value is the compensated running K.
+  and adding its children's; the estimate is E = F + X. Corrected by the independent review (below): subtracting the
+  same bits that were added does not undo an addition in a compensated sum, since a small contribution absorbed into
+  the correction beside much larger ones is lost when they are subtracted again, so the running sums can drift. The
+  running sums decide when to test; every exit is decided on, and the result taken from, sums formed afresh from the
+  current panels, which are kept, final ones too.
 
 ### D. Values that are not finite (BRIEF.md D14, corrected twice)
 
@@ -159,9 +162,10 @@ refuse (`checked_term`) is `non_finite`, as in Phase 1: the descent of D is a ru
   Correction: the brief's rule watched E, which a peak found late raises and which barely moves at the floor; draft 1
   watched X with a reset when X grew tenfold, which never tripped on a divergent integral (1/x^2 on [0, 1] in 168 bits
   ran to the cap: 322,710 evaluations). Without the reset (prototype R3, against two variants): no false trip over the
-  battery at four tolerances and five combs of 40 peaks; 1/x^2 and 1/(x - 0.5)^2 stop at 1,140 evaluations in double
-  and 168 bits; e^x (1 + 1e-10 h(x)), h a hash of x's bits (noise that never resolves), stops at 1,620 with an honest
-  best (1.2e-11 against an actual 1.7e-13), where it ran to the cap without a rule.
+  battery at four tolerances and five combs of 40 peaks; 1/x^2 and 1/(x - 0.5)^2 stop at 1,110 evaluations in double
+  (1,140 in double and 168 bits before the minimum was taken from the mesh: independent review, finding 3); e^x (1 +
+  1e-10 h(x)), h a hash of x's bits (noise that never resolves), stops at 1,620 with an honest best (1.2e-11 against
+  an actual 1.7e-13; the prototype before that finding), where it ran to the cap without a rule.
 - **The result:** `{K, E}`; E >= F, so abs_error is never below the floor.
 
 ### F. What the estimate is, and the documented limits
@@ -274,7 +278,8 @@ From the numerics review:
   the heap order, the Neumaier sums' adequacy, X's robustness, the 2 F test, the cap arithmetic, the API.
 From the simplicity review:
 - Adopted: D = K - G, no difference weights (B, Q10); three running sums with E derived (C); the compensated running
-  K as the result (draft 1 also asked for a fresh sum of panels it had forgotten); one unsplittability predicate; the
+  K as the result (draft 1 also asked for a fresh sum of the panels, which the independent review made necessary: the
+  final panels are kept, and the result is formed afresh from them); one unsplittability predicate; the
   study material shortened here and moved to `design.md`; Phase 1's edge tests as one template; no tautological
   default-method or cache tests; a four-case demo; the cap's change to the brief marked.
 - Not adopted: carrying the ancestor's estimate instead of the undo (Q8: less honest on a NaN region); dropping the
@@ -293,6 +298,37 @@ whose 15-point value or difference K - G overflows (the 7-point weights exceed t
 makes the run `non_finite`, a check beside D's one per panel on L1_p (tested: max on |x - 2.5| < 0.25 over [0, 50]);
 and the cap's b counts the bits of a digit rounded up, as Phase 1's isolation cap does, so in radix 10 it is 64 x 4
 bits per digit (`cpp_dec_float_50`: 12,800 against E's about 10,630).
+
+## Independent review (OpenAI Codex, 2098416)
+
+After the implementation (2098416, CI run 41240105813), a read-only review by OpenAI Codex. Every finding was
+reproduced before it was acted on (`scratchpad/codex_repro2/`: `r.cpp`, `ct.cpp`); the user approved all three fixes
+(2026-11-01).
+
+1. **The running sums could lose a contribution and accept a wrong result.** Removing a parent's contribution from a
+   compensated sum is not exact: a small contribution absorbed into the correction beside much larger ones is lost
+   when they are subtracted. fn = 1e100 at x = 0x1.9999999999998p-5, 1 at 0x1.3333333333333p-3 and 1e-100 elsewhere
+   on [0, 1] at rel_tol 0 (integral 1e-100) returned {0, 0}, also in a `static_assert`; with 1e30, 1e10 and 1 at the
+   default (integral 1), 0.99999994039535522 +- 1.1e-14. Fixed: every current panel is kept, final ones too (at most
+   the mesh plus two per bisection, grown on demand); the running sums still decide when to test, but every exit (ok,
+   the cap, stagnation, the heap empty) recomputes the three sums afresh from the current panels and rechecks; where
+   the fresh test fails where the running one passed, the running sums are replaced by the fresh ones and the loop
+   continues; after a bisection whose removed contribution exceeds what remains of a running sum (K, F or X), the
+   running sums are resynchronised, so that stagnation sees current values; the result and best come from the fresh
+   sums. Now 1e-100 +- 1.1e-114 and 1 +- 1.1e-14, both in 210 evaluations. No earlier count or value moved.
+2. **A compensated sum's final addition could overflow in constant evaluation.** The guards covered the additions of
+   terms, not `sum + correction`: a first mesh panel with Kronrod terms near max / 2 at its outer nodes and 2^968 at
+   twelve others made GCC reject the constant expression (Clang returned `non_finite`). Fixed: `detail::compensated`
+   refuses, in constant evaluation only, a sum above max / 2 with a nonzero correction, for the panel sums, the
+   running and fresh sums, the fixed rule's and Romberg's level sum; the case is a `static_assert` of `non_finite` on
+   all five compilers.
+3. **Stagnation's first bisection always counted as a new minimum.** The least excess started empty, so 1/x^2 on
+   [0, 1] took 33 bisections (1,140 evaluations) instead of 32 (1,110). Fixed: the least excess starts at the
+   completed mesh's; 1/x^2 and 1/(x - 0.5)^2 now stop at 1,110, and no other counted case moved.
+
+Codex found correct: the Kronrod rule and its generator, the node cache, the validation, the heap order, the bounded
+descent with its undo and taint, finality, the 2F test, the rules for user types; the 26 quadrature cases and 5,041
+assertions passed on cl, clang-cl, GCC and Clang.
 
 ## Deferred
 

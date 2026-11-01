@@ -230,6 +230,17 @@ namespace {
 
     constexpr auto runge = [](double x) { return 1.0 / (1.0 + x * x); };
 
+    // The independent review's fn (2098416, finding 1): `large` at one node of the mesh panel [0, 0.1], `middle` at
+    // one of [0.1, 0.2], `small` elsewhere; the integral is `small`'s. Removing the two parents' large contributions
+    // from the running sums lost the small ones absorbed beside them in the corrections.
+    constexpr auto three_scales(double large, double middle, double small)
+    {
+        return [large, middle, small](double x) {
+            if (x == 0x1.9999999999998p-5) return large;
+            return x == 0x1.3333333333333p-3 ? middle : small;
+        };
+    }
+
 } // namespace
 
 // The type is constrained on N, and the default method is GaussKronrod<15>.
@@ -262,6 +273,27 @@ namespace {
     constexpr auto kink_result = qd::integrate(kink_37, 0.0, 1.0);
 } // namespace
 static_assert(kink_result && nxx::math::abs(kink_result->value - 0.2669) <= kink_result->abs_error);
+// The independent review of 2098416. Finding 1 in constant evaluation: the integral 1e-100 within its estimate, where
+// the running sums had returned {0, 0}.
+namespace {
+    constexpr auto review_scales = qd::integrate(three_scales(1e100, 1.0, 1e-100), 0.0, 1.0, { .rel_tol = 0.0 });
+} // namespace
+static_assert(review_scales && review_scales->value > 0.0
+              && nxx::math::abs(review_scales->value - 1e-100) <= review_scales->abs_error);
+// Finding 2: the first mesh panel's Kronrod terms near max / 2 at its outer nodes and 2^968 at twelve others: the
+// compensated sum's final addition would overflow, which constant evaluation reports as non_finite.
+namespace {
+    constexpr auto review_overflow = qd::integrate(
+        [n = 0](double) mutable {
+            if (++n > 15 || n == 1) return 0.0;
+            constexpr auto const &rule = qd::detail::gauss_kronrod_table<double>;
+            double const scale = 50.0 * (rule.wk[static_cast<std::size_t>(n / 2)] / 2.0);
+            double const term = n == 2 || n == 15 ? std::numeric_limits<double>::max() / 2.0 : 0x1p968;
+            return term / scale;
+        },
+        0.0, 500.0);
+} // namespace
+static_assert(review_overflow == std::unexpected(qd::Failure<double>{ qd::error::non_finite, std::nullopt }));
 
 TEST_CASE("quadrature: kronrod: the rule against Boost.Math")
 {
@@ -457,10 +489,11 @@ TEST_CASE("quadrature: kronrod: evaluation counts and exits in double")
         { "x^-0.875 [0,1]", counted(power_875, 0.0, 1.0), status::ok, 5520 },
         { "x^-0.875 [0,1] 1e-12", counted(power_875, 0.0, 1.0, { .rel_tol = 1e-12 }), status::ok, 10710 },
         { "x^-(127/128) [0,1] (the heap empty)", counted(power_127, 0.0, 1.0), status::not_converged, 92130 },
+        // Stagnation: 32 bisections without a new minimum of the excess, counted from the mesh's.
         { "1/x^2 [0,1] (stagnation)", counted([](double x) { return 1.0 / (x * x); }, 0.0, 1.0), status::not_converged,
-          1140 },
+          1110 },
         { "1/(x - 0.5)^2 [0,1] (stagnation)",
-          counted([](double x) { return 1.0 / ((x - 0.5) * (x - 0.5)); }, 0.0, 1.0), status::not_converged, 1140 },
+          counted([](double x) { return 1.0 / ((x - 0.5) * (x - 0.5)); }, 0.0, 1.0), status::not_converged, 1110 },
         { "an undone NaN region, 1e-10 (the taint)", counted(holed, 0.0, 1.0, { .rel_tol = 1e-10 }),
           status::not_converged, 630 },
         // The cap: 3,392 bisections in double, 150 + 30 3,392 evaluations.
@@ -471,6 +504,10 @@ TEST_CASE("quadrature: kronrod: evaluation counts and exits in double")
         // overflows.
         { "max on |x - 2.5| < 0.25, [0,50] (G overflows)",
           counted([](double x) { return std::abs(x - 2.5) < 0.25 ? dmax : 0.0; }, 0.0, 50.0), status::non_finite, 15 },
+        // The independent review of 2098416, finding 1: three scales whose largest two vanish from the current panels.
+        { "review F1, rel 0", counted(three_scales(1e100, 1.0, 1e-100), 0.0, 1.0, { .rel_tol = 0.0 }), status::ok,
+          210 },
+        { "review F1, default", counted(three_scales(1e30, 1e10, 1.0), 0.0, 1.0), status::ok, 210 },
     };
     for (Case const &c : cases) {
         INFO(c.name);
@@ -490,6 +527,16 @@ TEST_CASE("quadrature: kronrod: evaluation counts and exits in double")
     auto const &cap = cases[14].run.first;
     REQUIRE(!cap.has_value());
     CHECK(error_of(cap.error().best->value, "0.25") <= cap.error().best->abs_error);
+    // The review's cases: the integrals are the third constant's, 1e-100 and 1 (changing fn at two points changes no
+    // integral), now within each estimate and the request; before the fix, {0, 0} and 0.99999994 +- 1.1e-14.
+    auto const &tiny = cases[16].run.first;
+    REQUIRE(tiny.has_value());
+    CHECK(error_of(tiny->value, "1e-100") <= tiny->abs_error);
+    CHECK(tiny->abs_error <= 50.0 * deps * 1e-100 * 2.0);
+    auto const &unit = cases[17].run.first;
+    REQUIRE(unit.has_value());
+    CHECK(error_of(unit->value, "1") <= unit->abs_error);
+    CHECK(error_of(unit->value, "1") <= 1.5e-8);
 }
 
 TEST_CASE("quadrature: kronrod: termination")
@@ -554,8 +601,9 @@ TEST_CASE("quadrature: kronrod: constant evaluation")
     Smooth const square_case{ -std::numeric_limits<double>::infinity(), 9.0, 6.0, deps / 2, 9.0 };
     CHECK(14.0 * 9.0 * deps <= kronrod_bound(square_case, 0.0, 3.0, deps, rule));
     CHECK(6.0 * deps <= kronrod_bound(runge_smooth(deps), 0.0, 1.0, deps, rule));
-    // The bisection loop: the same result at run time as in constant evaluation, bit for bit.
+    // The bisection loop: the same result at run time as in constant evaluation, bit for bit; and the review's case.
     CHECK(qd::integrate(kink_37, 0.0, 1.0) == kink_result);
+    CHECK(qd::integrate(three_scales(1e100, 1.0, 1e-100), 0.0, 1.0, { .rel_tol = 0.0 }) == review_scales);
     // float and long double: their tolerances against the bound, and the run-time values.
     CHECK(14.0 * 9.0 * eps_of<long double>()
           <= kronrod_bound(Smooth{ -std::numeric_limits<double>::infinity(), 9.0, 6.0, eps_of<long double>() / 2, 9.0 },

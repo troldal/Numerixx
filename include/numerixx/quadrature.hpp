@@ -373,6 +373,22 @@ namespace nxx::quadrature {
         };
 
         /**
+         * @brief The compensated value of @p s, or nothing where constant evaluation could not form it: sum +
+         * correction overflows only where |sum| > max / 2 and the correction is nonzero (the correction of terms within
+         * max / 2 stays far below max / 2), and an overflow is not a constant expression. At run time always the value.
+         * @param s The sum.
+         * @return s.value(), or std::nullopt.
+         */
+        template<real T>
+        constexpr std::optional<T> compensated(Sum<T> const &s)
+        {
+            if consteval {
+                if (detail::large(s.sum) && !(s.correction == T(0))) return std::nullopt;
+            }
+            return s.value();
+        }
+
+        /**
          * @brief The interval [a, b], a != b, both finite, as the methods use it: its centre and half-width, which
          * place the points, and the scale of each term.
          * @tparam T The real type.
@@ -1017,9 +1033,9 @@ namespace nxx::quadrature {
             }
             // At run time every scale is finite and nonzero, so a non-finite value of fn, or an overflow, makes the sum
             // non-finite: one check, outside the loop.
-            T const result = sum.value();
-            if (!nxx::math::isfinite(result)) return std::unexpected(error::non_finite);
-            return result;
+            std::optional<T> const result = detail::compensated(sum);
+            if (!result || !nxx::math::isfinite(*result)) return std::unexpected(error::non_finite);
+            return *result;
         }
 
         /**
@@ -1073,10 +1089,12 @@ namespace nxx::quadrature {
                     sum.add(*t);
                     abs_sum = T(abs_sum + nxx::math::abs(*t));
                 }
+                std::optional<T> const level = detail::compensated(sum);
+                if (!level) return std::unexpected(overflow);
                 if consteval {
-                    if (detail::large(sum.value()) || detail::large(abs_sum)) return std::unexpected(overflow);
+                    if (detail::large(*level) || detail::large(abs_sum)) return std::unexpected(overflow);
                 }
-                row[0] = T(T(previous[0] / T(2)) + sum.value());
+                row[0] = T(T(previous[0] / T(2)) + *level);
                 l1 = T(T(l1 / T(2)) + abs_sum);
                 if (!nxx::math::isfinite(l1)) return std::unexpected(overflow);
 
@@ -1187,9 +1205,11 @@ namespace nxx::quadrature {
             }
             if (refused) return std::unexpected(fault::overflow);
             if (!nxx::math::isfinite(l1)) return std::unexpected(fault::not_finite);
-            T const k = kronrod.value();
-            T const g = gauss.value();
-            if (!detail::fits(k, g)) return std::unexpected(fault::overflow);
+            std::optional<T> const kv = detail::compensated(kronrod);
+            std::optional<T> const gv = detail::compensated(gauss);
+            if (!kv || !gv || !detail::fits(*kv, *gv)) return std::unexpected(fault::overflow);
+            T const k = *kv;
+            T const g = *gv;
             T const difference = nxx::math::abs(T(k - g));
             // Beyond the spec's check of L1: a finite L1 whose value or difference overflows (the 7-point weights
             // are larger than the 15-point ones at the Gauss nodes) ends the run non_finite.
@@ -1264,31 +1284,51 @@ namespace nxx::quadrature {
             T const lower = reversed ? b : a;
             T const upper = reversed ? a : b;
 
+            // Every current panel, active and final, in the order it was committed; a bisected parent is marked
+            // removed. The running sums below follow them cheaply, but removing a parent's contribution from a
+            // compensated sum is not exact (a small contribution absorbed into the correction beside much larger ones
+            // is lost when they are subtracted again), so every decision to stop is checked against sums formed afresh
+            // from these panels (independent review, 2098416).
+            std::vector<Panel<T>> panels;
+            std::vector<bool> removed;
+
             // The running sums, compensated: the value K, the floor F and the excess X = sum (e_p - floor_p); the
-            // estimate is E = F + X. A panel's contribution is subtracted with the same bits that were added, so X,
-            // which panels at their floor leave at exactly 0, does not drift.
-            Sum<T> total;
-            Sum<T> floor;
-            Sum<T> excess;
+            // estimate is E = F + X.
+            struct Totals
+            {
+                Sum<T> value;
+                Sum<T> floor;
+                Sum<T> excess;
+            };
+            Totals running;
             bool refused = false; // a sum constant evaluation could not form within max / 2
-            auto const contribute = [&](Panel<T> const &p, bool add) {
+            auto const contribute = [&refused](Totals &t, Panel<T> const &p, bool add) {
                 T const v = add ? p.value : T(-p.value);
                 T const f = add ? p.floor : T(-p.floor);
                 T const x = add ? p.excess : T(-p.excess);
-                if (!detail::fits(total.sum, v) || !detail::fits(floor.sum, f) || !detail::fits(excess.sum, x)) {
+                if (!detail::fits(t.value.sum, v) || !detail::fits(t.floor.sum, f) || !detail::fits(t.excess.sum, x)) {
                     refused = true;
                     return;
                 }
-                total.add(v);
-                floor.add(f);
-                excess.add(x);
+                t.value.add(v);
+                t.floor.add(f);
+                t.excess.add(x);
+            };
+            // The three sums afresh, from the current panels.
+            auto const fresh = [&]() {
+                Totals t;
+                for (std::size_t i = 0; i < panels.size(); ++i)
+                    if (!removed[i]) contribute(t, panels[i], true);
+                return t;
             };
 
-            // The active panels, a heap by difference (the same order as the estimate, since only panels above their
-            // floor enter it), growing on demand; final panels stay only in the sums.
-            std::vector<Panel<T>> heap;
-            auto const before = [](Panel<T> const &p, Panel<T> const &q) {
-                return p.difference < q.difference || (p.difference == q.difference && q.order < p.order);
+            // The active panels, a heap of indices into panels by difference (the same order as the estimate, since
+            // only panels above their floor enter it), growing on demand.
+            std::vector<std::size_t> heap;
+            auto const before = [&panels](std::size_t p, std::size_t q) {
+                Panel<T> const &u = panels[p];
+                Panel<T> const &v = panels[q];
+                return u.difference < v.difference || (u.difference == v.difference && v.order < u.order);
             };
             std::size_t order = 0;
             int work = 0; // bisections and descent splits
@@ -1323,13 +1363,15 @@ namespace nxx::quadrature {
                 if (missing) return fault::not_finite;
                 return std::nullopt;
             };
-            // A piece enters the sums, and the heap unless it is final: at its floor (splitting cannot lower it below
-            // its floor, since L1 adds up), or not splittable.
+            // A piece enters the panels and the running sums, and the heap unless it is final: at its floor (splitting
+            // cannot lower it below its floor, since L1 adds up), or not splittable.
             auto const commit = [&]() {
                 for (Panel<T> const &piece : pieces) {
-                    contribute(piece, true);
+                    panels.push_back(piece);
+                    removed.push_back(false);
+                    contribute(running, piece, true);
                     if (!(piece.difference <= piece.floor) && detail::splittable(rule, piece.lo, piece.hi)) {
-                        heap.push_back(piece);
+                        heap.push_back(panels.size() - 1);
                         std::push_heap(heap.begin(), heap.end(), before);
                     }
                 }
@@ -1351,33 +1393,63 @@ namespace nxx::quadrature {
                 left = right;
             }
 
+            // The values of a set of sums, or nothing where they are not finite or constant evaluation refuses them.
+            struct Values
+            {
+                T value;
+                T floor;
+                T excess;
+                T estimate;
+            };
+            auto const values_of = [](Totals const &t) -> std::optional<Values> {
+                std::optional<T> const v = detail::compensated(t.value);
+                std::optional<T> const f = detail::compensated(t.floor);
+                std::optional<T> const x = detail::compensated(t.excess);
+                if (!v || !f || !x || !detail::fits(*f, *x)) return std::nullopt;
+                T const e = T(*f + *x);
+                if (!nxx::math::isfinite(*v) || !nxx::math::isfinite(e) || !nxx::math::isfinite(*f))
+                    return std::nullopt;
+                return Values{ *v, *f, *x, e };
+            };
+            // Twice the floor: a kink or a jump never brings every panel to its floor (X = 0), and on a smooth fn the
+            // test cannot accept an error above max(request, 2 F).
+            auto const met = [&abs_tol, &rel_tol](Values const &v) {
+                return v.estimate <= detail::wanted(abs_tol, rel_tol, v.value, T(T(2) * v.floor));
+            };
+            // The result {K, max(E, F)} (a Neumaier residue can leave E a hair below F).
+            auto const result_of = [reversed](Values const &v) {
+                return Integral<T>{ reversed ? T(-v.value) : v.value, detail::larger(v.estimate, v.floor) };
+            };
+
             bool tainted = false; // a piece no descent avoided was undone: the run cannot end ok
-            std::optional<T> least; // the least excess so far
-            int since = 0;          // bisections since the excess last reached a new minimum
+            std::optional<Values> const after_mesh = values_of(running);
+            if (!after_mesh) return std::unexpected(invalid);
+            T least = after_mesh->excess; // the least excess so far, from the completed mesh
+            int since = 0;                // bisections since the excess last reached a new minimum
             while (true) {
-                T const value = total.value();
-                T const f = floor.value();
-                T const x = excess.value();
-                if (!detail::fits(f, x)) return std::unexpected(invalid);
-                T const estimate = T(f + x);
-                if (!nxx::math::isfinite(value) || !nxx::math::isfinite(estimate) || !nxx::math::isfinite(f))
-                    return std::unexpected(invalid);
-                // The result {K, E}, its estimate at least F: a Neumaier residue can leave E a hair below it.
-                auto const result = [&] {
-                    return Integral<T>{ reversed ? T(-value) : value, detail::larger(estimate, f) };
-                };
-                // Twice the floor: a kink or a jump never brings every panel to its floor (X = 0), and on a smooth fn
-                // the test cannot accept an error above max(request, 2 F).
-                if (estimate <= detail::wanted(abs_tol, rel_tol, value, T(T(2) * f))) {
-                    if (tainted) return std::unexpected(Failure<T>{ error::not_converged, result() });
-                    return result();
+                std::optional<Values> const now = values_of(running);
+                if (!now) return std::unexpected(invalid);
+                bool const passed = met(*now);
+                if (passed || heap.empty() || work >= cap || since >= stagnation) {
+                    // Every exit is decided on the sums formed afresh.
+                    Totals const exact = fresh();
+                    if (refused) return std::unexpected(invalid);
+                    std::optional<Values> const checked = values_of(exact);
+                    if (!checked) return std::unexpected(invalid);
+                    if (met(*checked)) {
+                        if (tainted) return std::unexpected(Failure<T>{ error::not_converged, result_of(*checked) });
+                        return result_of(*checked);
+                    }
+                    if (!passed) return std::unexpected(Failure<T>{ error::not_converged, result_of(*checked) });
+                    // The running sums had drifted: continue from the fresh ones.
+                    running = exact;
+                    continue;
                 }
-                if (heap.empty() || work >= cap || since >= stagnation)
-                    return std::unexpected(Failure<T>{ error::not_converged, result() });
 
                 std::pop_heap(heap.begin(), heap.end(), before);
-                Panel<T> const parent = heap.back();
+                std::size_t const index = heap.back();
                 heap.pop_back();
+                Panel<T> const parent = panels[index];
                 T const mid = detail::midpoint(parent.lo, parent.hi);
                 ++work;
                 pieces.clear();
@@ -1390,13 +1462,24 @@ namespace nxx::quadrature {
                     tainted = true;
                 }
                 else {
-                    contribute(parent, false);
+                    removed[index] = true;
+                    contribute(running, parent, false);
                     commit();
                     if (refused) return std::unexpected(invalid);
+                    // A removed contribution larger than what remains of a running sum leaves that sum mostly
+                    // rounding: resynchronise, so that stagnation, too, sees the current values.
+                    std::optional<Values> const after = values_of(running);
+                    if (!after) return std::unexpected(invalid);
+                    if (nxx::math::abs(parent.value) > nxx::math::abs(after->value) || parent.floor > after->floor
+                        || parent.excess > after->excess) {
+                        running = fresh();
+                        if (refused) return std::unexpected(invalid);
+                    }
                 }
-                T const now = excess.value();
-                if (!least || now < *least) {
-                    least = now;
+                std::optional<Values> const current = values_of(running);
+                if (!current) return std::unexpected(invalid);
+                if (current->excess < least) {
+                    least = current->excess;
                     since = 0;
                 }
                 else ++since;

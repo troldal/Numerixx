@@ -278,8 +278,9 @@ if __name__ == '__main__':
   for both rules (`with_gauss_legendre`, `with_gauss_kronrod`, through one `with_generated<generate>`: the generator
   in constant evaluation, else `cached<generate>()`), one function-local static per generator, so per rule and T
   whatever fn is (the first version's static lay in a function templated on fn's closure type, so each lambda
-  regenerated), initialised once by the language and never changed. Safe because no `nxx::real` type changes its precision
-  at run time (Boost's variable-precision types do not specialise `numeric_limits`; documented for user types).
+  regenerated), initialised once by the language and never changed. Safe because no `nxx::real` type changes its
+  precision at run time (Boost's variable-precision types do not specialise `numeric_limits`; documented for user
+  types).
 - **A panel** (`detail::sample`, returning `std::expected<Panel<T>, fault>`): K15 and G7 on the same 15
   evaluations, two Neumaier sums, D = |K - G| (no difference weights, Q10), L1_p the plain sum of |term|, floor_p =
   `rounding_floor(L1_p)` = 50 max(eps L1_p, denorm_min) (shared with Romberg), e_p = max(D, floor_p), the excess
@@ -289,12 +290,26 @@ if __name__ == '__main__':
 - **The loop** (`detail::gauss_kronrod`): integrated over [min(a, b), max(a, b)] and negated where b < a (exactly);
   the mesh of 10 equal panels (empty ones skipped); a panel is final at creation if D <= floor or it cannot be split
   (`detail::splittable`: the midpoint, and both children's outer nodes, strictly inside); the heap by D, ties in
-  creation order, growing on demand; three running Neumaier sums K, F, X with E = F + X, a parent's contribution
-  subtracted with the same bits that were added; the stop test E <= max(abs_tol, rel_tol |K|, 2F); then the heap
-  empty, the cap (64 b bisections and descent splits, b = digits times the bits of a digit rounded up, 12,800 in
-  `cpp_dec_float_50`) and stagnation (32 bisections without a new minimum of X), each `not_converged` with best
-  {K, max(E, F)}; the result {K, max(E, F)} (E can sit a hair below F through a Neumaier residue, so the max keeps
-  abs_error at the floor or above exactly).
+  creation order (a heap of indices into the panel store), growing on demand; three running Neumaier sums K, F, X
+  with E = F + X; the stop test E <= max(abs_tol, rel_tol |K|, 2F); then the heap empty, the cap (64 b bisections
+  and descent splits, b = digits times the bits of a digit rounded up, 12,800 in `cpp_dec_float_50`) and stagnation
+  (32 bisections without a new minimum of X, the minimum starting at the completed mesh's X), each `not_converged`
+  with best {K, max(E, F)}; the result {K, max(E, F)} (E can sit a hair below F through a Neumaier residue, so the
+  max keeps abs_error at the floor or above exactly).
+- **The panel store and the fresh sums** (independent review of 2098416, finding 1): removing a parent's
+  contribution from a compensated sum is not exact (a small contribution absorbed beside much larger ones is lost
+  when they are subtracted), so every committed panel is kept in commit order with a removed flag, final ones too.
+  The running sums decide when to test; every exit (ok, the cap, stagnation, the heap empty) recomputes K, F and X
+  afresh from the current panels, in commit order, and rechecks: where the fresh test fails where the running one
+  passed, the running sums become the fresh ones and the loop continues. After a bisection whose removed contribution
+  exceeds what remains of a running sum, the running sums are resynchronised, so that stagnation sees current values.
+  The result and best come from the fresh sums. The store holds the mesh plus two panels per bisection (plus a
+  descent's pieces): 6,794 for the comb at the cap in double (380 KB at 56 bytes; the heap alone held at most 1,138),
+  about 5,650 for x^-0.875 in `cpp_bin_float_50` at its default (2.3 MB at 400 bytes). Time: x^-0.875 in
+  `cpp_bin_float_50` 236 ms against 225 ms before, the comb at the cap 1.3 against 1.5 ms (noise), a kink at rel_tol
+  0 4.1 against 3.3 microseconds. Resynchronisation fires often (179 times on x^-0.875 in double) and moved no count.
+- **The compensated value in constant evaluation** (finding 2): `detail::compensated` refuses a sum above max / 2
+  with a nonzero correction, whose final addition could overflow, for every compensated sum the methods form.
 - **Values that are not finite** (D): a panel whose L1 is not finite is split, iteratively, at most 2 levels below
   the panel that started the descent, each split counted against the cap; a descent left with such a piece is undone
   (the parent stays, final, with its own estimate), and the run is tainted: it can no longer end ok. A mesh panel with
@@ -332,7 +347,8 @@ arguments' rounding max |f'| (b - a) ((b - a) / 20 max |dx| + eps (max(|a|, |b|)
 
 ### The prototype, with the C++ table
 
-`scratchpad/gk-proto/gk3.py` (session scratchpad, not kept): the loop of `PHASE2_API.md` C to E in Python floats,
+`scratchpad/gk-proto/gk3.py`, and `gk4.py` with the independent review's corrections (session scratchpad, not
+kept): the loop of `PHASE2_API.md` C to E in Python floats,
 mirroring the header operation for operation (the order of evaluation, `Interval::term`, the Neumaier sums, the heap
 order, E = F + X, the running K as the value), with the C++ generator's double table loaded (`dump_k15.cpp`). Its
 results equal the C++'s bit for bit, values and estimates, on every case the tests count:
@@ -347,12 +363,14 @@ results equal the C++'s bit for bit, values and estimates, on every case the tes
 | sqrt x on [0, 1] | default | ok | 360 |
 | x^-0.75 on [0, 1] | default | ok | 2,790 |
 | x^-0.875 on [0, 1] | default; 1e-12 | ok | 5,520; 10,710 |
-| 1 / x^2 and 1 / (x - 0.5)^2 on [0, 1] | default | not_converged (stagnation) | 1,140 |
+| 1 / x^2 and 1 / (x - 0.5)^2 on [0, 1] | default | not_converged (stagnation) | 1,110 |
 | 1 / (1e-4 + (x - 0.42)^2), NaN on \|x - 0.48753\| < 7.86e-5 | 1e-10 | not_converged (the taint; ok without it) | 630 |
 | the same | 1e-12 | not_converged (final panels, with or without the taint) | 960 |
 | \|127 x - floor(127 x) - 1/2\| on [0, 1] | rel 0 | not_converged (the cap, 3,392 bisections) | 101,910 |
 | x^-(127/128) on [0, 1], 7 nested sqrt | default | not_converged (the heap empty: final panels) | 92,130 |
 | max on \|x - 2.5\| < 0.25, 0 elsewhere, on [0, 50] | default | non_finite (L1 finite, G7's term overflows) | 15 |
+| 1e100, 1 and 1e-100 at two nodes and elsewhere (review, finding 1) | rel 0 | ok, 1e-100 | 210 |
+| 1e30, 1e10 and 1 at the same points | default | ok, 1 | 210 |
 
 `counts3.py` holds every case, and reruns the holed ones without the taint rule. The counted powers are x^-0.75,
 x^-0.875 and x^-(127/128), written with sqrt, in place of the spec's x^-0.9, which needs pow (a libm function, whose
@@ -411,7 +429,7 @@ evaluations, estimate / actual error):
 - The stop test (Q4): at rel_tol 0 the brief's test (E <= F) ended 32 of 50 kinks and 42 of 50 jumps
   `not_converged`; with 2F, 50 and 38 end ok with 4 times fewer evaluations.
 - Stagnation (Q2), against the brief's rule on E and draft 1's reset on a tenfold rise: no false trip over the battery
-  at four tolerances and five combs of 40 peaks; 1/x^2 and 1/(x - 0.5)^2 stop at 1,140 evaluations in double and 168
+  at four tolerances and five combs of 40 peaks; 1/x^2 and 1/(x - 0.5)^2 stop at 1,110 evaluations in double and 168
   bits; e^x (1 + 1e-10 h(x)) at 1,620 with an honest best, where it ran to the cap without a rule.
 - The descent (Q8): unbounded, sqrt(x - 0.5) walked 1,063 levels (101,775 evaluations) in double; bounded at 2,
   `non_finite` in 105. The undo against carrying the ancestor's estimate: equal on the battery; on a NaN region the
