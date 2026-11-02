@@ -246,7 +246,7 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
   - [x] Step 3, `TanhSinh`; tests in every type; docs build clean (all five presets locally, Emscripten 6.0.13 with
     no workaround, and the docs build, 2026-11-02; the numerics review of the implementation, nine findings, all
     adopted)
-  - [ ] CI passes on all five toolchains
+  - [x] CI passes on all five toolchains (f551f10: run 41528481205)
   - [ ] The independent review (Codex) and its adopted findings
 - Phase 4: `TanhSinh` on half lines and the line (exp-sinh, sinh-sinh).
 - The milestone ends with its chapter on the documentation site, as Milestone 3 did for roots and deriv.

@@ -2224,6 +2224,8 @@ namespace nxx::quadrature {
             template<typename V>
             constexpr void each(int first, V &&visit) const
             {
+                // Plain loops, not std::ranges::all_of over iota: this is the hot path of constant evaluation, where
+                // the algorithm took 14 % more steps per evaluation and 1/x to the cap 98 % of Clang's default limit.
                 std::size_t const from = static_cast<std::size_t>(first);
                 for (std::size_t p = from / piece_size; p < most; ++p) {
                     std::size_t const start = p * piece_size;
@@ -2526,15 +2528,22 @@ namespace nxx::quadrature {
          * @param s The state.
          * @param w The weight.
          * @param y fn's value, finite.
-         * @return The term, or empty where constant evaluation could not form it within max / 2.
+         * @return The term, or empty where it overflows (at run time) or constant evaluation could not form it within
+         *         max / 2.
          */
         template<real T>
         constexpr std::optional<T> tanh_sinh_term(TanhSinhState<T> const &s, T const &w, T const &y)
         {
             if consteval {
+                // checked_term refuses an overflow here, and term() alone below safe_value cannot overflow.
                 if (nxx::math::abs(y) <= s.safe_value) return s.interval.term(w, y);
+                return s.interval.checked_term(w, y);
             }
-            return s.interval.checked_term(w, y);
+            else {
+                T const t = s.interval.term(w, y);
+                if (!nxx::math::isfinite(t)) return std::nullopt;
+                return t;
+            }
         }
 
         /**
@@ -2691,16 +2700,20 @@ namespace nxx::quadrature {
                     T value;
                     T term;
                 };
-                // Level 0's samples in fixed arrays (its nodes are at most level_capacity(0)): no allocation.
+                // Level 0's samples of a side in a fixed array (its nodes are at most level_capacity(0)): no allocation.
                 constexpr std::size_t most = static_cast<std::size_t>(detail::level_capacity<T>(0));
-                std::array<std::array<std::optional<Sample>, most>, 2> samples{};
-                std::array<std::size_t, 2> counts{ 0, 0 };
-                bool failed = false; // fn not finite outside a tail, or a term that overflows or that is refused
-                for (std::size_t side_index = 0; side_index < 2; ++side_index) {
-                    bool const right = side_index == 0;
-                    Side<T> &side = right ? s.right : s.left;
-                    std::array<std::optional<Sample>, most> &found = samples[side_index];
-                    std::size_t &count = counts[side_index];
+                struct Swept
+                {
+                    std::array<std::optional<Sample>, most> samples{};
+                    std::size_t count = 0;
+
+                    constexpr std::span<std::optional<Sample> const> held() const
+                    { return std::span(samples).first(count); }
+                };
+                // A side outward from t = 1; false where fn is not finite outside a tail, or a term overflows or is
+                // refused: non_finite.
+                auto const sweep = [&](Side<T> &side, bool right, Swept &swept) {
+                    bool failed = false;
                     nodes.each(1, [&](int i, T const &comp, T const &w) {
                         int const j = detail::position(0, i);
                         T const p = detail::tanh_sinh_point(s, right, comp);
@@ -2719,55 +2732,65 @@ namespace nxx::quadrature {
                             return false;
                         }
                         std::optional<T> const t = detail::tanh_sinh_term(s, w, y);
-                        if (!t || !nxx::math::isfinite(*t)) { // a term that overflows: non_finite at once
+                        if (!t) { // a term that overflows, or is refused: non_finite at once
                             failed = true;
                             return false;
                         }
-                        assert(count < most);
-                        found[count++] = Sample{ j, p, y, *t };
+                        assert(swept.count < most);
+                        swept.samples[swept.count++] = Sample{ j, p, y, *t };
                         return true;
                     });
-                    if (failed) return std::unexpected(invalid);
-                }
-                // The pruning threshold: eps times the L1 of the whole sweep, the centre included (h = 1).
-                bool refused = false;
+                    return !failed;
+                };
+                Swept right_swept;
+                Swept left_swept;
+                if (!sweep(s.right, true, right_swept) || !sweep(s.left, false, left_swept))
+                    return std::unexpected(invalid);
+                // The pruning threshold: eps times the L1 of the whole sweep, the centre included (h = 1), summed in
+                // the order centre, right side, left side.
                 Sum<T> sizes;
-                refused = refused || !detail::add_within(sizes, centre_size, half_max);
-                for (std::size_t side_index = 0; side_index < 2; ++side_index)
-                    for (std::size_t i = 0; i < counts[side_index]; ++i)
-                        refused = refused
-                                  || !detail::add_within(sizes, nxx::math::abs(samples[side_index][i]->term), half_max);
+                auto const add_sizes = [&](Swept const &swept) {
+                    return std::ranges::all_of(swept.held(), [&](std::optional<Sample> const &x) {
+                        return detail::add_within(sizes, nxx::math::abs(x->term), half_max);
+                    });
+                };
+                bool refused = !detail::add_within(sizes, centre_size, half_max) || !add_sizes(right_swept)
+                               || !add_sizes(left_swept);
                 std::optional<T> const l1_sweep = detail::compensated(sizes);
                 if (refused || !l1_sweep || !nxx::math::isfinite(*l1_sweep)) return std::unexpected(invalid);
-                // Each side drops its run of outermost small terms, from the outside in; a small term with a larger
-                // one beyond it is kept (PHASE3B_API.md D2). A pruned side's end term is 0, below the floor's eps L1
-                // by a factor 50.
-                for (std::size_t side_index = 0; side_index < 2; ++side_index) {
-                    Side<T> &side = side_index == 0 ? s.right : s.left;
-                    std::size_t &count = counts[side_index];
-                    while (count > 0 && nxx::math::abs(samples[side_index][count - 1]->term) < T(eps * *l1_sweep)) {
-                        side.cut = samples[side_index][count - 1]->position;
-                        side.cause = cut_by::pruning;
-                        --count;
-                    }
-                }
+                // Each side drops its run of outermost small terms, from the outside in, and is cut at the innermost
+                // dropped node; a small term with a larger one beyond it is kept (PHASE3B_API.md D2). A pruned side's
+                // end term is 0, below the floor's eps L1 by a factor 50.
+                T const small = T(eps * *l1_sweep);
+                auto const prune = [&](Side<T> &side, Swept &swept) {
+                    auto const outward = swept.held() | std::views::reverse;
+                    auto const large = std::ranges::find_if(outward, [&](std::optional<Sample> const &x) {
+                        return !(nxx::math::abs(x->term) < small);
+                    });
+                    std::size_t const dropped = static_cast<std::size_t>(std::ranges::distance(outward.begin(), large));
+                    if (dropped == 0) return;
+                    swept.count -= dropped;
+                    side.cut = swept.samples[swept.count]->position;
+                    side.cause = cut_by::pruning;
+                };
+                prune(s.right, right_swept);
+                prune(s.left, left_swept);
                 // V_0 and L1_0 from the kept terms only: the centre, the right side, the left side.
                 Sum<T> values;
                 Sum<T> magnitudes;
-                refused = refused || !detail::add_within(values, *centre_term, half_max);
-                refused = refused || !detail::add_within(magnitudes, centre_size, half_max);
-                for (std::size_t side_index = 0; side_index < 2; ++side_index) {
-                    bool const right = side_index == 0;
-                    Side<T> &side = right ? s.right : s.left;
-                    for (std::size_t i = 0; i < counts[side_index]; ++i) {
-                        Sample const &x = *samples[side_index][i];
-                        T const size = nxx::math::abs(x.term);
-                        refused = refused || !detail::add_within(values, x.term, half_max);
-                        refused = refused || !detail::add_within(magnitudes, size, half_max);
-                        side.keep(Kept<T>{ x.position, x.point, x.value, size }, right ? b : a);
-                    }
+                auto const add_kept = [&](Side<T> &side, Swept const &swept, T const &end) {
+                    bool const added = std::ranges::all_of(swept.held(), [&](std::optional<Sample> const &x) {
+                        T const size = nxx::math::abs(x->term);
+                        side.keep(Kept<T>{ x->position, x->point, x->value, size }, end);
+                        return detail::add_within(values, x->term, half_max)
+                               && detail::add_within(magnitudes, size, half_max);
+                    });
                     side.add_weights(nodes, 0);
-                }
+                    return added;
+                };
+                refused = !detail::add_within(values, *centre_term, half_max)
+                          || !detail::add_within(magnitudes, centre_size, half_max)
+                          || !add_kept(s.right, right_swept, b) || !add_kept(s.left, left_swept, a);
                 std::optional<T> const v_0 = detail::compensated(values);
                 std::optional<T> const a_0 = detail::compensated(magnitudes);
                 if (refused || !v_0 || !a_0) return std::unexpected(invalid);
@@ -2800,12 +2823,12 @@ namespace nxx::quadrature {
             return detail::with_tanh_sinh_level<T>(s.k, [&](TanhSinhLevel<T> const &nodes) -> result {
                 Sum<T> new_values;
                 Sum<T> new_magnitudes;
-                bool failed = false;
-                bool refused = false;
-                for (int side_index = 0; side_index < 2; ++side_index) {
-                    bool const right = side_index == 0;
-                    Side<T> &side = right ? s.right : s.left;
+                // A side from the centre outward; false where fn is not finite outside a tail, or a term overflows or
+                // is refused: non_finite.
+                auto const sweep = [&](Side<T> &side, bool right) {
                     T const &end = right ? s.interval.hi : s.interval.lo;
+                    bool failed = false;
+                    bool refused = false;
                     nodes.each(0, [&](int i, T const &comp, T const &w) {
                         int const j = detail::position(s.k, i);
                         if (side.cut >= 0 && j >= side.cut) return false;
@@ -2826,7 +2849,7 @@ namespace nxx::quadrature {
                             return false;
                         }
                         std::optional<T> const t = detail::tanh_sinh_term(s, w, y);
-                        if (!t || !nxx::math::isfinite(*t)) { // a term that overflows: non_finite at once
+                        if (!t) { // a term that overflows, or is refused: non_finite at once
                             failed = true;
                             return false;
                         }
@@ -2841,9 +2864,10 @@ namespace nxx::quadrature {
                         side.keep(Kept<T>{ j, p, y, size }, end);
                         return true;
                     });
-                    if (failed || refused) return std::unexpected(invalid);
                     side.add_weights(nodes, s.k);
-                }
+                    return !failed && !refused;
+                };
+                if (!sweep(s.right, true) || !sweep(s.left, false)) return std::unexpected(invalid);
                 std::optional<T> const added = detail::compensated(new_values);
                 std::optional<T> const added_l1 = detail::compensated(new_magnitudes);
                 if (!added || !added_l1) return std::unexpected(invalid);
@@ -3427,10 +3451,11 @@ namespace nxx::quadrature {
      * every earlier evaluation. The points crowd towards the ends double exponentially but never reach them, so log x
      * or 1 / sqrt x at an end is integrated as it is. Each side stops at its first point that rounds onto the end, at
      * a negligible term, or at a value that is not finite within eps times the half-width of the end and beyond its
-     * kept points (a singular end); a value that is not finite elsewhere is error::non_finite. The estimate is the difference of the last two levels plus a bound on what
-     * lies beyond each side's last point; it may stop from level 4, about 70 to 140 evaluations (the default needs
-     * 150), and certifies down to twice its rounding floor. The cap is 10 levels, then error::not_converged, without a
-     * best where the bound beyond an end is unbounded (the terms grow towards it, as for 1/x).
+     * kept points (a singular end); a value that is not finite elsewhere is error::non_finite. The estimate is the
+     * difference of the last two levels plus a bound on what lies beyond each side's last point; it may stop from
+     * level 4, about 70 to 140 evaluations (the default needs 150), and certifies down to twice its rounding floor.
+     * The cap is 10 levels, then error::not_converged, without a best where the bound beyond an end is unbounded (the
+     * terms grow towards it, as for 1/x).
      *
      * Its steps, observed: report i is level i; level 0 has no current; a later report without one means the estimate
      * is unbounded; `ready` from report 4, `exhausted` only at report 9 (or at report 0, with no point strictly
@@ -3449,7 +3474,7 @@ namespace nxx::quadrature {
      *   double, about 0.3 s more per translation unit for double (GCC, Clang), more for long double; instantiate it
      *   in one.
      * - Constant evaluation: fn rational, or built from one's own constexpr functions (std::sqrt and the like are not
-     *   constexpr on Clang and MSVC); about 250 constexpr steps per evaluation on Clang in float, double and long
+     *   constexpr on Clang and MSVC); about 240 constexpr steps per evaluation on Clang in float, double and long
      *   double. A class type has no compile-time table, so each level reached is generated in the same evaluation,
      *   about 940 steps per node on Clang: only a run that stops by about level 5 fits the default limit.
      * - High precision: the first call in a type without a table builds the levels it reaches, about 14 us per node in

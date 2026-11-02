@@ -565,8 +565,11 @@ Built in three steps (`PHASE3B_API.md` Q2): exp, the tables in pieces, the metho
 - **Constant evaluation**: the checks of Phase 1 (`checked_term`, `fits`, `compensated`) keep every term and sum
   within max / 2, else `non_finite`. Two equivalent forms save steps on the hot path: the sums' check with max / 2
   formed once, and term() alone where |y| <= (max / 8) / max(|hw|, 1), for which checked_term cannot refuse since every
-  weight is at most 1. The sweeps walk each piece in order (`TanhSinhLevel::each`), not by index: indexing cost 6 % per
-  evaluation and 12 % on 1/x to the cap.
+  weight is at most 1. A term that overflows ends the run at run time only (`tanh_sinh_term`): in constant evaluation
+  checked_term already refuses it, and the check there cost 8 % on 1/x to the cap. The sweeps walk each piece in order
+  (`TanhSinhLevel::each`), by plain loops: by index the cost was 6 % more per evaluation and 12 % more on 1/x to the
+  cap, by std::ranges::all_of over iota 14 % and 9 % more, which put 1/x at 98 % of Clang's limit (the one place the
+  project's no-raw-loops rule gives way, to the constexpr budget).
 
 ### Evidence (Phase 3b)
 
@@ -622,10 +625,10 @@ evaluations), which matched the pre-3a C++. Among them:
 | 0 on [D, 3D], 1e300 outside (D = denorm_min) | default | not_converged, no best (one distinct point a side) | 3 |
 | 1 on [1, nextafter(1)] | default | not_converged, no best | 0 |
 
-Constant evaluation of the method (Clang 22, the least step limit that compiles, by bisection): about 255 steps per
+Constant evaluation of the method (Clang 22, the least step limit that compiles, by bisection): about 240 steps per
 evaluation in double, from 20 and 40 runs of x^2 on [0, 3] in one expression (105 evaluations each); 1/x on [0, 1] to
-the cap (5,159 evaluations) 873,394 steps, 83.3 % of the default, which compiles on GCC, Clang, clang-cl, cl and em++
-(the pre-3a code took 821,270). A class type without a table in a constant expression: `Wrapped`'s 1 on [0, 1] (the
+the cap (5,159 evaluations) 871,858 steps, 83.1 % of the default, which compiles on GCC, Clang, clang-cl, cl and em++
+(the pre-3a code took 821,270; f551f10, with the overflow check in constant evaluation too, 943,278, 90.0 %). A class type without a table in a constant expression: `Wrapped`'s 1 on [0, 1] (the
 edge template) compiles on all five.
 
 Compile time (Debug, this machine, the best of three): a translation unit with one `integrate<TanhSinh>` in double

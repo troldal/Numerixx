@@ -1,8 +1,8 @@
 # Phase 3b API proposal: TanhSinh through the method protocol
 
-Status: approved by the user on 2026-11-02, Q1 to Q5 as recommended (draft 2). Draft 1's review round (simplicity, usage, numerics) is folded in
-("Decisions from the reviews"), with the prototype rebuilt on its questions (D); the numerics review rerun on draft 2
-is folded in too.
+Status: approved by the user on 2026-11-02, Q1 to Q5 as recommended (draft 2). Draft 1's review round (simplicity,
+usage, numerics) is folded in ("Decisions from the reviews"), with the prototype rebuilt on its questions (D); the
+numerics review rerun on draft 2 is folded in too.
 
 The decisions it builds on:
 - **`PHASE3_API.md`** (approved 2026-11-01, Q1 to Q10 as recommended): TanhSinh's numerics, A to F.
@@ -273,8 +273,8 @@ for a < b; named and as a value; reversed ends exactly negated.
 - **Q2. Three steps** (exp, the tables, the method), each checked on CI before the next. Recommended: yes.
   Alternative: one step.
 - **Q3. The prototype kept,** in double only, in `docs/quadrature/tanh-sinh-prototype/`: `ts.py` (about 350 lines
-  without the review's variants, Python floats, no mpmath) and the table dump from step 2. Recommended: yes. The counts are the only check of the
-  cut and pruning logic, and D rests on it.
+  without the review's variants, Python floats, no mpmath) and the table dump from step 2. Recommended: yes. The
+  counts are the only check of the cut and pruning logic, and D rests on it.
   - Phase 3's prototype survives in an old session's scratchpad, contrary to draft 1, but it covers five arithmetics
     and the battery, and is not written to the protocol.
   - Alternative: kept in a scratchpad again.
@@ -382,9 +382,10 @@ From the numerics review (each settled or confirmed by the prototype, D):
     only at report 9" names report 0 with no point inside.
   - The rounding cut's exact results are asserted within a derived bound, not exactly; a tolerance without an
     estimate is dropped; the x^3 floor window states TanhSinh's slivers.
-- Measured in step 3 (`design.md`): about 255 constexpr steps per evaluation on Clang (the comment's "about 250"), 1/x
-  to the cap at 83 % of Clang's default after the sweeps walk the pieces in order (93 % by index), and 0.2 to 0.3 s of
-  compile time per translation unit for double, not the spike's 0.5 to 1.5 s.
+- Measured in step 3 (`design.md`): about 240 constexpr steps per evaluation on Clang, 1/x to the cap at 83 % of
+  Clang's default with the sweeps walking the pieces in order (93 % by index) and the overflow check at run time only
+  (90 % in f551f10, which checked in constant evaluation too), and 0.2 to 0.3 s of compile time per translation unit
+  for double, not the spike's 0.5 to 1.5 s.
 - Noted, not raised against 3b: a node where fn is exactly 0 can turn a side's cut into pruning and drop its end term
   (`PHASE3_API.md` C's approved rule).
 
