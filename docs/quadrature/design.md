@@ -31,7 +31,7 @@ every module (the library, real types, the general test rules) is in `docs/desig
 - **A method is a type** (Phase 3a, `PHASE3A_API.md`, approved 2026-11-02; amends `BRIEF.md` D1 and 3.9): a
   `fixed_rule` (`apply(fn, a, b)`), an `iterative_method` (`start(fn, a, b)`, `advance(fn, state)`, `settle(state)`)
   or an `estimating_method` (`estimate(fn, a, b, criteria)`), each a const member checked by a public concept
-  `<M, T, F = T(T const &)>`. `GaussLegendre<N>` is a fixed rule, `Romberg` and `GaussKronrod<15>` iterative methods;
+  `<M, T, F = T (*)(T const &)>` (F by default what `integrate` passes for a plain function: a pointer to it). `GaussLegendre<N>` is a fixed rule, `Romberg` and `GaussKronrod<15>` iterative methods;
   a user's type works as they do. Adding a method edits nothing: no list of methods, no dispatch on them. The
   contract (what a method is given and must return) is written once, in the concepts' comments.
 - **Six forms of `integrate`:** the named forms of Phases 1 and 2, unchanged, `integrate<M>(fn, a, b)` for a fixed

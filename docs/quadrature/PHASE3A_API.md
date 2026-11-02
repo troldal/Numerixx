@@ -100,22 +100,22 @@ namespace nxx::quadrature {
 
     // ... detail; then the concepts:
 
-    template<typename M, typename T, typename F = T(T const &)>
+    template<typename M, typename T, typename F = T (*)(T const &)>
     concept fixed_rule = requires(M const &m, F &fn, T const &a, T const &b) {
         { m.apply(fn, a, b) } -> std::same_as<std::expected<T, error>>;
     };
 
-    template<typename M, typename T, typename F = T(T const &)>
+    template<typename M, typename T, typename F = T (*)(T const &)>
     concept estimating_method = requires(M const &m, F &fn, T const &a, T const &b, Criteria<T> const &criteria) {
         { m.estimate(fn, a, b, criteria) } -> std::same_as<std::expected<Integral<T>, Failure<T>>>;
     };
 
     /// The state of an iterative method: what start returns, inside its std::expected.
-    template<typename M, typename T, typename F = T(T const &)>
+    template<typename M, typename T, typename F = T (*)(T const &)>
     using state_t = typename decltype(std::declval<M const &>().start(
         std::declval<F &>(), std::declval<T const &>(), std::declval<T const &>()))::value_type;
 
-    template<typename M, typename T, typename F = T(T const &)>
+    template<typename M, typename T, typename F = T (*)(T const &)>
     concept iterative_method = requires(M const &m, F &fn, T const &a, T const &b) {
         { m.start(fn, a, b) } -> /* std::expected<S, Failure<T>> */;
     } && requires(M const &m, F &fn, state_t<M, T, F> &s) {
@@ -626,8 +626,8 @@ From draft 2 (unchanged unless noted):
 
   Recommended: yes.
 - **Q2. Concepts:**
-  - `fixed_rule`, `estimating_method` and `iterative_method`, each `<M, T, F = T(T const &)>`, with no copy
-    requirement;
+  - `fixed_rule`, `estimating_method` and `iterative_method`, each `<M, T, F = T (*)(T const &)>` (amended after
+    the independent review, finding 2), with no copy requirement;
   - draft 4 adds the alias `state_t<M, T, F>`.
 
   Recommended: yes.
@@ -807,19 +807,27 @@ logical defect: Romberg and Gauss-Kronrod are Phases 1 and 2 on every path it dr
 the pre-phase header on the structural edge cases, 13 constant-evaluation twins on GCC and Clang, expression templates
 and `cpp_dec_float_50` observed against unobserved), apart from Q4. Six low findings, each reproduced before acting:
 
-1. **A move-only method can be integrated but not observed:** `detail::Observed` holds a copy of the method, while
-   the value forms take `M const &` and the concepts require no copy. Proposed fix: hold `M const &`. Proposed to the
-   user (a change to `include/`).
-2. **The concepts' default `F = T(T const &)` is a function type, but `integrate` passes a function as a pointer:**
-   a method whose members take only a reference to a function satisfies `iterative_method<M, double>` but is not
-   accepted by `integrate`. Proposed fix: default `F = T (*)(T const &)`. Proposed to the user.
+1. **A move-only method can be integrated but not observed:** `detail::Observed` held a copy of the method, while
+   the value forms take `M const &` and the concepts require no copy. Adopted with the user's approval: `Observed`
+   holds `M const &`, which lives for the call to `integrate` (a temporary to the end of its full expression). Tests:
+   a method that cannot be copied observed in both forms, constant-evaluated and at run time, with Romberg's steps.
+2. **The concepts' default `F = T(T const &)` was a function type, but `integrate` passes a function as a pointer:**
+   a method whose members take only a reference to a function satisfied `iterative_method<M, double>` but was not
+   accepted by `integrate`. Adopted with the user's approval: default `F = T (*)(T const &)` in the three concepts
+   and `state_t`. Tests: a method taking only the pointer is a method and is accepted; one taking only a reference to
+   the function is neither.
 3. **Q4 also makes Romberg's exactly 0 result on reversed ends -0:** adopted, recorded in Q4 and `design.md`.
-4. **An observer of the wrong signature gives three errors, not one:** the second `static_assert` and the call run
-   after the first fails. Proposed fix: guard them with `if constexpr`. Proposed to the user.
+4. **An observer of the wrong signature gave three errors, not one:** the second `static_assert` and the call ran
+   after the first failed. Adopted with the user's approval: each requirement is checked under `if constexpr` on the
+   one before, so a wrong observer gives one diagnostic (checked on GCC 13 and Clang 18: one error where there were
+   three; an observer returning a value, one error).
 5. **"A braced list never becomes a method" holds only for a deduced M:** with M named, `integrate<M>({...}, fn, a,
    b)` takes the braced list as the method (correctly). Adopted: the wording in `design.md` and the test's comment.
 6. **Test gaps:** run-time twins for the loop's branches that had only `static_assert`s, and an estimating method's
    soft rejection by an observer. Adopted: both added.
+
+The fixes to findings 1, 2 and 4 change no result: the spike's 2,438-result battery is identical to the header before
+them, and observed runs equal unobserved ones in `cpp_bin_float_50` with expression templates and `cpp_dec_float_50`.
 
 ## Deferred
 
