@@ -8,6 +8,7 @@ import sys
 
 EPS = 2.0 ** -52
 DMIN = 5e-324
+NORMAL_MIN = 2.0 ** -1022
 MAX = sys.float_info.max
 HALF_MAX = MAX / 2
 CAP = 10       # levels 0 to 9
@@ -140,12 +141,16 @@ def power_end(side):
     if not small_product(de, ye) or not small_product(dp, yp):
         return UNBOUNDED
     re, rp = de * ye, dp * yp
-    if rp == 0.0:
-        return 0.0 if re == 0.0 else UNBOUNDED
+    # A product below min() lost its relative precision (the Codex review): q and the excess from ratios there.
+    lost = (re < NORMAL_MIN and ye > 0.0) or (rp < NORMAL_MIN and yp > 0.0)
+    if (yp == 0.0) if lost else (rp == 0.0):
+        return 0.0 if (not lost and re == 0.0) else UNBOUNDED
     rho = de / dp
-    if not (re < rp):
+    scaled = rho * ye if lost else re
+    base = yp if lost else rp
+    if not (scaled < base):
         return UNBOUNDED
-    q = re / rp
+    q = scaled / base
     if q >= 1.0:
         return UNBOUNDED
     num = (1.0 - rho) * q
@@ -154,6 +159,13 @@ def power_end(side):
         return UNBOUNDED
     ratio = num / den - 1.0
     factor = 0.0 if ratio < 0.0 else ratio
+    if lost:
+        if not small_product(ye, factor):
+            return UNBOUNDED
+        excess = ye * factor
+        if not small_product(de, excess):
+            return UNBOUNDED
+        return de * excess
     if not small_product(re, factor):
         return UNBOUNDED
     return re * factor

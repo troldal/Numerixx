@@ -34,7 +34,8 @@ add_executable(numerixx_tests test_math.cpp test_deriv.cpp test_stencils.cpp tes
         test_quadrature_tanh_sinh.cpp)
 target_link_libraries(numerixx_tests PRIVATE numerixx::numerixx doctest::doctest_with_main boost_multiprecision)
 if (MSVC)
-    set(numerixx_test_warnings /W4 /WX /permissive-)
+    # /bigobj: test_quadrature_tanh_sinh.cpp instantiates TanhSinh in seven types, past COFF's section limit (C1128).
+    set(numerixx_test_warnings /W4 /WX /permissive- /bigobj)
 else ()
     set(numerixx_test_warnings -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion -Werror)
 endif ()

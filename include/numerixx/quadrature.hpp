@@ -1796,7 +1796,9 @@ namespace nxx::quadrature {
         constexpr Pair<T> ln_two()
         {
             T const eps = T(std::numeric_limits<T>::epsilon());
-            T const stop = T(T(eps * eps) / T(16));
+            // At least min(): in a type whose exponents end before eps^2 (min() 2^-100, eps 2^-99) eps^2 / 16 is 0,
+            // which no term goes below.
+            T const stop = detail::larger(T(T(eps * eps) / T(16)), T((std::numeric_limits<T>::min)()));
             T const three = T(3);
             Pair<T> power = detail::pair_quotient(Pair<T>{ T(1), T(0) }, three);
             Pair<T> sum{ T(0), T(0) };
@@ -1908,16 +1910,17 @@ namespace nxx::quadrature {
 
             // m, the largest with 2^-m >= min(), by a greedy descent over its bits from min() itself, not min_exponent
             // (Boost's cpp_bin_float_50 has min() = 2^min_exponent, a binade above radix^(min_exponent - 1)): bit i is
-            // taken if 2^-(m + 2^i) >= min(), compared as 2^-m >= min() 2^(2^i), which neither underflows nor
-            // overflows. x_min = -m ln 2, moved 4 eps inward, so that the rounded reduction cannot give a result below
-            // min().
+            // taken if 2^-(m + 2^i) >= min(), formed from the downward factors. Nothing overflows, in a type whose
+            // exponents reach further below 0 than above too (2^(2^i) did there); a product that underflows lies below
+            // min() and is rejected, as it should be. x_min = -m ln 2, moved 4 eps inward, so that the rounded
+            // reduction cannot give a result below min().
             T const smallest = T((limits::min)());
             T scale = T(1); // 2^-m
             T exponent = T(0);
             for (std::size_t i = bits; i-- > 0;) {
-                T const needed = i > 0 ? T(T(smallest * up[i]) * up[i]) : T(smallest * up[0]);
-                if (scale >= needed) {
-                    scale = T(T(scale * down[i]) * (i > 0 ? down[i] : T(1)));
+                T const candidate = i > 0 ? T(T(scale * down[i]) * down[i]) : T(scale * down[0]);
+                if (candidate >= smallest) {
+                    scale = candidate;
                     exponent = T(exponent + powers[i]);
                 }
             }
@@ -1999,7 +2002,9 @@ namespace nxx::quadrature {
         constexpr Hyperbolic<T> sinh_cosh(T const &t, ExpConstants<T> const &constants)
         {
             if (t < T(T(1) / T(2))) {
-                T const eighth = T(T(std::numeric_limits<T>::epsilon()) / T(8));
+                // At least min(), as ln_two()'s stop.
+                T const eighth = detail::larger(T(T(std::numeric_limits<T>::epsilon()) / T(8)),
+                    T((std::numeric_limits<T>::min)()));
                 T const tt = T(t * t);
                 T odd = t;
                 T even = T(1);
@@ -2461,16 +2466,29 @@ namespace nxx::quadrature {
             if (!detail::small_product(d_e, y_e) || !detail::small_product(d_p, y_p)) return unbounded;
             T const r_e = T(d_e * y_e);
             T const r_p = T(d_p * y_p);
-            if (r_p == T(0)) return r_e == T(0) ? EndTerm<T>{ T(0), false } : unbounded;
+            // A product below min() has lost its relative precision: both 0 made 1/x's excess 0 on a scale near
+            // denorm_min, a false success. There q and the excess come from ratios, rho |y_e| / |y_p| and
+            // d_e (|y_e| factor); every other case keeps the products.
+            T const smallest = T((std::numeric_limits<T>::min)());
+            bool const lost = (r_e < smallest && y_e > T(0)) || (r_p < smallest && y_p > T(0));
+            if (lost ? y_p == T(0) : r_p == T(0)) return !lost && r_e == T(0) ? EndTerm<T>{ T(0), false } : unbounded;
             T const rho = T(d_e / d_p);
-            if (!(r_e < r_p)) return unbounded;
-            T const q = T(r_e / r_p);
+            T const scaled = lost ? T(rho * y_e) : r_e;
+            T const base = lost ? y_p : r_p;
+            if (!(scaled < base)) return unbounded;
+            T const q = T(scaled / base);
             if (q >= T(1)) return unbounded;
             T const numerator = T(T(T(1) - rho) * q);
             T const denominator = T(rho * T(T(1) - q));
             if (!(denominator > T(0)) || numerator > T(denominator * half_max)) return unbounded;
             T const ratio = T(T(numerator / denominator) - T(1));
             T const factor = ratio < T(0) ? T(0) : ratio;
+            if (lost) {
+                if (!detail::small_product(y_e, factor)) return unbounded;
+                T const excess = T(y_e * factor);
+                if (!detail::small_product(d_e, excess)) return unbounded;
+                return EndTerm<T>{ T(d_e * excess), false };
+            }
             if (!detail::small_product(r_e, factor)) return unbounded;
             return EndTerm<T>{ T(r_e * factor), false };
         }

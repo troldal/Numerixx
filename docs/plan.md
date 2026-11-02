@@ -247,7 +247,9 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
     no workaround, and the docs build, 2026-11-02; the numerics review of the implementation, nine findings, all
     adopted)
   - [x] CI passes on all five toolchains (f551f10: run 41528481205)
-  - [ ] The independent review (Codex) and its adopted findings
+  - [x] The independent review (Codex) and its adopted findings (three findings, all adopted with the user's
+    approval: the power law's products below min(), thresholds below min(), the search for x_min overflowing;
+    `PHASE3B_API.md`, "The independent review")
 - Phase 4: `TanhSinh` on half lines and the line (exp-sinh, sinh-sinh).
 - The milestone ends with its chapter on the documentation site, as Milestone 3 did for roots and deriv.
 

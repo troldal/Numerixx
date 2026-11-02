@@ -519,8 +519,11 @@ Built in three steps (`PHASE3B_API.md` Q2): exp, the tables in pieces, the metho
   rounding of r 0.25). No NaN test, no overflow guard, no subnormal results (Phase 4 widens it). Its constants
   (`detail::ExpConstants`, from `detail::exp_constants<T>()`) are passed in, so that a caller forms them once.
 - **x_min from min(), not min_exponent** (an implementation note to `PHASE3_API.md` B): x_min = -m ln 2, moved 4 eps
-  inward, m the largest integer with 2^-m >= min(), found by a greedy descent over m's bits that compares
-  2^-m >= min() 2^(2^i) (no underflow, no overflow). Boost's types give min() = radix^min_exponent, a binade above the
+  inward, m the largest integer with 2^-m >= min(), found by a greedy descent over m's bits that forms 2^-(m + 2^i)
+  from the downward factors and takes the bit where it is at least min() (a product that underflows lies below it;
+  2^(2^i) overflowed where the exponents reach further below 0 than above: the independent review). The series'
+  thresholds, eps^2 / 16 for ln 2 and eps / 8 for sinh and cosh, are at least min(), for a type whose exponents end
+  before eps^2. Boost's types give min() = radix^min_exponent, a binade above the
   standard's radix^(min_exponent - 1) (`cpp_bin_float_50`: min_exponent -2147483312, min() 2^-2147483312;
   `cpp_dec_float_50`: -67108864 and 10^-67108864). The spike's x_min, -(1 - min_exponent) ln 2, therefore lay ln 2
   below ln min() in `cpp_bin_float_50`, where exp flushed to 0 on that band; for `cpp_dec_float_50` it used ln 2 for
@@ -550,7 +553,7 @@ Built in three steps (`PHASE3B_API.md` Q2): exp, the tables in pieces, the metho
   outermost kept one pruned below eps L1_(k-1) / 2 in h-scale; R_k = R_(k-1) / 2 + the new terms in a local Neumaier
   sum, L1 likewise; the tail rule comp < eps; the end term by how the side ended (0 after pruning; geometric after a
   value not finite or at the table's end, D1; the sliver W at the last kept value and the power-law excess after
-  rounding); the reported value V_k = R_k + the slivers (D3); the estimate max(|V_k - V_(k-1)|, F_k) plus the end
+  rounding, from ratios where a product d |y| lies below min(): the independent review); the reported value V_k = R_k + the slivers (D3); the estimate max(|V_k - V_(k-1)|, F_k) plus the end
   terms; attainable 2 F_k, F_k with the slivers' sizes; ready from level 4; exhausted at level 9, or at the start where
   no point is strictly inside.
 - **The side's state** (`detail::Side`): its cut and kind, the outermost kept point (the centre at first), the kept

@@ -389,6 +389,31 @@ From the numerics review (each settled or confirmed by the prototype, D):
 - Noted, not raised against 3b: a node where fn is exactly 0 can turn a side's cut into pruning and drop its end term
   (`PHASE3_API.md` C's approved rule).
 
+## The independent review
+
+By Codex (gpt-6.1-sol, read-only) on 2026-11-02, on 189d090, 080ecc8, f551f10 and 049903e against this document,
+`PHASE3_API.md`, `PHASE3A_API.md` B to D, `docs/design.md`, `docs/quadrature/design.md` and `CLAUDE.md`. It found the
+traversal, the pruning order, W, the raw sum and the slivers, the protocol, the constant-evaluation refusals and the
+references (regenerated exactly) correct, and three defects, each reproduced before acting and fixed with the user's
+approval:
+
+1. **The power-law end term could certify a divergent integral:** on a scale near denorm_min both products d |y| at
+   the last two distinct points rounded to 0, which read as a zero excess. (D / (1 - x)) / 4 on [0, 1] at rel_tol 0,
+   D = denorm_min, ended ok {3 D, 50 D}; (D (1 - x)^(-1023/1024)) / 4 = 256 D the same. The prototype shared it.
+   Fixed: where a product lies below min() with both factors positive, q and the excess come from ratios,
+   rho |y_e| / |y_p| and d_e (|y_e| factor); every other case keeps the products. Now not_converged without a best,
+   and with an honest best. Tests: both cases.
+2. **A type whose exponents end before eps^2 hung:** `cpp_bin_float<100, digit_base_2, void, int, -100, 100>` (eps
+   2^-99, min() 2^-100) made eps^2 / 16 and eps / 8 zero, so ln 2's series and the sinh and cosh series never stopped.
+   Fixed: both thresholds at least min(). Test: 1 on [0, 1] in that type.
+3. **Exponents that reach further below 0 than above mis-sized exp's domain:** in
+   `cpp_bin_float<53, digit_base_2, void, int, -10000, 1000>` the search for x_min formed 2^1024, which overflowed;
+   x_min came out as -1418.9 instead of ln min() = -6931.5, and exp(-2000) as 0. Fixed: the search uses the downward
+   powers of 2 only. Tests: x_min, e^-2000 within 1.5 ulp of mpmath, log x on [0, 1] in that type.
+
+With the fixes, exp's constants in float, double, long double and both 50-digit types and the double table are bit
+for bit unchanged, and every count the tests assert stands.
+
 ## Deferred
 
 As `PHASE3_API.md` (infinite intervals, fn of the distance to the end, exp as a public helper, a stagnation rule) and

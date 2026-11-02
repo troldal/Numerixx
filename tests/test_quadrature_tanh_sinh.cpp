@@ -719,3 +719,44 @@ TEST_CASE("quadrature: tanh_sinh: the fallback to the default")
     CHECK(with_fallback(ts_reciprocal, 0.0, 1.0)
           == std::unexpected(qd::Failure<double>{ qd::error::not_converged, std::nullopt }));
 }
+
+// The independent review's cases (Codex, PHASE3B_API.md): two valid types it found the method failing in, exponents
+// that end before eps^2 and exponents that reach further below 0 than above.
+namespace {
+    using narrow = mp::number<mp::cpp_bin_float<100, mp::digit_base_2, void, int, -100, 100>>;
+    using lopsided = mp::number<mp::cpp_bin_float<53, mp::digit_base_2, void, int, -10000, 1000>>;
+} // namespace
+
+TEST_CASE("quadrature: tanh_sinh: the independent review's cases")
+{
+    // The power law's products d |y| below min(), D = denorm_min: (D / (1 - x)) / 4 diverges, and both products at the
+    // last two distinct points near 1 were 0, which made the excess 0 and the run ok {3 D, 50 D}. From ratios, the
+    // estimate is unbounded: no best.
+    auto const divergent =
+        qd::integrate<tanh_sinh>([](double x) { return (dmin / (1.0 - x)) / 4.0; }, 0.0, 1.0, { .rel_tol = 0.0 });
+    CHECK(divergent == std::unexpected(qd::Failure<double>{ qd::error::not_converged, std::nullopt }));
+    // (D (1 - x)^(-1023/1024)) / 4 = 256 D: no longer ok, and its best honest.
+    auto const tiny = qd::integrate<tanh_sinh>(
+        [](double x) { return (dmin * std::pow(1.0 - x, -1023.0 / 1024.0)) / 4.0; }, 0.0, 1.0, { .rel_tol = 0.0 });
+    REQUIRE(!tiny.has_value());
+    REQUIRE(tiny.error().best.has_value());
+    CHECK(error_of(tiny.error().best->value, bin100(256) * bin100(dmin)) <= tiny.error().best->abs_error);
+    // eps^2 / 16 and eps / 8 below min() (min() 2^-100, eps 2^-99): ln 2's series and sinh's ran forever; now the
+    // constants and the nodes form, and a run ends.
+    static_assert(nxx::real<narrow>);
+    auto const one = qd::integrate<tanh_sinh>([](narrow const &) { return narrow(1); }, narrow(0), narrow(1));
+    REQUIRE(one.has_value());
+    CHECK(error_of(one->value, "1") <= one->abs_error);
+    // Exponents to -10000 but only to 1000: 2^1024 overflowed in the search for x_min, which came out as -1418.9 and
+    // flushed e^-2000 to 0. Now x_min lies at ln min() = -6931.47 (4 eps inward), e^-2000 = 2.5765e-869 (mpmath) is
+    // within exp()'s 1.5 ulp, and log x integrates.
+    static_assert(nxx::real<lopsided>);
+    qd::detail::ExpConstants<lopsided> const constants = qd::detail::exp_constants<lopsided>();
+    CHECK(constants.x_min < lopsided(-6931));
+    char const *e_2000 = "1.52617269672275131712597356791827058566759031120209"; // times 2^-2886
+    CHECK(scaled_error(qd::detail::exp(lopsided(-2000), constants), e_2000, -2886) / eps_of<lopsided>() <= 1.5);
+    auto const log_x = qd::integrate<tanh_sinh>([](lopsided const &x) { return lopsided(log(x)); }, lopsided(0),
+                                                lopsided(1));
+    REQUIRE(log_x.has_value());
+    CHECK(error_of(log_x->value, "-1") <= log_x->abs_error);
+}
