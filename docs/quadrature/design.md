@@ -525,6 +525,22 @@ Built in three steps (`PHASE3B_API.md` Q2): exp, the tables in pieces, the metho
   `cpp_dec_float_50`: -67108864 and 10^-67108864). The spike's x_min, -(1 - min_exponent) ln 2, therefore lay ln 2
   below ln min() in `cpp_bin_float_50`, where exp flushed to 0 on that band; for `cpp_dec_float_50` it used ln 2 for
   ln 10. For float, double and long double m = 1 - min_exponent.
+- **The nodes** (`PHASE3_API.md` B): sinh t and cosh t by their series below t = 1/2, else from e = exp(t);
+  q = exp(-2 sinh t), comp = 2q / (1 + q) and w = cosh t 4q / (1 + q)^2, formed directly; a level ends at its first
+  node with q = 0, so every stored value is normal. Nodes to h = 2^-9: float 2,289, double 3,361, long double (80-bit
+  and binary128) 4,781, `cpp_bin_float_50` 10,814, `cpp_dec_float_50` 9,655.
+- **Pieces** (`PHASE3_API.md` Q3): the unit is a piece of one level of at most 1,024 nodes,
+  `detail::tanh_sinh_piece<T, L, P>`; for float, double and long double each is its own `inline constexpr` table
+  (`detail::tanh_sinh_table`), for other T the piece through `with_generated` (cached, keyed per level, piece and T).
+  A piece's capacity comes from an upper bound on t_max in integers, 0.7 bit_width((1 - min_exponent) bits per digit)
+  >= ln(that) >= asinh(-ln min() / 2): double 3,585 slots for 3,361 nodes. For float, double and long double the
+  storage is std::array (static data); for every other T std::vector: a run-time piece of 1,024 `cpp_bin_float_50`
+  nodes in arrays, about 80 KB, overflowed Emscripten's default stack of 64 KB (found by the pre-3a tests).
+- **A level at once** (`PHASE3B_API.md` C): `detail::with_tanh_sinh_level<T>(level, use)` passes `use` a
+  `TanhSinhLevel<T>`, a view of every piece of the level (spans of their complements and weights), so that a step
+  reads its level once for both sides and the slivers' weights. In constant evaluation, for a T without a table, each
+  piece is generated once per call, as a temporary; the pre-3a code visited the pieces once per side and once per
+  sliver, regenerating them each time.
 
 ### Evidence (Phase 3b)
 
@@ -533,14 +549,36 @@ largest error: 0.62 ulp (float), 0.77 (double), 0.70 (80-bit long double), 0.66 
 (`cpp_bin_float_50`, with or without expression templates), 0.0022 (`cpp_dec_float_50`, its guard digits); the
 derived bound is 1.48.
 
+The tables (step 2): the sampled nodes of the double and `cpp_bin_float_50` tables (mpmath at 80 digits) are within
+0.33 and 0.47 of the a-priori bound of `PHASE3_API.md` B; the nodes per level are the script's in every type; the
+compile-time tables of float, double and long double are bit for bit the run-time pieces of a boxed twin, and the
+double table bit for bit Phase 3's dump (`tanh-sinh-prototype/tab_double.txt`, from `dump.cpp`).
+
+The largest piece's share of each toolchain's default constexpr budget (1,048,576 steps; GCC's 2^25 operations), the
+least limit that compiles it, found by bisection on a translation unit holding that piece alone:
+
+| | float | double | long double |
+|---|---|---|---|
+| GCC 16 | 7.4 % | 9.3 % | 13.7 % (80-bit) |
+| Clang 22 | 20.8 % | 25.3 % (265,128 steps, level 9 piece 0) | 37.0 % (80-bit) |
+| clang-cl 22 | 17.9 % | 21.8 % | as double |
+| cl 19.51 | 16.7 % | 23.2 % | as double |
+| em++ 6.0.8 | 20.8 % | 25.3 % | 39.7 % (binary128) |
+
+Constant evaluation for a T without a table (`PHASE3B_API.md` C): a class wrapping double costs about 940 steps per
+node on Clang, 3.4 times double's 275 (levels 4 and 8 generated alone: 77,269 and 813,861 steps), since each
+arithmetic operation is a call. Levels 0 to 4, 5, 6 and 7 generated in one constant expression take 22.6, 34.6, 55.9
+and 96.2 % of Clang's default before the run's own steps (clang-cl 21.9 % and cl 18.2 % to level 4). So such a type
+fits in a constant expression only where the run stops by about level 5.
+
 ### The references of the tanh-sinh tests
 
-`tests/quadrature_tanh_sinh_reference.hpp`, run as `python -I ts_references.py > quadrature_tanh_sinh_reference.hpp`
-(step 2 adds the nodes):
+`tests/quadrature_tanh_sinh_reference.hpp`, run as `python -I ts_references.py > quadrature_tanh_sinh_reference.hpp`:
 
 ```python
 # References for the tanh-sinh tests (tests/quadrature_tanh_sinh_reference.hpp), from mpmath at 80 digits, printed to
-# 60: e^x at points of exp()'s domain per type.
+# 60: e^x at points of exp()'s domain per type, the complement 1 - x and the weight dx/dt of sampled nodes of the
+# double and cpp_bin_float_50 tables, and the nodes per level of every type's table.
 # A value is written as a mantissa in [1, radix) and an exponent of the radix, so that a value below
 # cpp_bin_float_100's range (cpp_bin_float_50's smallest are) can still be compared.
 # Usage: python -I ts_references.py > quadrature_tanh_sinh_reference.hpp
@@ -612,6 +650,45 @@ def exp_points(name, radix, digits, m, count=40):
     return out
 
 
+def node_t(level, i):
+    return mp.mpf(i) if level == 0 else mp.mpf(2 * i + 1) / mp.mpf(2) ** level
+
+
+def counts(m):
+    lmin = m * LN2
+    result, gap = [], mp.inf
+    for level in range(10):
+        n = 0
+        while True:
+            t = node_t(level, n)
+            v = 2 * mp.sinh(t)
+            gap = min(gap, abs(v - lmin) / lmin)
+            if not v < lmin:
+                break
+            n += 1
+        result.append(n)
+    return result, gap
+
+
+def table_sample(m, full_levels, stride_from):
+    per_level = counts(m)[0]
+    out = []
+    for level in range(10):
+        n = per_level[level]
+        chosen = set(range(n)) if level < full_levels else set(range(0, n, 2 ** (level - stride_from)))
+        chosen.add(n - 1)
+        for i in range(n):  # around the switch from the series to exp at t = 1/2
+            if abs(node_t(level, i) - mp.mpf(1) / 2) <= mp.mpf(1) / 16 and level >= 4:
+                chosen.add(i)
+        for i in sorted(chosen):
+            t = node_t(level, i)
+            q = mp.exp(-2 * mp.sinh(t))
+            comp = 2 * q / (1 + q)
+            w = 4 * mp.cosh(t) * q / (1 + q) ** 2
+            out.append((level, i, scaled(comp, 2), scaled(w, 2)))
+    return out
+
+
 def main():
     print('// Generated by the script in docs/quadrature/design.md ("The references of the tanh-sinh tests") from '
           'mpmath at 80')
@@ -619,11 +696,24 @@ def main():
     print('\n#pragma once\n\nnamespace tanh_sinh_reference {\n')
     print('    // e^x at x = k / 2^s.\n    struct ExpPoint\n    {\n        long long k;\n        int s;\n'
           '        char const *mantissa;\n        long long exponent;\n    };\n')
+    print('    // The complement and the weight of node i of a level.\n    struct Node\n    {\n        int level;\n'
+          '        int i;\n        char const *comp;\n        long long comp_exponent;\n        char const *w;\n'
+          '        long long w_exponent;\n    };\n')
     for name, radix, digits, m in TYPES:
         pts = exp_points(name, radix, digits, m)
         print(f'    inline constexpr ExpPoint exp_{name}[] = {{')
         for k, s, mantissa, e in pts:
             print(f'        {{ {k}LL, {s}, "{mantissa}", {e} }},')
+        print('    };\n')
+    for name, radix, digits, m in TYPES:
+        c, gap = counts(m)
+        print(f'    // {name}: the smallest |2 sinh t - L| / L over the nodes tested, L = {m} ln 2: {mp.nstr(gap, 3)}')
+        print(f'    inline constexpr int nodes_{name}[] = {{ ' + ', '.join(str(v) for v in c) + ' };\n')
+    for name, m, full, stride in (('double', 1022, 4, 3), ('bin50', 2147483312, 3, 1)):
+        print(f'    inline constexpr Node table_{name}[] = {{')
+        for level, i, (cm, ce), (wm, we) in table_sample(m, full, stride):
+            print(f'        {{ {level}, {i}, "{cm}", {ce},')
+            print(f'          "{wm}", {we} }},')
         print('    };\n')
     print('} // namespace tanh_sinh_reference')
 
@@ -662,4 +752,7 @@ if __name__ == '__main__':
 - TanhSinh (`tests/test_quadrature_tanh_sinh.cpp`, `quadrature: tanh_sinh: *`): exp against mpmath within 1.5 ulp
   in float, double, long double and the 50-digit types (with and without expression templates), 0 at and below x_min
   and normal just above it, static_asserts at both ends of its domain in double, the compile-time constants equal to
-  the run-time ones.
+  the run-time ones; the sampled nodes of the double and `cpp_bin_float_50` tables within the bound of B, the nodes
+  per level in every type within the capacity bound, the compile-time tables equal to the run-time pieces of a boxed
+  twin of the same type (the cached path); static_asserts on the double table's levels and on a boxed double's level
+  4 generated in a constant expression, equal to the table's.

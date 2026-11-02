@@ -43,6 +43,7 @@
 #include <limits>
 #include <optional>
 #include <ranges>
+#include <span>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -1959,6 +1960,290 @@ namespace nxx::quadrature {
             T p = T(0);
             for (int n = constants.terms; n >= 1; --n) p = T(T(r / T(n)) * T(T(1) + p));
             return T(T(T(T(1) + p) * scale_1) * scale_2);
+        }
+
+        /**
+         * @brief sinh t and cosh t.
+         * @tparam T The real type.
+         */
+        template<real T>
+        struct Hyperbolic
+        {
+            /** @brief sinh t. */
+            T s;
+
+            /** @brief cosh t. */
+            T c;
+        };
+
+        /**
+         * @brief sinh t and cosh t for t >= 0: by their Taylor series below t = 1/2, where e - 1/e cancels, else from
+         * e = exp(t) as (e - 1/e) / 2 and (e + 1/e) / 2.
+         * @param t The argument, t >= 0.
+         * @param constants exp()'s constants.
+         * @return sinh t and cosh t.
+         */
+        template<real T>
+        constexpr Hyperbolic<T> sinh_cosh(T const &t, ExpConstants<T> const &constants)
+        {
+            if (t < T(T(1) / T(2))) {
+                T const eighth = T(T(std::numeric_limits<T>::epsilon()) / T(8));
+                T const tt = T(t * t);
+                T odd = t;
+                T even = T(1);
+                T s = t;
+                T c = T(1);
+                for (int n = 1;; ++n) {
+                    even = T(T(even * tt) / T(T(2 * n - 1) * T(2 * n)));
+                    odd = T(T(odd * tt) / T(T(2 * n) * T(2 * n + 1)));
+                    c = T(c + even);
+                    s = T(s + odd);
+                    if (even < eighth && odd <= T(s * eighth)) break;
+                }
+                return Hyperbolic<T>{ s, c };
+            }
+            T const e = detail::exp(t, constants);
+            T const inverse = T(T(1) / e);
+            return Hyperbolic<T>{ T(T(e - inverse) / T(2)), T(T(e + inverse) / T(2)) };
+        }
+
+        /** @brief The levels of the tanh-sinh rule: h = 1 down to 2^-9 (PHASE3_API.md Q2). */
+        inline constexpr int tanh_sinh_levels = 10;
+
+        /** @brief The nodes of a piece at most: the unit of the tables, one initializer each (the constexpr budget). */
+        inline constexpr int piece_size = 1024;
+
+        /**
+         * @brief Ten times an upper bound on the tables' t_max, from T's limits in integers: a node is kept while
+         * 2 sinh t < L, L = -ln min() <= n ln 2, n = (1 - min_exponent) bits per digit, so t_max <= asinh(L / 2) <=
+         * ln(L + 1) <= ln n < 0.7 bit_width(n).
+         * @return 10 times the bound.
+         */
+        template<real T>
+        constexpr int reach_tenths()
+        {
+            unsigned long long const n = static_cast<unsigned long long>(1LL - std::numeric_limits<T>::min_exponent)
+                                         * static_cast<unsigned long long>(detail::significand_bits<T>()
+                                                                           / std::numeric_limits<T>::digits);
+            return 7 * static_cast<int>(std::bit_width(n));
+        }
+
+        /**
+         * @brief An upper bound on the nodes of a level: t = 0, 1, ... at level 0, the odd multiples of 2^-level
+         * above, up to reach_tenths() / 10.
+         * @param level The level.
+         * @return The bound.
+         */
+        template<real T>
+        constexpr int level_capacity(int level)
+        {
+            int const tenths = detail::reach_tenths<T>();
+            if (level == 0) return tenths / 10 + 1;
+            return ((tenths << level) / 10 + 1) / 2;
+        }
+
+        /**
+         * @brief The pieces of a level.
+         * @param level The level.
+         * @return ceil(level_capacity / piece_size).
+         */
+        template<real T>
+        constexpr int level_pieces(int level)
+        { return (detail::level_capacity<T>(level) + piece_size - 1) / piece_size; }
+
+        /**
+         * @brief The capacity of a piece: piece_size, or what is left of the level's bound.
+         * @param level The level.
+         * @param piece The piece.
+         * @return The capacity.
+         */
+        template<real T>
+        constexpr std::size_t piece_capacity(int level, int piece)
+        {
+            int const left = detail::level_capacity<T>(level) - piece * piece_size;
+            return static_cast<std::size_t>(left < piece_size ? left : piece_size);
+        }
+
+        /**
+         * @brief The nodes of a piece of a level of the tanh-sinh rule, t ascending: each node's complement 1 - x and
+         * weight dx/dt (without the step h).
+         *
+         * In std::arrays for float, double and long double, whose pieces are compile-time tables; in std::vectors for
+         * every other T, whose pieces are built at run time: a piece of 1,024 cpp_bin_float_50 nodes, about 80 KB,
+         * would not fit in Emscripten's default stack of 64 KB.
+         *
+         * @tparam T The real type.
+         * @tparam N The capacity.
+         */
+        template<real T, std::size_t N>
+        struct Nodes
+        {
+            /** @brief The storage of a column. */
+            using Column = std::conditional_t<tabled<T>, std::array<T, N>, std::vector<T>>;
+
+            /** @brief 1 - x = 2q / (1 + q), q = exp(-2 sinh t), formed directly, never as 1 - x. */
+            Column comp;
+
+            /** @brief dx/dt = cosh t 4q / (1 + q)^2. */
+            Column w;
+
+            /** @brief The nodes held: N, or fewer where the table ends. */
+            std::size_t size;
+
+            /**
+             * @brief N nodes of value 0 in either storage (T need not be default constructible).
+             * @return The column.
+             */
+            static constexpr Column column()
+            {
+                if constexpr (tabled<T>) return detail::zeros<T, N>();
+                else return std::vector<T>(N, T(0));
+            }
+        };
+
+        /**
+         * @brief A piece of a level of the tanh-sinh table, from exp() alone (c = 1, so no pi: x = tanh(sinh t)).
+         *
+         * Level 0 holds t = i, level L >= 1 the odd multiples t = (2i + 1) 2^-L, i = piece 1024 + index. The table
+         * ends at the first node whose q = exp(-2 sinh t) is 0, that is below x_min: q >= min() for the nodes kept, so
+         * that no stored value is subnormal. Nothing overflows: q only underflows.
+         *
+         * @tparam T The real type.
+         * @tparam L The level, 0 to 9.
+         * @tparam P The piece.
+         * @return The piece.
+         */
+        template<real T, int L, int P>
+        constexpr Nodes<T, detail::piece_capacity<T>(L, P)> tanh_sinh_piece()
+        {
+            constexpr std::size_t capacity = detail::piece_capacity<T>(L, P);
+            return detail::with_generated<&detail::exp_constants<T>>([](ExpConstants<T> const &constants) {
+                Nodes<T, capacity> nodes{ Nodes<T, capacity>::column(), Nodes<T, capacity>::column(), 0 };
+                T h = T(1);
+                for (int i = 0; i < L; ++i) h = T(h / T(2));
+                for (std::size_t index = 0; index < capacity; ++index) {
+                    int const i = P * piece_size + static_cast<int>(index);
+                    T const t = L == 0 ? T(i) : T(T(2 * i + 1) * h);
+                    Hyperbolic<T> const hyperbolic = detail::sinh_cosh(t, constants);
+                    T const q = detail::exp(T(-T(hyperbolic.s + hyperbolic.s)), constants);
+                    if (!(q > T(0))) break;
+                    T const denominator = T(T(1) + q);
+                    nodes.comp[index] = T(T(T(2) * q) / denominator);
+                    nodes.w[index] = T(T(T(T(4) * hyperbolic.c) * q) / T(denominator * denominator));
+                    nodes.size = index + 1;
+                }
+                return nodes;
+            });
+        }
+
+        /**
+         * @brief A piece of the tanh-sinh table for float, double and long double, computed at compile time once per
+         * program; each piece is its own initializer, within the constexpr budget.
+         * @tparam T float, double or long double.
+         * @tparam L The level.
+         * @tparam P The piece.
+         */
+        template<typename T, int L, int P>
+        inline constexpr Nodes<T, piece_capacity<T>(L, P)> tanh_sinh_table = detail::tanh_sinh_piece<T, L, P>();
+
+        /**
+         * @brief @p use applied to a piece of the tanh-sinh table in T: the compile-time table for float, double and
+         * long double, with_generated() (keyed per level, piece and T) for every other T.
+         * @param use A callable taking the piece.
+         * @return What use returns.
+         */
+        template<real T, int L, int P, typename U>
+        constexpr decltype(auto) with_tanh_sinh_piece(U &&use)
+        {
+            if constexpr (tabled<T>) return use(detail::tanh_sinh_table<T, L, P>);
+            else return detail::with_generated<&detail::tanh_sinh_piece<T, L, P>>(use);
+        }
+
+        /**
+         * @brief The nodes of one level of the tanh-sinh table across its pieces, t ascending: node i is t = i at
+         * level 0 and t = (2i + 1) 2^-level above. A view, valid only inside with_tanh_sinh_level()'s callback, so
+         * that a step reads its level's pieces once for both sides and the slivers' weights (PHASE3B_API.md C).
+         * @tparam T The real type.
+         */
+        template<real T>
+        struct TanhSinhLevel
+        {
+            /** @brief The most pieces of any level: the finest level's. */
+            static constexpr std::size_t most =
+                static_cast<std::size_t>(detail::level_pieces<T>(tanh_sinh_levels - 1));
+
+            /** @brief The complements of each piece, its nodes held. */
+            std::array<std::span<T const>, most> comp;
+
+            /** @brief The weights of each piece. */
+            std::array<std::span<T const>, most> w;
+
+            /** @brief The nodes of the level. */
+            int size;
+
+            /**
+             * @brief The complement 1 - x of node @p i.
+             * @param i The node, 0 <= i < size.
+             * @return Its complement.
+             */
+            constexpr T const &complement(int i) const
+            {
+                assert(0 <= i && i < size);
+                return comp[static_cast<std::size_t>(i / piece_size)][static_cast<std::size_t>(i % piece_size)];
+            }
+
+            /**
+             * @brief The weight dx/dt of node @p i.
+             * @param i The node, 0 <= i < size.
+             * @return Its weight.
+             */
+            constexpr T const &weight(int i) const
+            {
+                assert(0 <= i && i < size);
+                return w[static_cast<std::size_t>(i / piece_size)][static_cast<std::size_t>(i % piece_size)];
+            }
+        };
+
+        /**
+         * @brief @p use applied to level L once pieces P onward are added to @p level: each piece in turn, until one
+         * that is not full ends the level.
+         * @param level The view, holding pieces 0 to P - 1.
+         * @param use A callable taking the view.
+         * @return What use returns.
+         */
+        template<real T, int L, int P, typename U>
+        constexpr decltype(auto) with_pieces(TanhSinhLevel<T> &level, U &use)
+        {
+            if constexpr (P == detail::level_pieces<T>(L)) return use(std::as_const(level));
+            else {
+                constexpr std::size_t capacity = detail::piece_capacity<T>(L, P);
+                return detail::with_tanh_sinh_piece<T, L, P>([&](Nodes<T, capacity> const &nodes) -> decltype(auto) {
+                    level.comp[P] = std::span<T const>(nodes.comp.data(), nodes.size);
+                    level.w[P] = std::span<T const>(nodes.w.data(), nodes.size);
+                    level.size += static_cast<int>(nodes.size);
+                    if (nodes.size < capacity) return use(std::as_const(level));
+                    return detail::with_pieces<T, L, P + 1>(level, use);
+                });
+            }
+        }
+
+        /**
+         * @brief @p use applied to a level of the tanh-sinh table in T, every piece of it at once: the compile-time
+         * tables for float, double and long double, with_generated() for every other T (in constant evaluation, each
+         * piece generated as a temporary for the call).
+         * @param level The level, 0 to 9.
+         * @param use A callable taking a TanhSinhLevel<T> const &.
+         * @return What use returns.
+         */
+        template<real T, int L = 0, typename U>
+        constexpr decltype(auto) with_tanh_sinh_level(int level, U &&use)
+        {
+            assert(0 <= level && level < tanh_sinh_levels);
+            if constexpr (L + 1 < tanh_sinh_levels) {
+                if (level != L) return detail::with_tanh_sinh_level<T, L + 1>(level, use);
+            }
+            TanhSinhLevel<T> nodes{ {}, {}, 0 };
+            return detail::with_pieces<T, L, 0>(nodes, use);
         }
 
     } // namespace detail

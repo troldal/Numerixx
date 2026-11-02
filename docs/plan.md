@@ -239,7 +239,10 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
   - [x] Step 1, `detail::exp`: against mpmath within 1.5 ulp in every type, constexpr; all five presets locally and
     the docs build (2026-11-02; Emscripten with `-Wno-error=unused-template`, since the local emsdk 6.0.8 flags
     `test_quadrature_protocol.cpp`, which CI's 6.0.10 does not)
-  - [ ] Step 2, the tables in pieces
+  - [x] Step 2, the tables in pieces: against mpmath within the a-priori bound, the counts per level, compile-time
+    and run-time tables bit-identical, a level read at once; the budgets per toolchain in `design.md`; the
+    prototype in `docs/quadrature/tanh-sinh-prototype/`; all five presets locally (Emscripten as in step 1) and the
+    docs build (2026-11-02)
   - [ ] Step 3, `TanhSinh`; tests in every type; docs build clean
   - [ ] CI passes on all five toolchains
   - [ ] The independent review (Codex) and its adopted findings
