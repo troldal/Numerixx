@@ -1671,6 +1671,29 @@ namespace nxx::quadrature {
         using kept = std::conditional_t<std::is_lvalue_reference_v<O>,
             std::reference_wrapper<std::remove_reference_t<O>>, std::remove_cvref_t<O>>;
 
+        /**
+         * @brief fn's type as integrate() passes it to a method: a function as a pointer to it, any other callable as
+         * itself (reference removed).
+         * @tparam F fn's type as integrate() received it.
+         */
+        template<typename F>
+        using passed = std::conditional_t<std::is_function_v<std::remove_reference_t<F>>,
+            std::add_pointer_t<std::remove_reference_t<F>>, std::remove_reference_t<F>>;
+
+        /**
+         * @brief fn as integrate() passes it to a method: a function as a pointer to it, so that no method's lambda
+         * captures a reference to a function (MSVC's constant evaluator reads such a capture as uninitialized); any
+         * other callable as the lvalue it is.
+         * @param fn The function.
+         * @return A pointer to fn, or fn.
+         */
+        template<typename F>
+        constexpr decltype(auto) as_object(F &fn)
+        {
+            if constexpr (std::is_function_v<F>) return &fn;
+            else return (fn);
+        }
+
     } // namespace detail
     /** @endcond */
 
@@ -1681,8 +1704,8 @@ namespace nxx::quadrature {
      * The contract, which integrate() relies on:
      * - **Given:** a < b, both finite, possibly extreme (b - a may overflow; the ends may be subnormal, adjacent, or of
      *   opposite signs so that b - a rounds). integrate() orders the ends and negates the result for b < a. fn is an
-     *   lvalue, valid for the call only: call it with std::invoke and an argument of type T, and convert its result
-     *   with T(...).
+     *   lvalue (a function arrives as a pointer to it), valid for the call only: call it with std::invoke and an
+     *   argument of type T, and convert its result with T(...).
      * - **Required:** fn evaluated only at points of [a, b] (clamp a point formed as a + h t; form a midpoint as
      *   a / 2 + b / 2); a finite value or an error (integrate() turns a value that is not finite into
      *   error::non_finite); the method's parameters are its own preconditions; exceptions pass through.
@@ -1693,7 +1716,7 @@ namespace nxx::quadrature {
      *
      * @tparam M The method.
      * @tparam T The real type.
-     * @tparam F fn's type, reference removed; by default a plain function of T.
+     * @tparam F fn's type as a method receives it (a function as a pointer to it); by default a plain function of T.
      */
     template<typename M, typename T, typename F = T(T const &)>
     concept fixed_rule = requires(M const &m, F &fn, T const &a, T const &b) {
@@ -1989,6 +2012,23 @@ namespace nxx::quadrature {
         }
 
         /**
+         * @brief An estimating method on a < b: an iterative method's loop, or an estimating method's estimate.
+         * @param m The method.
+         * @param fn The function, as passed.
+         * @param a The lower end.
+         * @param b The upper end.
+         * @param criteria The validated criteria.
+         * @return The method's result.
+         */
+        template<typename M, real T, typename F>
+        constexpr std::expected<Integral<T>, Failure<T>>
+            estimate_on(M const &m, F &fn, T const &a, T const &b, Criteria<T> const &criteria)
+        {
+            if constexpr (iterative_method<M, T, F>) return detail::drive(m, fn, a, b, criteria);
+            else return m.estimate(fn, a, b, criteria);
+        }
+
+        /**
          * @brief r, negated: the integral from b to a.
          * @param r The integral from a to b.
          * @return -r, with the same estimate.
@@ -2178,13 +2218,14 @@ namespace nxx::quadrature {
      * @return The integral; error::non_finite if an end or a value of fn is not finite, or the sum overflowed.
      */
     template<typename M, real T, typename F>
-    requires nxx::detail::callable<F, T> && fixed_rule<M, T, std::remove_reference_t<F>>
+    requires nxx::detail::callable<F, T> && fixed_rule<M, T, detail::passed<F>>
     [[nodiscard]] constexpr std::expected<T, error> integrate(M const &m, F &&fn, T const &a, T const &b)
     {
         if (!nxx::math::isfinite(a) || !nxx::math::isfinite(b)) return std::unexpected(error::non_finite);
         if (a == b) return T(0);
+        auto &&f = detail::as_object(fn);
         std::expected<T, error> const r =
-            b < a ? m.apply(fn, b, a).transform([](T const &v) { return T(-v); }) : m.apply(fn, a, b);
+            b < a ? m.apply(f, b, a).transform([](T const &v) { return T(-v); }) : m.apply(f, a, b);
         if (r && !nxx::math::isfinite(*r)) return std::unexpected(error::non_finite);
         return r;
     }
@@ -2225,7 +2266,7 @@ namespace nxx::quadrature {
     // converts to a multiprecision T.
     template<typename M, real T, typename F>
     requires nxx::detail::callable<F, T>
-             && (iterative_method<M, T, std::remove_reference_t<F>> || estimating_method<M, T, std::remove_reference_t<F>>)
+             && (iterative_method<M, T, detail::passed<F>> || estimating_method<M, T, detail::passed<F>>)
     [[nodiscard]] constexpr std::expected<Integral<T>, Failure<T>>
         integrate(M const &m, F &&fn, T const &a, T const &b, Criteria<std::type_identity_t<T>> const &criteria = {})
     {
@@ -2239,19 +2280,15 @@ namespace nxx::quadrature {
         Criteria<T> const validated{ criteria.abs_tol, criteria.rel_tol > T(1) ? T(1) : criteria.rel_tol };
         if (!nxx::math::isfinite(a) || !nxx::math::isfinite(b)) return std::unexpected(invalid);
         if (a == b) return Integral<T>{ T(0), T(0) };
-        auto const run = [&](T const &lower, T const &upper) -> std::expected<Integral<T>, Failure<T>> {
-            if constexpr (iterative_method<M, T, std::remove_reference_t<F>>)
-                return detail::drive(m, fn, lower, upper, validated);
-            else
-                return m.estimate(fn, lower, upper, validated);
-        };
-        std::expected<Integral<T>, Failure<T>> const r = b < a ? run(b, a)
+        auto &&f = detail::as_object(fn);
+        std::expected<Integral<T>, Failure<T>> const r = b < a ? detail::estimate_on(m, f, b, a, validated)
                                                                      .transform(detail::negated<T>)
-                                                                     .transform_error([](Failure<T> f) {
-                                                                         f.best = f.best.transform(detail::negated<T>);
-                                                                         return f;
+                                                                     .transform_error([](Failure<T> failure) {
+                                                                         failure.best =
+                                                                             failure.best.transform(detail::negated<T>);
+                                                                         return failure;
                                                                      })
-                                                               : run(a, b);
+                                                               : detail::estimate_on(m, f, a, b, validated);
         // What every method must return: a sound result, or a Failure whose best, if any, is sound and not_converged's.
         bool const broken = r ? !detail::sound(*r)
                               : r.error().best
@@ -2283,7 +2320,7 @@ namespace nxx::quadrature {
      */
     template<typename M, real T, typename F>
     requires std::default_initializable<M> && nxx::detail::callable<F, T>
-             && fixed_rule<M, T, std::remove_reference_t<F>>
+             && fixed_rule<M, T, detail::passed<F>>
     [[nodiscard]] constexpr std::expected<T, error> integrate(F &&fn, T const &a, T const &b)
     { return nxx::quadrature::integrate(M{}, fn, a, b); }
 
@@ -2312,7 +2349,7 @@ namespace nxx::quadrature {
      */
     template<typename M = GaussKronrod<15>, real T, typename F>
     requires std::default_initializable<M> && nxx::detail::callable<F, T>
-             && (iterative_method<M, T, std::remove_reference_t<F>> || estimating_method<M, T, std::remove_reference_t<F>>)
+             && (iterative_method<M, T, detail::passed<F>> || estimating_method<M, T, detail::passed<F>>)
     [[nodiscard]] constexpr std::expected<Integral<T>, Failure<T>>
         integrate(F &&fn, T const &a, T const &b, Criteria<std::type_identity_t<T>> const &criteria = {})
     { return nxx::quadrature::integrate(M{}, fn, a, b, criteria); }
@@ -2340,7 +2377,7 @@ namespace nxx::quadrature {
      */
     template<typename M = GaussKronrod<15>, typename O, real T, typename F>
     requires std::default_initializable<M> && nxx::detail::callable<F, T>
-             && iterative_method<M, T, std::remove_reference_t<F>>
+             && iterative_method<M, T, detail::passed<F>>
     [[nodiscard]] constexpr std::expected<Integral<T>, Failure<T>> integrate(Observer<O> o, F &&fn, T const &a,
         T const &b, Criteria<std::type_identity_t<T>> const &criteria = {})
     { return nxx::quadrature::integrate(detail::observed(M{}, std::move(o)), fn, a, b, criteria); }
@@ -2367,7 +2404,7 @@ namespace nxx::quadrature {
      * @return As for the method given as a value.
      */
     template<typename M, typename O, real T, typename F>
-    requires nxx::detail::callable<F, T> && iterative_method<M, T, std::remove_reference_t<F>>
+    requires nxx::detail::callable<F, T> && iterative_method<M, T, detail::passed<F>>
     [[nodiscard]] constexpr std::expected<Integral<T>, Failure<T>> integrate(M const &m, Observer<O> o, F &&fn,
         T const &a, T const &b, Criteria<std::type_identity_t<T>> const &criteria = {})
     { return nxx::quadrature::integrate(detail::observed(m, std::move(o)), fn, a, b, criteria); }

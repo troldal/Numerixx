@@ -15,6 +15,15 @@ for full precision. Gauss-Kronrod accepts a result at twice the rounding floor, 
 `using namespace` for both modules the two names collide, as `error` does: the call does not compile. Qualify them, or
 use a namespace alias such as `namespace qd = nxx::quadrature;`.
 
+```{doxygenconcept} nxx::quadrature::fixed_rule
+```
+
+```{doxygenconcept} nxx::quadrature::iterative_method
+```
+
+```{doxygenconcept} nxx::quadrature::estimating_method
+```
+
 ```{doxygennamespace} nxx::quadrature
 :members:
 :undoc-members:
