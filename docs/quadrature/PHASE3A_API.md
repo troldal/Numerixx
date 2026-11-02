@@ -330,7 +330,8 @@ project's five toolchains are not available here; the phase itself builds and te
     `abs_error` alone in 9 float results and 1 double result (the floor's L1 sum); in `cpp_dec_float_50`, 7
     Gauss-Legendre values and 6 Romberg results, in the guard digits (about the 70th significant digit).
     Gauss-Kronrod: none.
-  - Draft 3: FINAL_DUMP (run pending).
+  - Draft 3: identical to draft 2 with the ends ordered, all 2,438 results, so the stepped methods and the loop of B
+    change nothing.
 - **Orientation today** (`orient.cpp`): 3,000 intervals (positive, negative, across 0, up to 2e6 wide), each
   integrated forwards and reversed, the whole result compared. Gauss-Legendre<64> and Gauss-Kronrod<15> give the
   exact negation every time. Romberg gives the exact negation in value and status every time, and a different
