@@ -869,4 +869,80 @@ sub("""            while (true) {
                     if (!settled) return std::unexpected(settled.error());
                     if (!checked(s.step)) return std::unexpected(invalid);
                     if (met(s.step)) {""")
+
+# 8. Draft 5, the user's syntax: integrate<M>(observer(o), fn, a, b[, criteria]) and integrate(m, observer(o), fn, a,
+#    b[, criteria]). observer(o) wraps the callable in Observer<O>, so that the overloads are told apart by type, never
+#    by calling an argument on trial. observed() moves to detail, the mechanism behind them.
+sub("""    /**
+     * @brief An iterative method m whose steps are reported to observer, called with the Step<T> after the start and
+     * after each step, for the ends in order (a < b). An lvalue observer is kept by reference, an rvalue by value.
+     * @param m The iterative method.
+     * @param observer A callable taking Step<T> const &, returning void.
+     * @return The observed method, itself an iterative method with m's state.
+     */
+    template<typename M, typename O>
+    constexpr detail::Observed<M, O> observed(M const &m, O &&observer)
+    { return detail::Observed<M, O>{ m, detail::kept<O>(std::forward<O>(observer)) }; }
+""", """    /**
+     * @brief An observer for integrate(): made by observer(o), it marks o as the callable that receives each step.
+     * @tparam O The callable's type as given: an lvalue reference (kept by reference) or a value.
+     */
+    template<typename O>
+    struct Observer
+    {
+        /** @brief The callable, by reference for an lvalue, by value for an rvalue. */
+        detail::kept<O> callable;
+    };
+
+    /**
+     * @brief o as an observer for integrate(): o(step) is called with the Step<T> after the start and after each step
+     * of an iterative method, for the ends in order (a < b). An lvalue is kept by reference, an rvalue by value.
+     * @code
+     * auto const r = qd::integrate<qd::Romberg>(qd::observer(print), fn, 0.0, 1.0, {.rel_tol = 1e-12});
+     * @endcode
+     * @param o A callable taking Step<T> const &, returning void.
+     * @return The observer.
+     */
+    template<typename O>
+    constexpr Observer<O> observer(O &&o)
+    { return Observer<O>{ detail::kept<O>(std::forward<O>(o)) }; }
+
+    /** @cond INTERNAL */
+    namespace detail {
+
+        /** @brief The iterative method m, observed by o: itself an iterative method with m's state. */
+        template<typename M, typename O>
+        constexpr Observed<M, O> observed(M const &m, Observer<O> &&o)
+        { return Observed<M, O>{ m, std::move(o.callable) }; }
+
+    } // namespace detail
+    /** @endcond */
+""")
+sub("""    { return nxx::quadrature::integrate(M{}, fn, a, b, criteria); }
+
+} // namespace nxx::quadrature
+""", """    { return nxx::quadrature::integrate(M{}, fn, a, b, criteria); }
+
+    /**
+     * @brief The iterative method M, named, observed: integrate<M>(observer(o), fn, a, b[, criteria]); GaussKronrod<15>
+     * by default. The same result as integrate<M>(fn, a, b[, criteria]); o(step) after the start and after each step.
+     */
+    template<typename M = GaussKronrod<15>, typename O, real T, typename F>
+    requires std::default_initializable<M> && nxx::detail::callable<F, T>
+             && iterative_method<M, T, std::remove_reference_t<F>>
+    [[nodiscard]] constexpr std::expected<Integral<T>, Failure<T>> integrate(Observer<O> o, F &&fn, T const &a,
+        T const &b, Criteria<std::type_identity_t<T>> const &criteria = {})
+    { return nxx::quadrature::integrate(detail::observed(M{}, std::move(o)), fn, a, b, criteria); }
+
+    /**
+     * @brief The iterative method m, given as a value, observed: integrate(m, observer(o), fn, a, b[, criteria]).
+     */
+    template<typename M, typename O, real T, typename F>
+    requires nxx::detail::callable<F, T> && iterative_method<M, T, std::remove_reference_t<F>>
+    [[nodiscard]] constexpr std::expected<Integral<T>, Failure<T>> integrate(M const &m, Observer<O> o, F &&fn,
+        T const &a, T const &b, Criteria<std::type_identity_t<T>> const &criteria = {})
+    { return nxx::quadrature::integrate(detail::observed(m, std::move(o)), fn, a, b, criteria); }
+
+} // namespace nxx::quadrature
+""")
 open(sys.argv[2], "w").write(src)

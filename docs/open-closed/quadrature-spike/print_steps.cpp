@@ -1,4 +1,4 @@
-// Spike (draft 4): print the Step of every iteration, the example in PHASE3A_API.md, "Example: printing each step".
+// Spike (draft 5): print the Step of every iteration, the example in PHASE3A_API.md, "Example: printing each step".
 #include <numerixx/quadrature.hpp>
 
 #include <cmath>
@@ -48,7 +48,7 @@ int main()
     };
     header("Romberg, e^x on [0, 1], rel_tol 1e-12");
     Printer romberg{ &evaluations };
-    footer(qd::integrate(qd::observed(qd::Romberg{}, romberg), e, 0.0, 1.0, { .rel_tol = 1e-12 }));
+    footer(qd::integrate<qd::Romberg>(qd::observer(romberg), e, 0.0, 1.0, { .rel_tol = 1e-12 }));
 
     // Gauss-Kronrod on a peak of width 1e-3 at 0.3 over [0, 1] at rel_tol 1e-10: the mesh, then one step per bisection.
     evaluations = 0;
@@ -59,5 +59,5 @@ int main()
     };
     header("GaussKronrod<15>, 1 / ((x - 0.3)^2 + 1e-6) on [0, 1], rel_tol 1e-10");
     Printer kronrod{ &evaluations };
-    footer(qd::integrate(qd::observed(qd::GaussKronrod<15>{}, kronrod), peak, 0.0, 1.0, { .rel_tol = 1e-10 }));
+    footer(qd::integrate<qd::GaussKronrod<15>>(qd::observer(kronrod), peak, 0.0, 1.0, { .rel_tol = 1e-10 }));
 }

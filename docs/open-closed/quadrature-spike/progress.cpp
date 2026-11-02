@@ -1,4 +1,4 @@
-// Spike (draft 4): the iterative protocol and observed(), against the header steps.py writes.
+// Spike (draft 5): the iterative protocol and observer(), against the header steps.py writes.
 #include <numerixx/quadrature.hpp>
 
 #include <array>
@@ -11,7 +11,7 @@ namespace qd = nxx::quadrature;
 namespace user {
 
     // A method of one's own, iterative: the trapezoidal rule, halving the step. It computes and reports; integrate()
-    // owns the loop and the test against the criteria; observed() reports its steps. Its own limits: ready from
+    // owns the loop and the test against the criteria; observer() reports its steps. Its own limits: ready from
     // level 3, exhausted at level 20, the attainable error a floor from its own sum of |terms| (Criteria's recipe).
     // fn only in [a, b] (a < b, from integrate()): the midpoint as a/2 + b/2, a width that overflows refused, a
     // point a + i h never past b (rounding is monotone and i h <= b - a).
@@ -118,16 +118,26 @@ constexpr auto quiet = [](auto const &) {};
 using Integral = qd::Integral<double>;
 using Step = qd::Step<double>;
 
-// The library's iterative methods, observed or not, give the same result, in constant expressions too.
+// The library's iterative methods, observed or not, give the same result, in constant expressions too: both observed
+// forms, the method named (Gauss-Kronrod by default) or given as a value, reversed ends included.
 static_assert(qd::iterative_method<qd::Romberg, double> && qd::iterative_method<qd::GaussKronrod<15>, double>);
-static_assert(qd::integrate(qd::observed(qd::GaussKronrod<15>{}, quiet), cubic, -1.0, 2.0)
-              == qd::integrate(cubic, -1.0, 2.0));
-static_assert(qd::integrate(qd::observed(qd::Romberg{}, quiet), cubic, 2.0, -1.0, { .rel_tol = 1e-10 })
+static_assert(qd::integrate(qd::observer(quiet), cubic, -1.0, 2.0) == qd::integrate(cubic, -1.0, 2.0));
+static_assert(qd::integrate<qd::Romberg>(qd::observer(quiet), cubic, 2.0, -1.0, { .rel_tol = 1e-10 })
               == qd::integrate<qd::Romberg>(cubic, 2.0, -1.0, { .rel_tol = 1e-10 }));
-// observed() on what does not step is rejected softly.
+static_assert(qd::integrate(qd::Romberg{}, qd::observer(quiet), cubic, 2.0, -1.0, { .rel_tol = 1e-10 })
+              == qd::integrate(qd::Romberg{}, cubic, 2.0, -1.0, { .rel_tol = 1e-10 }));
+static_assert(qd::integrate(user::Trapezoid{}, qd::observer(quiet), cubic, -1.0, 2.0, { .rel_tol = 1e-6 })
+              == qd::integrate<user::Trapezoid>(cubic, -1.0, 2.0, { .rel_tol = 1e-6 }));
+// An observer on what does not step is rejected softly, in both forms.
 template<typename M>
-concept observable = requires { qd::integrate(qd::observed(M{}, quiet), cubic, 0.0, 1.0); };
-static_assert(observable<qd::Romberg> && !observable<qd::GaussLegendre<7>>);
+concept observable = requires { qd::integrate<M>(qd::observer(quiet), cubic, 0.0, 1.0); }
+                     && requires { qd::integrate(M{}, qd::observer(quiet), cubic, 0.0, 1.0); };
+static_assert(observable<qd::Romberg> && observable<qd::GaussKronrod<15>> && !observable<qd::GaussLegendre<7>>);
+// The calls of today, with a generic lambda as fn, still resolve: no overload calls an argument on trial.
+constexpr auto generic_square = [](auto const &x) { return x * x; };
+static_assert(qd::integrate<qd::Romberg>(generic_square, 0.0, 1.0, { .rel_tol = 1e-12 }).has_value());
+static_assert(qd::integrate(qd::Romberg{}, generic_square, 0.0, 1.0, { .rel_tol = 1e-12 }).has_value());
+static_assert(qd::integrate(generic_square, 0.0, 1.0).has_value());
 
 // A user's iterative method against the closed form: the trapezoidal rule on x^3 - x over [-1, 2] errs by exactly
 // (h^2 / 12) (f'(2) - f'(-1)) = 3 h^2 / 4 (Euler-Maclaurin ends after one term: f''' is constant); its change between
@@ -187,8 +197,7 @@ int main()
     };
     std::vector<Row> rows;
     auto const record = [&](Step const &s) { rows.push_back(Row{ evaluations, s }); };
-    auto const observed =
-        qd::integrate(qd::observed(qd::GaussKronrod<15>{}, record), peak, 0.0, 1.0, { .rel_tol = 1e-10 });
+    auto const observed = qd::integrate<qd::GaussKronrod<15>>(qd::observer(record), peak, 0.0, 1.0, { .rel_tol = 1e-10 });
     std::size_t const observed_calls = evaluations;
     evaluations = 0;
     auto const plain = qd::integrate(peak, 0.0, 1.0, { .rel_tol = 1e-10 });
@@ -207,7 +216,7 @@ int main()
     // Romberg on e^x over [0, 1], every level: a mutable lambda counts its calls.
     auto const exp_fn = [](double x) { return std::exp(x); };
     std::printf("Romberg on e^x:\n");
-    auto const r = qd::integrate(qd::observed(qd::Romberg{}, [level = 0](Step const &s) mutable {
+    auto const r = qd::integrate<qd::Romberg>(qd::observer([level = 0](Step const &s) mutable {
         ++level;
         if (s.current)
             std::printf("  level %2d  evaluations %5d  value %.17g  abs_error %.3g  ready %d\n", level, (1 << level) + 1,
@@ -221,7 +230,7 @@ int main()
         std::vector<Step> steps;
         void operator()(Step const &s) { steps.push_back(s); }
     } recorder;
-    auto const t = qd::integrate(qd::observed(user::Trapezoid{}, recorder), exp_fn, 0.0, 1.0, { .rel_tol = 1e-10 });
+    auto const t = qd::integrate(user::Trapezoid{}, qd::observer(recorder), exp_fn, 0.0, 1.0, { .rel_tol = 1e-10 });
     std::printf("Trapezoid (a user's method) on e^x: %zu steps recorded; result %.17g +- %.3g\n",
         recorder.steps.size(), t->value, t->abs_error);
 }
