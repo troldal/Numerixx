@@ -1672,6 +1672,16 @@ namespace nxx::quadrature {
             std::reference_wrapper<std::remove_reference_t<O>>, std::remove_cvref_t<O>>;
 
         /**
+         * @brief What an iterative method's start returns: std::expected<S, Failure<T>> for its state S.
+         * @tparam M The method.
+         * @tparam T The real type.
+         * @tparam F fn's type as the method receives it.
+         */
+        template<typename M, typename T, typename F>
+        using start_result = decltype(std::declval<M const &>().start(
+            std::declval<F &>(), std::declval<T const &>(), std::declval<T const &>()));
+
+        /**
          * @brief fn's type as integrate() passes it to a method: a function as a pointer to it, any other callable as
          * itself (reference removed).
          * @tparam F fn's type as integrate() received it.
@@ -1755,8 +1765,7 @@ namespace nxx::quadrature {
      * @tparam F fn's type, reference removed; by default a plain function of T.
      */
     template<typename M, typename T, typename F = T(T const &)>
-    using state_t = typename decltype(std::declval<M const &>().start(
-        std::declval<F &>(), std::declval<T const &>(), std::declval<T const &>()))::value_type;
+    using state_t = typename detail::start_result<M, T, F>::value_type;
 
     /**
      * @brief An iterative method: it computes and reports, and integrate() decides when to stop. Romberg and
