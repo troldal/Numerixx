@@ -192,7 +192,9 @@ Kept in `docs/open-closed/quadrature-spike/`, beside the roots spike:
   `<20>` and `<64>`, `GaussKronrod<15>` at the default, 1e-12 and 0, and Romberg at the default, 1e-10 and an
   oversized tolerance, in float, double, long double, `cpp_bin_float_50` and `cpp_dec_float_50`. It also covers edges
   (the constants 1 and 1/4 on [-max, max], a == b, a NaN end, a negative tolerance) and three results computed in
-  constant expressions. Built once against today's header and once against the patched one: DUMP_RESULT.
+  constant expressions. Built once against today's header and once against the patched one: the 2,438 lines are
+  identical (`cmp`). They hold 919 successes, 553 failures with or without a best and 180 fixed-rule errors, the
+  rest fixed-rule values; hexadecimal for the built-in types, max_digits10 digits for the Boost types.
 - `user_methods.cpp`: methods outside `nxx`, on the public protocol alone. A fixed rule with a run-time parameter
   (`Midpoint{.panels}`) and a combinator over any estimating method (`SquareAtLowerEnd<Inner>`, x = a + (b - a) u^2),
   in constant expressions and at run time. Also the concepts' rejections (a wrong return type, a non-const member,
