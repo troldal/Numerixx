@@ -20,6 +20,9 @@ g++ -std=c++23 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -I$S/include docs/
 # Progress: observed(), the library's methods stepped, a user's iterative method.
 g++ -std=c++23 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -I$S/include docs/open-closed/quadrature-spike/progress.cpp
 
+# Printing each step: the example of PHASE3A_API.md, "Example: printing each step".
+g++ -std=c++23 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -I$S/include docs/open-closed/quadrature-spike/print_steps.cpp
+
 # Orientation: integrate(fn, b, a) against -integrate(fn, a, b), the whole result, with today's header.
 g++ -std=c++23 -O1 -Iinclude docs/open-closed/quadrature-spike/orient.cpp
 ```

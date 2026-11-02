@@ -294,6 +294,127 @@ Written once, in the concepts' Doxygen comments, as in draft 2.
 - **Not in the protocol:** the observer cannot stop the run (Q14), and method-specific numbers (Gauss-Kronrod's
   panels, Romberg's tableau) are not reported.
 
+### Example: printing each step
+
+The state at each iteration, as `observed` passes it: every field of the `Step`, with the step's number and the
+evaluations so far, both counted by the caller. The program is the spike's `print_steps.cpp`, built against the
+draft-4 header; the output below is its run (GCC 13.3, x86-64).
+
+```cpp
+#include <numerixx/quadrature.hpp>
+
+#include <cmath>
+#include <cstdio>
+
+namespace qd = nxx::quadrature;
+
+// Prints one Step: the iteration, the evaluations of fn so far, and every field of the step.
+struct Printer
+{
+    std::size_t const *evaluations; // counted by fn
+    int iteration = 0;
+
+    void operator()(qd::Step<double> const &s)
+    {
+        std::printf("%4d %6zu  ", iteration++, *evaluations);
+        if (s.current)
+            std::printf("%22.17f %10.3g", s.current->value, s.current->abs_error);
+        else
+            std::printf("%22s %10s", "-", "-");
+        std::printf(" %10.3g  %-5s %-9s %s\n", s.attainable, s.ready ? "yes" : "no", s.exhausted ? "yes" : "no",
+            s.trusted ? "yes" : "no");
+    }
+};
+
+void header(char const *title)
+{
+    std::printf("%s\n%4s %6s  %22s %10s %10s  %-5s %-9s %s\n", title, "step", "evals", "value", "abs_error",
+        "attainable", "ready", "exhausted", "trusted");
+}
+
+template<typename R>
+void footer(R const &r)
+{
+    if (r) std::printf("result: %.17f +- %.3g\n\n", r->value, r->abs_error);
+    else std::printf("no result: reason %d\n\n", static_cast<int>(r.error().reason));
+}
+
+int main()
+{
+    std::size_t evaluations = 0;
+
+    // Romberg on e^x over [0, 1] at rel_tol 1e-12: one step per level.
+    auto const e = [&evaluations](double x) {
+        ++evaluations;
+        return std::exp(x);
+    };
+    header("Romberg, e^x on [0, 1], rel_tol 1e-12");
+    Printer romberg{ &evaluations };
+    footer(qd::integrate(qd::observed(qd::Romberg{}, romberg), e, 0.0, 1.0, { .rel_tol = 1e-12 }));
+
+    // Gauss-Kronrod on a peak of width 1e-3 at 0.3 over [0, 1] at rel_tol 1e-10: the mesh, then one step per bisection.
+    evaluations = 0;
+    auto const peak = [&evaluations](double x) {
+        ++evaluations;
+        double const d = x - 0.3;
+        return 1.0 / (d * d + 1e-6);
+    };
+    header("GaussKronrod<15>, 1 / ((x - 0.3)^2 + 1e-6) on [0, 1], rel_tol 1e-10");
+    Printer kronrod{ &evaluations };
+    footer(qd::integrate(qd::observed(qd::GaussKronrod<15>{}, kronrod), peak, 0.0, 1.0, { .rel_tol = 1e-10 }));
+}
+```
+
+Output:
+
+```
+Romberg, e^x on [0, 1], rel_tol 1e-12
+step  evals                   value  abs_error attainable  ready exhausted trusted
+   0      3     1.71886115187659283       0.14   1.95e-14  no    no        yes
+   1      5     1.71828268792475725   0.000578   1.92e-14  no    no        yes
+   2      9     1.71828182879453029   8.59e-07   1.91e-14  no    no        yes
+   3     17     1.71828182845907840   3.35e-10   1.91e-14  yes   no        yes
+   4     33     1.71828182845904531   3.31e-14   1.91e-14  yes   no        yes
+result: 1.71828182845904531 +- 3.31e-14
+
+GaussKronrod<15>, 1 / ((x - 0.3)^2 + 1e-6) on [0, 1], rel_tol 1e-10
+step  evals                   value  abs_error attainable  ready exhausted trusted
+   0    150  3205.52671587585973612   1.22e+03   7.12e-11  yes   no        yes
+   1    180  3162.35187766923809249        679   7.02e-11  yes   no        yes
+   2    210  3119.17703946259962322        140   6.93e-11  yes   no        yes
+   3    240  3128.71314052564457597        140   6.95e-11  yes   no        yes
+   4    270  3127.97134058085566721       75.2   6.95e-11  yes   no        yes
+   5    300  3137.50744164390016522       75.5   6.97e-11  yes   no        yes
+   6    330  3136.76564169911125646       10.9   6.97e-11  yes   no        yes
+   7    360  3136.79841664353580200       6.37   6.97e-11  yes   no        yes
+   8    390  3136.83119158795989279        1.9   6.97e-11  yes   no        yes
+   9    420  3136.83097700711550715      0.969   6.97e-11  yes   no        yes
+  10    450  3136.83076242627112151     0.0421   6.97e-11  yes   no        yes
+  11    480  3136.83076228576510402     0.0211   6.97e-11  yes   no        yes
+  12    510  3136.83076214525908654   0.000117   6.97e-11  yes   no        yes
+  13    540  3136.83076214526909098   5.86e-05   6.97e-11  yes   no        yes
+  14    570  3136.83076214527955017   1.35e-07   6.97e-11  yes   no        yes
+result: 3136.83076214527955017 +- 1.35e-07
+```
+
+How to read it:
+- **Romberg** reports one step per level, starting at level 1 (3 evaluations); level k costs 2^k + 1. `ready` turns
+  on at level 4 (step 3), the minimum before any decision (C). Step 3 does not meet the request (3.35e-10 against
+  1e-12 times 1.72); step 4 does (3.31e-14), so the loop settles (nothing to do for Romberg) and returns it.
+  `attainable` is the floor F, about 1.9e-14, far below the request, so it plays no part here. The result,
+  1.71828182845904531, is 7.4e-17 from e - 1 = 1.71828182845904523536 (mpmath), well inside its estimate.
+- **Gauss-Kronrod** reports the initial mesh of 10 panels as step 0 (150 evaluations), then one bisection per step,
+  30 evaluations each. The estimate does not fall steadily: some bisections cut it by 23 to 430 times (steps 10,
+  12 and 14), others halve it or leave it almost unchanged (steps 3 and 5), depending on which panel holds the
+  largest estimate when it is split. `attainable` is twice the floor, about 7e-11. At step 14 the estimate,
+  1.35e-7, meets the request, 1e-10 times 3137 = 3.1e-7: the loop settles (the sums formed afresh, here the same,
+  as the result line shows) and returns it. The result, 3136.83076214527955, is 2.2e-11 from
+  1000 (atan 700 + atan 300) = 3136.83076214530129340 (mpmath), within its estimate, which overstates the error by a
+  factor of about 6,000, as Gauss-Kronrod's estimate usually does.
+- **`exhausted` and `trusted`** stay no and yes throughout: neither run reaches a cap or stagnates, and no descent
+  was undone. A run that runs out of steps (its cap, or stagnation) shows `exhausted` turning on in its last step.
+- **The values are for the ends in order.** For b < a, `integrate` negates the result, not the reports (E).
+
 ### F. The library's methods
 
 - **`GaussLegendre<N>::apply`:** unchanged from draft 2.
@@ -394,6 +515,7 @@ project's five toolchains are not available here; the phase itself builds and te
     - A reusable recorder passed as an lvalue: it keeps its 16 steps afterwards.
     - An observer returning `bool`: the `static_assert` message, "observer must return void (a result is reserved
       for stopping the run)".
+- **Printing each step** (`print_steps.cpp`): the example above, run as shown.
 - **Methods of one's own** (`user_methods.cpp`, unchanged from draft 2, passing against draft 4): the fixed rule
   `Midpoint`, the combinator `SquareAtLowerEnd<Inner>` over the iterative library methods, the spy, the checked
   results, and the concepts' rejections. On 1/sqrt x and cos x / sqrt x over [0, 1] at 1e-12, the substitution takes
