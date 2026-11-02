@@ -6,8 +6,8 @@ Working notes, 2026-11-02, so that the review round can continue in another sess
 Status of the round:
 - **Simplicity review:** done (below).
 - **Usage sketch:** done (below). Its finding 1 has been reproduced (below).
-- **Numerics review:** still running when these notes were written. Rerun it on draft 1 or on draft 2. The numerics
-  findings must also weigh simplicity findings 6 and 7.
+- **Numerics review:** done (below; the reviewer derived its findings by hand, without running scripts). Its
+  findings 1 and 4 cover simplicity findings 6 and 7. Rerun the numerics review on draft 2.
 
 ## Simplicity review
 
@@ -138,3 +138,87 @@ Its sketch programs were in a session scratchpad and are not kept.
 - level 0 is reported;
 - the tests;
 - D's two points.
+
+## Numerics review
+
+1. **The running sum and the slivers are not separated (C).** As written, the slivers are counted twice. If V_k
+   includes S_k = term(h_k W_k, y_e), then V_(k-1)/2 carries S_(k-1)/2, whose weights are all in W_k again.
+   - The error is d_k = (d_(k-1) + S_(k-1))/2, which tends to S.
+   - fn = 1 on [1, 1 + 1e-9], which `PHASE3_API.md` says is exact, would be off by about 2.2e-7 relative. The
+     result is covered by the floor, so it is not a false success, but the value is wrong.
+   - **Fix:** the state keeps the raw sum R_k = R_(k-1)/2 + the new terms. The reported value is V_k = R_k + the
+     slivers, and |V_k - V_(k-1)| uses the previous reported value. The prototype does the same. This matches
+     simplicity finding 6.
+2. **D1's evidence is wrong; its conclusion is right.**
+   - x^-0.99 in double overflows below max^(-1/0.99) ≈ 4.3e-312, which is subnormal. The mass below that point is
+     0.0770, which is `PHASE3_API.md` E's "0.077". So Phase 3's prototype table went into the subnormals (A records
+     5.5e-318), and the cut there was a tail cut.
+   - Moving the table's end to min made x^-0.99 a table-end case. D1 is what keeps B's "no change in any result"
+     true.
+   - **Soundness:** for x^-alpha the terms are log-concave on [t_e, ∞) wherever they decrease at t_e >= 0.88. So
+     h Te / (1 - r) bounds the mass beyond the table; where they do not decrease, the term is unbounded.
+   - **Correct:** fn is finite down to 4.3e-312, not "down to min". 100 min^0.01 = 0.0838.
+   - **Fix:** replace the evidence with this argument and these figures. Q5's prototype runs the table to min, and
+     also the old subnormal table, to show the case moved from a tail cut to a table-end cut. Q5 then becomes a
+     clarification (simplicity finding 2).
+3. **The changes of a side's cut omit the table-end kind, which can become a rounding cut.** The counterexample is
+   x^-0.99 on [0, 1e-40]: a table end at level 0 (t = 6), then rounding at level 1 (t = 6.5, since hw comp
+   underflows).
+   - The full set of changes:
+     - rounding to rounding, pruning or tail;
+     - pruning to tail, and tail to pruning;
+     - table end to table end, pruning, tail or rounding.
+   - "Cut at t_last + 2^-(k-1)" is false for a table end, but "at most one new node beyond" still holds.
+   - **Fix:** list the four kinds and their changes. W starts at 0 and is accumulated at every level whatever the
+     kind; it stays 0 for a table-end side. Keep the data on the last kept point and the nearest point at a
+     different position for every kind.
+4. **The pruning details are open, and one reading is unsound.** The exact counts depend on them.
+   - (a) Level 0 drops the run of outermost small terms, taken from the outside in. Cutting at the first small term
+     going outward is a false success. Counterexample: (x - x2)/sqrt(x) on [0, 1] with x2 = 7.065e-4, the point at
+     t = 2. The term there is exactly 0, the terms beyond are not small, and 2.5e-5 is missed.
+   - (b) Level 0's threshold uses the L1 of the whole sweep; L1_0 is then formed from the kept terms.
+   - (c) The test at level k needs a stated L1: L1_(k-1), recommended by the simplicity review; the running sum; or
+     L1_k.
+   - (d) The order of summation: the sides, and the inner nodes before or after the node beyond.
+   - **Fix:** pin all four in D2.
+5. **The constant-evaluation cost is understated.**
+   - Nodes per level: 7, 7, 13, 26, 53, 105, 210, 420, 840, 1680.
+   - Totals at 275 steps a node:
+
+     | levels | nodes | steps |
+     |---|---|---|
+     | to 4 | 106 | 29k |
+     | to 5 | 211 | 58k |
+     | to 7 | 841 | 231k |
+     | to 9 | 3,361 | 924k |
+
+   - Clang's budget is per top-level evaluation, so the table's generation shares it with the run. A user's literal
+     class type costs several times 275 steps a node. A run past level 7 likely exceeds the default.
+   - The test "1/x in double in constant evaluation" runs 5,164 evaluations in one evaluation: about 203 steps each
+     under Clang's default.
+   - **To measure:** a constexpr wrapper of double, at level 4 and to the cap; the 1/x test on Clang, clang-cl,
+     Emscripten and cl.
+6. **A: "replaces A's first bullet" drops too much.** Keep Phase 1's `Interval` with its scale order, and the
+   constant-evaluation refusals (`checked_term`, `fits`, `compensated`) that give `non_finite`. Add them to the
+   failures list. Replace only the validation and the orientation.
+7. **The state must hold the centre's term.** It counts as each side's innermost kept node: for "a side with no
+   kept node: h |w(0) y(0)|", and for Tp when the outermost kept node is t = h_k.
+8. **The tests:**
+   - "Evaluations per level match B" needs the rule:
+     - level 0: 1, plus per side each integer t up to and including an evaluated cut node;
+     - level k: per side the odd multiples of 2^-k up to t_last, plus 1 if the node beyond is in the table and
+       strictly inside.
+   - "The last report equals the result" holds only for a < b.
+
+**Noted, not raised against 3b:** a single node with fn exactly 0 can turn a tail, table-end or rounding side into
+a pruning cut, and so drop its end term. This is `PHASE3_API.md` C's approved rule.
+
+**Checked and correct:**
+- B's fields, and that the loop reproduces E bit for bit; the edge cases;
+- level 0's 13 evaluations at most;
+- 3,361 nodes;
+- at most one new node beyond, by induction;
+- the incremental W equals the suffix sum up to rounding;
+- the end terms need only their own level;
+- D2's halving;
+- the cost arithmetic.
