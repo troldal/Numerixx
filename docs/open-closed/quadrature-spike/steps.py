@@ -677,4 +677,196 @@ sub("""    template<typename M = GaussKronrod<15>, real T, typename F>
     requires std::default_initializable<M> && nxx::detail::callable<F, T>
              && (iterative_method<M, T, std::remove_reference_t<F>> || estimating_method<M, T, std::remove_reference_t<F>>)""")
 sub("#include <type_traits>\n", "#include <type_traits>\n#include <utility>\n") if src.count("#include <utility>\n") == 0 else None
+
+# 7. Draft 4, after draft 3's review round: Step's defaults; settle required; state_t public; the observer receives the
+#    Step, without counting; per-step checks in the loop; Gauss-Kronrod's dead orientation code removed.
+sub("""    template<real T>
+    struct Step
+    {
+        /** @brief The value and its estimate now, as integrate() would return them; empty where the method has no
+         * usable estimate (TanhSinh: an unbounded end term, or no point strictly inside). */
+        std::optional<Integral<T>> current;
+
+        /** @brief The least error the method can certify: Romberg its rounding floor F, Gauss-Kronrod 2 F. */
+        T attainable;
+
+        /** @brief Whether the method has done the minimum work to stop (Romberg: level 4). */
+        bool ready;
+
+        /** @brief Whether the method cannot go on: its cap, stagnation, or every panel final. */
+        bool exhausted;
+
+        /** @brief Whether a result that meets the request may be returned as a success. */
+        bool trusted;
+    };""", """    template<real T>
+    struct Step
+    {
+        /** @brief The value and its estimate now, as integrate() would return them; empty where the method has no
+         * usable estimate (TanhSinh: an unbounded end term, or no point strictly inside). */
+        std::optional<Integral<T>> current{};
+
+        /** @brief The least error the method can certify (Romberg its rounding floor F, Gauss-Kronrod 2 F); 0, the
+         * default, certifies nothing beyond the request. Finite and not negative. */
+        T attainable = T(0);
+
+        /** @brief Whether the method has done the minimum work to stop (Romberg: level 4); true by default. */
+        bool ready = true;
+
+        /** @brief Whether the method cannot go on: its cap, stagnation, or every panel final; false by default. */
+        bool exhausted = false;
+
+        /** @brief Whether a result that meets the request may be returned as a success; true by default. */
+        bool trusted = true;
+    };""")
+sub("""                Step<T>{ std::nullopt, T(0), false, false, true } };""", """                Step<T>{} };""")
+sub("""                  step{ std::nullopt, T(0), false, false, true }""", """                  step{}""")
+# Gauss-Kronrod: integrate() passes a < b, so its orientation code is dead.
+sub("""            int cap;
+            bool reversed; // integrated over [min, max] and negated, so that the panels' ends are in order
+""", """            int cap;
+""")
+sub("""            constexpr KronrodState(Kronrod<T> const &r, bool rev)
+                : rule(r), cap(64 * detail::significand_bits<T>()), reversed(rev), panels(), removed(), running(),""",
+"""            constexpr explicit KronrodState(Kronrod<T> const &r)
+                : rule(r), cap(64 * detail::significand_bits<T>()), panels(), removed(), running(),""")
+sub("""                step = Step<T>{ Integral<T>{ reversed ? T(-v.value) : v.value, detail::larger(v.estimate, v.floor) },""",
+"""                step = Step<T>{ Integral<T>{ v.value, detail::larger(v.estimate, v.floor) },""")
+sub("""            Failure<T> const invalid{ error::non_finite, std::nullopt };
+            bool const reversed = b < a;
+            T const lower = reversed ? b : a;
+            T const upper = reversed ? a : b;
+            KronrodState<T> s(rule, reversed);""", """            Failure<T> const invalid{ error::non_finite, std::nullopt };
+            T const lower = a; // a < b: integrate() orders the ends
+            T const upper = b;
+            KronrodState<T> s(rule);""")
+# Romberg: settle, which does nothing.
+sub("""        template<real T, typename F>
+        constexpr std::expected<void, Failure<T>> advance(F &fn, detail::RombergState<T> &s) const
+        { return detail::romberg_advance(fn, s); }""", """        template<real T, typename F>
+        constexpr std::expected<void, Failure<T>> advance(F &fn, detail::RombergState<T> &s) const
+        { return detail::romberg_advance(fn, s); }
+
+        /** @brief Nothing to refine (iterative_method). */
+        template<real T>
+        constexpr std::expected<void, Failure<T>> settle(detail::RombergState<T> &) const
+        { return {}; }""")
+# state_t public, settle required.
+sub("""        /** @brief The state type of an iterative method. */
+        template<typename M, typename T, typename F>
+        using state_of = typename decltype(std::declval<M const &>().start(
+            std::declval<F &>(), std::declval<T const &>(), std::declval<T const &>()))::value_type;
+
+    } // namespace detail
+    /** @endcond */
+""", """    } // namespace detail
+    /** @endcond */
+
+    /** @brief The state type of an iterative method M: what start(fn, a, b) returns, inside its std::expected. */
+    template<typename M, typename T, typename F = T(T const &)>
+    using state_t = typename decltype(std::declval<M const &>().start(
+        std::declval<F &>(), std::declval<T const &>(), std::declval<T const &>()))::value_type;
+""")
+sub("""    } && requires(M const &m, F &fn, detail::state_of<M, T, F> &s) {
+        { m.advance(fn, s) } -> std::same_as<std::expected<void, Failure<T>>>;
+        { std::as_const(s).step } -> std::same_as<Step<T> const &>;
+    };""", """    } && requires(M const &m, F &fn, state_t<M, T, F> &s) {
+        { m.advance(fn, s) } -> std::same_as<std::expected<void, Failure<T>>>;
+        { m.settle(s) } -> std::same_as<std::expected<void, Failure<T>>>;
+        { std::as_const(s).step } -> std::same_as<Step<T> const &>;
+    };""")
+# The observer receives the Step: no Progress, no counting; Observed in detail, sharing its method's state.
+i = src.index("    /**\n     * @brief What an observer of an iterative method sees")
+j = src.index("    /** @cond INTERNAL */\n    namespace detail {\n\n        /**\n         * @brief The loop of an iterative method")
+src = src[:i] + """    /** @cond INTERNAL */
+    namespace detail {
+
+        /** @brief An observer as observed() keeps it: an lvalue by reference, an rvalue by value. */
+        template<typename O>
+        using kept = std::conditional_t<std::is_lvalue_reference_v<O>,
+            std::reference_wrapper<std::remove_reference_t<O>>, std::remove_cvref_t<O>>;
+
+        /**
+         * @brief An iterative method M whose steps are reported: observer(step) after the start and after each
+         * advance; M's state, untouched. Made by observed().
+         */
+        template<typename M, typename O>
+        struct Observed
+        {
+            M method;
+            mutable kept<O> observer; // called as a non-const callable: a mutable lambda counts its calls
+
+            // Self = M makes each declaration dependent, so that observed() on a method without these members is a
+            // soft failure of the concept rather than an error where the class is instantiated.
+            template<real T, typename F, typename Self = M>
+            requires iterative_method<Self, T, F>
+            constexpr std::expected<state_t<Self, T, F>, Failure<T>> start(F &fn, T const &a, T const &b) const
+            {
+                auto started = method.start(fn, a, b);
+                if (started) report(started->step);
+                return started;
+            }
+
+            template<typename F, typename S, typename Self = M>
+            constexpr auto advance(F &fn, S &s) const -> decltype(std::declval<Self const &>().advance(fn, s))
+            {
+                auto const r = method.advance(fn, s);
+                if (r) report(s.step);
+                return r;
+            }
+
+            template<typename S, typename Self = M>
+            constexpr auto settle(S &s) const -> decltype(std::declval<Self const &>().settle(s))
+            { return method.settle(s); }
+
+            template<real T>
+            constexpr void report(Step<T> const &step) const
+            {
+                static_assert(std::invocable<kept<O> &, Step<T> const &>,
+                    "observed(m, observer): observer must be callable as observer(Step<T> const &)");
+                static_assert(std::is_void_v<std::invoke_result_t<kept<O> &, Step<T> const &>>,
+                    "observed(m, observer): observer must return void (a result is reserved for stopping the run)");
+                std::invoke(observer, step);
+            }
+        };
+
+    } // namespace detail
+    /** @endcond */
+
+    /**
+     * @brief An iterative method m whose steps are reported to observer, called with the Step<T> after the start and
+     * after each step, for the ends in order (a < b). An lvalue observer is kept by reference, an rvalue by value.
+     * @param m The iterative method.
+     * @param observer A callable taking Step<T> const &, returning void.
+     * @return The observed method, itself an iterative method with m's state.
+     */
+    template<typename M, typename O>
+    constexpr detail::Observed<M, O> observed(M const &m, O &&observer)
+    { return detail::Observed<M, O>{ m, detail::kept<O>(std::forward<O>(observer)) }; }
+
+""" + src[j:]
+# The loop: each step checked; settle always.
+sub("""            while (true) {
+                bool const passed = met(s.step);
+                if (passed || s.step.exhausted) {
+                    if constexpr (requires { m.settle(s); }) {
+                        std::expected<void, Failure<T>> const r = m.settle(s);
+                        if (!r) return std::unexpected(r.error());
+                    }
+                    if (met(s.step)) {""", """            // Each step checked before it is tested: a current that is not finite, or an attainable error that is
+            // not finite or negative, is non_finite (in constant evaluation, before any arithmetic on it).
+            auto const checked = [](Step<T> const &p) {
+                bool const sound = !p.current
+                                   || (nxx::math::isfinite(p.current->value) && nxx::math::isfinite(p.current->abs_error)
+                                       && !(p.current->abs_error < T(0)));
+                return sound && nxx::math::isfinite(p.attainable) && !(p.attainable < T(0));
+            };
+            Failure<T> const invalid{ error::non_finite, std::nullopt };
+            while (true) {
+                if (!checked(s.step)) return std::unexpected(invalid);
+                bool const passed = met(s.step);
+                if (passed || s.step.exhausted) {
+                    std::expected<void, Failure<T>> const settled = m.settle(s);
+                    if (!settled) return std::unexpected(settled.error());
+                    if (!checked(s.step)) return std::unexpected(invalid);
+                    if (met(s.step)) {""")
 open(sys.argv[2], "w").write(src)

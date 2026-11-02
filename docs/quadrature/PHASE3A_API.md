@@ -1,18 +1,20 @@
 # Phase 3a API proposal: the method protocol
 
-Status: draft 3, for review (numerics-reviewer, simplicity-critic, usage-sketcher), then the user. History:
+Status: draft 4, for the user. History:
 - **Draft 1:** one member per method.
-- **Draft 2:** after the first review round ("Decisions from the reviews", below).
-- **Draft 3:** the user's request (2026-11-02) that the methods only compute while `integrate` decides when to
-  stop (single responsibility), and that the numbers of each iteration can be reported (debugging).
+- **Draft 2:** after the first review round.
+- **Draft 3:** at the user's request (2026-11-02), methods only compute, `integrate` decides when to stop (single
+  responsibility), and each iteration's numbers can be reported (debugging).
+- **Draft 4:** after draft 3's review round (numerics-reviewer, simplicity-critic, usage-sketcher; "Decisions from
+  the reviews", below). The observer receives the `Step` itself; `settle` is required; the loop checks every step;
+  `Step` has defaults.
 
-Draft 3 adds the iterative protocol, `Step`, `Progress` and `observed()` (sections B, C and E, and Q11 to Q14), and
-keeps every decision of draft 2. The earlier decisions it builds on:
+The decisions it builds on:
 - `docs/open-closed/ANALYSIS.md` (2026-11-02): the methods open to users (D1), quadrature first (D4).
 - `docs/quadrature/BRIEF.md` (approved 2026-10-30), amended in two places: D1 ("methods as a closed set of empty
   tags") and 3.9 ("No step interface").
-- Phase 3 (`PHASE3_API.md`, TanhSinh, approved 2026-11-01, not yet implemented) becomes Phase 3b. It adds `TanhSinh`
-  through this protocol (G).
+- Phase 3 (`PHASE3_API.md`, TanhSinh, approved 2026-11-01, not yet implemented) becomes Phase 3b and adds
+  `TanhSinh` through this protocol (G).
 
 The evidence is a spike on a patched copy of `quadrature.hpp` (Spike, below).
 
@@ -27,10 +29,9 @@ auto const r = qd::integrate(fn, 0.0, 1.0);
 auto const s = qd::integrate<qd::Romberg>(fn, 0.0, 1.0, {.rel_tol = 1e-12});
 auto const g = qd::integrate<qd::GaussLegendre<20>>(fn, 0.0, 1.0);
 
-// New: each iteration reported, for any iterative method, the library's or a user's.
-auto const p = qd::integrate(qd::observed(qd::GaussKronrod<15>{}, [](qd::Progress<double> const &p) {
-                                 std::println("{:3} {:5} {:.15f} ± {:.3g}", p.iteration, p.evaluations,
-                                              p.step.current->value, p.step.current->abs_error);
+// New: each step reported, for any iterative method, the library's or a user's.
+auto const p = qd::integrate(qd::observed(qd::GaussKronrod<15>{}, [](qd::Step<double> const &s) {
+                                 if (s.current) std::println("{:.15f} ± {:.3g}", s.current->value, s.current->abs_error);
                              }),
                              fn, 0.0, 1.0, {.rel_tol = 1e-10});
 
@@ -42,6 +43,8 @@ struct Trapezoid
     constexpr std::expected<State<T>, qd::Failure<T>> start(F &fn, T const &a, T const &b) const;  // a < b
     template<nxx::real T, typename F>
     constexpr std::expected<void, qd::Failure<T>> advance(F &fn, State<T> &s) const;           // one more level
+    template<nxx::real T>
+    constexpr std::expected<void, qd::Failure<T>> settle(State<T> &) const { return {}; }      // nothing to refine
 };
 auto const t = qd::integrate<Trapezoid>(fn, 0.0, 1.0, {.rel_tol = 1e-10});
 
@@ -52,15 +55,16 @@ auto const u = qd::integrate(SquareAtLowerEnd<qd::GaussKronrod<15>>{}, fn, 0.0, 
 
 - **Three public concepts:**
   - `fixed_rule`: `apply(fn, a, b)`.
-  - `iterative_method`: `start(fn, a, b)` and `advance(fn, state)`, optionally `settle(state)`.
+  - `iterative_method`: `start(fn, a, b)`, `advance(fn, state)` and `settle(state)`.
   - `estimating_method`: `estimate(fn, a, b, criteria)`, the whole computation in one member.
 - **An iterative method computes; `integrate` decides.** The method reports a `Step` after its start and after each
   step: its current result, the least error it can certify, and whether it is ready, exhausted and trusted.
   `integrate` owns the loop and the test against the criteria. The method never sees the criteria.
 - **`Romberg`** steps by level and **`GaussKronrod<15>`** by bisection. Their arithmetic is unchanged, and so are
   their results: the battery's 2,438 results are identical to draft 2's.
-- **`observed(m, observer)`** reports each iteration, `Progress{iteration, evaluations, step}`, of any iterative
-  method. It is an adaptor, not a parameter of `integrate`, and without it nothing is counted or called.
+- **`observed(m, observer)`** calls `observer(step)` after the start and after each step of any iterative method. It
+  is an adaptor, not a parameter of `integrate`, and it shares the method's state, so an observed run computes
+  exactly what an unobserved one does.
 - **From draft 2, unchanged:**
   - `integrate` validates, puts the ends in order (b < a negates), and checks the result's finiteness.
   - It takes a method named, `integrate<M>(fn, ...)` as today, or as a value, first: `integrate(m, fn, ...)`.
@@ -74,15 +78,15 @@ namespace nxx::quadrature {
 
     // ... error, Integral, Failure, Criteria as today; then:
 
-    /// Where an iterative method stands after its start or a step.
+    /// Where an iterative method stands after its start or a step; the defaults are the neutral values.
     template<real T>
     struct Step
     {
-        std::optional<Integral<T>> current; ///< the value and estimate now; empty where it has no usable estimate
-        T attainable;                       ///< the least error it can certify: Romberg F, Gauss-Kronrod 2F
-        bool ready;                         ///< it has done its minimum work (Romberg: level 4)
-        bool exhausted;                     ///< it cannot go on: its cap, stagnation, every panel final
-        bool trusted;                       ///< a result that meets the request may be returned as a success
+        std::optional<Integral<T>> current{}; ///< the value and estimate now; empty where it has no usable estimate
+        T attainable = T(0);   ///< the least error it can certify (Romberg F, Gauss-Kronrod 2F); finite, not negative
+        bool ready = true;     ///< it has done its minimum work (Romberg: level 4)
+        bool exhausted = false; ///< it cannot go on: its cap, stagnation, every panel final
+        bool trusted = true;   ///< a result that meets the request may be returned as a success
     };
 
     // ... detail; then the concepts:
@@ -97,33 +101,26 @@ namespace nxx::quadrature {
         { m.estimate(fn, a, b, criteria) } -> std::same_as<std::expected<Integral<T>, Failure<T>>>;
     };
 
-    /// start returns std::expected<S, Failure<T>> for a state S of the method's own, whose member step is current.
+    /// The state of an iterative method: what start returns, inside its std::expected.
+    template<typename M, typename T, typename F = T(T const &)>
+    using state_t = typename decltype(std::declval<M const &>().start(
+        std::declval<F &>(), std::declval<T const &>(), std::declval<T const &>()))::value_type;
+
     template<typename M, typename T, typename F = T(T const &)>
     concept iterative_method = requires(M const &m, F &fn, T const &a, T const &b) {
         { m.start(fn, a, b) } -> /* std::expected<S, Failure<T>> */;
-    } && requires(M const &m, F &fn, /* S */ &s) {
+    } && requires(M const &m, F &fn, state_t<M, T, F> &s) {
         { m.advance(fn, s) } -> std::same_as<std::expected<void, Failure<T>>>;
+        { m.settle(s) } -> std::same_as<std::expected<void, Failure<T>>>;
         { std::as_const(s).step } -> std::same_as<Step<T> const &>;
     };
 
-    /// What an observer sees after the start (iteration 0) and after each step.
-    template<real T>
-    struct Progress
-    {
-        int iteration;
-        std::size_t evaluations; ///< of fn, so far
-        Step<T> step;
-    };
-
-    /// An iterative method whose progress is reported; itself an iterative method.
+    /// An iterative method whose steps are reported to observer(Step<T> const &), which returns void.
     template<typename M, typename Observer>
-    struct Observed { M method; Observer observer; /* start, advance, settle: M's, counted and reported */ };
-
-    template<typename M, typename Observer>
-    constexpr Observed<M, std::decay_t<Observer>> observed(M const &m, Observer &&observer);
+    constexpr /* an iterative method */ auto observed(M const &m, Observer &&observer);
 
     template<int N> struct GaussLegendre { /* apply, as in draft 2 */ };
-    struct Romberg { /* start: T_0 and level 1; advance: the next level */ };
+    struct Romberg { /* start: T_0 and level 1; advance: the next level; settle: nothing */ };
     template<int N> requires(N == 15) struct GaussKronrod { /* start: the mesh; advance: a bisection; settle */ };
 
     // The four forms of integrate, as in draft 2; the estimating two take an iterative or an estimating method.
@@ -147,14 +144,19 @@ namespace nxx::quadrature {
 ```
 
 - **The state is the method's own type,** opaque to `integrate` except for its member `step`. It is returned by value
-  from `start`, so it is movable, and it lives for one call of `integrate`. The library's states are in `detail`
-  (`RombergState<T>`, `KronrodState<T>`).
+  from `start`, so it is movable, and it lives for one call of `integrate`. `state_t` names it for a combinator
+  that keeps an inner method's state. The library's states are in `detail` (`RombergState<T>`, `KronrodState<T>`).
+- **`Step`'s defaults are the neutral values:** a method sets only the limits it has, with designated initialisers,
+  `Step<T>{.current = ..., .attainable = F, .ready = k >= 4}`.
+- **`observed`'s type is in `detail`;** users name only `observed()`. It is itself an iterative method, so it is
+  passed by value to `integrate`.
 - **The methods** move after `detail` and define their members inline, as in draft 2. Gauss-Kronrod's state copies
   its rule (24 values of T), because for a type without a table, in constant evaluation, the rule is a temporary.
-- **A type with both an iterative and an estimating form** is driven: the iterative form wins, with no ambiguity. A
-  type that is both a fixed rule and an estimating method is ambiguous when named, as in draft 2.
-- **The concepts** take `<M, T, F>`, F defaulted, as in draft 2, so that `static_assert(qd::iterative_method<MyMethod,
-  double>)` beside a method is the usual check.
+- **A type of two kinds** is outside the contract: `integrate` promises nothing about which form it uses.
+- **Calling a method's members directly** (`Romberg{}.start(fn, a, b)`, then `advance`) compiles: they are public,
+  because `integrate` calls them. It is outside the contract, though, which assumes `integrate`'s validation and
+  ordering of the ends and its use of `settle` before any decision. A public stop test for one's own loop is
+  deferred.
 
 ## Behaviour
 
@@ -178,9 +180,10 @@ In order, as in draft 2:
 ```
 s = start(fn, a, b)                                   (a Failure ends the run)
 loop:
+    check s.step: current, where present, as A.5; attainable finite and not negative; else non_finite, no best
     passed = s.step.ready and s.step.current and abs_error <= max(abs_tol, rel_tol |value|, s.step.attainable)
     if passed or s.step.exhausted:
-        settle(s), if the method has it              (a Failure ends the run)
+        settle(s), then check s.step again          (a Failure ends the run)
         if the settled step passes: success if trusted, else not_converged with it as the best
         if it did not pass before settling: not_converged, with s.step.current as the best (or none)
         otherwise go on from the settled step        (the running sums had drifted: Gauss-Kronrod)
@@ -189,29 +192,39 @@ loop:
 ```
 
 - **The test against the request** is `BRIEF.md` D5's, the same for every method: `abs_error <= max(abs_tol,
-  rel_tol |value|, attainable)`. It is equivalent to each method's test today. Romberg tests its estimate E against
-  `max(abs_tol, rel_tol |value|, F)`, and Gauss-Kronrod against `max(..., 2F)`. The step's `abs_error` is max(E, F),
-  and F <= attainable <= the right-hand side, so `max(E, F) <= W` exactly when `E <= W`. The comparisons are exact,
-  so the decisions are the same bit for bit.
-- **Termination is the method's:** the loop advances only while the step is not exhausted. So the contract (D)
-  requires every iterative method to report `exhausted` within finitely many steps. The library's do: a cap, plus
-  for Gauss-Kronrod stagnation and an empty heap.
+  rel_tol |value|, attainable)`. It is equivalent to each method's test today:
+  - Romberg tests its estimate E against `max(abs_tol, rel_tol |value|, F)`, and Gauss-Kronrod against
+    `max(..., 2F)`. The step's `abs_error` is max(E, F), and W, the right-hand side, is formed by `larger`, which
+    returns one of its arguments without rounding, so F <= attainable <= W exactly and `max(E, F) <= W` exactly when
+    `E <= W`.
+  - 2F is the same expression in both versions; round(2F) >= F in any radix. So the decisions are the same bit for
+    bit (numerics review: no path differs).
+- **Each step is checked before it is tested.** The check is A.5's, applied to `current`, plus `attainable` finite
+  and not negative. A method's broken step is thus `non_finite` before any arithmetic on it: in constant evaluation a
+  NaN in `rel_tol |value|` would otherwise be a compile error, and an infinite `attainable` would accept anything.
+  The library's steps always pass the check, so no result changes.
+- **Termination is the method's:** the loop advances only while the step is not exhausted, and settles at most twice
+  per advance. So it ends exactly when the method reports `exhausted` (D).
 - **`settle`** is Gauss-Kronrod's check against sums formed afresh, which Phase 2 makes before every decision to stop
-  (independent review, 2098416). A method without it is decided on its step as it stands.
+  (independent review, 2098416). The other methods' `settle` does nothing. It is required, not detected (Q15): a
+  `settle` with a near-miss signature, or a combinator that forgets to forward it, would otherwise be skipped
+  silently. Without it, 22 of the battery's 2,438 results change (simplicity review).
 
 ### C. What stays in the method, and why
 
 The loop owns the user's request; the method owns its own limits, which no driver can know:
 - **`ready`, the minimum work:** Romberg's level 4 (fewer samples of sin^2 on [0, 2 pi] all vanish); TanhSinh's
-  level 4.
+  level 4. Kept as a field, not folded into `start`, so that the steps before it are reported: the first levels are
+  what a user debugging Romberg wants to see.
 - **`attainable`, the least error it can certify:** Romberg's floor F; Gauss-Kronrod's and TanhSinh's 2F (a kink or
   a jump never brings every panel to its floor).
 - **`exhausted`:** the caps (Romberg 16 levels; Gauss-Kronrod 64 bisections per bit of T; TanhSinh 10 levels),
   Gauss-Kronrod's stagnation (32 bisections without a new minimum of its excess), and its empty heap.
 - **`trusted`:** Gauss-Kronrod's undone descent, a piece where fn is not finite that no short bisection avoided. Such
-  a run cannot end as a success.
-- **`current` empty:** TanhSinh's unbounded end term, or an interval with no point strictly inside. The run then
-  ends `not_converged` without a best, as `PHASE3_API.md` Q7 decided.
+  a run cannot end as a success. It keeps Phase 2's behaviour of bisecting on to a better best before failing;
+  exhausting at once would change those runs' best and their evaluation count.
+- **`current` empty:** TanhSinh's level 0, which has no estimate yet, and its unbounded end term or an interval
+  with no point strictly inside. The run then ends `not_converged` without a best, as `PHASE3_API.md` Q7 decided.
 
 One common rule for these would change when the methods stop. A common minimum or floor, for example, would move
 Romberg's or Gauss-Kronrod's results.
@@ -223,54 +236,69 @@ Written once, in the concepts' Doxygen comments, as in draft 2.
 - **Given to every method:**
   - a < b, both finite, possibly extreme: b - a may overflow, the ends may be subnormal or adjacent, or of opposite
     signs so that b - a rounds.
-  - fn as an lvalue: call it with `std::invoke` and a T, and convert the result with `T(...)`.
+  - fn as an lvalue, valid for the call only: call it with `std::invoke` and a T, and convert the result with
+    `T(...)`.
   - An estimating method also gets the criteria: finite, non-negative, `rel_tol <= 1`, `abs_tol` unclamped, possibly
     both 0. An iterative method never sees them.
+- **Given to an iterative method:**
+  - `advance` is never called on an exhausted step.
+  - Nothing is called after a Failure.
+  - `settle` may be called twice between steps.
 - **Required of every method:**
-  - fn is evaluated only at points of [a, b]; clamp a point formed as a + h t.
+  - fn is evaluated only at points of [a, b]; clamp a point formed as a + h t, and form a midpoint as a/2 + b/2.
   - A finite result (checked, A.5), or an error: `non_finite` without a best, or `not_converged` with or without one.
   - Its parameters are its own preconditions (Q9).
   - fn's exceptions, and the method's own, pass through.
 - **Required of an iterative method:**
-  - `start` and every `advance` leave `step` describing the state.
-  - It reports `exhausted` within finitely many steps.
-  - `advance` is never called on an exhausted state, and nothing is called after a Failure.
-  - `current`, where present, satisfies A.5.
-  - `settle` may only make `step` more exact; it must not take a step.
+  - Its state keeps no reference, pointer or copy of fn: fn is passed to every call, and need not be the same object
+    each time.
+  - `start` and every `advance` leave `step` describing the state; the step passes the check of B.
+  - It reports `exhausted` within finitely many steps. A method that never does loops forever at run time, and hits
+    the compiler's limit in constant evaluation, as an estimating method that never returns would.
+  - `settle` refines `step` without taking a step. It leaves `ready` and `exhausted` as they are, and calling it twice
+    gives the same step as calling it once.
 - **Required of an estimating method:** it terminates for every criteria it can be given, both tolerances 0
   included.
 - **Required in meaning, not checkable:**
   - `abs_error` estimates |value - exact| and covers the rounding of the method's own sum.
-  - `attainable` is an error the method can actually certify.
-  - For an estimating method, success means its own stop test was met.
+  - `attainable` is an error the method can actually certify. A huge one would let it stop anywhere, as an estimating
+    method may declare success at any `abs_error`.
+  - For an estimating method, success means its own stop test was met. That is the one exception to "methods
+    compute, integrate decides".
 - **The library's methods only** (Q8): the rounding floor (for a != b), `abs_tol = 0` working, a best with every
   `not_converged` of Romberg and Gauss-Kronrod, fn never evaluated at an end (GaussLegendre, TanhSinh), and
   `non_finite` in constant evaluation where an overflow or a NaN would otherwise be a compile error.
 - **Infinite ends** stay outside this contract (Q10); Phase 4 makes them opt-in per method.
 
-### E. Progress (`observed`)
+### E. Observing (`observed`)
 
-- `observed(m, observer)` wraps an iterative method. Its `start` and `advance` call m's with fn wrapped in a counter,
-  then call `observer(Progress<T>{iteration, evaluations, step})`: iteration 0 after the start, then one per step.
-  Its `settle` forwards to m's and reports nothing; the result `integrate` returns shows the settled values.
-- It is itself an iterative method, so it works with every form of `integrate`, and an observed user method needs
-  nothing more from its author.
-- **Cost:** without `observed`, nothing is counted or called. With it, a counter per evaluation and one call per
-  step. In constant evaluation it works with an observer that is itself constexpr (a lambda that records nothing, or
-  one that writes to a constexpr-usable container).
-- **The evaluations** come from the counter, not from the method, so every method's count is right without its
-  author's help. This also covers `BRIEF.md` D12's deferred "evaluations" for those who want them, without a new
-  member of `Integral`.
-- **Not in the protocol:** the observer cannot stop the run (Q14), and method-specific numbers (Gauss-Kronrod's panel
-  count, Romberg's tableau) are not reported; `Step` holds what every iterative method has.
-- An estimating method (one member) and a fixed rule have no steps to report. `observed` requires an iterative
-  method.
+- **What it calls:** `observed(m, observer)` wraps an iterative method. After m's `start` and after each `advance`
+  it calls `observer(step)` with the method's `Step<T>`, for the ends in order (a < b), so a reversed integral
+  reports values of the opposite sign to the result. It reports nothing after `settle`; the result `integrate`
+  returns shows the settled values.
+- **It shares m's state** and passes fn on unchanged. An observed run is therefore the same instantiation of the
+  method and computes exactly what an unobserved one does.
+- **The observer:**
+  - It must be callable as `observer(Step<T> const &)` and return `void`. A `static_assert` names both requirements;
+    a result is reserved for a stopping observer (deferred).
+  - An lvalue observer is kept by reference, so what a reusable recorder records is there afterwards. An rvalue is
+    kept by value.
+  - It is called as a non-const callable, so a mutable lambda can count its calls.
+  - Its exceptions pass through. That is also the way out of a user's method that never reports `exhausted`.
+- **Counting is the caller's:** the evaluations are counted in fn (two lines; the spike's progress program does it),
+  and the steps in the observer. The library's methods have exact counts there, which the tests assert: Romberg's
+  report i at 2^(i+1) + 1 evaluations, Gauss-Kronrod's at 150 + 30 i without descents.
+- **Where it works:** with the value forms of `integrate`, in constant evaluation with a constexpr observer, and on
+  any iterative method, a user's included. On a fixed rule or an estimating method it is rejected softly: the
+  concept is false, with no error inside the header.
+- **Not in the protocol:** the observer cannot stop the run (Q14), and method-specific numbers (Gauss-Kronrod's
+  panels, Romberg's tableau) are not reported.
 
 ### F. The library's methods
 
 - **`GaussLegendre<N>::apply`:** unchanged from draft 2.
-- **`Romberg`:** `start` forms T_0 from the ends and level 1, and `advance` forms the next level. The level is
-  Phase 1's loop body, line for line, with the stop test removed. Its step:
+- **`Romberg`:** `start` forms T_0 from the ends and level 1; `advance` forms the next level; `settle` does nothing.
+  The level is Phase 1's loop body, line for line, with the stop test removed. Its step:
   - current: {R(k, k), max(estimate, F)};
   - attainable F;
   - ready from level 4;
@@ -278,8 +306,9 @@ Written once, in the concepts' Doxygen comments, as in draft 2.
   - always trusted.
 - **`GaussKronrod<15>`:** `start` builds the initial mesh, `advance` bisects the panel with the largest estimate, and
   `settle` forms the sums afresh. Phase 2's loop is kept line for line, with its locals as members of
-  `detail::KronrodState<T>` and the stop test moved to the loop. Its step:
-  - current: {K, max(E, F)}, negated for reversed ends, which `integrate` no longer passes;
+  `detail::KronrodState<T>` and the stop test moved to the loop. Its orientation code is removed: `integrate` passes
+  a < b, so it was dead. Its step:
+  - current: {K, max(E, F)};
   - attainable 2F;
   - always ready;
   - exhausted by an empty heap, the cap or stagnation;
@@ -288,14 +317,22 @@ Written once, in the concepts' Doxygen comments, as in draft 2.
 ### G. Phase 3b (TanhSinh) through the protocol
 
 `PHASE3_API.md` stays approved, except:
-- **Its "Public API" bullet:** `TanhSinh` is an iterative method (`start`: level 0 with its outward sweep; `advance`:
-  the next level), so the existing estimating forms of `integrate` take it.
+- **Its "Public API" bullet:** `TanhSinh` is an iterative method, so the existing estimating forms of `integrate`
+  take it:
+  - `start`: level 0 with its outward sweep, reporting no current (level 0 has no estimate);
+  - `advance`: the next level;
+  - `settle`: nothing;
+  - always trusted.
 - **Its A:** "b < a negates" is done by `integrate`; TanhSinh receives a < b. The centre not strictly inside gives a
   start whose step is exhausted with no current: `not_converged` without a best.
+- **Its B:** the state must own what it uses across `advance`. For a type without a table, in constant evaluation,
+  the generated pieces are temporaries, so the state copies them, as Gauss-Kronrod copies its rule, or regenerates
+  them. The rounding cut's suffix sums need every earlier level's table at each step, so regenerating repeats that
+  cost; the phase measures which is cheaper.
 - **Its E:** the stop test `E_k <= max(abs_tol, rel_tol |V_k|, 2 F_k)` from level 4 moves to the loop as ready
   (level >= 4) and attainable 2F_k. The cap of 10 levels is `exhausted`. An unbounded estimate is a step without
   current, so the best is absent (its Q7).
-- **Progress:** an observed TanhSinh reports each level.
+- **Observing:** an observed TanhSinh reports each level.
 
 Its behaviour otherwise, the decisions Q1 to Q10 and the tests are unchanged. `docs/plan.md` splits Phase 3 into 3a
 and 3b.
@@ -310,17 +347,17 @@ iterative method reports as its attainable error.
 
 `docs/open-closed/quadrature-spike/` (README there):
 - `quadrature.patch.py ... normalize` writes draft 2 into a copy of `quadrature.hpp`.
-- `steps.py` then writes draft 3: `Step`, the stepped Romberg and Gauss-Kronrod, the loop, `iterative_method`,
-  `Progress` and `observed`.
+- `steps.py` then writes drafts 3 and 4: `Step`, the stepped Romberg and Gauss-Kronrod, the loop, `iterative_method`
+  and `observed`. Its last section holds draft 4's changes.
 
 Built with GCC 13.3 and Boost 1.83, and the programs also with Clang 18, which needs `-U__cpp_concepts
 -D__cpp_concepts=202002L` for libstdc++ 13's `<expected>`. The container's network refuses Boost 1.92, and the
 project's five toolchains are not available here; the phase itself builds and tests on all five.
 
 - **The existing quadrature tests** (`test_quadrature_gauss.cpp`, `_romberg.cpp`, `_kronrod.cpp`), built unchanged
-  against draft 3, pass exactly as against today's header and drafts 1 and 2. That is 25 of 26 test cases. The one
-  failure is the same in every build: the `GaussLegendre<2>` long double node baseline, which was recorded on the
-  project's toolchains and does not hold for GCC 13's 80-bit long double. The tests' `static_assert`s, Gauss-Kronrod
+  against draft 4, pass exactly as against today's header and every earlier draft. That is 25 of 26 test cases. The
+  one failure is the same in every build: the `GaussLegendre<2>` long double node baseline, which was recorded on
+  the project's toolchains and does not hold for GCC 13's 80-bit long double. The tests' `static_assert`s, Gauss-Kronrod
   and Romberg in constant evaluation among them, now run through the loop of B.
 - **Bit for bit** (`dump.cpp`): the battery covers 8 integrands on 6 intervals (three reversed); 4 Gauss-Legendre
   rules; Gauss-Kronrod at 3 tolerances; Romberg at 3; float, double, long double, `cpp_bin_float_50` and
@@ -330,28 +367,41 @@ project's five toolchains are not available here; the phase itself builds and te
     `abs_error` alone in 9 float results and 1 double result (the floor's L1 sum); in `cpp_dec_float_50`, 7
     Gauss-Legendre values and 6 Romberg results, in the guard digits (about the 70th significant digit).
     Gauss-Kronrod: none.
-  - Draft 3: identical to draft 2 with the ends ordered, all 2,438 results, so the stepped methods and the loop of B
-    change nothing.
+  - Draft 3: identical to draft 2 with the ends ordered.
+  - Draft 4: (run pending).
 - **Orientation today** (`orient.cpp`): 3,000 intervals (positive, negative, across 0, up to 2e6 wide), each
   integrated forwards and reversed, the whole result compared. Gauss-Legendre<64> and Gauss-Kronrod<15> give the
   exact negation every time. Romberg gives the exact negation in value and status every time, and a different
   `abs_error` in 374 of 6,000 runs.
-- **Progress** (`progress.cpp`):
-  - **Same results observed:** `observed()` gives the same result as the unobserved method, in `static_assert`s
-    (Gauss-Kronrod on x^3 - x over [-1, 2]; Romberg reversed at 1e-10) and at run time.
-  - **Gauss-Kronrod on a peak** of width 1e-3 at rel_tol 1e-10: 15 reports (the mesh, then 14 bisections), with
-    evaluations 150 to 570. The 570 equals both a count kept by fn and the unobserved run's.
-  - **Romberg on e^x at 1e-12:** a report per level, ready from level 4, the result at level 5 (33 evaluations,
-    1.7182818284590453).
-  - **A user's iterative method** (a trapezoidal rule halving its step, about 40 lines): it gets the stop test and
-    the reports without writing either. `static_assert(qd::iterative_method<Trapezoid, double>)`; x^3 - x over
-    [-1, 2] in a constant expression.
-- **Methods of one's own** (`user_methods.cpp`, unchanged from draft 2, passing against draft 3): the fixed rule
+- **The loop and observing** (`progress.cpp`; the `static_assert`s run in constant evaluation on GCC and Clang):
+  - **Observed equals unobserved** for Gauss-Kronrod and Romberg (reversed), as `static_assert`s; `observed()` on
+    `GaussLegendre<7>` is rejected softly (a concept is false).
+  - **Every branch of the loop,** with a scripted method whose steps come from a list:
+    - not ready: it goes on;
+    - passing but untrusted: `not_converged` with the best;
+    - exhausted: `not_converged` with the best, and without one where current is empty, with `advance` never
+      called there;
+    - passing before settle and failing after: it goes on to the next step;
+    - a NaN current, an infinite or a negative attainable: `non_finite`, without any arithmetic on the NaN.
+  - **A user's iterative method** (a trapezoidal rule halving its step, about 45 lines, which meets D): x^3 - x over
+    [-1, 2] gives exactly 9/4 + 27/2^26 at rel_tol 1e-6, its closed form at level 12 (the error is 3h^2/4 exactly,
+    and every sum is exact in double), as a `static_assert`. On e^x at 1e-10 it stops at level 16, as derived.
+  - **At run time:**
+    - Gauss-Kronrod on a peak of width 1e-3 at rel_tol 1e-10: 15 steps, the evaluations exactly 150 + 30 i, 570 in
+      all, and the result equal to the unobserved run's.
+    - Romberg on e^x at 1e-12: a step per level through a mutable lambda, ready from level 4, the result at level 5.
+    - A reusable recorder passed as an lvalue: it keeps its 16 steps afterwards.
+    - An observer returning `bool`: the `static_assert` message, "observer must return void (a result is reserved
+      for stopping the run)".
+- **Methods of one's own** (`user_methods.cpp`, unchanged from draft 2, passing against draft 4): the fixed rule
   `Midpoint`, the combinator `SquareAtLowerEnd<Inner>` over the iterative library methods, the spy, the checked
   results, and the concepts' rejections. On 1/sqrt x and cos x / sqrt x over [0, 1] at 1e-12, the substitution takes
   150 evaluations against Gauss-Kronrod's 2,370 and 2,400.
 
 ## Tests (`tests/test_quadrature_protocol.cpp`, test cases `quadrature:protocol:*`)
+
+Each in constant evaluation (`static_assert`) and at run time, unless it needs a library function or a type that is
+not constexpr.
 
 As in draft 2:
 - the existing suite unchanged;
@@ -364,31 +414,46 @@ As in draft 2:
 - the concepts.
 
 New:
-- **The loop's branches** with a scripted iterative method, whose steps come from a list:
-  - not ready: it goes on;
-  - passing but untrusted: `not_converged` with the best;
-  - exhausted and failing: `not_converged` with the best, and without one where current is empty;
-  - passing before settle and failing after: it goes on from the settled step;
-  - a Failure from `start`, `advance` or `settle`: returned as it is;
-  - `advance` never called on an exhausted step.
+- **The loop's branches** with the scripted method:
+  - every branch the spike shows;
+  - passing, then failing after settle, while exhausted. This is Phase 2's double settle: settle is called twice,
+    and the best is the settled step's.
+  - exhausted before ready, with a best;
+  - ready with an empty current while not exhausted (it goes on);
+  - a Failure from `start`, `advance` or `settle`, returned as it is;
+  - the scripted method run through `observed` too, the branch where settle moves the step included, since that is
+    where `observed` forwards `settle`.
 - **`observed` changes nothing:** `integrate(observed(M{}, quiet), ...) == integrate<M>(...)` for Romberg and
-  Gauss-Kronrod, as `static_assert`s in double with run-time twins; reversed too.
-- **The reports:** iterations 0, 1, 2, ... in order; evaluations non-decreasing and, at the end, equal to a count kept
-  by fn; the last report's step equal to the result for Romberg; for Gauss-Kronrod, equal unless settle moved it.
-- **A user's iterative method** (the trapezoidal rule) against closed forms: x^3 - x over [-1, 2] = 9/4, its error
-  (b - a) h^2 f'' / 12 in closed form at each level; e^x over [0, 1] within its estimate and the tolerance.
+  Gauss-Kronrod, reversed too.
+- **The reports:**
+  - Romberg's report i at 2^(i+1) + 1 evaluations of a counting fn, its last step equal to the result.
+  - Gauss-Kronrod's at 150 + 30 i on a case without descents, and its last step equal to the result on a mesh-only
+    case, where the running and fresh sums add the same panels in the same order.
+  - An lvalue recorder keeps its steps; a mutable lambda observer compiles and counts.
+- **A user's iterative method** (the trapezoidal rule): x^3 - x over [-1, 2] exactly 9/4 + 27/2^26 at rel_tol 1e-6;
+  e^x over [0, 1] at 1e-10 within its estimate (T_h - (e - 1) = (e - 1)(h^2/12 - h^4/720 + ...), plus the plain
+  sum's rounding, about 1.2e-11 at level 16).
+- Not tested (compile errors): an observer of the wrong signature or result, and a state without `step`. Their
+  diagnostics are checked by hand in the spike.
 
 ## Documentation
 
 As in draft 2, and:
-- `quadrature.hpp`: the comments of `Step`, `Progress`, `iterative_method` and `observed`. The contract of D goes in
-  the concepts. The file comment says that a method computes and `integrate` decides, and shows `observed` in its
-  example.
+- `quadrature.hpp`: the comments of `Step`, `state_t`, `iterative_method` and `observed()`. The contract of D goes in
+  the concepts, with the usual causes of a failed concept: a missing `const`, the exact return types, `settle`, and
+  the `step` member. The file comment says that a method computes and `integrate` decides, and shows `observed` in
+  its example.
 - `docs/quadrature/design.md`: "The interface" records the loop and what stays in the method (C); BRIEF.md 3.9
   marked as amended.
-- `docs/sphinx/quadrature/reference.md`: `Step`, `Progress`, the three concepts and `observed`.
-- The guide page on writing a method shows the three forms, with a user's iterative method as its main example, and
-  `observed` for debugging.
+- `docs/sphinx/quadrature/reference.md`: `Step`, `state_t`, the three concepts and `observed`.
+- The guide page on writing a method:
+  - the three forms, with a user's iterative method as its main example;
+  - `observed` for debugging: a table, a recorder, counting evaluations in fn, slicing fn's recorded points between
+    steps to see where Gauss-Kronrod bisects;
+  - choosing at compile time whether a method can be observed: `if constexpr (qd::iterative_method<M, double>)`;
+  - an observable combinator that forwards `start`, `advance` and `settle` to an inner method, keeping
+    `state_t<Inner, T, G>` and rebuilding its function G in each call;
+  - throwing from the observer as the way out of a method that never ends.
 
 ## Decisions for the user
 
@@ -399,8 +464,9 @@ From draft 2 (unchanged unless noted):
 
   Recommended: yes.
 - **Q2. Concepts:**
-  - `fixed_rule`, `estimating_method` and, new, `iterative_method`;
-  - each `<M, T, F = T(T const &)>`, no copy requirement.
+  - `fixed_rule`, `estimating_method` and `iterative_method`, each `<M, T, F = T(T const &)>`, with no copy
+    requirement;
+  - draft 4 adds the alias `state_t<M, T, F>`.
 
   Recommended: yes.
 - **Q3. A method value goes first,** `integrate(m, fn, a, b[, criteria])`, beside today's named forms, which keep
@@ -409,67 +475,137 @@ From draft 2 (unchanged unless noted):
   - **Cost:** 23 of the battery's 2,438 results change, all on reversed ends, no status. That covers Romberg's
     `abs_error` in float and double, and values beyond `cpp_dec_float_50`'s 50 digits.
   - **Alternative:** the method orients itself, bit for bit with today.
-- **Q5. The result's finiteness checked in every build,** a broken result returned as `non_finite`. Recommended: yes.
+- **Q5. The result's finiteness checked in every build,** a broken result returned as `non_finite`; draft 4 checks
+  each step of the loop too (B). Recommended: yes.
 - **Q6. The validated criteria passed as `Criteria<T>`** to an estimating method. Recommended: yes.
 - **Q7. The protocol as Phase 3a, before TanhSinh (3b).** Recommended: yes.
 - **Q8. The statements that hold only for the library's methods say so.** Recommended: yes.
 - **Q9. A method's parameters are its own preconditions;** no new enumerator now. Recommended: yes.
 - **Q10. Finite ends only;** infinite ends opt-in per method in Phase 4. Recommended: yes.
 
-New in draft 3:
+From draft 3, as revised:
 - **Q11. `integrate` owns the loop and the test against the request; the method keeps its own limits** (`ready`,
   `attainable`, `exhausted`, `trusted`, `settle`; C). Recommended: yes. The results are unchanged, and the test is
   `BRIEF.md` D5's.
   - **Alternative, a common rule for the limits:** one floor multiple and one minimum. That changes when Romberg and
     Gauss-Kronrod stop.
-  - **Alternative, draft 2:** each method owns its loop, with no reports.
-- **Q12. `Step` as above:** `current` optional, `attainable`, `ready`, `exhausted`, `trusted`. Recommended: yes.
-  - **`current` is optional** so that TanhSinh's "no best when the estimate is unbounded" (its Q7) needs no change
-    later.
-  - **The names are open to change.** `attainable` could be `floor`, but the floor is F while Gauss-Kronrod's
-    attainable is 2F; `trusted` could be `acceptable`.
+- **Q12. `Step`:** `current` optional, `attainable`, `ready`, `exhausted`, `trusted`, with the neutral values as
+  defaults. Recommended: yes.
+  - **`current` is optional** for TanhSinh's Q7.
+  - **The defaults:** a method that forgets `trusted` or `ready` is then not stuck at `not_converged` (usage sketch).
+  - **The names are open to change:** `attainable` could be `floor`, but Gauss-Kronrod's is 2F; `trusted` could be
+    `acceptable`.
 - **Q13. The one-member `estimate` form stays beside the iterative one,** for methods that do not step: a
-  recursion, a combinator over a library method, or a port of an existing routine. Such methods are not observed.
+  recursion, a combinator over a library method, a port of an existing routine. Such methods are not observed.
+  Recommended: yes. An iterative combinator takes about three times the code of the 15-line `SquareAtLowerEnd`.
+- **Q14. Observing through `observed(m, observer)`:** the observer receives the `Step` (changed from draft 3's
+  `Progress{iteration, evaluations, step}`), after the start and after each step, and cannot stop the run.
   Recommended: yes.
-  - **Alternative:** the iterative form only. That is one concept fewer, but a recursive method must become a work
-    list, and a combinator must forward start and advance to its inner method.
-- **Q14. Progress through `observed(m, observer)`,** an adaptor, reporting `Progress{iteration, evaluations, step}`
-  after the start and after each step; the observer cannot stop the run. Recommended: yes.
-  - **Alternative:** an observer parameter of `integrate` (a fifth argument, in every form).
-  - **Deferred:** a stopping observer, or a public stepping interface (`start`, then `advance` in the caller's own
-    loop), which the same protocol allows later without a change.
+  - **Why the change:** draft 3 counted evaluations by wrapping fn. That made an observed run a different
+    instantiation, needed a type in `detail` that brought that namespace into users' argument-dependent lookup, and
+    left a method that kept fn in its state with a dangling pointer when observed (numerics review and usage
+    sketch). The counts are two lines of the caller's code (E).
+  - **Alternative:** draft 3's `Progress` with the counts.
+  - **Alternative:** an observer parameter of `integrate`, a fifth argument in every form.
+  - **Deferred:** a stopping observer; a public stop test, `meets(step, criteria)`, for an observer that shows the
+    distance to the request or for one's own loop over `start` and `advance`; method-specific numbers.
+
+New in draft 4:
+- **Q15. `settle` required of every iterative method,** `return {};` where there is nothing to refine.
+  Recommended: yes.
+  - **Why:** detected, as in draft 3, a `settle` whose signature is a near miss (not `const`, say), or a combinator
+    that forgets to forward it, is skipped without a diagnostic. Gauss-Kronrod without `settle` changes 22 of the
+    battery's 2,438 results.
+  - **Alternative:** detected, with the trap documented.
 
 ## Decisions from the reviews
+
+Draft 4's round (on draft 3):
+
+From the numerics review:
+- **Adopted:**
+  - the state keeps no reference, pointer or copy of fn (D), and draft 3's counting wrapper, which made such a state
+    dangle under `observed`, is gone (Q14);
+  - every step checked in the loop, `current` as A.5 and `attainable` finite and not negative, before any arithmetic
+    (B);
+  - the tests: the trapezoid's exact closed form, 3h^2/4, and exact equality at level 12; exact evaluation counts;
+    named Gauss-Kronrod cases instead of "equal unless settle moved it"; the missing branches; `static_assert`
+    twins;
+  - the trapezoid's midpoint as a/2 + b/2, so it stays in [a, b] near max (D);
+  - no type in `detail` passed to users' methods (the wrapper is gone);
+  - the reports for the ends in order (E);
+  - G: level 0 without current, always trusted, `settle` nothing, the tables owned by the state;
+  - D: settle idempotent and leaving `ready` and `exhausted`; the loop's promises under "Given"; the consequence of
+    never exhausting;
+  - E and Summary: a mutable observer, the `current` check in the example, "the value forms".
+- **Confirmed:**
+  - the stepped Romberg and Gauss-Kronrod are Phases 1 and 2 on every path, including the double settle and
+    constant evaluation;
+  - the request test's equivalence, including E < F and F = 0;
+  - termination;
+  - G preserves every decision of `PHASE3_API.md`, and nothing in it uses the tolerance inside a step;
+  - the observer changes no result.
+
+From the simplicity review:
+- **Adopted:**
+  - the observer receives the `Step`, `Progress` dropped (Q14);
+  - `settle` made required (Q15) rather than detected;
+  - Gauss-Kronrod's dead orientation code removed;
+  - `observed`'s type moved to `detail`, `observed()` kept;
+  - "the value forms";
+  - calling members directly stated as outside the contract, and the deferred item restated as a public stop test;
+  - a type of two kinds promised nothing;
+  - the example's `current` check;
+  - the scripted method through `observed`;
+  - the battery's result filled in;
+  - "the one exception" for an estimating method.
+- **Not adopted:**
+  - `ready` folded into `start`, which would hide Romberg's first three levels from the reports (C);
+  - dropping the trapezoid's closed-form check, kept as one exact `static_assert` at its stopping level, which the
+    numerics review derived.
+
+From the usage sketch:
+- **Adopted:**
+  - an lvalue observer kept by reference, called as non-const, with a `static_assert` naming its signature and
+    requiring `void` (E);
+  - fn valid for the call only (D);
+  - `Step`'s defaults (Q12);
+  - `observed()` on a method that does not step rejected softly;
+  - a hang's way out documented (E);
+  - `state_t` public (Q2);
+  - `attainable` checked (B);
+  - the guide's patterns (Documentation).
+- **Not adopted:**
+  - a public `meets(step, criteria)` now (deferred, Q14);
+  - accepting a `step()` member function beside the data member;
+  - a library-wide safety cap.
 
 Draft 2's round (on draft 1):
 
 From the numerics review:
 - **Adopted:**
   - fn evaluated only in [a, b] required of every method, and the spike's methods clamp and refuse an overflowing
-    width. Draft 1's midpoint rule called fn at +inf on [-max, max], and its substitution at b + 2 on
-    [-1, 2^53 + 2].
-  - The orientation of methods tied to an end, answered by Q4.
-  - Termination for every criteria, and parameters as the method's preconditions.
-  - The edge inputs and constant evaluation in the contract.
-  - Q8 extended, and the a == b inconsistency of the floor's wording fixed.
-  - The tests' tolerances derived, a spy, an expression-template instantiation, a reversed combinator, the domain
-    check.
-  - The spike's presentation corrected.
-  - `orient.cpp` compares whole results, which found Romberg's `abs_error`.
-- **Confirmed:** the checked part for all four methods, the edges and constant evaluation; the members' arguments;
-  the clamped criteria; the spike's values; Q4's derivation.
+    width;
+  - the orientation of methods tied to an end (Q4);
+  - termination for every criteria, and parameters as preconditions;
+  - the edge inputs and constant evaluation in the contract;
+  - Q8 extended;
+  - the tests' tolerances derived, a spy, an expression-template instantiation, a reversed combinator, the domain
+    check;
+  - `orient.cpp` comparing whole results.
+- **Confirmed:** the checked part for all four methods; the members' arguments; the clamped criteria; Q4's
+  derivation.
 
 From the simplicity review:
 - **Adopted:**
-  - the methods moved after `detail` with inline members;
+  - the methods after `detail` with inline members;
   - no `std::copy_constructible`;
-  - the contract written once, in the header;
+  - the contract once, in the header;
   - "a method is of one kind";
   - the tests trimmed;
-  - "an lvalue";
-  - Q2's reason restated.
+  - "an lvalue".
 - **Not adopted:**
-  - Q5's "no check", in favour of the release check (a NaN was returned as a success under `NDEBUG`);
+  - Q5's "no check";
   - dropping the second integrand of the substitution.
 
 From the usage sketch:
@@ -478,22 +614,17 @@ From the usage sketch:
   - the ends ordered (Q4);
   - the release check (Q5);
   - parameters (Q9);
-  - infinite ends recorded (Q10);
+  - infinite ends (Q10);
   - `<M, T, F>` with F defaulted;
   - no copy requirement;
-  - the concepts' comments on diagnostics;
-  - the floor's recipe and the guide's style.
-- **Not adopted:**
-  - a precedence between the kinds (a sentence instead; in draft 3 an iterative form is preferred over an
-    estimating one);
-  - publishing `rounding_floor` now.
-
-Draft 3's round: pending.
+  - the concepts' diagnostics;
+  - the floor's recipe.
+- **Not adopted:** a precedence between the kinds; publishing `rounding_floor` now.
 
 ## Deferred
 
 - The building blocks (`Interval`, `Sum`, `rounding_floor`, the overflow checks, the tables) as public API (H).
-- A stopping observer, a public stepping interface, and method-specific progress (Q14, E).
+- A stopping observer, a public stop test (`meets`), and method-specific numbers in the reports (Q14, E).
 - Infinite ends as an opt-in (Q10): Phase 4.
 - `Adaptive<Pair>`, the globally adaptive loop over any embedded pair (`ANALYSIS.md` 6.3).
 - The same protocol for `nxx::roots` and `nxx::deriv` (`ANALYSIS.md` 10). In roots the tolerance enters Brent's and
