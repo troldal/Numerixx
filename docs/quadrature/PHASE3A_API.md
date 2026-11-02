@@ -1,6 +1,6 @@
 # Phase 3a API proposal: the method protocol
 
-Status: draft 5, for the user. History:
+Status: approved by the user on 2026-11-02, Q1 to Q15 as recommended (draft 5). History:
 - **Draft 1:** one member per method.
 - **Draft 2:** after the first review round.
 - **Draft 3:** at the user's request (2026-11-02), methods only compute, `integrate` decides when to stop (single

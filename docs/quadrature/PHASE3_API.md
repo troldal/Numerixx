@@ -1,6 +1,10 @@
 # Phase 3 API proposal: TanhSinh on finite intervals
 
-Status: approved by the user on 2026-11-01, Q1 to Q10 as recommended (draft 2). One review round (numerics-reviewer, simplicity-critic, usage-sketcher),
+Status: approved by the user on 2026-11-01, Q1 to Q10 as recommended (draft 2). Amended by Phase 3a
+(`PHASE3A_API.md`, section G, approved 2026-11-02): this phase is now Phase 3b, and `TanhSinh` is an iterative method
+of that protocol. Its stop test moves to `integrate`'s loop (ready from level 4, attainable 2F), the ends arrive in
+order, and level 0, an unbounded estimate and an interval with no point inside are steps without a current result;
+everything else below stands. One review round (numerics-reviewer, simplicity-critic, usage-sketcher),
 with the prototype and the spike rerun on its questions, is folded in ("Decisions from the reviews"). Architecture:
 `docs/quadrature/BRIEF.md` (approved 2026-10-30); Phase 2: `docs/quadrature/PHASE2_API.md` (done, 9cfb0f3). The
 evidence is a Python prototype on Phase 2's battery and a C++ spike of exp and the node tables (Prototype, below).

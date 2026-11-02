@@ -389,8 +389,9 @@ Each step is small, non-breaking and reviewable on its own:
 
 ## 11. Decisions for the user
 
-Decided by the user on 2026-11-02: D1 public, D4 quadrature first. The quadrature protocol is proposed in
-`docs/quadrature/PHASE3A_API.md`, which takes up D2 and D3 for that module.
+Decided by the user on 2026-11-02: D1 public, D4 quadrature first. The quadrature protocol is
+`docs/quadrature/PHASE3A_API.md`, approved on 2026-11-02 (Q1 to Q15), which settles D2 and D3 for that module: the
+members `apply`, `start`/`advance`/`settle` and `estimate`, and the method value first, `integrate(m, fn, a, b)`.
 
 - **D1. Open to users, or only internally?** Internal only (step 1 and 2 without promoting `Start` and `Tolerance`)
   already removes every edit to existing code when the library adds a method. Recommended: public, because
