@@ -37,7 +37,8 @@ every module (the library, real types, the general test rules) is in `docs/desig
 - **Six forms of `integrate`:** the named forms of Phases 1 and 2, unchanged, `integrate<M>(fn, a, b)` for a fixed
   rule and `integrate<M = GaussKronrod<15>>(fn, a, b, criteria = {})` for a method with an estimate, now
   `integrate(M{}, ...)`; the method as a value, first, `integrate(m, fn, a, b[, criteria])`, for a method with
-  parameters (a braced list never becomes a method); and with an observer, `integrate<M>(observer(o), fn, a, b[,
+  parameters (a braced list is never deduced as a method; with M named, `integrate<M>({...}, fn, a, b)` takes one as
+  the method); and with an observer, `integrate<M>(observer(o), fn, a, b[,
   criteria])` and `integrate(m, observer(o), fn, a, b[, criteria])`. Criteria for a fixed rule do not compile.
   `GaussKronrod<N>` requires N == 15 on the type, so `GaussKronrod<21>` fails where it is named (Phase 2, Q11);
   `GaussLegendre<N>`'s range is a constraint on its member, so `GaussLegendre<0>` is a type that `integrate` rejects.
@@ -53,7 +54,8 @@ every module (the library, real types, the general test rules) is in `docs/desig
   `integrate(fn, b, a)` is exactly `-integrate(fn, a, b)` for every method. It changed Romberg's `abs_error` on
   reversed ends where its plain L1 sum, summed in the other order, moved the floor (10 of the battery's float and
   double results), and Gauss-Legendre's and Romberg's values in `cpp_dec_float_50`'s guard digits (13 results); no
-  status.
+  status. It also gives Romberg's exactly 0 result on reversed ends the sign -0, as Gauss-Kronrod's already had (the
+  independent review; -0 == 0).
 - **Checked results** (Q5): in every build, a value that is not finite, an estimate that is not finite or negative,
   or a best with `non_finite`, is returned as `non_finite`; the library's methods never trip it.
 - **Observing** (Q14): `observer(o)` wraps o, so that the overloads are told apart by type, never by calling an

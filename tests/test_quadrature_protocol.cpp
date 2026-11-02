@@ -309,11 +309,13 @@ static_assert(!qd::fixed_rule<WrongReturn, double> && !integrable<WrongReturn>);
 static_assert(!qd::fixed_rule<NotConst, double> && !integrable<NotConst>);
 static_assert(!qd::iterative_method<NoSettle, double> && !integrable<NoSettle>);
 static_assert(!integrable<int> && !integrable<qd::GaussLegendre<0>> && !integrable<qd::GaussLegendre<65>>);
-// A braced list is never a method: the named forms take none.
+// A braced list is never deduced as a method: with M named, a braced list after the ends is criteria, which a fixed rule
+// does not take. (With M named, a braced list in the method's place is the method: integrate<M>({...}, fn, a, b).)
 static_assert(!braced_method<Midpoint>);
 // An observer only with an iterative method, in both forms.
 static_assert(observable<qd::Romberg> && observable<gk15> && observable<Trapezoid>);
 static_assert(!observable<qd::GaussLegendre<7>> && !observable<Midpoint>);
+static_assert(!observable<SquareAtLowerEnd<gk15>>); // an estimating method has no steps to report
 // Today's calls with a generic lambda as fn still resolve: no overload calls an argument on trial.
 static_assert(qd::integrate<qd::Romberg>(generic_square, 0.0, 1.0, { .rel_tol = 1e-12 }).has_value());
 static_assert(qd::integrate(qd::Romberg{}, generic_square, 0.0, 1.0).has_value());
@@ -530,6 +532,38 @@ TEST_CASE("quadrature: protocol: the loop's branches")
           == std::unexpected(qd::Failure<double>{ qd::error::not_converged, wide_two }));
     CHECK(settles == 2);
     CHECK(reports == 1);
+}
+
+TEST_CASE("quadrature: protocol: the loop's branches at run time")
+{
+    // The run-time twins of the static_asserts above that have none in the test case before.
+    CHECK(qd::integrate(Scripted{ { qd::Step<double>{}, pass, miss, miss } }, one, 0.0, 1.0, loose) == two);
+    CHECK(qd::integrate(Scripted{ { qd::Step<double>{ .current = two, .trusted = false }, miss, miss, miss } }, one, 0.0,
+              1.0, loose)
+          == std::unexpected(qd::Failure<double>{ qd::error::not_converged, two }));
+    CHECK(qd::integrate(Scripted{ { miss, qd::Step<double>{ .current = wide_two, .exhausted = true }, miss, miss } }, one,
+              0.0, 1.0, loose)
+          == std::unexpected(qd::Failure<double>{ qd::error::not_converged, wide_two }));
+    CHECK(qd::integrate(Scripted{ { qd::Step<double>{ .current = two, .ready = false, .exhausted = true }, miss, miss,
+                            miss } },
+              one, 0.0, 1.0, loose)
+          == std::unexpected(qd::Failure<double>{ qd::error::not_converged, two }));
+    CHECK(qd::integrate(Scripted{ .steps = { pass, miss, miss, miss }, .fail_start = Scripted::scripted_failure }, one, 0.0,
+              1.0, loose)
+          == std::unexpected(Scripted::scripted_failure));
+    CHECK(qd::integrate(Scripted{ .steps = { miss, miss, miss, miss }, .fail_advance_at = 1 }, one, 0.0, 1.0, loose)
+          == std::unexpected(Scripted::scripted_failure));
+    CHECK(qd::integrate(Scripted{ .steps = { miss, pass, miss, miss }, .fail_settle_at = 1 }, one, 0.0, 1.0, loose)
+          == std::unexpected(Scripted::scripted_failure));
+    for (double attainable : { dinf, dnan, -1.0 }) {
+        CAPTURE(attainable);
+        CHECK(qd::integrate(Scripted{ { qd::Step<double>{ .current = two, .attainable = attainable }, miss, miss, miss } },
+                  one, 0.0, 1.0, loose)
+              == std::unexpected(non_finite));
+    }
+    CHECK(qd::integrate(Scripted{ { qd::Step<double>{ .current = wide_two, .attainable = 1.0 }, miss, miss, miss } }, one,
+              0.0, 1.0, loose)
+          == wide_two);
 }
 
 // --- The observer -----------------------------------------------------------------------------------------------------

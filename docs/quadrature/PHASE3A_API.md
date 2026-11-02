@@ -634,7 +634,9 @@ From draft 2 (unchanged unless noted):
   their signatures. Recommended: yes. Draft 5 adds the two observed forms (Q14), six forms in all.
 - **Q4. `integrate` puts the ends in order and negates.** Recommended: yes.
   - **Cost:** 23 of the battery's 2,438 results change, all on reversed ends, no status. That covers Romberg's
-    `abs_error` in float and double, and values beyond `cpp_dec_float_50`'s 50 digits.
+    `abs_error` in float and double, and values beyond `cpp_dec_float_50`'s 50 digits. Romberg's exactly 0 result on
+    reversed ends also becomes -0, as Gauss-Kronrod's already was (the independent review; the battery has no
+    integrand that is exactly 0).
   - **Alternative:** the method orients itself, bit for bit with today.
 - **Q5. The result's finiteness checked in every build,** a broken result returned as `non_finite`; draft 4 checks
   each step of the loop too (B). Recommended: yes.
@@ -795,6 +797,28 @@ From the usage sketch:
   - the concepts' diagnostics;
   - the floor's recipe.
 - **Not adopted:** a precedence between the kinds; publishing `rounding_floor` now.
+
+## The independent review
+
+By Claude Fable on 2026-11-02, in place of Codex (not available that session), read-only, on 6aa135b, a2cb348 and
+c2398c9 against this document, `docs/design.md`, `docs/quadrature/design.md` and `CLAUDE.md`. It found no numerical or
+logical defect: Romberg and Gauss-Kronrod are Phases 1 and 2 on every path it drove (468 whole-result comparisons with
+the pre-phase header on the structural edge cases, 13 constant-evaluation twins on GCC and Clang, expression templates
+and `cpp_dec_float_50` observed against unobserved), apart from Q4. Six low findings, each reproduced before acting:
+
+1. **A move-only method can be integrated but not observed:** `detail::Observed` holds a copy of the method, while
+   the value forms take `M const &` and the concepts require no copy. Proposed fix: hold `M const &`. Proposed to the
+   user (a change to `include/`).
+2. **The concepts' default `F = T(T const &)` is a function type, but `integrate` passes a function as a pointer:**
+   a method whose members take only a reference to a function satisfies `iterative_method<M, double>` but is not
+   accepted by `integrate`. Proposed fix: default `F = T (*)(T const &)`. Proposed to the user.
+3. **Q4 also makes Romberg's exactly 0 result on reversed ends -0:** adopted, recorded in Q4 and `design.md`.
+4. **An observer of the wrong signature gives three errors, not one:** the second `static_assert` and the call run
+   after the first fails. Proposed fix: guard them with `if constexpr`. Proposed to the user.
+5. **"A braced list never becomes a method" holds only for a deduced M:** with M named, `integrate<M>({...}, fn, a,
+   b)` takes the braced list as the method (correctly). Adopted: the wording in `design.md` and the test's comment.
+6. **Test gaps:** run-time twins for the loop's branches that had only `static_assert`s, and an estimating method's
+   soft rejection by an observer. Adopted: both added.
 
 ## Deferred
 
