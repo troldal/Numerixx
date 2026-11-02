@@ -224,9 +224,9 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
   criteria (`Step`); the method value first; the ends ordered by `integrate`; `qd::observer` for each step; Romberg
   and Gauss-Kronrod stepped, results unchanged except Romberg's floor on reversed ends.
   - [x] API approved: `docs/quadrature/PHASE3A_API.md` (2026-11-02, Q1 to Q15 as recommended, draft 5)
-  - [ ] The protocol in `quadrature.hpp`, constexpr; `tests/test_quadrature_protocol.cpp`; the existing tests
-    unchanged; docs build clean
-  - [ ] CI passes on all five toolchains
+  - [x] The protocol in `quadrature.hpp`, constexpr; `tests/test_quadrature_protocol.cpp`; the existing tests
+    unchanged; docs build clean (GCC 13 and Clang 18 locally, the 2,438-result battery identical, 2026-11-02)
+  - [x] CI passes on all five toolchains and the docs build (c2398c9: run 41467982100, PR #19)
   - [ ] The independent review (Codex) and its adopted findings
 - Phase 3b: exp (internal) and `TanhSinh` on finite intervals, with the endpoint handling and the end-term test, as
   an iterative method of Phase 3a's protocol.
