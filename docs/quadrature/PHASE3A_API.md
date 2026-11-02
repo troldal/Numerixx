@@ -368,7 +368,8 @@ project's five toolchains are not available here; the phase itself builds and te
     Gauss-Legendre values and 6 Romberg results, in the guard digits (about the 70th significant digit).
     Gauss-Kronrod: none.
   - Draft 3: identical to draft 2 with the ends ordered.
-  - Draft 4: (run pending).
+  - Draft 4: identical to draft 2 with the ends ordered: the per-step checks, the required `settle` and the
+    observer change no result.
 - **Orientation today** (`orient.cpp`): 3,000 intervals (positive, negative, across 0, up to 2e6 wide), each
   integrated forwards and reversed, the whole result compared. Gauss-Legendre<64> and Gauss-Kronrod<15> give the
   exact negation every time. Romberg gives the exact negation in value and status every time, and a different
