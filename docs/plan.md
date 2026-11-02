@@ -218,9 +218,22 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
   - [x] CI passes on all five toolchains (2098416: run 41240105813)
   - [x] The independent review (Codex) and its adopted findings (three findings, all adopted:
     `docs/quadrature/PHASE2_API.md`)
-- Phase 3: exp (internal) and `TanhSinh` on finite intervals, with the endpoint handling and the end-term test.
+- Phase 3a: the method protocol, so that a method, the library's or a user's, is a type and adding one edits nothing
+  (`docs/open-closed/ANALYSIS.md`: the user's decisions D1, open to users, and D4, quadrature first). The concepts
+  `fixed_rule`, `iterative_method` and `estimating_method`; `integrate` owns the loop and the test against the
+  criteria (`Step`); the method value first; the ends ordered by `integrate`; `qd::observer` for each step; Romberg
+  and Gauss-Kronrod stepped, results unchanged except Romberg's floor on reversed ends.
+  - [x] API approved: `docs/quadrature/PHASE3A_API.md` (2026-11-02, Q1 to Q15 as recommended, draft 5)
+  - [x] The protocol in `quadrature.hpp`, constexpr; `tests/test_quadrature_protocol.cpp`; the existing tests
+    unchanged; docs build clean (GCC 13 and Clang 18 locally, the 2,438-result battery identical, 2026-11-02)
+  - [x] CI passes on all five toolchains and the docs build (c2398c9: run 41467982100, PR #19)
+  - [x] The independent review (Claude Fable in place of Codex, 2026-11-02): no defect; six low findings, three
+    adopted in the docs and tests, three small fixes to `include/` proposed (`PHASE3A_API.md`, "The independent
+    review")
+- Phase 3b: exp (internal) and `TanhSinh` on finite intervals, with the endpoint handling and the end-term test, as
+  an iterative method of Phase 3a's protocol.
   - [x] API approved: `docs/quadrature/PHASE3_API.md` (2026-11-01, Q1 to Q10 as recommended; no K31, closing
-    Phase 2's Q7)
+    Phase 2's Q7), amended by `PHASE3A_API.md` G (2026-11-02)
   - [ ] `TanhSinh`, `detail::exp`, the tables in pieces, constexpr; tests in every type; docs build clean
   - [ ] CI passes on all five toolchains
   - [ ] The independent review (Codex) and its adopted findings
@@ -237,7 +250,9 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
   it again.
 
 Customization (reviewed 2026-10-25 with a usage sketch and a simplicity review; every item can be added without
-breaking the API, so none needs a hook now):
+breaking the API, so none needs a hook now). For `nxx::quadrature` the open method protocol is Phase 3a
+(`docs/quadrature/PHASE3A_API.md`, approved 2026-11-02); the same for deriv and roots follows it
+(`docs/open-closed/ANALYSIS.md`, section 10):
 - An open method protocol, so that a user's method works in `derivative<M>`: method objects with a const member
   template, which also carry parameters. Until a library algorithm is generic in the method (gradients, Jacobians,
   `derivatives<M, N>`) and a user needs a method of their own in it. A spike compiled it in constant expressions on
