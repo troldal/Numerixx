@@ -75,7 +75,9 @@ namespace {
 
     // An iterative method: the trapezoidal rule, halving its step. Its own limits: ready from level 3, exhausted at
     // level 20, the attainable error a floor of 50 eps times its sum of |terms|. fn only in [a, b]: the midpoint as
-    // a/2 + b/2, a width that overflows refused, a point a + i h never past b (rounding is monotone and i h <= b - a).
+    // a/2 + b/2, a width that overflows refused, a point a + i h clamped to b. It refines only while its next step
+    // (b - a) / 2^k is exact, so that its sums are the trapezoidal sums of [a, b]: a step that rounds (in the subnormal
+    // range, 1.5 denorm_min to 2) would sample past b and sum the wrong width.
     struct Trapezoid
     {
         template<nxx::real T>
@@ -86,6 +88,15 @@ namespace {
             qd::Step<T> step;
         };
 
+        // Whether level k's step (b - a) / 2^k is exact: in radix 2 it is until it is subnormal.
+        template<nxx::real T>
+        static constexpr bool exact_step(T const &width, int k)
+        {
+            T const n = T(1 << k);
+            T const h = T(width / n);
+            return h > T(0) && T(h * n) == width;
+        }
+
         template<nxx::real T>
         static constexpr void report(State<T> &s)
         {
@@ -95,7 +106,7 @@ namespace {
             s.step = qd::Step<T>{ .current = qd::Integral<T>{ value, change > floor ? change : floor },
                 .attainable = floor,
                 .ready = s.level >= 3,
-                .exhausted = s.level >= 20 };
+                .exhausted = s.level >= 20 || !exact_step(T(s.b - s.a), s.level + 1) };
             s.previous = value;
         }
 
@@ -105,6 +116,7 @@ namespace {
             qd::Failure<T> const invalid{ qd::error::non_finite, std::nullopt };
             T const width = T(b - a);
             if (!nxx::math::isfinite(width)) return std::unexpected(invalid);
+            if (!exact_step(width, 1)) return std::unexpected(qd::Failure<T>{ qd::error::not_converged, std::nullopt });
             T const fa = T(std::invoke(fn, a));
             T const fb = T(std::invoke(fn, b));
             T const mid = T(std::invoke(fn, T(T(a / T(2)) + T(b / T(2)))));
@@ -123,7 +135,9 @@ namespace {
             int const n = 1 << s.level;
             s.h = T(T(s.b - s.a) / T(n));
             for (int i = 1; i < n; i += 2) {
-                T const y = T(std::invoke(fn, T(s.a + T(T(i) * s.h))));
+                T x = T(s.a + T(T(i) * s.h));
+                if (s.b < x) x = s.b;
+                T const y = T(std::invoke(fn, x));
                 s.sum = T(s.sum + y);
                 s.abs_sum = T(s.abs_sum + nxx::math::abs(y));
             }
@@ -699,6 +713,20 @@ TEST_CASE("quadrature: protocol: methods of one's own")
         CHECK(error_of(r->value, e_minus_1) <= 4.5e-11);
         CHECK(error_of(r->value, e_minus_1) <= r->abs_error);
         CHECK(r->abs_error <= 1e-10 * 1.7182818284590452);
+    }
+    SUBCASE("an iterative method stops where its step cannot be represented")
+    {
+        // On [0, 12 D], D = denorm_min, the trapezoidal rule's step 12 D / 2^k is exact to level 2 (3 D); at level 3,
+        // 1.5 D would round to 2 D and sample 14 D. So the method reports exhausted at level 2, before it is ready:
+        // not_converged, with the level-2 sum of the constant 1, exactly 12 D, as the best, and fn never outside.
+        int outside = 0;
+        auto const constant = Confined{ [](double) { return 1.0; }, 0.0, 12.0 * dmin, &outside };
+        auto const r = qd::integrate(Trapezoid{}, constant, 0.0, 12.0 * dmin);
+        REQUIRE(!r.has_value());
+        CHECK(r.error().reason == qd::error::not_converged);
+        REQUIRE(r.error().best.has_value());
+        CHECK(r.error().best->value == 12.0 * dmin);
+        CHECK(outside == 0);
     }
     SUBCASE("a combinator over a library method")
     {

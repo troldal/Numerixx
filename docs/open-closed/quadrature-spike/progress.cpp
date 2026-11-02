@@ -14,7 +14,8 @@ namespace user {
     // owns the loop and the test against the criteria; observer() reports its steps. Its own limits: ready from
     // level 3, exhausted at level 20, the attainable error a floor from its own sum of |terms| (Criteria's recipe).
     // fn only in [a, b] (a < b, from integrate()): the midpoint as a/2 + b/2, a width that overflows refused, a
-    // point a + i h never past b (rounding is monotone and i h <= b - a).
+    // point a + i h clamped to b. It refines only while its next step (b - a) / 2^k is exact (in the subnormal range a
+    // step rounds, and the sums would be of the wrong width).
     struct Trapezoid
     {
         template<nxx::real T>
@@ -25,6 +26,15 @@ namespace user {
             qd::Step<T> step;
         };
 
+        // Whether level k's step (b - a) / 2^k is exact: in radix 2 it is until it is subnormal.
+        template<nxx::real T>
+        static constexpr bool exact_step(T const &width, int k)
+        {
+            T const n = T(1 << k);
+            T const h = T(width / n);
+            return h > T(0) && T(h * n) == width;
+        }
+
         template<nxx::real T>
         static constexpr void report(State<T> &s)
         {
@@ -32,7 +42,7 @@ namespace user {
             T const floor = T(T(50) * T(std::numeric_limits<T>::epsilon()) * T(s.h * s.abs_sum));
             T const change = nxx::math::abs(T(value - s.previous));
             s.step = qd::Step<T>{ .current = qd::Integral<T>{ value, change > floor ? change : floor },
-                .attainable = floor, .ready = s.level >= 3, .exhausted = s.level >= 20 };
+                .attainable = floor, .ready = s.level >= 3, .exhausted = s.level >= 20 || !exact_step(T(s.b - s.a), s.level + 1) };
             s.previous = value;
         }
 
@@ -42,6 +52,7 @@ namespace user {
             qd::Failure<T> const invalid{ qd::error::non_finite, std::nullopt };
             T const width = T(b - a);
             if (!nxx::math::isfinite(width)) return std::unexpected(invalid);
+            if (!exact_step(width, 1)) return std::unexpected(qd::Failure<T>{ qd::error::not_converged, std::nullopt });
             T const fa = T(std::invoke(fn, a));
             T const fb = T(std::invoke(fn, b));
             T const mid = T(std::invoke(fn, T(T(a / T(2)) + T(b / T(2)))));
@@ -60,7 +71,9 @@ namespace user {
             int const n = 1 << s.level;
             s.h = T(T(s.b - s.a) / T(n));
             for (int i = 1; i < n; i += 2) {
-                T const y = T(std::invoke(fn, T(s.a + T(T(i) * s.h))));
+                T x = T(s.a + T(T(i) * s.h));
+                if (s.b < x) x = s.b;
+                T const y = T(std::invoke(fn, x));
                 s.sum = T(s.sum + y);
                 s.abs_sum = T(s.abs_sum + nxx::math::abs(y));
             }

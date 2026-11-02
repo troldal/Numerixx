@@ -291,7 +291,8 @@ Written once, in the concepts' Doxygen comments, as in draft 2.
   - For an estimating method, success means its own stop test was met. That is the one exception to "methods
     compute, integrate decides".
 - **The library's methods only** (Q8): the rounding floor (for a != b), `abs_tol = 0` working, a best with every
-  `not_converged` of Romberg and Gauss-Kronrod, fn never evaluated at an end (GaussLegendre, TanhSinh), and
+  `not_converged` of Romberg and Gauss-Kronrod, fn never evaluated at an end (GaussLegendre, except where a node
+  rounds onto an end on an interval a few ulps wide; TanhSinh), and
   `non_finite` in constant evaluation where an overflow or a NaN would otherwise be a compile error.
 - **Infinite ends** stay outside this contract (Q10); Phase 4 makes them opt-in per method.
 
