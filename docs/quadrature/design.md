@@ -23,6 +23,14 @@ every module (the library, real types, the general test rules) is in `docs/desig
   and Simpson (1975), Piessens et al. (1983, QUADPACK's QAG) and Shampine (2008, `quadgk`'s mesh of 10); Kahaner's
   21 problems (Kahaner 1971) as Gander and Gautschi (2000) list them, for the battery. Boost.Math's 115-digit G7-K15
   table (BSL-1.0, values only) as the tests' reference.
+- Tanh-sinh (Phase 3): Takahasi, H. and Mori, M. (1974), Double exponential formulas for numerical integration, Publ.
+  RIMS Kyoto Univ. 9 (the transformation); Mori, M. and Sugihara, M. (2001), The double-exponential transformation in
+  numerical analysis, J. Comput. Appl. Math. 127 (its convergence, the strip of analyticity); Bailey, D. H., Jeyabalan,
+  K. and Li, X. S. (2005), A comparison of three high-precision quadrature schemes, Experimental Mathematics 14 (the
+  levels that reuse every evaluation, tables to the underflow threshold, the end terms); Cody, W. J. and Waite, W.
+  (1980), Software Manual for the Elementary Functions (exp's reduction by ln 2 split in two); Knuth's two-sum and
+  Dekker's product with Veltkamp's split (Dekker 1971) for ln 2 as a double-word pair. Boost.Math's `tanh_sinh` was
+  compared in the prototype (its centre form of the points, its stagnation rule); none of its code is used.
 - Not used: GSL, QUADPACK's Fortran (no licence on netlib), Numerical Recipes. Numerixx 1.x's `integrate/` was
   surveyed (`BRIEF.md` 2.1); none of its code is kept.
 
@@ -499,6 +507,131 @@ with a lambda of its own (50 distinct closure types, the cache built once before
 default method, 420 evaluations: 1.7 times faster than with the generator per call) and 0.012 ms (GaussLegendre<20>:
 81 times faster). The first version's cache, per closure type, saved nothing on each lambda's first call.
 
+## TanhSinh (Phase 3b, `PHASE3_API.md`, `PHASE3B_API.md`)
+
+Built in three steps (`PHASE3B_API.md` Q2): exp, the tables in pieces, the method.
+
+- **exp in T** (`detail::exp`, internal, `PHASE3_API.md` B and Q10): ln 2 as a `Pair` (double-word arithmetic:
+  Knuth's two-sum, Dekker's product with Veltkamp's split, which needs no fused multiply-add) from 2 atanh(1/3); Cody
+  and Waite's c1, ln 2 cut so that k c1 is exact for every k the domain needs; k by a greedy comparison against powers
+  of 2 (T has no conversion to an integer), 2^k as two factors; the Taylor series of expm1 by Horner's scheme. One
+  guard: x <= x_min gives 0. The error, derived: at most 1.48 ulp (the final rounding of 1 + p 0.5, Horner 0.73, the
+  rounding of r 0.25). No NaN test, no overflow guard, no subnormal results (Phase 4 widens it). Its constants
+  (`detail::ExpConstants`, from `detail::exp_constants<T>()`) are passed in, so that a caller forms them once.
+- **x_min from min(), not min_exponent** (an implementation note to `PHASE3_API.md` B): x_min = -m ln 2, moved 4 eps
+  inward, m the largest integer with 2^-m >= min(), found by a greedy descent over m's bits that compares
+  2^-m >= min() 2^(2^i) (no underflow, no overflow). Boost's types give min() = radix^min_exponent, a binade above the
+  standard's radix^(min_exponent - 1) (`cpp_bin_float_50`: min_exponent -2147483312, min() 2^-2147483312;
+  `cpp_dec_float_50`: -67108864 and 10^-67108864). The spike's x_min, -(1 - min_exponent) ln 2, therefore lay ln 2
+  below ln min() in `cpp_bin_float_50`, where exp flushed to 0 on that band; for `cpp_dec_float_50` it used ln 2 for
+  ln 10. For float, double and long double m = 1 - min_exponent.
+
+### Evidence (Phase 3b)
+
+exp against the tests' references (mpmath at 80 digits, printed to 60; about 40 points per type over its domain),
+largest error: 0.62 ulp (float), 0.77 (double), 0.70 (80-bit long double), 0.66 (binary128), 0.89
+(`cpp_bin_float_50`, with or without expression templates), 0.0022 (`cpp_dec_float_50`, its guard digits); the
+derived bound is 1.48.
+
+### The references of the tanh-sinh tests
+
+`tests/quadrature_tanh_sinh_reference.hpp`, run as `python -I ts_references.py > quadrature_tanh_sinh_reference.hpp`
+(step 2 adds the nodes):
+
+```python
+# References for the tanh-sinh tests (tests/quadrature_tanh_sinh_reference.hpp), from mpmath at 80 digits, printed to
+# 60: e^x at points of exp()'s domain per type.
+# A value is written as a mantissa in [1, radix) and an exponent of the radix, so that a value below
+# cpp_bin_float_100's range (cpp_bin_float_50's smallest are) can still be compared.
+# Usage: python -I ts_references.py > quadrature_tanh_sinh_reference.hpp
+import random
+import mpmath as mp
+
+mp.mp.dps = 80
+LN2 = mp.log(2)
+
+# (name, radix, digits, m) of each type: m the largest integer with 2^-m >= min(), where exp()'s domain and the tables
+# end (x_min = -m ln 2). min() is radix^(min_exponent - 1) for the built-in types (long double x87 and binary128 share
+# it), but radix^min_exponent for Boost's types (std::numeric_limits gives cpp_bin_float_50 min_exponent -2147483312
+# and min() 2^-2147483312, cpp_dec_float_50 min_exponent -67108864 and min() 10^-67108864).
+TYPES = [('float', 2, 24, 126), ('double', 2, 53, 1022), ('long_double', 2, 64, 16382),
+         ('bin50', 2, 168, 2147483312), ('dec50', 10, 50, int(mp.floor(67108864 * mp.log(10, 2))))]
+
+
+def scaled(v, radix):
+    # v = m radix^e, 1 <= m < radix, m to 60 digits.
+    e = int(mp.floor(mp.log(v, radix)))
+    m = v / mp.mpf(radix) ** e
+    if m >= radix:
+        m /= radix
+        e += 1
+    if m < 1:
+        m *= radix
+        e -= 1
+    return mp.nstr(m, 60, min_fixed=-1, max_fixed=-1, strip_zeros=False), e
+
+
+def domain(m):
+    # exp()'s domain in the library: x_min = -m ln 2 (moved 4 eps inward), up to the tables' t_max.
+    lmin = m * LN2
+    return -lmin, mp.asinh(lmin / 2)
+
+
+def exp_points(name, radix, digits, m, count=40):
+    rnd = random.Random(20261101 + digits)
+    lo, hi = domain(m)
+    bits = min(digits, 50) if radix == 2 else 30
+    pts = set()
+
+    def dyadic(x):
+        # x as k / 2^s with k of at most `bits` bits (exact in the type), s chosen for that.
+        s = 0
+        while s < 60 and abs(x) * 2 ** (s + 1) < 2 ** bits:
+            s += 1
+        if radix == 10:
+            s = min(s, 20)  # k / 2^s then has at most about 30 significant decimal digits
+        k = int(mp.nint(x * 2 ** s))
+        return k, s
+
+    for _ in range(count // 5):  # near x_min, inside it
+        pts.add(dyadic(lo + (1 - mp.mpf(rnd.random()) ** 2) * mp.mpf(1)))
+    for _ in range(count // 5):  # up to t_max
+        pts.add(dyadic(mp.mpf(1) / 2 + (hi - mp.mpf(1) / 2) * mp.mpf(rnd.random())))
+    for _ in range(count // 5):  # [-1, 1]
+        pts.add(dyadic(2 * mp.mpf(rnd.random()) - 1))
+    while len(pts) < count:  # the rest of the domain
+        pts.add(dyadic(lo + 1 + (-lo - 1) * mp.mpf(rnd.random())))
+    out = []
+    for k, s in sorted(pts):
+        x = mp.mpf(k) / mp.mpf(2) ** s
+        eps = mp.mpf(radix) ** (1 - digits)
+        if not (lo * (1 - 16 * eps) < x <= hi):  # inside, away from x_min, which lies 4 eps inward of ln min()
+            continue
+        m, e = scaled(mp.exp(x), radix)
+        out.append((k, s, m, e))
+    return out
+
+
+def main():
+    print('// Generated by the script in docs/quadrature/design.md ("The references of the tanh-sinh tests") from '
+          'mpmath at 80')
+    print('// digits, printed to 60: a value is mantissa radix^exponent, 1 <= mantissa < radix.')
+    print('\n#pragma once\n\nnamespace tanh_sinh_reference {\n')
+    print('    // e^x at x = k / 2^s.\n    struct ExpPoint\n    {\n        long long k;\n        int s;\n'
+          '        char const *mantissa;\n        long long exponent;\n    };\n')
+    for name, radix, digits, m in TYPES:
+        pts = exp_points(name, radix, digits, m)
+        print(f'    inline constexpr ExpPoint exp_{name}[] = {{')
+        for k, s, mantissa, e in pts:
+            print(f'        {{ {k}LL, {s}, "{mantissa}", {e} }},')
+        print('    };\n')
+    print('} // namespace tanh_sinh_reference')
+
+
+if __name__ == '__main__':
+    main()
+```
+
 ## Tests
 
 - References from closed forms at 70 digits (mpmath at 80), never Numerixx; Boost's and mpmath's nodes and weights
@@ -526,3 +659,7 @@ default method, 420 evaluations: 1.7 times faster than with the generator per ca
 - The edge cases of both methods with an estimate as one template (`quadrature: estimating methods: edges`):
   orientation, a == b, NaN and infinite ends, tolerances, [-max, max], subnormal widths, the domain-checking callback,
   the scales 1e-300 and 1e300, x^3 with abs_error the floor, overflow, and the constant-evaluation cases.
+- TanhSinh (`tests/test_quadrature_tanh_sinh.cpp`, `quadrature: tanh_sinh: *`): exp against mpmath within 1.5 ulp
+  in float, double, long double and the 50-digit types (with and without expression templates), 0 at and below x_min
+  and normal just above it, static_asserts at both ends of its domain in double, the compile-time constants equal to
+  the run-time ones.

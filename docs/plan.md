@@ -234,7 +234,13 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
   an iterative method of Phase 3a's protocol.
   - [x] API approved: `docs/quadrature/PHASE3_API.md` (2026-11-01, Q1 to Q10 as recommended; no K31, closing
     Phase 2's Q7), amended by `PHASE3A_API.md` G (2026-11-02)
-  - [ ] `TanhSinh`, `detail::exp`, the tables in pieces, constexpr; tests in every type; docs build clean
+  - [x] API approved: `docs/quadrature/PHASE3B_API.md` (2026-11-02, Q1 to Q5 as recommended, draft 2): TanhSinh
+    through the protocol, in three steps
+  - [x] Step 1, `detail::exp`: against mpmath within 1.5 ulp in every type, constexpr; all five presets locally and
+    the docs build (2026-11-02; Emscripten with `-Wno-error=unused-template`, since the local emsdk 6.0.8 flags
+    `test_quadrature_protocol.cpp`, which CI's 6.0.10 does not)
+  - [ ] Step 2, the tables in pieces
+  - [ ] Step 3, `TanhSinh`; tests in every type; docs build clean
   - [ ] CI passes on all five toolchains
   - [ ] The independent review (Codex) and its adopted findings
 - Phase 4: `TanhSinh` on half lines and the line (exp-sinh, sinh-sinh).

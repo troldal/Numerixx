@@ -33,6 +33,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cassert>
 #include <concepts>
 #include <cstddef>
@@ -1646,6 +1647,318 @@ namespace nxx::quadrature {
             s.running = exact;
             s.report(*checked);
             return {};
+        }
+
+        /**
+         * @brief A value as the unevaluated sum hi + lo of two T, |lo| at most about half an ulp of hi: twice T's
+         * precision, for ln 2 in exp()'s reduction.
+         * @tparam T The real type.
+         */
+        template<real T>
+        struct Pair
+        {
+            /** @brief The leading part. */
+            T hi;
+
+            /** @brief The rest. */
+            T lo;
+        };
+
+        /**
+         * @brief @p a + @p b as a Pair, exactly (Knuth's two-sum, for any magnitudes).
+         * @param a A value.
+         * @param b A value.
+         * @return The rounded sum and its rounding error.
+         */
+        template<real T>
+        constexpr Pair<T> two_sum(T const &a, T const &b)
+        {
+            T const s = T(a + b);
+            T const b_part = T(s - a);
+            return Pair<T>{ s, T(T(a - T(s - b_part)) + T(b - b_part)) };
+        }
+
+        /**
+         * @brief @p a + @p b as a Pair, exactly, for |a| >= |b| (Dekker's fast two-sum).
+         * @param a The larger value.
+         * @param b The smaller value.
+         * @return The rounded sum and its rounding error.
+         */
+        template<real T>
+        constexpr Pair<T> fast_two_sum(T const &a, T const &b)
+        {
+            T const s = T(a + b);
+            return Pair<T>{ s, T(b - T(s - a)) };
+        }
+
+        /**
+         * @brief radix^n, exactly.
+         * @param n The power, at least 0.
+         * @return radix^n.
+         */
+        template<real T>
+        constexpr T radix_power(int n)
+        {
+            T const radix = T(std::numeric_limits<T>::radix);
+            T power = T(1);
+            for (int i = 0; i < n; ++i) power = T(power * radix);
+            return power;
+        }
+
+        /**
+         * @brief @p a @p b as a Pair, exactly: Dekker's product, with Veltkamp's split by radix^ceil(digits / 2) + 1,
+         * which needs no fused multiply-add and holds in any radix.
+         * @param a A value.
+         * @param b A value.
+         * @return The rounded product and its rounding error.
+         */
+        template<real T>
+        constexpr Pair<T> two_product(T const &a, T const &b)
+        {
+            T const splitter = T(detail::radix_power<T>((std::numeric_limits<T>::digits + 1) / 2) + T(1));
+            T const p = T(a * b);
+            T const ca = T(splitter * a);
+            T const a_hi = T(ca - T(ca - a));
+            T const a_lo = T(a - a_hi);
+            T const cb = T(splitter * b);
+            T const b_hi = T(cb - T(cb - b));
+            T const b_lo = T(b - b_hi);
+            T e = T(T(a_hi * b_hi) - p);
+            e = T(e + T(a_hi * b_lo));
+            e = T(e + T(a_lo * b_hi));
+            e = T(e + T(a_lo * b_lo));
+            return Pair<T>{ p, e };
+        }
+
+        /**
+         * @brief @p a + @p b for Pairs (the double-word addition).
+         * @param a A Pair.
+         * @param b A Pair.
+         * @return The sum, renormalised.
+         */
+        template<real T>
+        constexpr Pair<T> pair_sum(Pair<T> const &a, Pair<T> const &b)
+        {
+            Pair<T> const s = detail::two_sum(a.hi, b.hi);
+            Pair<T> const t = detail::two_sum(a.lo, b.lo);
+            T e = T(s.lo + t.hi);
+            Pair<T> const u = detail::fast_two_sum(s.hi, e);
+            e = T(t.lo + u.lo);
+            return detail::fast_two_sum(u.hi, e);
+        }
+
+        /**
+         * @brief @p a / @p n for a small integer n held exactly in T.
+         * @param a A Pair.
+         * @param n The divisor.
+         * @return The quotient.
+         */
+        template<real T>
+        constexpr Pair<T> pair_quotient(Pair<T> const &a, T const &n)
+        {
+            T const q1 = T(a.hi / n);
+            Pair<T> const p = detail::two_product(q1, n);
+            T const r = T(T(T(a.hi - p.hi) - p.lo) + a.lo);
+            return detail::fast_two_sum(q1, T(r / n));
+        }
+
+        /**
+         * @brief @p a @p n for a small integer n held exactly in T.
+         * @param a A Pair.
+         * @param n The factor.
+         * @return The product.
+         */
+        template<real T>
+        constexpr Pair<T> pair_product(Pair<T> const &a, T const &n)
+        {
+            Pair<T> const p = detail::two_product(a.hi, n);
+            return detail::fast_two_sum(p.hi, T(p.lo + T(a.lo * n)));
+        }
+
+        /**
+         * @brief ln 2 = 2 atanh(1/3) = 2 sum_i 3^-(2i+1) / (2i + 1), in Pairs, to a term below eps^2 / 16.
+         * @return ln 2 as a Pair.
+         */
+        template<real T>
+        constexpr Pair<T> ln_two()
+        {
+            T const eps = T(std::numeric_limits<T>::epsilon());
+            T const stop = T(T(eps * eps) / T(16));
+            T const three = T(3);
+            Pair<T> power = detail::pair_quotient(Pair<T>{ T(1), T(0) }, three);
+            Pair<T> sum{ T(0), T(0) };
+            for (int i = 0;; ++i) {
+                Pair<T> const term = detail::pair_quotient(power, T(2 * i + 1));
+                if (term.hi < stop) break;
+                sum = detail::pair_sum(sum, term);
+                power = detail::pair_quotient(detail::pair_quotient(power, three), three);
+            }
+            return detail::pair_product(sum, T(2));
+        }
+
+        /**
+         * @brief The constants of exp() in T: the reduction x = k ln 2 + r by Cody and Waite's split of ln 2, a table
+         * of powers of 2 for k (T has no conversion to an integer), and the length of the Taylor series of expm1 on r.
+         *
+         * The domain is the tables' (B): from x_min = ln 2^-m moved a few eps inward, 2^-m the smallest power of 2 at
+         * or above min(), up to about 22. k counts powers of 2, at most -log2 min() <= (1 - min_exponent) times the
+         * bits of a digit; reach adds a margin.
+         *
+         * @tparam T The real type.
+         */
+        template<real T>
+        struct ExpConstants
+        {
+            /** @brief The largest |k| the reduction meets, with a margin. */
+            static constexpr long long reach =
+                (1LL - std::numeric_limits<T>::min_exponent)
+                    * static_cast<long long>(detail::significand_bits<T>() / std::numeric_limits<T>::digits)
+                + 4;
+
+            /** @brief The bits of reach: the length of the tables. */
+            static constexpr std::size_t bits =
+                static_cast<std::size_t>(std::bit_width(static_cast<unsigned long long>(reach)));
+
+            /** @brief 1 / ln 2, rounded. */
+            T inverse_ln2;
+
+            /** @brief ln 2 cut to digits - m radix digits, m the digits of reach, so that k c1 is exact. */
+            T c1;
+
+            /** @brief The rest of ln 2, from the Pair: ln 2 - c1. */
+            T c2;
+
+            /** @brief Where the domain ends below: exp(x) is 0 for x <= x_min. */
+            T x_min;
+
+            /** @brief The terms of the Taylor series of expm1 for |r| <= ln 2 / 2: until one is below eps / 8. */
+            int terms;
+
+            /** @brief 2^i. */
+            std::array<T, bits> powers;
+
+            /** @brief The factors of 2^k for k > 0: 2 for bit 0, and 2^(2^(i-1)) for bit i, applied twice. */
+            std::array<T, bits> up;
+
+            /** @brief Their inverses, for k < 0. */
+            std::array<T, bits> down;
+        };
+
+        /**
+         * @brief The constants of exp() in T, from + - * / alone.
+         * @return The constants.
+         */
+        template<real T>
+        constexpr ExpConstants<T> exp_constants()
+        {
+            using limits = std::numeric_limits<T>;
+            constexpr std::size_t bits = ExpConstants<T>::bits;
+            T const radix = T(limits::radix);
+            T const eps = T(limits::epsilon());
+            Pair<T> const ln2 = detail::ln_two<T>();
+
+            // Cody and Waite: k c1 must be exact for every |k| <= reach, so c1 keeps digits - m radix digits of ln 2,
+            // m the radix digits of reach, cut by subtracting units of the leading digit's place downward.
+            int m = 0;
+            for (long long held = 1; held <= ExpConstants<T>::reach; held *= limits::radix) ++m;
+            int const keep = limits::digits - m;
+            T leading = T(1);
+            while (leading > ln2.hi) leading = T(leading / radix);
+            while (T(leading * radix) <= ln2.hi) leading = T(leading * radix);
+            T rest = ln2.hi;
+            T c1 = T(0);
+            T unit = leading;
+            for (int i = 0; i < keep; ++i) {
+                while (rest >= unit) {
+                    rest = T(rest - unit);
+                    c1 = T(c1 + unit);
+                }
+                unit = T(unit / radix);
+            }
+            T const c2 = T(rest + ln2.lo);
+
+            std::array<T, bits> powers = detail::zeros<T, bits>();
+            std::array<T, bits> up = detail::zeros<T, bits>();
+            std::array<T, bits> down = detail::zeros<T, bits>();
+            powers[0] = T(1);
+            for (std::size_t i = 1; i < bits; ++i) powers[i] = T(powers[i - 1] + powers[i - 1]);
+            // 2^k as two factors, each about 2^(k/2): bit 0 contributes 2 once, bit i > 0 contributes 2^(2^(i-1))
+            // twice, so that neither factor leaves the range where the product is still inside it.
+            up[0] = T(2);
+            down[0] = T(T(1) / T(2));
+            up[1] = up[0];
+            down[1] = down[0];
+            for (std::size_t i = 2; i < bits; ++i) {
+                up[i] = T(up[i - 1] * up[i - 1]);
+                down[i] = T(down[i - 1] * down[i - 1]);
+            }
+
+            // m, the largest with 2^-m >= min(), by a greedy descent over its bits from min() itself, not min_exponent
+            // (Boost's cpp_bin_float_50 has min() = 2^min_exponent, a binade above radix^(min_exponent - 1)): bit i is
+            // taken if 2^-(m + 2^i) >= min(), compared as 2^-m >= min() 2^(2^i), which neither underflows nor
+            // overflows. x_min = -m ln 2, moved 4 eps inward, so that the rounded reduction cannot give a result below
+            // min().
+            T const smallest = T((limits::min)());
+            T scale = T(1); // 2^-m
+            T exponent = T(0);
+            for (std::size_t i = bits; i-- > 0;) {
+                T const needed = i > 0 ? T(T(smallest * up[i]) * up[i]) : T(smallest * up[0]);
+                if (scale >= needed) {
+                    scale = T(T(scale * down[i]) * (i > 0 ? down[i] : T(1)));
+                    exponent = T(exponent + powers[i]);
+                }
+            }
+            T const ln_min = T(T(exponent * c1) + T(exponent * c2));
+            T const x_min = T(-T(ln_min - T(T(4) * T(eps * ln_min))));
+
+            // |r| <= ln 2 / 2: the Taylor terms of expm1 until the next one is below eps / 8.
+            T const half_ln2 = T(ln2.hi / T(2));
+            T term = T(1);
+            int terms = 0;
+            while (term > T(eps / T(8))) {
+                ++terms;
+                term = T(T(term * half_ln2) / T(terms));
+            }
+            return ExpConstants<T>{ T(T(1) / ln2.hi), c1, c2, x_min, terms, powers, up, down };
+        }
+
+        /**
+         * @brief e^x on the tables' domain, from + - * / in T (Cody and Waite's reduction, an expm1 Taylor core).
+         *
+         * x = k ln 2 + r with k the nearest integer to x / ln 2, found by a greedy comparison against powers of 2,
+         * r = (x - k c1) - k c2, and e^x = (1 + p(r)) 2^k, p the series by Horner's scheme. The error: the final
+         * rounding of 1 + p (0.5 ulp), Horner's (0.73), the rounding of r (0.25): at most 1.48 ulp. No NaN test, no
+         * overflow guard, no subnormal results: x <= x_min gives 0, and x up to about 22 (the tables need t_max) is
+         * far from overflow.
+         *
+         * @param x The argument, x_min < x <= 22 (or x <= x_min for 0).
+         * @param constants The constants.
+         * @return e^x.
+         */
+        template<real T>
+        constexpr T exp(T const &x, ExpConstants<T> const &constants)
+        {
+            if (!(x > constants.x_min)) return T(0);
+            T const y = T(x * constants.inverse_ln2);
+            bool const negative = y < T(0);
+            T rest = T(T(negative ? T(-y) : y) + T(T(1) / T(2)));
+            std::array<T, ExpConstants<T>::bits> const &factors = negative ? constants.down : constants.up;
+            T k = T(0);
+            T scale_1 = T(1);
+            T scale_2 = T(1);
+            for (std::size_t i = constants.powers.size(); i-- > 0;) {
+                if (rest >= constants.powers[i]) {
+                    rest = T(rest - constants.powers[i]);
+                    k = T(k + constants.powers[i]);
+                    scale_1 = T(scale_1 * factors[i]);
+                    if (i > 0) scale_2 = T(scale_2 * factors[i]);
+                }
+            }
+            T const signed_k = negative ? T(-k) : k;
+            T const r = T(T(x - T(signed_k * constants.c1)) - T(signed_k * constants.c2));
+            T p = T(0);
+            for (int n = constants.terms; n >= 1; --n) p = T(T(r / T(n)) * T(T(1) + p));
+            return T(T(T(T(1) + p) * scale_1) * scale_2);
         }
 
     } // namespace detail
