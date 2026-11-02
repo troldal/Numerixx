@@ -1726,9 +1726,9 @@ namespace nxx::quadrature {
      *
      * @tparam M The method.
      * @tparam T The real type.
-     * @tparam F fn's type as a method receives it (a function as a pointer to it); by default a plain function of T.
+     * @tparam F fn's type as a method receives it (a function as a pointer to it); by default a pointer to a plain function of T, as integrate() passes one.
      */
-    template<typename M, typename T, typename F = T(T const &)>
+    template<typename M, typename T, typename F = T (*)(T const &)>
     concept fixed_rule = requires(M const &m, F &fn, T const &a, T const &b) {
         { m.apply(fn, a, b) } -> std::same_as<std::expected<T, error>>;
     };
@@ -1750,9 +1750,9 @@ namespace nxx::quadrature {
      *
      * @tparam M The method.
      * @tparam T The real type.
-     * @tparam F fn's type, reference removed; by default a plain function of T.
+     * @tparam F fn's type, reference removed; by default a pointer to a plain function of T, as integrate() passes one.
      */
-    template<typename M, typename T, typename F = T(T const &)>
+    template<typename M, typename T, typename F = T (*)(T const &)>
     concept estimating_method = requires(M const &m, F &fn, T const &a, T const &b, Criteria<T> const &criteria) {
         { m.estimate(fn, a, b, criteria) } -> std::same_as<std::expected<Integral<T>, Failure<T>>>;
     };
@@ -1762,9 +1762,9 @@ namespace nxx::quadrature {
      * combinator that keeps an inner method's state names it with this.
      * @tparam M The method.
      * @tparam T The real type.
-     * @tparam F fn's type, reference removed; by default a plain function of T.
+     * @tparam F fn's type, reference removed; by default a pointer to a plain function of T, as integrate() passes one.
      */
-    template<typename M, typename T, typename F = T(T const &)>
+    template<typename M, typename T, typename F = T (*)(T const &)>
     using state_t = typename detail::start_result<M, T, F>::value_type;
 
     /**
@@ -1799,9 +1799,9 @@ namespace nxx::quadrature {
      *
      * @tparam M The method.
      * @tparam T The real type.
-     * @tparam F fn's type, reference removed; by default a plain function of T.
+     * @tparam F fn's type, reference removed; by default a pointer to a plain function of T, as integrate() passes one.
      */
-    template<typename M, typename T, typename F = T(T const &)>
+    template<typename M, typename T, typename F = T (*)(T const &)>
     concept iterative_method = requires(M const &m, F &fn, T const &a, T const &b) {
         { m.start(fn, a, b) } -> detail::expected_state<T>;
     } && requires(M const &m, F &fn, state_t<M, T, F> &s) {
@@ -1860,8 +1860,9 @@ namespace nxx::quadrature {
         template<typename M, typename O>
         struct Observed
         {
-            /** @brief The method. */
-            M method;
+            /** @brief The method, held for the call to integrate() that observes it, so that a method that cannot be
+             * copied can be observed. */
+            M const &method;
 
             /** @brief The observer, called as a non-const callable: a mutable lambda can count its calls. */
             mutable kept<O> observer;
@@ -1924,17 +1925,23 @@ namespace nxx::quadrature {
             template<real T>
             constexpr void report(Step<T> const &step) const
             {
-                static_assert(std::invocable<kept<O> &, Step<T> const &>,
-                    "nxx::quadrature::observer(o): o must be callable as o(Step<T> const &)");
-                static_assert(std::is_void_v<std::invoke_result_t<kept<O> &, Step<T> const &>>,
-                    "nxx::quadrature::observer(o): o must return void (a result is reserved for stopping the run)");
-                std::invoke(observer, step);
+                // Each requirement is checked only where the one before it holds, so a wrong observer gives one
+                // diagnostic, not a cascade.
+                constexpr bool callable = std::invocable<kept<O> &, Step<T> const &>;
+                static_assert(callable, "nxx::quadrature::observer(o): o must be callable as o(Step<T> const &)");
+                if constexpr (callable) {
+                    constexpr bool returns_void = std::is_void_v<std::invoke_result_t<kept<O> &, Step<T> const &>>;
+                    static_assert(returns_void,
+                        "nxx::quadrature::observer(o): o must return void (a result is reserved for stopping the run)");
+                    if constexpr (returns_void) std::invoke(observer, step);
+                }
             }
         };
 
         /**
          * @brief The iterative method m observed by o.
-         * @param m The method.
+         * @param m The method, held by reference: it must outlive the result (a temporary does, for the full
+         * expression that integrates with it).
          * @param o The observer.
          * @return The observed method.
          */

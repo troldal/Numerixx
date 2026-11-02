@@ -10,8 +10,10 @@
 
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <concepts>
 #include <cstddef>
 #include <limits>
 #include <optional>
@@ -153,6 +155,64 @@ namespace {
     };
     static_assert(qd::iterative_method<Trapezoid, double>);
 
+    // An iterative method that cannot be copied: Romberg's steps, through state_t. It can be observed, since the
+    // observed method holds it by reference.
+    struct MoveOnly
+    {
+        constexpr MoveOnly() = default;
+        MoveOnly(MoveOnly const &) = delete;
+        constexpr MoveOnly(MoveOnly &&) = default;
+
+        template<nxx::real T, typename F>
+        constexpr std::expected<qd::state_t<qd::Romberg, T, F>, qd::Failure<T>> start(F &fn, T const &a, T const &b) const
+        { return qd::Romberg{}.start(fn, a, b); }
+
+        template<typename F, typename S>
+        constexpr auto advance(F &fn, S &s) const -> decltype(qd::Romberg{}.advance(fn, s))
+        { return qd::Romberg{}.advance(fn, s); }
+
+        template<typename S>
+        constexpr auto settle(S &s) const -> decltype(qd::Romberg{}.settle(s))
+        { return qd::Romberg{}.settle(s); }
+    };
+    static_assert(qd::iterative_method<MoveOnly, double> && !std::copy_constructible<MoveOnly>);
+
+    // Methods that take fn only as a plain function of double: as a pointer, which integrate() passes for a function,
+    // or as a reference, which it never passes. Each returns (b - a) fn(a) at its start.
+    struct OneStep
+    {
+        qd::Step<double> step;
+    };
+
+    constexpr std::expected<OneStep, qd::Failure<double>> one_step(double fa, double const &a, double const &b)
+    { return OneStep{ qd::Step<double>{ .current = qd::Integral<double>{ (b - a) * fa, 0.0 }, .exhausted = true } }; }
+
+    struct PointerOnly
+    {
+        constexpr std::expected<OneStep, qd::Failure<double>> start(double (*fn)(double const &), double const &a,
+            double const &b) const
+        { return one_step(fn(a), a, b); }
+
+        constexpr std::expected<void, qd::Failure<double>> advance(double (*)(double const &), OneStep &) const
+        { return {}; }
+
+        constexpr std::expected<void, qd::Failure<double>> settle(OneStep &) const
+        { return {}; }
+    };
+
+    struct ReferenceOnly
+    {
+        constexpr std::expected<OneStep, qd::Failure<double>> start(double (&fn)(double const &), double const &a,
+            double const &b) const
+        { return one_step(fn(a), a, b); }
+
+        constexpr std::expected<void, qd::Failure<double>> advance(double (&)(double const &), OneStep &) const
+        { return {}; }
+
+        constexpr std::expected<void, qd::Failure<double>> settle(OneStep &) const
+        { return {}; }
+    };
+
     // What an estimating method receives, recorded through a pointer (the member is const).
     struct Seen
     {
@@ -276,6 +336,7 @@ namespace {
     constexpr double cubic(double x) { return x * x * x - x; }
     constexpr double one(double) { return 1.0; }
     constexpr double runge(double x) { return 1.0 / (1.0 + x * x); }
+    constexpr double unit(double const &) { return 1.0; }
     constexpr auto quiet = [](qd::Step<double> const &) {};
     constexpr auto generic_square = [](auto const &x) { return x * x; };
 
@@ -284,6 +345,8 @@ namespace {
     template<typename M>
     concept observable = requires { qd::integrate<M>(qd::observer(quiet), square, 0.0, 1.0); }
                          && requires { qd::integrate(M{}, qd::observer(quiet), square, 0.0, 1.0); };
+    template<typename M>
+    concept integrable_unit = requires { qd::integrate<M>(unit, 0.0, 1.0); };
     template<typename M>
     concept braced_method = requires { qd::integrate<M>(square, 0.0, 1.0, { 3 }); };
 
@@ -330,6 +393,18 @@ static_assert(!braced_method<Midpoint>);
 static_assert(observable<qd::Romberg> && observable<gk15> && observable<Trapezoid>);
 static_assert(!observable<qd::GaussLegendre<7>> && !observable<Midpoint>);
 static_assert(!observable<SquareAtLowerEnd<gk15>>); // an estimating method has no steps to report
+// A method that cannot be copied is integrated and observed, named and as a value: Romberg's computation.
+static_assert(integrable<MoveOnly> && observable<MoveOnly>);
+static_assert(qd::integrate<MoveOnly>(qd::observer(quiet), runge, 0.0, 1.0, { .rel_tol = 1e-10 })
+              == qd::integrate<qd::Romberg>(runge, 0.0, 1.0, { .rel_tol = 1e-10 }));
+static_assert(qd::integrate(MoveOnly{}, qd::observer(quiet), runge, 1.0, 0.0, { .rel_tol = 1e-10 })
+              == qd::integrate<qd::Romberg>(runge, 1.0, 0.0, { .rel_tol = 1e-10 }));
+// The concepts' default F is what integrate() passes for a plain function of T, a pointer to it, so the concepts and
+// integrate() agree on a method that takes fn only as such: one that takes the pointer is both a method and
+// accepted, and one that takes a reference to the function is neither. (The rule is exact: (2 - 0) 1.)
+static_assert(qd::iterative_method<PointerOnly, double> && integrable_unit<PointerOnly>);
+static_assert(qd::integrate<PointerOnly>(unit, 0.0, 2.0) == qd::Integral<double>{ 2.0, 0.0 });
+static_assert(!qd::iterative_method<ReferenceOnly, double> && !integrable_unit<ReferenceOnly>);
 // Today's calls with a generic lambda as fn still resolve: no overload calls an argument on trial.
 static_assert(qd::integrate<qd::Romberg>(generic_square, 0.0, 1.0, { .rel_tol = 1e-12 }).has_value());
 static_assert(qd::integrate(qd::Romberg{}, generic_square, 0.0, 1.0).has_value());
@@ -662,6 +737,22 @@ TEST_CASE("quadrature: protocol: an observer reports each step and changes nothi
         auto counting = [&calls, n = 0](qd::Step<double> const &) mutable { calls = ++n; };
         (void)qd::integrate(qd::Romberg{}, qd::observer(counting), runge, 0.0, 1.0, { .rel_tol = 1e-10 });
         CHECK(calls == static_cast<int>(recorder.steps.size()));
+    }
+    SUBCASE("a method that cannot be copied is observed, and reports Romberg's steps")
+    {
+        std::vector<qd::Step<double>> steps, romberg;
+        auto const keep = [&steps](qd::Step<double> const &s) { steps.push_back(s); };
+        auto const keep_romberg = [&romberg](qd::Step<double> const &s) { romberg.push_back(s); };
+        MoveOnly const m;
+        auto const r = qd::integrate(m, qd::observer(keep), runge, 0.0, 1.0, { .rel_tol = 1e-10 });
+        auto const q = qd::integrate<qd::Romberg>(qd::observer(keep_romberg), runge, 0.0, 1.0, { .rel_tol = 1e-10 });
+        REQUIRE(r.has_value());
+        CHECK(r == q);
+        REQUIRE(steps.size() == romberg.size());
+        CHECK(std::ranges::equal(steps, romberg, [](auto const &x, auto const &y) {
+            return x.current == y.current && x.attainable == y.attainable && x.ready == y.ready
+                   && x.exhausted == y.exhausted && x.trusted == y.trusted;
+        }));
     }
     SUBCASE("the reports are for the ends in order")
     {

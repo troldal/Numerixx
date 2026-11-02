@@ -227,9 +227,9 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
   - [x] The protocol in `quadrature.hpp`, constexpr; `tests/test_quadrature_protocol.cpp`; the existing tests
     unchanged; docs build clean (GCC 13 and Clang 18 locally, the 2,438-result battery identical, 2026-11-02)
   - [x] CI passes on all five toolchains and the docs build (c2398c9: run 41467982100, PR #19)
-  - [x] The independent review (Claude Fable in place of Codex, 2026-11-02): no defect; six low findings, three
-    adopted in the docs and tests, three small fixes to `include/` proposed (`PHASE3A_API.md`, "The independent
-    review")
+  - [x] The independent review (Claude Fable in place of Codex, 2026-11-02): no defect; six low findings, all
+    adopted: three in the docs and tests (PR #19), and the three small fixes to `include/` after the user's approval
+    (`PHASE3A_API.md`, "The independent review")
 - Phase 3b: exp (internal) and `TanhSinh` on finite intervals, with the endpoint handling and the end-term test, as
   an iterative method of Phase 3a's protocol.
   - [x] API approved: `docs/quadrature/PHASE3_API.md` (2026-11-01, Q1 to Q10 as recommended; no K31, closing
