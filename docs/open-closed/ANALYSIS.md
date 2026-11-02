@@ -389,11 +389,14 @@ Each step is small, non-breaking and reviewable on its own:
 
 ## 11. Decisions for the user
 
+Decided by the user on 2026-11-02: D1 public, D4 quadrature first. The quadrature protocol is proposed in
+`docs/quadrature/PHASE3A_API.md`, which takes up D2 and D3 for that module.
+
 - **D1. Open to users, or only internally?** Internal only (step 1 and 2 without promoting `Start` and `Tolerance`)
   already removes every edit to existing code when the library adds a method. Recommended: public, because
-  that is where the principle pays most, and `plan.md` already anticipates it.
+  that is where the principle pays most, and `plan.md` already anticipates it. **Decided: public.**
 - **D2. Names:** `bracketed` / `from_guess` / `apply` / `estimate` for the members; `Start` (or `ValidBracket`) and
   `Tolerance` for the promoted types; `values` for the derivative count.
 - **D3. The method-value form:** the method as the last argument (`solve(fn, b, criteria, m)`, proposed: the existing
   argument order is kept and `solve<M>` stays the usual form), or a separate overload with the method first.
-- **D4. Order:** quadrature first (before Phase 3), as recommended, or roots first.
+- **D4. Order:** quadrature first (before Phase 3), as recommended, or roots first. **Decided: quadrature first.**
