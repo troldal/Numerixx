@@ -28,11 +28,43 @@ every module (the library, real types, the general test rules) is in `docs/desig
 
 ## The interface (`quadrature.hpp`)
 
-- `integrate<M>(fn, a, b)` for the fixed rule `GaussLegendre<N>`, 1 <= N <= 64, returning `std::expected<T, error>`;
-  `integrate<M = GaussKronrod<15>>(fn, a, b, criteria = {})` for the methods with an estimate (`GaussKronrod<15>`,
-  the default, and `Romberg`), returning `std::expected<Integral<T>, Failure<T>>`. Each overload is constrained to its
-  methods (`detail::fixed_rule<M>`, `detail::estimating<M>`), so criteria for the fixed rule do not compile.
-  `GaussKronrod<N>` requires N == 15 on the type, so `GaussKronrod<21>` fails where it is named (Phase 2, Q11).
+- **A method is a type** (Phase 3a, `PHASE3A_API.md`, approved 2026-11-02; amends `BRIEF.md` D1 and 3.9): a
+  `fixed_rule` (`apply(fn, a, b)`), an `iterative_method` (`start(fn, a, b)`, `advance(fn, state)`, `settle(state)`)
+  or an `estimating_method` (`estimate(fn, a, b, criteria)`), each a const member checked by a public concept
+  `<M, T, F = T(T const &)>`. `GaussLegendre<N>` is a fixed rule, `Romberg` and `GaussKronrod<15>` iterative methods;
+  a user's type works as they do. Adding a method edits nothing: no list of methods, no dispatch on them. The
+  contract (what a method is given and must return) is written once, in the concepts' comments.
+- **Six forms of `integrate`:** the named forms of Phases 1 and 2, unchanged, `integrate<M>(fn, a, b)` for a fixed
+  rule and `integrate<M = GaussKronrod<15>>(fn, a, b, criteria = {})` for a method with an estimate, now
+  `integrate(M{}, ...)`; the method as a value, first, `integrate(m, fn, a, b[, criteria])`, for a method with
+  parameters (a braced list never becomes a method); and with an observer, `integrate<M>(observer(o), fn, a, b[,
+  criteria])` and `integrate(m, observer(o), fn, a, b[, criteria])`. Criteria for a fixed rule do not compile.
+  `GaussKronrod<N>` requires N == 15 on the type, so `GaussKronrod<21>` fails where it is named (Phase 2, Q11);
+  `GaussLegendre<N>`'s range is a constraint on its member, so `GaussLegendre<0>` is a type that `integrate` rejects.
+- **Methods compute, `integrate` decides** (`PHASE3A_API.md` B, C): an iterative method reports a `Step<T>{current,
+  attainable, ready, exhausted, trusted}` after its start and after each step, and `integrate` runs the loop: each step
+  checked (a current result sound, attainable finite and not negative), then tested against `BRIEF.md` D5's request,
+  `abs_error <= max(abs_tol, rel_tol |value|, attainable)` once ready, settled before any decision, advanced while not
+  exhausted. The method keeps its own limits (Romberg ready from level 4 and attainable F; Gauss-Kronrod attainable 2F,
+  exhausted by an empty heap, the cap or stagnation, untrusted after an undone descent, settled on sums formed
+  afresh), so that no result changed: the 2,438 results of the protocol's battery (`docs/open-closed/quadrature-spike`)
+  are those of Phases 1 and 2 apart from Q4 below.
+- **The ends in order** (`PHASE3A_API.md` Q4): every method receives a < b, and `integrate` negates for b < a, so
+  `integrate(fn, b, a)` is exactly `-integrate(fn, a, b)` for every method. It changed Romberg's `abs_error` on
+  reversed ends where its plain L1 sum, summed in the other order, moved the floor (10 of the battery's float and
+  double results), and Gauss-Legendre's and Romberg's values in `cpp_dec_float_50`'s guard digits (13 results); no
+  status.
+- **Checked results** (Q5): in every build, a value that is not finite, an estimate that is not finite or negative,
+  or a best with `non_finite`, is returned as `non_finite`; the library's methods never trip it.
+- **Observing** (Q14): `observer(o)` wraps o, so that the overloads are told apart by type, never by calling an
+  argument on trial (a bare callable broke a call with a generic lambda as fn, `bare_observer.cpp`). `o(step)` after
+  the start and after each step, for the ends in order; the observed method shares its state, so the run is the same
+  computation. Counting evaluations is the caller's (in fn).
+- **No raw loops** in the code Phase 3a wrote or restructured (the user's request): Romberg's level adds its midpoints
+  and extrapolates with `std::ranges::all_of` over `std::views::iota` (stopping at the first term that cannot be formed),
+  Gauss-Kronrod's mesh likewise, its fresh sums with `std::ranges::for_each` over the panels not removed, its commit with
+  `std::ranges::for_each`; the descent's work list and `integrate`'s loop are each the whole of their function. Phases
+  1 and 2's other loops are unchanged.
 - Both ends deduce T; criteria as `Criteria<std::type_identity_t<T>>`. fn as in every module (`nxx::detail::callable`).
 - `Integral<T>{value, abs_error}`, `Failure<T>{reason, best}` (best present for `not_converged`),
   `Criteria<T>{abs_tol = 0, rel_tol = sqrt(eps)}`, `error{non_finite, not_converged}`; `error` and `Failure` format as
@@ -40,9 +72,9 @@ every module (the library, real types, the general test rules) is in `docs/desig
 
 ## Behaviour
 
-- **Validation, in order** (A): the tolerances (Romberg; negative or not finite: `non_finite`, then `rel_tol` clamped
-  to at most 1), the ends (NaN or infinite: `non_finite`), a == b (0, or `{0, 0}`, without calling fn). b < a negates
-  through the signed scale.
+- **Validation, in order** (A): the tolerances (a method with an estimate; negative or not finite: `non_finite`, then
+  `rel_tol` clamped to at most 1), the ends (NaN or infinite: `non_finite`), a == b (0, or `{0, 0}`, without calling
+  fn). b < a negates: since Phase 3a in `integrate`, which passes the method a < b (it was the signed scale's).
 - **The interval** (`detail::Interval`, built once by `detail::interval_of` and used by both methods): the nodes
   `c + hw u`, c = a / 2 + b / 2, hw = b / 2 - a / 2 (no overflow on [-max, max]), each clamped into
   [min(a, b), max(a, b)] by comparisons (`Interval::point`): where the halves round (on [D, 3D], D = denorm_min,

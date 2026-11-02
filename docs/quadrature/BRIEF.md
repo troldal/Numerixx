@@ -368,7 +368,8 @@ As in the other modules: `integrate` validates and dispatches once with `if cons
 `detail::gauss_kronrod`, `detail::tanh_sinh`, `detail::romberg`, each with its own loop. Gauss-Kronrod keeps its
 panels in a `std::vector` used as a binary heap (`std::push_heap`; transient allocation, so constexpr), reserved from
 the cap. No step interface, no shared mutable state. Everything constexpr; nothing throws; fn's exceptions pass
-through.
+through. Amended by Phase 3a (`PHASE3A_API.md`, 2026-11-02): the iterative methods step (`start`, `advance`,
+`settle`), `integrate` runs their loop and the test against the criteria, and an observer receives each step.
 
 ### 3.10 What `math.hpp` gains
 
@@ -499,7 +500,8 @@ Non-breaking to add later unless marked:
 ## 8. Decisions
 
 - **D1. One entry point `integrate<M>(fn, a, b[, criteria])`, methods as a closed set of empty tags, `GaussKronrod<15>`
-  the default.** Recommended: yes.
+  the default.** Recommended: yes. Amended by Phase 3a (`PHASE3A_API.md`, 2026-11-02): the set is open, a method is a
+  type with a const member checked by a public concept, and `integrate` also takes the method as a value.
 - **D2. The ends as two positional, oriented arguments** (b < a negates, a == b is 0). Recommended: yes.
   Alternative: an aggregate `Interval{a, b}` as roots' `Bracket`.
 - **D3. Failure carries the best estimate:** `std::expected<Integral<T>, Failure<T>>`, `Failure{reason, best}`, best
