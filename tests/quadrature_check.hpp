@@ -14,6 +14,7 @@
 #include <boost/multiprecision/cpp_bin_float.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <ios>
@@ -80,7 +81,8 @@ namespace quadrature_check {
         }
     };
 
-    // fn wrapped to count its samples outside [lo, hi], the interval's ends in order.
+    // fn wrapped to count its samples outside [lo, hi], the interval's ends in order, or outside (lo, hi) where open
+    // (TanhSinh never samples an end).
     template<typename F>
     struct Confined
     {
@@ -88,9 +90,10 @@ namespace quadrature_check {
         double lo;
         double hi;
         int *outside;
+        bool open = false;
         double operator()(double x) const
         {
-            if (x < lo || hi < x) ++*outside;
+            if (x < lo || hi < x || (open && (x == lo || x == hi))) ++*outside;
             return fn(x);
         }
     };
@@ -196,6 +199,62 @@ namespace quadrature_check {
         double const w = 2.0 / ((1.0 - x) * (1.0 + x) * dp * dp);
         double const relative = 2.0 * std::abs(x) / ((1.0 - x) * (1.0 + x)) * dx + 6.0 * u + 2.0 * r.error_dp / dp;
         return { dx, w * relative };
+    }
+
+    // The a-priori bound of docs/quadrature/PHASE3_API.md B on the relative error of a tanh-sinh node's complement and
+    // weight, in eps (exp's error taken as 1.5 ulp): for t >= 1/2, 2.5 + 4 sinh t + 3.5 e^-t and 6.2 + 4 sinh t +
+    // 3.5 e^-t; for t < 1/2, where sinh and cosh come from their series of N additions, 2.5 + (N + 0.5) sinh t and
+    // 6.2 + (N + 0.5) sinh t. The error of s = sinh t moves q = e^(-2s) by 2s times it, which dominates the outer
+    // nodes.
+    struct NodeBound
+    {
+        double comp;
+        double w;
+    };
+
+    inline NodeBound node_bound(double t, int series_additions)
+    {
+        if (t >= 0.5) {
+            double const common = 4.0 * std::sinh(t) + 3.5 * std::exp(-t);
+            return { 2.5 + common, 6.2 + common };
+        }
+        double const series = (series_additions + 0.5) * std::sinh(t);
+        return { 2.5 + series, 6.2 + series };
+    }
+
+    // Sums over the tanh-sinh double table, both sides, at the spacing h = 2^-k of a level k: sum h w (about 2, the
+    // integral of dx/dt over the line), sum h w B_w and sum h w comp B_comp (B: node_bound, 8 series additions in
+    // double); the largest of each over the levels 4 to 9, where a run can stop.
+    struct TableSums
+    {
+        double weight;
+        double w_bound;
+        double comp_bound;
+    };
+
+    inline TableSums tanh_sinh_sums()
+    {
+        TableSums largest{ 0.0, 0.0, 0.0 };
+        for (int k = 4; k <= 9; ++k) {
+            double const h = 1.0 / static_cast<double>(1 << k);
+            TableSums sums{ 0.0, 0.0, 0.0 };
+            for (int level = 0; level <= k; ++level) {
+                qd::detail::with_tanh_sinh_level<double>(level, [&sums, h, level](auto const &nodes) {
+                    for (int i = 0; i < nodes.size; ++i) {
+                        double const t = qd::detail::position(level, i) / 512.0;
+                        NodeBound const b = node_bound(t, 8);
+                        double const sides = t == 0.0 ? 1.0 : 2.0;
+                        double const w = nodes.weight(i);
+                        sums.weight += sides * h * w;
+                        sums.w_bound += sides * h * w * b.w;
+                        sums.comp_bound += sides * h * w * nodes.complement(i) * b.comp;
+                    }
+                });
+            }
+            largest = { std::max(largest.weight, sums.weight), std::max(largest.w_bound, sums.w_bound),
+                        std::max(largest.comp_bound, sums.comp_bound) };
+        }
+        return largest;
     }
 
     constexpr auto square = [](double x) { return x * x; };

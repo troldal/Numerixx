@@ -243,7 +243,9 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
     and run-time tables bit-identical, a level read at once; the budgets per toolchain in `design.md`; the
     prototype in `docs/quadrature/tanh-sinh-prototype/`; all five presets locally (Emscripten as in step 1) and the
     docs build (2026-11-02)
-  - [ ] Step 3, `TanhSinh`; tests in every type; docs build clean
+  - [x] Step 3, `TanhSinh`; tests in every type; docs build clean (all five presets locally, Emscripten 6.0.13 with
+    no workaround, and the docs build, 2026-11-02; the numerics review of the implementation, nine findings, all
+    adopted)
   - [ ] CI passes on all five toolchains
   - [ ] The independent review (Codex) and its adopted findings
 - Phase 4: `TanhSinh` on half lines and the line (exp-sinh, sinh-sinh).

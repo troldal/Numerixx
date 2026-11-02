@@ -1,5 +1,5 @@
 // GaussKronrod<15> of nxx::quadrature (Phase 2, docs/quadrature/PHASE2_API.md), the default method; and the edge cases
-// of both methods with an estimate, Romberg and GaussKronrod<15>, as one template.
+// of the methods with an estimate, Romberg, GaussKronrod<15> and TanhSinh, as one template.
 //
 // The rule is checked against Boost.Math's 115-digit G7-K15 table (quadrature_reference.hpp) within an a-posteriori
 // bound, as Phase 1's Gauss-Legendre rules. Smooth integrals are checked within a derived bound: the truncation of K15
@@ -31,6 +31,7 @@ using namespace quadrature_check;
 namespace {
 
     using gk15 = qd::GaussKronrod<15>;
+    using tanh_sinh = qd::TanhSinh;
 
     // The pair as integrate uses it in T: the compile-time table for float, double and long double, the generator
     // for every other T.
@@ -615,20 +616,42 @@ TEST_CASE("quadrature: kronrod: constant evaluation")
     CHECK(14.0 * 9.0 * eps_of<float>() <= kronrod_bound(square_float, 0.0, 3.0, eps_of<float>(), rule_f));
 }
 
-// The edge cases of both methods with an estimate, Romberg and GaussKronrod<15> (Phase 1's, moved here).
+// The edge cases of the methods with an estimate, Romberg, GaussKronrod<15> (Phase 1's, moved here) and TanhSinh
+// (Phase 3, with its statuses of docs/quadrature/PHASE3_API.md F).
 namespace {
 
-    // The number of panels a method's floor sums over on a mesh where every panel is final at its floor.
+    // The number of panels a method's floor sums over on a mesh where every panel is final at its floor (TanhSinh has
+    // one sum).
     template<typename M>
-    constexpr double floors = std::same_as<M, qd::Romberg> ? 1.0 : 10.0;
+    constexpr double floors = std::same_as<M, gk15> ? 10.0 : 1.0;
 
     // The rounding allowance of a result, by method: Romberg's 14 eps L1 and fn's 1.97 rho L1 (Phase 1);
     // Gauss-Kronrod's kronrod_bound without truncation (the cases are constants and e^x, whose truncation is
-    // negligible: below).
+    // negligible: below); TanhSinh's from its table's error bound per node (PHASE3_API.md B), without truncation, which
+    // the trapezoidal rule on the transformed fn makes negligible at the levels reached (its error decays like
+    // e^(-pi^2 / h), below 1e-60 from h = 1/16):
+    // - the weights: sum_i h |dw_i| |f_i| |hw| <= max |f| |hw| eps sum h w B_w;
+    // - the points: b - hw comp_i and a + hw comp_i err by |hw| comp_i B_comp eps through the complement and by
+    //   eps (|hw| + max(|a|, |b|)) through their two roundings, which move f by |f'| times that: max |f'| |hw|
+    //   (|hw| eps sum h w comp B_comp + eps (|hw| + max(|a|, |b|)) sum h w);
+    // - (6 eps + rho) L1: the term's products (1.5 eps), the compensated sums (2 eps), the pruned tails (each side's
+    //   first dropped term below eps L1 / 2, the rest decaying double exponentially: at most eps L1 for both), the
+    //   restored slivers (below an ulp of their end each: 1.5 eps L1), and fn's own rounding.
     template<typename M>
     double allowance(double rho, double l1, double max_f, double max_df, double a, double b)
     {
         if constexpr (std::same_as<M, qd::Romberg>) return finite((14.0 * deps + 1.97 * rho) * l1);
+        else if constexpr (std::same_as<M, tanh_sinh>) {
+            TableSums const sums = tanh_sinh_sums();
+            double const half = std::abs(b / 2 - a / 2);
+            double const weights = max_f * half * deps * sums.w_bound;
+            double const points =
+                max_df == 0.0 ? 0.0
+                              : max_df * half
+                                    * (half * deps * sums.comp_bound
+                                       + deps * (half + std::max(std::abs(a), std::abs(b))) * sums.weight);
+            return finite(weights + points + (6.0 * deps + rho) * l1);
+        }
         else {
             // On [-max, max] the width overflows double: its terms are the half-widths', doubled.
             double const half = std::abs(b / 2 - a / 2);
@@ -652,7 +675,8 @@ namespace {
     // The constant-evaluation edges of the independent review of Phase 1, for one method: a zero fn on [-max, max]
     // (b - a not formed) is 0 with its floor; NaN and infinite values and a sum that overflows are non_finite; a sum
     // above max / 2 is non_finite there, conservatively, where run time gives 0.8 max; a type without a default
-    // constructor integrates.
+    // constructor integrates (for TanhSinh, a type without a compile-time table, its levels generated in the same
+    // constant expression, each once).
     template<typename M>
     constexpr bool constant_edges()
     {
@@ -672,8 +696,9 @@ namespace {
 
 static_assert(constant_edges<qd::Romberg>());
 static_assert(constant_edges<gk15>());
+static_assert(constant_edges<tanh_sinh>());
 
-TEST_CASE_TEMPLATE("quadrature: estimating methods: edges", M, qd::Romberg, gk15)
+TEST_CASE_TEMPLATE("quadrature: estimating methods: edges", M, qd::Romberg, gk15, tanh_sinh)
 {
     qd::Failure<double> const invalid{ qd::error::non_finite, std::nullopt };
 
@@ -718,8 +743,8 @@ TEST_CASE_TEMPLATE("quadrature: estimating methods: edges", M, qd::Romberg, gk15
     CHECK(error_of(-backward->value, e_minus_1) <= backward->abs_error); // the honesty check
     CHECK(error_of(-backward->value, bin100(forward->value))
           <= 2.0 * allowance<M>(2.0 * deps, 1.7183, 2.7183, 2.7183, 0.0, 1.0));
-    // Gauss-Kronrod integrates over [min, max] and negates: exactly.
-    if constexpr (std::same_as<M, gk15>) {
+    // Gauss-Kronrod and TanhSinh integrate over [min, max] and negate: exactly.
+    if constexpr (!std::same_as<M, qd::Romberg>) {
         CHECK(backward->value == -forward->value);
         CHECK(backward->abs_error == forward->abs_error);
     }
@@ -734,7 +759,8 @@ TEST_CASE_TEMPLATE("quadrature: estimating methods: edges", M, qd::Romberg, gk15
 
     // An odd fn: x^3 on [-1, 1] = 0, its abs_error the floor (abs_tol 0): 50 eps L1, L1 between the exact 1/2
     // (Gauss-Kronrod: |x|^3 is a polynomial on each panel, the mesh having a point at 0) and Romberg's trapezoid sum
-    // 0.5078125, each formed with a few roundings.
+    // 0.5078125, each formed with a few roundings. TanhSinh's floor adds its two slivers, 5.0e-17 here (at level 4,
+    // h W = 2.5e-17 beyond t = 3.625 a side, at |x^3| = 1): 5.601e-15 in all, inside the window's 5.638e-15.
     auto const odd = qd::integrate<M>(cube, -1.0, 1.0, { .abs_tol = 0.0, .rel_tol = 1e-14 });
     REQUIRE(odd.has_value());
     CHECK(error_of(odd->value, "0") <= allowance<M>(deps, 0.5, 1.0, 3.0, -1.0, 1.0));
@@ -776,23 +802,55 @@ TEST_CASE_TEMPLATE("quadrature: estimating methods: edges", M, qd::Romberg, gk15
                                 std::pair{ dmax, -dmax }, std::pair{ 0.0, dmax } }) {
         INFO("[" << a << ", " << b << "]");
         int outside = 0;
-        auto const fn = Confined{ [](double x) { return x / 2; }, std::min(a, b), std::max(a, b), &outside };
+        // TanhSinh never samples an end either.
+        auto const fn = Confined{ [](double x) { return x / 2; }, std::min(a, b), std::max(a, b), &outside,
+                                  std::same_as<M, tanh_sinh> };
         (void)qd::integrate<M>(fn, a, b);
         (void)qd::integrate<M>(fn, a, b, { .rel_tol = 0.0 });
         CHECK(outside == 0);
     }
-    // Phase 1's review's counterexample: 0 on [D, 3D], 1e300 outside it; the integral is 0, with a floor.
+    // Phase 1's review's counterexample: 0 on [D, 3D], 1e300 outside it; the integral is 0, with a floor. TanhSinh
+    // samples it at three points, which round onto D and 2D: neither side has two points of distinct positions for
+    // its power-law end term, so the estimate is unbounded (not_converged, no best).
     auto const r = qd::integrate<M>([D](double x) { return x < D || x > 3.0 * D ? 1e300 : 0.0; }, D, 3.0 * D);
-    REQUIRE(r.has_value());
-    CHECK(error_of(r->value, "0") <= 0.0);
-    CHECK(r->abs_error >= 50.0 * dmin);
-    CHECK(r->abs_error <= 500.0 * dmin);
+    if constexpr (std::same_as<M, tanh_sinh>)
+        CHECK(r == std::unexpected(qd::Failure<double>{ qd::error::not_converged, std::nullopt }));
+    else {
+        REQUIRE(r.has_value());
+        CHECK(error_of(r->value, "0") <= 0.0);
+        CHECK(r->abs_error >= 50.0 * dmin);
+        CHECK(r->abs_error <= 500.0 * dmin);
+    }
+
+    // TanhSinh's remaining cases of PHASE3_API.md F: 0.25 on [-max, max] ok (max / 2, the width overflowing); 1 on
+    // [-max, max] non_finite (the value overflows); e^x on [0, 1000 D] and 1e300 x / D on [D, 64 D] ok within their
+    // estimates; 1e308 sin x on [0, 2 pi] non_finite (L1 overflows); no point strictly inside [1, nextafter(1)]:
+    // not_converged, no best, fn not called.
+    if constexpr (std::same_as<M, tanh_sinh>) {
+        auto const quarter = qd::integrate<M>([](double) { return 0.25; }, -dmax, dmax);
+        REQUIRE(quarter.has_value());
+        CHECK(error_of(quarter->value, bin100(dmax) / 2) <= quarter->abs_error);
+        CHECK(qd::integrate<M>([](double) { return 1.0; }, -dmax, dmax) == std::unexpected(invalid));
+        auto const exponential = qd::integrate<M>([](double x) { return std::exp(x); }, 0.0, 1000.0 * D);
+        REQUIRE(exponential.has_value());
+        CHECK(error_of(exponential->value, bin100(1000.0 * D)) <= exponential->abs_error);
+        // 1e300 (x / D) is exactly 1e300 k at x = k D: the integral 1e300 D (64^2 - 1) / 2.
+        auto const linear = qd::integrate<M>([D](double x) { return 1e300 * (x / D); }, D, 64.0 * D);
+        REQUIRE(linear.has_value());
+        CHECK(error_of(linear->value, bin100(1e300) * bin100(D) * bin100(4095) / 2) <= linear->abs_error);
+        CHECK(qd::integrate<M>([](double x) { return 1e308 * std::sin(x); }, 0.0, 6.283185307179586)
+              == std::unexpected(invalid));
+        int calls = 0;
+        auto const none = qd::integrate<M>(Counted{ square, &calls }, 1.0, std::nextafter(1.0, 2.0));
+        CHECK(none == std::unexpected(qd::Failure<double>{ qd::error::not_converged, std::nullopt }));
+        CHECK(calls == 0);
+    }
 }
 
 // Emscripten's default build compiles throw but aborts on it rather than unwinding to a catch, so the test runs
 // everywhere else.
 #ifndef __EMSCRIPTEN__
-TEST_CASE_TEMPLATE("quadrature: estimating methods: fn's exceptions pass through", M, qd::Romberg, gk15)
+TEST_CASE_TEMPLATE("quadrature: estimating methods: fn's exceptions pass through", M, qd::Romberg, gk15, tanh_sinh)
 {
     auto const throwing = [](double x) -> double {
         if (x > 0.6) throw std::runtime_error("fn failed");

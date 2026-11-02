@@ -1,11 +1,17 @@
-// TanhSinh of nxx::quadrature (Phase 3b, docs/quadrature/PHASE3B_API.md, with the numerics of PHASE3_API.md). Step 1:
-// detail::exp, the exponential in T from + - * / on the domain the node tables need. Step 2: the node tables in
-// pieces.
+// TanhSinh of nxx::quadrature (Phase 3b, docs/quadrature/PHASE3B_API.md, with the numerics of PHASE3_API.md): exp()
+// and the node tables against mpmath, the rule's accuracy, its steps and evaluation counts, termination and values
+// that are not finite, constant evaluation, the substitution for a singularity at an end other than 0, and the
+// fallback to the default. The edge cases it shares with Romberg and GaussKronrod<15> are in
+// test_quadrature_kronrod.cpp's template, and the protocol's properties in test_quadrature_protocol.cpp.
 //
 // exp() is checked against mpmath at 60 digits within the derived 1.48 ulp (PHASE3_API.md B: the final rounding of
 // 1 + p, 0.5 ulp; Horner's scheme, 0.73; the rounding of r, 0.25); the test allows 1.5. The tables' complements and
 // weights are checked per node within the a-priori bound of B. The references are in
 // quadrature_tanh_sinh_reference.hpp, from the script in docs/quadrature/design.md.
+// Integrals are checked against closed forms or mpmath with the honesty check |value - ref| <= abs_error and within
+// the tolerance. Evaluation counts are asserted exactly in double, in total and per level through the observer, for fn
+// of + - * / and sqrt, against the prototype of the specification (docs/quadrature/tanh-sinh-prototype/ts.py, Python
+// floats, the C++ double table loaded); no count is asserted where a libm function's last bits could move a decision.
 
 #include "quadrature_check.hpp"
 #include "quadrature_tanh_sinh_reference.hpp"
@@ -13,11 +19,15 @@
 #include <doctest/doctest.h>
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
+#include <expected>
 #include <limits>
 #include <span>
 #include <utility>
+#include <vector>
 
 using namespace quadrature_check;
 
@@ -72,26 +82,6 @@ namespace {
     }
 
     constexpr qd::detail::ExpConstants<double> exp_double = qd::detail::exp_constants<double>();
-
-    // The a-priori bound of PHASE3_API.md B on the relative error of a node's complement and weight, in eps (exp's
-    // error taken as 1.5 ulp): for t >= 1/2, 2.5 + 4 sinh t + 3.5 e^-t and 6.2 + 4 sinh t + 3.5 e^-t; for t < 1/2,
-    // where sinh and cosh come from their series of N additions, 2.5 + (N + 0.5) sinh t and 6.2 + (N + 0.5) sinh t.
-    // The error of s = sinh t moves q = e^(-2s) by 2s times it, which dominates the outer nodes.
-    struct NodeBound
-    {
-        double comp;
-        double w;
-    };
-
-    NodeBound node_bound(double t, int series_additions)
-    {
-        if (t >= 0.5) {
-            double const common = 4.0 * std::sinh(t) + 3.5 * std::exp(-t);
-            return { 2.5 + common, 6.2 + common };
-        }
-        double const series = (series_additions + 0.5) * std::sinh(t);
-        return { 2.5 + series, 6.2 + series };
-    }
 
     double node_t(int level, int i)
     { return level == 0 ? i : (2.0 * i + 1.0) / static_cast<double>(1 << level); }
@@ -254,4 +244,478 @@ TEST_CASE("quadrature: tanh_sinh: the tables against mpmath")
     CHECK(same_tables<float>(std::make_integer_sequence<int, qd::detail::tanh_sinh_levels>{}));
     CHECK(same_tables<double>(std::make_integer_sequence<int, qd::detail::tanh_sinh_levels>{}));
     CHECK(same_tables<long double>(std::make_integer_sequence<int, qd::detail::tanh_sinh_levels>{}));
+}
+
+// The method (step 3).
+namespace {
+
+    using tanh_sinh = qd::TanhSinh;
+
+    // A run with its evaluations counted.
+    template<typename T, typename F>
+    std::pair<std::expected<qd::Integral<T>, qd::Failure<T>>, int> run_counted(F fn, T a, T b, qd::Criteria<T> c = {})
+    {
+        int n = 0;
+        auto const r = qd::integrate<tanh_sinh>(Counted<F>{ fn, &n }, a, b, c);
+        return { r, n };
+    }
+
+    // Each step an observer receives, with the evaluations counted so far.
+    struct Recorder
+    {
+        int const *evaluations;
+        std::vector<qd::Step<double>> steps{};
+        std::vector<int> counts{};
+
+        void operator()(qd::Step<double> const &s)
+        {
+            steps.push_back(s);
+            counts.push_back(*evaluations);
+        }
+    };
+
+    // An observed run in double: its result and what the observer saw.
+    using Observed = std::pair<std::expected<qd::Integral<double>, qd::Failure<double>>, Recorder>;
+
+    template<typename F>
+    Observed run_observed(F fn, double a, double b, qd::Criteria<double> c = {})
+    {
+        int n = 0;
+        Recorder recorder{ &n };
+        auto const r = qd::integrate<tanh_sinh>(qd::observer(recorder), Counted<F>{ fn, &n }, a, b, c);
+        return { r, recorder };
+    }
+
+    double root_of(double x)
+    { return std::sqrt(x); }
+
+    // e^x by its Taylor polynomial of degree 20 in Horner's form: + - * / only (its error on [0, 1] is below 1e-19, so
+    // e - 1 remains the reference), for exact counts.
+    double taylor_exp(double x)
+    {
+        double s = 1.0;
+        for (int n = 20; n > 0; --n) s = 1.0 + x * s / n;
+        return s;
+    }
+
+    // x^-0.875 = 1 / (x^(1/2) x^(1/4) x^(1/8)) and x^-(127/128) by 7 nested square roots: powers by sqrt alone.
+    double power_875(double x)
+    { return 1.0 / (root_of(x) * root_of(root_of(x)) * root_of(root_of(root_of(x)))); }
+
+    double power_127(double x)
+    {
+        double r = x;
+        double product = 1.0;
+        for (int k = 0; k < 7; ++k) {
+            r = root_of(r);
+            product *= r;
+        }
+        return 1.0 / product;
+    }
+
+    // A hash of x's bits in [-1, 1]: noise that never resolves (as test_quadrature_kronrod.cpp's).
+    double noise_of(double x)
+    {
+        std::uint64_t h = std::bit_cast<std::uint64_t>(x) * 0x9E3779B97F4A7C15ull;
+        h ^= h >> 29;
+        h *= 0xBF58476D1CE4E5B9ull;
+        h ^= h >> 32;
+        return static_cast<double>(h >> 11) / 4503599627370496.0 - 1.0;
+    }
+
+    enum class status { ok, not_converged, non_finite };
+
+    template<typename T>
+    status status_of(std::expected<qd::Integral<T>, qd::Failure<T>> const &r)
+    {
+        if (r) return status::ok;
+        return r.error().reason == qd::error::not_converged ? status::not_converged : status::non_finite;
+    }
+
+    // The fallback of integrate()'s comment (PHASE3B_API.md Q4): the default only where TanhSinh is not_converged with
+    // a best, and its success only where it agrees with that best within the two estimates.
+    template<typename G>
+    std::expected<qd::Integral<double>, qd::Failure<double>> with_fallback(G const &g, double a, double b,
+                                                                           qd::Criteria<double> c = {})
+    {
+        auto const t = qd::integrate<qd::TanhSinh>(g, a, b, c);
+        return t.or_else([&](qd::Failure<double> const &f) -> decltype(t) {
+            if (f.reason != qd::error::not_converged || !f.best) return t;
+            auto const k = qd::integrate(g, a, b, c);
+            if (k && std::abs(k->value - f.best->value) <= f.best->abs_error + k->abs_error) return k;
+            return t;
+        });
+    }
+
+    // pi to 60 digits (mpmath).
+    constexpr char const *pi = "3.14159265358979323846264338327950288419716939937510582097494";
+
+    constexpr auto ts_square = [](double x) { return x * x; };
+    constexpr auto ts_runge = [](double x) { return 1.0 / (1.0 + x * x); };
+    constexpr auto ts_reciprocal = [](double x) { return 1.0 / x; };
+
+} // namespace
+
+static_assert(qd::iterative_method<tanh_sinh, double>);
+
+TEST_CASE("quadrature: tanh_sinh: accuracy on smooth and endpoint cases")
+{
+    // Kahaner's 1, 3, 6, 7 and 19 (e^x, sqrt x, x^1.5, 1 / sqrt x, log x), x^-0.9 and sqrt(x) log x on [0, 1]: ok, the
+    // honesty check, and the error within the request rel_tol |ref|. References are closed forms.
+    struct Case
+    {
+        char const *name;
+        int fn;
+        char const *ref;
+    };
+    Case const cases[] = {
+        { "e^x", 0, e_minus_1 },
+        { "sqrt x", 1, "0.6666666666666666666666666666666666666666666666666666666666666666666667" },
+        { "x^1.5", 2, "0.4" },
+        { "1 / sqrt x", 3, "2" },
+        { "log x", 4, "-1" },
+        { "x^-0.9", 5, "10" },
+        { "sqrt(x) log x", 6, "-0.4444444444444444444444444444444444444444444444444444444444444444444444" },
+    };
+    auto const check = []<typename T>(T, Case const &c, T const &rel_tol) {
+        auto const fn = [&c](T const &x) -> T {
+            using std::exp, std::log, std::pow, std::sqrt;
+            switch (c.fn) {
+            case 0: return T(exp(x));
+            case 1: return T(sqrt(x));
+            case 2: return T(x * sqrt(x));
+            case 3: return T(T(1) / sqrt(x));
+            case 4: return T(log(x));
+            case 5: return T(pow(x, T(T(-9) / T(10))));
+            default: return T(sqrt(x) * log(x));
+            }
+        };
+        INFO(c.name << ", rel_tol " << static_cast<double>(wide(rel_tol)));
+        auto const r = qd::integrate<tanh_sinh>(fn, T(0), T(1), { .rel_tol = rel_tol });
+        REQUIRE(r.has_value());
+        double const error = error_of(r->value, c.ref);
+        CHECK(error <= static_cast<double>(wide(r->abs_error))); // the honesty check
+        CHECK(error <= static_cast<double>(wide(rel_tol)) * std::abs(static_cast<double>(bin100(c.ref))));
+    };
+    for (Case const &c : cases) {
+        for (double const rel : { 1.5e-8, 1e-12 }) check(0.0, c, rel);
+        for (char const *rel : { "1e-25", "1e-45" }) {
+            check(bin50{}, c, bin50(rel));
+            check(bin50_et{}, c, bin50_et(rel));
+            check(dec50{}, c, dec50(rel));
+        }
+    }
+}
+
+TEST_CASE("quadrature: tanh_sinh: steps")
+{
+    // Report i is level i (PHASE3B_API.md B and E): level 0 has no current and is not ready; ready from level 4; the
+    // evaluations after each level as the prototype's.
+    auto const [r, seen] = run_observed(taylor_exp, 0.0, 1.0);
+    REQUIRE(r.has_value());
+    CHECK(seen.counts == std::vector<int>{ 10, 18, 33, 62, 121 });
+    REQUIRE(seen.steps.size() == 5);
+    CHECK(!seen.steps[0].current.has_value());
+    CHECK(!seen.steps[0].ready);
+    for (std::size_t i = 1; i < seen.steps.size(); ++i) {
+        INFO("step " << i);
+        CHECK(seen.steps[i].current.has_value());
+        CHECK(seen.steps[i].ready == (i >= 4));
+        CHECK(!seen.steps[i].exhausted);
+        CHECK(seen.steps[i].trusted);
+    }
+    CHECK(seen.steps.back().current == *r); // the last report is the result (a < b)
+    CHECK(r == qd::integrate<tanh_sinh>(taylor_exp, 0.0, 1.0)); // observed equals unobserved
+
+    // A run to the cap: 10 reports, only the last exhausted; 1/x's estimate is unbounded, so no report has a current.
+    auto const [divergent, cap] = run_observed(ts_reciprocal, 0.0, 1.0);
+    CHECK(divergent == std::unexpected(qd::Failure<double>{ qd::error::not_converged, std::nullopt }));
+    CHECK(cap.counts == std::vector<int>{ 10, 21, 41, 81, 163, 325, 648, 1293, 2582, 5159 });
+    REQUIRE(cap.steps.size() == 10);
+    for (std::size_t i = 0; i < cap.steps.size(); ++i) {
+        INFO("step " << i);
+        CHECK(cap.steps[i].exhausted == (i == 9));
+        CHECK(!cap.steps[i].current.has_value());
+    }
+
+    // The other levels the prototype records: 1 / sqrt x, a rounding cut on [1, 1 + 1e-9], the table's end on
+    // x^-(127/128) and the step at 0.3.
+    CHECK(run_observed([](double x) { return 1.0 / root_of(x); }, 0.0, 1.0).second.counts
+          == std::vector<int>{ 10, 19, 35, 67, 131 });
+    CHECK(run_observed([](double) { return 1.0; }, 1.0, 1.0 + 1e-9).second.counts
+          == std::vector<int>{ 5, 11, 23, 45, 89 });
+    CHECK(run_observed(power_127, 0.0, 1.0, { .rel_tol = 1e-4 }).second.counts
+          == std::vector<int>{ 10, 21, 41, 81, 163, 325, 648, 1293, 2582, 5159 });
+    CHECK(run_observed([](double x) { return x >= 0.3 ? 1.0 : 0.0; }, 0.0, 1.0).second.counts
+          == std::vector<int>{ 10, 15, 23, 39, 72, 137, 267, 525, 1039, 2066 });
+
+    // No point strictly inside: one report, exhausted, with no current, and fn never called. A failure at level 0
+    // gives no report.
+    auto const [none, single] = run_observed(ts_square, 1.0, std::nextafter(1.0, 2.0));
+    CHECK(none == std::unexpected(qd::Failure<double>{ qd::error::not_converged, std::nullopt }));
+    REQUIRE(single.steps.size() == 1);
+    CHECK(single.steps[0].exhausted);
+    CHECK(!single.steps[0].current.has_value());
+    CHECK(single.counts == std::vector<int>{ 0 });
+    auto const [shifted, silent] = run_observed([](double x) { return x >= 0.5 ? root_of(x - 0.5) : dnan; }, 0.0, 1.0);
+    CHECK(status_of(shifted) == status::non_finite);
+    CHECK(silent.steps.empty());
+}
+
+TEST_CASE("quadrature: tanh_sinh: evaluation counts in double")
+{
+    // The prototype's counts with the C++ table (docs/quadrature/design.md), with the status and whether a failure
+    // carries a best estimate: absent only where the estimate is unbounded or nothing can be sampled.
+    double const nan = dnan;
+    struct Case
+    {
+        char const *name;
+        std::pair<std::expected<qd::Integral<double>, qd::Failure<double>>, int> run;
+        status expected;
+        int evaluations;
+        bool best;
+    };
+    Case const cases[] = {
+        // The minimum cost: level 4, 121 evaluations, at every tolerance down to rel 0 (the 2F test).
+        { "e^x by Taylor [0,1]", run_counted(taylor_exp, 0.0, 1.0), status::ok, 121, false },
+        { "e^x by Taylor [0,1] rel 0 (the 2F test)", run_counted(taylor_exp, 0.0, 1.0, { .rel_tol = 0.0 }), status::ok,
+          121, false },
+        { "1/(1+x^2) [0,1]", run_counted(+ts_runge, 0.0, 1.0), status::ok, 121, false },
+        { "x^2 [0,3]", run_counted(+ts_square, 0.0, 3.0), status::ok, 105, false },
+        { "1/sqrt x [0,1]", run_counted([](double x) { return 1.0 / root_of(x); }, 0.0, 1.0), status::ok, 131, false },
+        { "x^-0.875 [0,1]", run_counted(power_875, 0.0, 1.0), status::ok, 151, false },
+        { "x^-0.875 [0,1] 1e-12", run_counted(power_875, 0.0, 1.0, { .rel_tol = 1e-12 }), status::ok, 151, false },
+        { "a peak of width 1e-2 at 0.42",
+          run_counted([](double x) { return 1.0 / (1e-4 + (x - 0.42) * (x - 0.42)); }, 0.0, 1.0), status::ok, 3602,
+          false },
+        // The cap, 10 levels, with no stagnation rule: unbounded estimates, no best.
+        { "1/x [0,1] (the cap, the table's end)", run_counted(+ts_reciprocal, 0.0, 1.0), status::not_converged, 5159,
+          false },
+        { "1/x^2 [0,1] (the cap, a value not finite)", run_counted([](double x) { return 1.0 / (x * x); }, 0.0, 1.0),
+          status::not_converged, 3022, false },
+        // The table's end with the geometric end term (D1) refuses x^-(127/128) at 1e-4, with an honest best (below).
+        { "x^-(127/128) [0,1] 1e-4", run_counted(power_127, 0.0, 1.0, { .rel_tol = 1e-4 }), status::not_converged,
+          5159, true },
+        // The rounding cut and its sliver (D3).
+        { "1 on [1, 1 + 1e-9]", run_counted([](double) { return 1.0; }, 1.0, 1.0 + 1e-9), status::ok, 89, false },
+        { "1 on [1000, 1001] rel 0", run_counted([](double) { return 1.0; }, 1000.0, 1001.0, { .rel_tol = 0.0 }),
+          status::ok, 109, false },
+        { "1e300 on [0, 3 denorm_min]", run_counted([](double) { return 1e300; }, 0.0, 3.0 * dmin), status::ok, 27,
+          false },
+        { "(1 - x)^-0.875 [0,1] (the power-law end term)",
+          run_counted([](double x) { return power_875(1.0 - x); }, 0.0, 1.0), status::not_converged, 3690, true },
+        // Values that are not finite (PHASE3_API.md D).
+        { "sqrt(x - 0.5) [0,1]", run_counted([nan](double x) { return x >= 0.5 ? root_of(x - 0.5) : nan; }, 0.0, 1.0),
+          status::non_finite, 5, false },
+        { "sqrt(x - 0.01) [0,1]",
+          run_counted([nan](double x) { return x >= 0.01 ? root_of(x - 0.01) : nan; }, 0.0, 1.0), status::non_finite,
+          6, false },
+        { "NaN on |x - 0.3| < 0.05",
+          run_counted([nan](double x) { return std::abs(x - 0.3) < 0.05 ? nan : 1.0; }, 0.0, 1.0), status::non_finite,
+          15, false },
+        // A NaN region of width 0.02 between the nodes: no sampling sees it.
+        { "NaN on |x - 0.3| < 0.01 (missed)",
+          run_counted([nan](double x) { return std::abs(x - 0.3) < 0.01 ? nan : 1.0; }, 0.0, 1.0), status::ok, 121,
+          false },
+        { "1/sqrt x, NaN below 1e-300 (a tail)",
+          run_counted([nan](double x) { return x < 1e-300 ? nan : 1.0 / root_of(x); }, 0.0, 1.0), status::ok, 131,
+          false },
+        // Noise that never resolves, at rel 0: the cap, with an honest best.
+        { "e^x (1 + 1e-10 h(x)) rel 0",
+          run_counted([](double x) { return taylor_exp(x) * (1.0 + 1e-10 * noise_of(x)); }, 0.0, 1.0,
+                      { .rel_tol = 0.0 }),
+          status::not_converged, 3711, true },
+        // Interior features: honest failures (use the default).
+        { "the step at 0.3 (Kahaner 2)", run_counted([](double x) { return x >= 0.3 ? 1.0 : 0.0; }, 0.0, 1.0),
+          status::not_converged, 2066, true },
+        { "|x - 0.37|", run_counted([](double x) { return std::abs(x - 0.37); }, 0.0, 1.0), status::not_converged, 3718,
+          true },
+        // No point of double strictly inside.
+        { "1 on [1, nextafter(1)]", run_counted([](double) { return 1.0; }, 1.0, std::nextafter(1.0, 2.0)),
+          status::not_converged, 0, false },
+        // A term that overflows ends the run at once: the centre's, (10 / 2) 1e308.
+        { "1e308 on [0, 10]", run_counted([](double) { return 1e308; }, 0.0, 10.0), status::non_finite, 1, false },
+    };
+    for (Case const &c : cases) {
+        INFO(c.name);
+        auto const &r = c.run.first;
+        CHECK(status_of(r) == c.expected);
+        CHECK(c.run.second == c.evaluations);
+        if (!r) CHECK(r.error().best.has_value() == c.best);
+    }
+    // The bests are honest: x^-(127/128) = 128, (1 - x)^-0.875 = 8, the noise within its amplitude 1e-10 (e - 1), the
+    // step 0.7 and the kink (0.37^2 + 0.63^2) / 2 = 0.2669.
+    auto const honest = [](Case const &c, char const *value, double margin) {
+        INFO(c.name);
+        REQUIRE(c.run.first.error().best.has_value());
+        qd::Integral<double> const &best = *c.run.first.error().best;
+        CHECK(error_of(best.value, value) <= best.abs_error + margin);
+    };
+    honest(cases[10], "128", 0.0);
+    honest(cases[14], "8", 0.0);
+    honest(cases[20], e_minus_1, 1e-10 * 1.7183);
+    honest(cases[21], "0.7", 0.0);
+    honest(cases[22], "0.2669", 0.0);
+    // The rounding cut's results (D3: the raw sum and the slivers kept apart), against 1e-9 (1 + 1e-9 - 1 as doubles)
+    // and 1, within the rule's rounding for a constant: the table's weights err by B_w eps each (the a-priori bound),
+    // so the value by (b - a) / 2 eps sum h w B_w; the products, the compensated sums and the slivers add 6 eps
+    // (b - a); the trapezoidal sum of the weights over the line is 2 up to e^(-pi^2 / h), negligible from h = 1/16.
+    // Draft 1's reading, the slivers in the running sum, erred by 6.8e-8 and 5.3e-14 relative.
+    double const rounding = deps * (tanh_sinh_sums().w_bound / 2.0 + 6.0);
+    auto const &narrow = cases[11].run.first;
+    double const width = (1.0 + 1e-9) - 1.0;
+    CHECK(error_of(narrow->value, bin100(width)) <= rounding * width);
+    CHECK(error_of(cases[12].run.first->value, "1") <= rounding);
+    // The first ends ok with an estimate above the request: twice its floor, which holds the two slivers, h W at the
+    // last kept value times the half-width per side; at level 4 the last kept node is t = 2.75 (its point 1.7e-16 from
+    // the end, the next rounding onto it) and h W = 2.0e-7 beyond it, so each sliver is 1.0e-16 and the floor 2.0e-16,
+    // 2.0e-7 of the width (0.9 half-ulps of 1 a side; up to 1.6 on other widths next to 1).
+    CHECK(narrow->abs_error > 1.5e-8 * width);
+    CHECK(narrow->abs_error <= 2.5e-7 * width);
+    CHECK(error_of(cases[13].run.first->value, bin100(3.0 * dmin) * bin100(1e300)) <= cases[13].run.first->abs_error);
+}
+
+TEST_CASE("quadrature: tanh_sinh: termination")
+{
+    // x^-0.99 by pow at 1e-4: a table's end (fn is finite down to 4.3e-312, below the table), whose geometric end term
+    // refuses it with a best (PHASE3B_API.md D1); an end term of 0 there, or h Te, returned ok with an error of 0.08.
+    auto const strong = qd::integrate<tanh_sinh>([](double x) { return std::pow(x, -0.99); }, 0.0, 1.0,
+                                                 { .rel_tol = 1e-4 });
+    REQUIRE(!strong.has_value());
+    CHECK(strong.error().reason == qd::error::not_converged);
+    REQUIRE(strong.error().best.has_value());
+    CHECK(error_of(strong.error().best->value, "100") <= strong.error().best->abs_error);
+    // x^-0.99 on [0, 1e-40]: the side at 0 ends at the table, then by rounding, then at a tail; the best is honest.
+    // The integral is 100 (1e-40)^0.01 = 100 10^-0.4.
+    auto const tiny = qd::integrate<tanh_sinh>([](double x) { return std::pow(x, -0.99); }, 0.0, 1e-40,
+                                               { .rel_tol = 1e-4 });
+    REQUIRE(!tiny.has_value());
+    REQUIRE(tiny.error().best.has_value());
+    CHECK(error_of(tiny.error().best->value, "39.8107170553497250770252305087752043487677037297380446865284")
+          <= tiny.error().best->abs_error);
+    // (1 - x)^-0.9 by pow: limited by the spacing of double near 1, not_converged with an honest best.
+    auto const far_end = qd::integrate<tanh_sinh>([](double x) { return std::pow(1.0 - x, -0.9); }, 0.0, 1.0);
+    REQUIRE(!far_end.has_value());
+    CHECK(far_end.error().reason == qd::error::not_converged);
+    REQUIRE(far_end.error().best.has_value());
+    CHECK(error_of(far_end.error().best->value, "10") <= far_end.error().best->abs_error);
+    // Level 0 drops each side's run of outermost small terms, from the outside in (D2): with fn exactly 0 at the left
+    // point of t = 2 and large beyond it, the exact value 2/3 - 2 x2; cutting at that first small term instead missed
+    // 2.5e-5.
+    double const x2 = 0.5 * qd::detail::with_tanh_sinh_level<double>(0, [](auto const &nodes) {
+        return nodes.complement(2);
+    });
+    auto const zero_inside = qd::integrate<tanh_sinh>([x2](double x) { return (x - x2) / root_of(x); }, 0.0, 1.0);
+    REQUIRE(zero_inside.has_value());
+    CHECK(error_of(zero_inside->value, bin100(2) / 3 - 2 * bin100(x2)) <= zero_inside->abs_error);
+    // 1/x in cpp_bin_float_50: the cap, no best, as in double.
+    auto const divergent = qd::integrate<tanh_sinh>([](bin50 const &x) { return bin50(1 / x); }, bin50(0), bin50(1));
+    CHECK(divergent == std::unexpected(qd::Failure<bin50>{ qd::error::not_converged, std::nullopt }));
+}
+
+TEST_CASE("quadrature: tanh_sinh: values not finite")
+{
+    // In the tail (comp < eps beyond every kept point) a value that is not finite cuts the side, as for 1/x^2 at the
+    // points nearest 0; elsewhere it is non_finite, with no best, whatever the type.
+    qd::Failure<double> const invalid{ qd::error::non_finite, std::nullopt };
+    CHECK(qd::integrate<tanh_sinh>([](double x) { return std::sqrt(x - 0.5); }, 0.0, 1.0) == std::unexpected(invalid));
+    CHECK(qd::integrate<tanh_sinh>([](double x) { return std::log(x - 0.25); }, 0.0, 1.0) == std::unexpected(invalid));
+    auto const tail = qd::integrate<tanh_sinh>([](double x) { return x < 1e-300 ? dinf : std::log(x); }, 0.0, 1.0);
+    REQUIRE(tail.has_value());
+    CHECK(error_of(tail->value, "-1") <= tail->abs_error);
+    auto const shifted = qd::integrate<tanh_sinh>([](bin50 const &x) { return bin50(sqrt(bin50(x - bin50(0.5)))); },
+                                                  bin50(0), bin50(1));
+    CHECK(shifted == std::unexpected(qd::Failure<bin50>{ qd::error::non_finite, std::nullopt }));
+}
+
+// Constant evaluation: polynomial and rational cases with the honesty check and within the request (the run-time
+// twins in "quadrature: tanh_sinh: constant evaluation" check that run time gives the same results, bit for bit); 1/x
+// on [0, 1] runs to the cap with an unbounded estimate and ends not_converged with no best, a flag rather than inf
+// arithmetic, which would not be a constant expression; a NaN fn is non_finite. x^2 on [0, 3] is 9 (105 evaluations),
+// 1 / (1 + x^2) on [0, 1] pi / 4 (121), against the double nearest pi / 4 (its half ulp far inside the estimate).
+namespace {
+    constexpr auto ts_square_result = qd::integrate<tanh_sinh>(ts_square, 0.0, 3.0);
+    constexpr auto ts_runge_result = qd::integrate<tanh_sinh>(ts_runge, 0.0, 1.0);
+    constexpr auto ts_reciprocal_result = qd::integrate<tanh_sinh>(ts_reciprocal, 0.0, 1.0);
+    constexpr auto ts_square_f = [](float x) { return x * x; };
+    constexpr auto ts_square_l = [](long double x) { return x * x; };
+    constexpr auto ts_square_float = qd::integrate<tanh_sinh>(ts_square_f, 0.0f, 3.0f);
+    constexpr auto ts_square_long = qd::integrate<tanh_sinh>(ts_square_l, 0.0L, 3.0L);
+} // namespace
+static_assert(ts_square_result && nxx::math::abs(ts_square_result->value - 9.0) <= ts_square_result->abs_error
+              && ts_square_result->abs_error <= 1.5e-8 * 9.0);
+static_assert(ts_runge_result
+              && nxx::math::abs(ts_runge_result->value - 0.78539816339744831) <= ts_runge_result->abs_error
+              && ts_runge_result->abs_error <= 1.5e-8 * 0.7854);
+static_assert(ts_reciprocal_result == std::unexpected(qd::Failure<double>{ qd::error::not_converged, std::nullopt }));
+static_assert(qd::integrate<tanh_sinh>([](double) { return std::numeric_limits<double>::quiet_NaN(); }, 0.0, 1.0)
+              == std::unexpected(qd::Failure<double>{ qd::error::non_finite, std::nullopt }));
+static_assert(ts_square_float && nxx::math::abs(ts_square_float->value - 9.0f) <= ts_square_float->abs_error);
+static_assert(ts_square_long && nxx::math::abs(ts_square_long->value - 9.0L) <= ts_square_long->abs_error);
+
+TEST_CASE("quadrature: tanh_sinh: constant evaluation")
+{
+    CHECK(qd::integrate<tanh_sinh>(ts_square, 0.0, 3.0) == ts_square_result);
+    CHECK(qd::integrate<tanh_sinh>(ts_runge, 0.0, 1.0) == ts_runge_result);
+    CHECK(qd::integrate<tanh_sinh>(ts_reciprocal, 0.0, 1.0) == ts_reciprocal_result);
+    CHECK(qd::integrate<tanh_sinh>(ts_square_f, 0.0f, 3.0f) == ts_square_float);
+    CHECK(qd::integrate<tanh_sinh>(ts_square_l, 0.0L, 3.0L) == ts_square_long);
+    // The constant's error against the closed forms, from bin100: the static_asserts' references rounded.
+    CHECK(error_of(ts_square_result->value, "9") <= ts_square_result->abs_error);
+    CHECK(error_of(ts_runge_result->value, pi_over_4) <= ts_runge_result->abs_error);
+}
+
+TEST_CASE("quadrature: tanh_sinh: the substitution for a singularity at an end other than 0")
+{
+    // cos(x) (1 - x)^-0.9 on [0, 1] = sum_n (-1)^n (cos 1 / ((2n)! (2n + 0.1)) + sin 1 / ((2n + 1)! (2n + 1.1)))
+    // (mpmath; the same as 10 times the integral of cos(1 - v^10) on [0, 1]). Directly the singularity at 1 is limited
+    // by the spacing of double there; with u = 1 - x it moves to 0, where u^-0.9 is formed from u itself.
+    char const *exact = "6.00083408694045601486578515775831407028906508236";
+    auto const direct =
+        qd::integrate<tanh_sinh>([](double x) { return std::cos(x) * std::pow(1.0 - x, -0.9); }, 0.0, 1.0);
+    REQUIRE(!direct.has_value());
+    CHECK(direct.error().reason == qd::error::not_converged);
+    auto const substituted =
+        qd::integrate<tanh_sinh>([](double u) { return std::cos(1.0 - u) * std::pow(u, -0.9); }, 0.0, 1.0);
+    REQUIRE(substituted.has_value());
+    CHECK(error_of(substituted->value, exact) <= substituted->abs_error);
+    CHECK(error_of(substituted->value, exact) <= 1.5e-8 * 6.0008);
+    // Singular at both ends: 1 / sqrt(1 - x^2) on [-1, 1] = pi, split at 0, each half with u = 1 -+ x as the integral
+    // of 1 / sqrt(u (2 - u)) over [0, 1], pi / 2, with fn written in u (1 - x^2 = u (2 - u)).
+    auto const half = qd::integrate<tanh_sinh>([](double u) { return 1.0 / root_of(u * (2.0 - u)); }, 0.0, 1.0);
+    REQUIRE(half.has_value());
+    CHECK(error_of(2.0 * half->value, pi) <= 2.0 * half->abs_error);
+    CHECK(error_of(2.0 * half->value, pi) <= 1.5e-8 * 3.1416);
+}
+
+TEST_CASE("quadrature: tanh_sinh: the fallback to the default")
+{
+    // integrate()'s pattern (PHASE3B_API.md Q4). A step: TanhSinh fails honestly, the default ends ok, and it agrees
+    // with TanhSinh's best, so it is returned.
+    auto const step = [](double x) { return x >= 0.3 ? 1.0 : 0.0; };
+    auto const stepped = with_fallback(step, 0.0, 1.0);
+    REQUIRE(stepped.has_value());
+    CHECK(error_of(stepped->value, "0.700000000000000011102230246251565404236316681") <= stepped->abs_error);
+    CHECK(stepped == qd::integrate(step, 0.0, 1.0));
+    // An endpoint singularity: TanhSinh itself ends ok, and the default is not called (as many calls as TanhSinh
+    // alone makes).
+    auto const log_of = [](double x) { return std::log(x); };
+    int calls = 0;
+    int alone = 0;
+    auto const logarithm = with_fallback(Counted{ log_of, &calls }, 0.0, 1.0);
+    (void)qd::integrate<tanh_sinh>(Counted{ log_of, &alone }, 0.0, 1.0);
+    REQUIRE(logarithm.has_value());
+    CHECK(calls == alone);
+    CHECK(error_of(logarithm->value, "-1") <= logarithm->abs_error);
+    // x^-0.99 at 1e-4: TanhSinh fails honestly, and the default's ok (99.47 +- 0.0099, an error of 0.53) contradicts
+    // TanhSinh's best (99.92 +- 0.099), so TanhSinh's failure stands; or_else alone returned that false success.
+    auto const power = [](double x) { return std::pow(x, -0.99); };
+    auto const strong = with_fallback(power, 0.0, 1.0, { .rel_tol = 1e-4 });
+    CHECK(strong == qd::integrate<tanh_sinh>(power, 0.0, 1.0, { .rel_tol = 1e-4 }));
+    auto const plain = qd::integrate(power, 0.0, 1.0, { .rel_tol = 1e-4 });
+    REQUIRE(plain.has_value());
+    CHECK(error_of(plain->value, "100") > plain->abs_error); // the false success the pattern rejects
+    // 1/x: no best, so the default is not called.
+    CHECK(with_fallback(ts_reciprocal, 0.0, 1.0)
+          == std::unexpected(qd::Failure<double>{ qd::error::not_converged, std::nullopt }));
 }

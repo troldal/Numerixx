@@ -371,6 +371,20 @@ From the numerics review (each settled or confirmed by the prototype, D):
   - The wording: cumulative counts, a term of a finite value, the two slivers up to an ulp, the test's reference
     (1.0 + 1e-9) - 1.0, and the kinds of the cuts as prototype evidence only.
   - A prototype line labelled Bailey that ran the geometric term was dropped.
+- The review of step 3's implementation (before its commit), each reproduced or derived, all adopted:
+  - A sliver can exceed half an ulp of its end: up to 1.6 half-ulps on widths from 1e-10 to 1e-8 next to 1 (the
+    prototype's sweep). The comments now say "up to about an ulp", and the narrow-interval test derives its bound.
+  - A term that overflows now ends the run at once, as in the prototype: 1e308 on [0, 10] took 10 evaluations to
+    reach `non_finite`, now 1 (a counted case).
+  - The sum of the two end terms is checked within max / 2 in constant evaluation.
+  - Level 0's samples are held in fixed arrays: no allocation, so nothing can throw.
+  - The tail rule is stated as within eps times the half-width of an end, beyond the points kept there; "exhausted
+    only at report 9" names report 0 with no point inside.
+  - The rounding cut's exact results are asserted within a derived bound, not exactly; a tolerance without an
+    estimate is dropped; the x^3 floor window states TanhSinh's slivers.
+- Measured in step 3 (`design.md`): about 255 constexpr steps per evaluation on Clang (the comment's "about 250"), 1/x
+  to the cap at 83 % of Clang's default after the sweeps walk the pieces in order (93 % by index), and 0.2 to 0.3 s of
+  compile time per translation unit for double, not the spike's 0.5 to 1.5 s.
 - Noted, not raised against 3b: a node where fn is exactly 0 can turn a side's cut into pruning and drop its end term
   (`PHASE3_API.md` C's approved rule).
 

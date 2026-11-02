@@ -541,6 +541,32 @@ Built in three steps (`PHASE3B_API.md` Q2): exp, the tables in pieces, the metho
   reads its level once for both sides and the slivers' weights. In constant evaluation, for a T without a table, each
   piece is generated once per call, as a temporary; the pre-3a code visited the pieces once per side and once per
   sliver, regenerating them each time.
+- **The method** (`TanhSinh`, step 3): an iterative method of Phase 3a's protocol. `start` is level 0, `advance` the
+  next level, `settle` nothing; `detail::TanhSinhState<T>` holds the interval, both sides, h, the raw sum R_k, L1_k and
+  the previous reported value, and the `Step`, with no table and no reference to fn. The computation is
+  `PHASE3_API.md` A to E as `PHASE3B_API.md` D pins it: the points b - hw comp and a + hw comp, evaluated only strictly
+  inside, the first that is not cutting its side; Phase 1's `Interval::term`, times h before the sum; level 0's
+  outermost run of terms below eps L1 of the whole sweep dropped, from the outside in; at level k a new node beyond the
+  outermost kept one pruned below eps L1_(k-1) / 2 in h-scale; R_k = R_(k-1) / 2 + the new terms in a local Neumaier
+  sum, L1 likewise; the tail rule comp < eps; the end term by how the side ended (0 after pruning; geometric after a
+  value not finite or at the table's end, D1; the sliver W at the last kept value and the power-law excess after
+  rounding); the reported value V_k = R_k + the slivers (D3); the estimate max(|V_k - V_(k-1)|, F_k) plus the end
+  terms; attainable 2 F_k, F_k with the slivers' sizes; ready from level 4; exhausted at level 9, or at the start where
+  no point is strictly inside.
+- **The side's state** (`detail::Side`): its cut and kind, the outermost kept point (the centre at first), the kept
+  point with the largest t below it (the geometric term's Tp), the kept point with the largest t farther from the end
+  (the power law's second point), updated as points are kept, and W, kept while the side is uncut or cut by rounding.
+  The prototype of Phase 3 searched every kept point at each level; since the points are monotone in t and adjacent
+  nodes differ in q by far more than a rounding, the choices are the same.
+- **Unbounded is a flag** (`PHASE3_API.md` E): an end term is unbounded where the terms do not decrease, where the
+  power law has no two points of distinct positions or q >= 1, or where its value would exceed max / 2 (each product
+  checked before it is formed, as `small_product` does); the step then has no current, and at the cap the failure no
+  best. A value, an L1, a level's difference or an estimate that overflows with finite end terms is `non_finite`.
+- **Constant evaluation**: the checks of Phase 1 (`checked_term`, `fits`, `compensated`) keep every term and sum
+  within max / 2, else `non_finite`. Two equivalent forms save steps on the hot path: the sums' check with max / 2
+  formed once, and term() alone where |y| <= (max / 8) / max(|hw|, 1), for which checked_term cannot refuse since every
+  weight is at most 1. The sweeps walk each piece in order (`TanhSinhLevel::each`), not by index: indexing cost 6 % per
+  evaluation and 12 % on 1/x to the cap.
 
 ### Evidence (Phase 3b)
 
@@ -570,6 +596,41 @@ node on Clang, 3.4 times double's 275 (levels 4 and 8 generated alone: 77,269 an
 arithmetic operation is a call. Levels 0 to 4, 5, 6 and 7 generated in one constant expression take 22.6, 34.6, 55.9
 and 96.2 % of Clang's default before the run's own steps (clang-cl 21.9 % and cl 18.2 % to level 4). So such a type
 fits in a constant expression only where the run stops by about level 5.
+
+The method (step 3): the kept prototype (`tanh-sinh-prototype/ts.py`, reading `tab_double.txt`) and the C++ agree on
+every count asserted, in total and per level (`quadrature: tanh_sinh: steps` and `evaluation counts in double`), and
+the prototype reproduces Phase 3's prototype bit for bit on its 38 counted cases (status, value, `abs_error`,
+evaluations), which matched the pre-3a C++. Among them:
+
+| Case | Criteria | Status | Evaluations |
+|---|---|---|---|
+| e^x (Taylor polynomial), 1 / (1 + x^2) on [0, 1] | default; rel 0 (the 2F test) | ok | 121 (10, 18, 33, 62, 121 by level) |
+| x^2 on [0, 3] | default | ok | 105 |
+| 1 / sqrt x; x^-0.875 by sqrt on [0, 1] | default (also 1e-12) | ok | 131; 151 |
+| 1 / (1e-4 + (x - 0.42)^2) on [0, 1] | default | ok | 3,602 |
+| 1 / x; 1 / x^2 on [0, 1] | default | not_converged (the cap), no best | 5,159; 3,022 |
+| x^-(127/128) by 7 sqrt on [0, 1] (a table's end, D1) | 1e-4 | not_converged, best 127.50 +- 0.62 | 5,159 |
+| 1 on [1, 1 + 1e-9]; on [1000, 1001] (D3) | default; rel 0 | ok, exact | 89; 109 |
+| 1e300 on [0, 3 denorm_min] | default | ok, exact | 27 |
+| (1 - x)^-0.875 on [0, 1] | default | not_converged, best 7.930 +- 0.107 | 3,690 |
+| sqrt(x - 0.5); sqrt(x - 0.01); NaN on \|x - 0.3\| < 0.05 | default | non_finite | 5; 6; 15 |
+| NaN on \|x - 0.3\| < 0.01 (between the nodes) | default | ok (missed) | 121 |
+| 1 / sqrt x, NaN below 1e-300 | default | ok (a tail) | 131 |
+| e^x (1 + 1e-10 h(x)), h a hash | rel 0 | not_converged (the cap), honest best | 3,711 |
+| the step at 0.3; \|x - 0.37\| | default | not_converged, honest best | 2,066; 3,718 |
+| 0 on [-max, max]; 0.25 on [-max, max]; 1 on [-max, max] | default | ok {0, 50 denorm_min}; ok; non_finite | 117; 117; 7 |
+| 0 on [D, 3D], 1e300 outside (D = denorm_min) | default | not_converged, no best (one distinct point a side) | 3 |
+| 1 on [1, nextafter(1)] | default | not_converged, no best | 0 |
+
+Constant evaluation of the method (Clang 22, the least step limit that compiles, by bisection): about 255 steps per
+evaluation in double, from 20 and 40 runs of x^2 on [0, 3] in one expression (105 evaluations each); 1/x on [0, 1] to
+the cap (5,159 evaluations) 873,394 steps, 83.3 % of the default, which compiles on GCC, Clang, clang-cl, cl and em++
+(the pre-3a code took 821,270). A class type without a table in a constant expression: `Wrapped`'s 1 on [0, 1] (the
+edge template) compiles on all five.
+
+Compile time (Debug, this machine, the best of three): a translation unit with one `integrate<TanhSinh>` in double
+takes 0.32 s longer than with the default method on GCC 16 (1.20 against 0.89 s) and 0.23 s on Clang 22 (0.97 against
+0.74 s): the double table's pieces.
 
 ### The references of the tanh-sinh tests
 
@@ -755,4 +816,12 @@ if __name__ == '__main__':
   the run-time ones; the sampled nodes of the double and `cpp_bin_float_50` tables within the bound of B, the nodes
   per level in every type within the capacity bound, the compile-time tables equal to the run-time pieces of a boxed
   twin of the same type (the cached path); static_asserts on the double table's levels and on a boxed double's level
-  4 generated in a constant expression, equal to the table's.
+  4 generated in a constant expression, equal to the table's; accuracy and honesty on Kahaner's 1, 3, 6, 7, 19,
+  x^-0.9 and sqrt(x) log x in double and the 50-digit types; the steps as observed (level 0 without a current, ready
+  from level 4, the cap's 10 reports, no point inside, no report after a failure at level 0) and the counts per level;
+  the counts above with each status and best; termination (D1's table end, x^-0.99 on [0, 1e-40], the far end, D2's
+  zero inside, 1/x in `cpp_bin_float_50`); values not finite; static_asserts with run-time twins, 1/x to the cap among
+  them; the substitutions for a singular end other than 0 and for both ends; the fallback of `integrate`'s comment.
+  TanhSinh joins the edge template (`test_quadrature_kronrod.cpp`) with its statuses of `PHASE3_API.md` F and an
+  allowance from its table's bound, and the protocol's tests (`test_quadrature_protocol.cpp`): the concept, named and
+  as a value, reversed ends exactly negated, observed equal to unobserved, in constant evaluation too.

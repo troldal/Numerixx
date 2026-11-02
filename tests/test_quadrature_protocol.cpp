@@ -378,6 +378,7 @@ namespace {
 static_assert(qd::fixed_rule<qd::GaussLegendre<7>, double> && !qd::fixed_rule<qd::GaussLegendre<0>, double>);
 static_assert(qd::iterative_method<qd::Romberg, double> && qd::iterative_method<gk15, double>);
 static_assert(qd::iterative_method<qd::Romberg, bin50> && qd::iterative_method<gk15, float>);
+static_assert(qd::iterative_method<qd::TanhSinh, double>);
 // The kinds stay apart.
 static_assert(!qd::fixed_rule<qd::Romberg, double> && !qd::estimating_method<qd::Romberg, double>);
 static_assert(!qd::iterative_method<qd::GaussLegendre<7>, double> && !qd::estimating_method<gk15, double>);
@@ -390,7 +391,7 @@ static_assert(!integrable<int> && !integrable<qd::GaussLegendre<0>> && !integrab
 // does not take. (With M named, a braced list in the method's place is the method: integrate<M>({...}, fn, a, b).)
 static_assert(!braced_method<Midpoint>);
 // An observer only with an iterative method, in both forms.
-static_assert(observable<qd::Romberg> && observable<gk15> && observable<Trapezoid>);
+static_assert(observable<qd::Romberg> && observable<gk15> && observable<qd::TanhSinh> && observable<Trapezoid>);
 static_assert(!observable<qd::GaussLegendre<7>> && !observable<Midpoint>);
 static_assert(!observable<SquareAtLowerEnd<gk15>>); // an estimating method has no steps to report
 // A method that cannot be copied is integrated and observed, named and as a value: Romberg's computation.
@@ -418,9 +419,11 @@ static_assert(qd::integrate<qd::GaussLegendre<7>>(runge, 0.0, 1.0) == qd::integr
 static_assert(qd::integrate<qd::Romberg>(runge, 0.0, 1.0, { .rel_tol = 1e-10 })
               == qd::integrate(qd::Romberg{}, runge, 0.0, 1.0, { .rel_tol = 1e-10 }));
 static_assert(qd::integrate(runge, 0.0, 1.0) == qd::integrate(gk15{}, runge, 0.0, 1.0));
+static_assert(qd::integrate<qd::TanhSinh>(runge, 0.0, 1.0) == qd::integrate(qd::TanhSinh{}, runge, 0.0, 1.0));
 
 TEST_CASE("quadrature: protocol: a method named and as a value")
 {
+    CHECK(qd::integrate<qd::TanhSinh>(runge, 0.0, 1.0) == qd::integrate(qd::TanhSinh{}, runge, 0.0, 1.0));
     CHECK(qd::integrate<qd::GaussLegendre<7>>(runge, 0.0, 1.0) == qd::integrate(qd::GaussLegendre<7>{}, runge, 0.0, 1.0));
     CHECK(qd::integrate<qd::Romberg>(runge, 0.0, 1.0, { .rel_tol = 1e-10 })
           == qd::integrate(qd::Romberg{}, runge, 0.0, 1.0, { .rel_tol = 1e-10 }));
@@ -434,6 +437,8 @@ TEST_CASE("quadrature: protocol: a method named and as a value")
 // its last bits (the plain sum of |terms| behind the floor, summed in the other order).
 static_assert(qd::integrate<qd::Romberg>(runge, 1.25, 0.0, { .rel_tol = 0.0 })
               == negated(qd::integrate<qd::Romberg>(runge, 0.0, 1.25, { .rel_tol = 0.0 })));
+static_assert(qd::integrate<qd::TanhSinh>(runge, 1.25, 0.0, { .rel_tol = 0.0 })
+              == negated(qd::integrate<qd::TanhSinh>(runge, 0.0, 1.25, { .rel_tol = 0.0 })));
 
 TEST_CASE("quadrature: protocol: reversed ends give exactly the negated result")
 {
@@ -443,6 +448,8 @@ TEST_CASE("quadrature: protocol: reversed ends give exactly the negated result")
         CHECK(qd::integrate<qd::Romberg>(runge, 1.25, 0.0, c) == negated(qd::integrate<qd::Romberg>(runge, 0.0, 1.25, c)));
         CHECK(qd::integrate<qd::Romberg>(peak, 1.0, -0.5, c) == negated(qd::integrate<qd::Romberg>(peak, -0.5, 1.0, c)));
         CHECK(qd::integrate(peak, 1.0, -0.5, c) == negated(qd::integrate(peak, -0.5, 1.0, c)));
+        CHECK(qd::integrate<qd::TanhSinh>(peak, 1.0, -0.5, c)
+              == negated(qd::integrate<qd::TanhSinh>(peak, -0.5, 1.0, c)));
         CHECK(qd::integrate<Trapezoid>(runge, 2.0, -1.0, c) == negated(qd::integrate<Trapezoid>(runge, -1.0, 2.0, c)));
     }
     auto const g = qd::integrate<qd::GaussLegendre<20>>(peak, 1.0, -0.5);
@@ -664,12 +671,22 @@ static_assert(qd::integrate<qd::Romberg>(qd::observer(quiet), runge, 1.0, 0.0, {
 static_assert(qd::integrate(qd::Romberg{}, qd::observer(quiet), runge, 1.0, 0.0, { .rel_tol = 1e-10 })
               == qd::integrate(qd::Romberg{}, runge, 1.0, 0.0, { .rel_tol = 1e-10 }));
 static_assert(qd::integrate(gk15{}, qd::observer(quiet), cubic, 2.0, -1.0) == qd::integrate(cubic, 2.0, -1.0));
+static_assert(qd::integrate<qd::TanhSinh>(qd::observer(quiet), runge, 1.0, 0.0)
+              == qd::integrate<qd::TanhSinh>(runge, 1.0, 0.0));
+static_assert(qd::integrate(qd::TanhSinh{}, qd::observer(quiet), runge, 1.0, 0.0)
+              == qd::integrate(qd::TanhSinh{}, runge, 1.0, 0.0));
 // In constant evaluation an observer may record, here into a transient vector.
 static_assert([] {
     std::vector<qd::Step<double>> steps;
     auto record = [&steps](qd::Step<double> const &s) { steps.push_back(s); };
     auto const r = qd::integrate<qd::Romberg>(qd::observer(record), runge, 0.0, 1.0, { .rel_tol = 1e-10 });
     return r && !steps.empty() && steps.back().current == *r;
+}());
+static_assert([] {
+    std::vector<qd::Step<double>> steps;
+    auto record = [&steps](qd::Step<double> const &s) { steps.push_back(s); };
+    auto const r = qd::integrate<qd::TanhSinh>(qd::observer(record), runge, 0.0, 1.0);
+    return r && steps.size() == 5 && !steps.front().current && steps.back().current == *r;
 }());
 
 TEST_CASE("quadrature: protocol: an observer reports each step and changes nothing")

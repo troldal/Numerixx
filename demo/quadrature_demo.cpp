@@ -30,11 +30,11 @@ namespace {
         }
     };
 
-    template<typename F>
+    template<typename M = qd::GaussKronrod<15>, typename F>
     void show(std::string_view label, F const &fn, double a, double b, double exact, qd::Criteria<double> c = {})
     {
         int n = 0;
-        auto const r = qd::integrate(Counted<F>{ fn, &n }, a, b, c);
+        auto const r = qd::integrate<M>(Counted<F>{ fn, &n }, a, b, c);
         if (r)
             std::println("   {:<34} {:.17g} +- {:.1e}  (error {:.1e}, {} evaluations)", label, r->value, r->abs_error,
                          std::abs(r->value - exact), n);
@@ -57,11 +57,14 @@ int main()
 
     // 2. A strong endpoint singularity: x^-0.9 cos x on [0, 1]. Beyond about x^-0.65, |K - G| understates the end
     //    panel's error by a ratio bisection does not change. Substituting x = u^k with k (1 + alpha) >= 1, here
-    //    k = 10, turns it into 10 cos(u^10), smooth.
+    //    k = 10, turns it into 10 cos(u^10), smooth. TanhSinh, whose points crowd double exponentially towards the
+    //    ends, takes it directly.
     std::println("\nAn endpoint singularity stronger than x^-0.65:");
     double const exact = 9.7718427116392900; // sum_n (-1)^n / ((2n)! (2n + 0.1))
-    show("x^-0.9 cos x, directly", [](double x) { return std::pow(x, -0.9) * std::cos(x); }, 0.0, 1.0, exact);
+    auto const singular = [](double x) { return std::pow(x, -0.9) * std::cos(x); };
+    show("x^-0.9 cos x, directly", singular, 0.0, 1.0, exact);
     show("10 cos(u^10), x = u^10", [](double u) { return 10.0 * std::cos(std::pow(u, 10.0)); }, 0.0, 1.0, exact);
+    show<qd::TanhSinh>("x^-0.9 cos x by TanhSinh", singular, 0.0, 1.0, exact);
 
     // 3. A failure with its best estimate: e^x with noise at 1e-10 never resolves at rel_tol 1e-12, and the
     //    bisections stop lowering the estimate (stagnation). Failure::best holds where it got.
