@@ -13,7 +13,7 @@ on a patched copy of `quadrature.hpp` (Spike, below).
 #include <numerixx/quadrature.hpp>
 namespace qd = nxx::quadrature;
 
-// Unchanged: every call that compiles today compiles, with the same results (Romberg's floor on reversed ends aside, Q4).
+// Unchanged: every call that compiles today compiles, with the same results, except on reversed ends (Q4).
 auto const r = qd::integrate(fn, 0.0, 1.0);
 auto const s = qd::integrate<qd::Romberg>(fn, 0.0, 1.0, {.rel_tol = 1e-12});
 auto const g = qd::integrate<qd::GaussLegendre<20>>(fn, 0.0, 1.0);
@@ -131,9 +131,10 @@ In order:
 - The tolerances, for an estimating method (negative or not finite: `non_finite`), then `rel_tol` clamped to at most
   1. The ends (NaN or infinite: `non_finite`). a == b: 0, or `{0, 0}`, without calling fn. All as today.
 - **The ends in order** (Q4): the method receives `(min, max)`; where b < a, `integrate` negates the value, and a
-  best's value. Today each method orients itself; Gauss-Legendre and Gauss-Kronrod give the exact negation, so they
-  are unchanged, and Romberg's `abs_error` on reversed ends changes where its plain L1 sum, summed in the other
-  order, moves the floor (Spike).
+  best's value. Today each method orients itself. Gauss-Kronrod already orders its ends, so it is unchanged. On
+  reversed ends Romberg's `abs_error` can change where its plain L1 sum, summed in the other order, moves the floor.
+  In `cpp_dec_float_50`, whose rounding is not symmetric in sign, Gauss-Legendre's and Romberg's values can change
+  in the guard digits beyond the type's 50. No status changes (Spike).
 - **The method's member**, with the criteria validated and clamped, as `Criteria<T>` (Q6).
 - **The result checked** (Q5), in every build: a fixed rule's value must be finite; an `Integral` (the result, or a
   best) must have a finite value and a finite, non-negative `abs_error`, and a best may come only with
@@ -211,7 +212,10 @@ project's five toolchains; the phase itself builds and tests on all five.
   `GaussKronrod<15>` at the default, 1e-12 and 0, and Romberg at the default, 1e-10 and an oversized tolerance, in
   float, double, long double, `cpp_bin_float_50` and `cpp_dec_float_50`; edges (1 and 1/4 on [-max, max], a == b, a
   NaN end, a negative tolerance) and three results computed in constant expressions: 2,438 results. Draft 1:
-  identical. Draft 2 without ordering the ends: identical. Draft 2 with it (Q4): DUMP_NORMALIZE (run pending).
+  identical. Draft 2 without ordering the ends: identical. Draft 2 with it (Q4): 23 differ, all on reversed
+  ends, no status among them: Romberg's `abs_error` alone in 9 float and 1 double results (the floor's L1 sum);
+  in `cpp_dec_float_50`, 7 Gauss-Legendre values and 6 Romberg results, in the guard digits (about the 70th
+  significant digit). Gauss-Kronrod: none.
 - **Orientation today** (`orient.cpp`): 3,000 intervals (positive, negative, across 0, up to 2e6 wide) and three
   integrand families, each integrated forwards and reversed, the whole result compared (status, value, abs_error,
   best). Gauss-Legendre<64> and Gauss-Kronrod<15> (at the default and at rel_tol 0): the exact negation every time.
@@ -235,8 +239,8 @@ project's five toolchains; the phase itself builds and tests on all five.
 
 ## Tests (`tests/test_quadrature_protocol.cpp`, test cases `quadrature:protocol:*`)
 
-- **The existing suite unchanged**, passing with its exact counts and values, except any check of Romberg's
-  `abs_error` on reversed ends (none in the spike's run; Q4).
+- **The existing suite unchanged**, passing with its exact counts and values (it did in the spike with the ends
+  ordered: no test pins a reversed result that Q4 changes).
 - **Both forms agree:** `integrate<M>(fn, a, b[, c]) == integrate(M{}, fn, a, b[, c])` for the three library
   methods, one `static_assert` each in double, with run-time twins.
 - **Reversal is exact for every method:** `integrate(fn, b, a) == -integrate(fn, a, b)`, the whole result, for the
@@ -293,8 +297,10 @@ project's five toolchains; the phase itself builds and tests on all five.
   receives a < b: the contract is simpler, a method tied to an end knows which, and two mistakes the usage sketch
   made that nothing catches (a loop `x < b` from a, an `if (b < a) swap`) cannot happen. Reversal becomes exact for
   every method. Cost: Romberg's `abs_error` on reversed ends changes where the floor's L1 sum rounds differently
-  (values and statuses never, in 6,000 runs; DUMP_NORMALIZE). Alternative: the method orients itself, bit for bit with
-  today, with the orientation as the first rule of the contract and a reversal check in the guide.
+  (values and statuses never, in 6,000 double runs), and in `cpp_dec_float_50` Gauss-Legendre's and Romberg's
+  values on reversed ends change beyond its 50 digits (23 of the battery's 2,438 results changed, no status).
+  Alternative: the method orients itself, bit for bit with today, with the orientation as the first rule of the
+  contract and a reversal check in the guide.
 - **Q5. The result's finiteness checked in every build, a broken result returned as `non_finite`.** Recommended: yes
   (changed from draft 1's assert). `integrate`'s comment promises `non_finite` where a value is not finite; under
   `NDEBUG` an assert would return a user's NaN as a success. It costs a few comparisons per call, and it is tested.
