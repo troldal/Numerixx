@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Numerixx">
+<title>Numerixx</title>
+<rect width="64" height="64" rx="12" fill="#1c3329"/>
+<path fill="#10b981" d="M14 14h15v15h-15zM35 14h15v15h-15zM14 35h15v15h-15zM35 35h15v15h-15z"/>
+</svg>

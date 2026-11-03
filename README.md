@@ -1,4 +1,8 @@
-# Numerixx
+<!-- GitHub shows one image per colour scheme; Doxygen, which reads this file as its main page, knows no <picture>. -->
+<h1>
+  <img alt="Numerixx" src="docs/sphinx/_static/numerixx-logo-light.svg#gh-light-mode-only" height="48">
+  <img alt="Numerixx" src="docs/sphinx/_static/numerixx-logo-dark.svg#gh-dark-mode-only" height="48">
+</h1>
 
 A header-only C++23 library of numerical methods, in the spirit of GSL: small algorithms that combine, work with any
 real type (including Boost.Multiprecision) and run in constant expressions. Numerixx itself throws nothing but
@@ -72,6 +76,21 @@ target_link_libraries(app PRIVATE numerixx::numerixx)
 
 The API documentation is generated with Doxygen: build the target `numerixx_docs`, or run `doxygen docs/Doxyfile` in
 the project root.
+
+## Logo
+
+The logo, its mark alone and the favicon are in `docs/sphinx/_static/` (`numerixx-logo-{light,dark}.svg`,
+`numerixx-mark-{light,dark}.svg`, `favicon.svg`), drawn from outlines of IBM Plex Mono (SIL Open Font License). Where
+only text will do:
+
+```text
+ _ __  __  ____  __ _  _
+| '_ \ \ \/ /\ \/ /|_||_|
+| | | | >  <  >  <  _  _
+|_| |_|/_/\_\/_/\_\|_||_|
+
+numerixx -- header-only numerical algorithms for C++23
+```
 
 ## License
 

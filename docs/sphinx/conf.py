@@ -22,7 +22,12 @@ html_theme_options = {
     "search_backend": "sphinx",
     "disable_seo": "true",
     "wide_layout": "always",
+    # The logo already spells the name, so the header shows it alone; Lumina swaps the files with its theme toggle.
+    "light_logo": "numerixx-logo-light.svg",
+    "dark_logo": "numerixx-logo-dark.svg",
+    "logo_only": "true",
 }
+html_favicon = "_static/favicon.svg"
 # Wider still, so that the examples' code blocks need no horizontal scroll bar (_static/numerixx.css).
 html_static_path = ["_static"]
 html_css_files = ["numerixx.css"]
