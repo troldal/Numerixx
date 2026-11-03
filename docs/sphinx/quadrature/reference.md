@@ -2,8 +2,10 @@
 
 Integrals of a real function of one variable over a finite interval, from `numerixx/quadrature.hpp`: adaptive
 Gauss-Kronrod (G7-K15), the default method; the tanh-sinh rule (`TanhSinh`), for endpoint singularities and high
-precision; Romberg's method; and the fixed Gauss-Legendre rule. The module's chapter, with its overview, tutorial and
-guides, comes when the module is complete; until then this page is its reference.
+precision; Romberg's method; and the fixed Gauss-Legendre rule. `TanhSinh` alone also takes an infinite end, by
+exp-sinh on a half line and sinh-sinh on the line; every other method returns `non_finite` for one. The module's
+chapter, with its overview, tutorial and guides, comes when the module is complete; until then this page is its
+reference.
 
 A method is a type: a `fixed_rule`, an `iterative_method` or an `estimating_method`, and a type of one's own that is
 one works as the library's do. An iterative method computes and reports a `Step` after each step, and `integrate`

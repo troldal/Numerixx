@@ -1,14 +1,16 @@
 /**
  * @file
- * @brief Integrals of a real function of one variable over a finite interval: adaptive Gauss-Kronrod, the default;
- * the tanh-sinh rule; Romberg's method; and the fixed Gauss-Legendre rule.
+ * @brief Integrals of a real function of one variable over a finite interval, or for TanhSinh an infinite one:
+ * adaptive Gauss-Kronrod, the default; the tanh-sinh rule and its exp-sinh and sinh-sinh forms; Romberg's method; and
+ * the fixed Gauss-Legendre rule.
  *
  * integrate(fn, a, b) integrates fn from a to b by adaptive Gauss-Kronrod, the default method, and integrate<M>(fn, a,
- * b) by a method M: `GaussKronrod<15>`, the default named; `TanhSinh`, for endpoint singularities and high
- * precision; `Romberg`; or `GaussLegendre<N>`, a fixed rule that returns a plain number. integrate(m, fn, a, b) takes
- * the method as a value, for a method with parameters. The methods with an estimate return an Integral, the value and
- * an estimate of its error, or a Failure. Every method returns a std::expected; Numerixx itself never throws, but the
- * result's own value() throws std::bad_expected_access on a failure, so test the result and read it with `->` or `*`.
+ * b) by a method M: `GaussKronrod<15>`, the default named; `TanhSinh`, for endpoint singularities, high precision and
+ * infinite intervals; `Romberg`; or `GaussLegendre<N>`, a fixed rule that returns a plain number. integrate(m, fn, a,
+ * b) takes the method as a value, for a method with parameters. The methods with an estimate return an Integral, the
+ * value and an estimate of its error, or a Failure. Every method returns a std::expected; Numerixx itself never
+ * throws, but the result's own value() throws std::bad_expected_access on a failure, so test the result and read it
+ * with `->` or `*`.
  *
  * A method is a type: a fixed_rule, an iterative_method or an estimating_method, and a user's type that is one works
  * as the library's do. An iterative method (GaussKronrod<15>, TanhSinh, Romberg) computes and reports a Step after each
@@ -20,11 +22,14 @@
  * if (r) use(r->value, r->abs_error);
  * auto const s = qd::integrate<qd::Romberg>(qd::observer([](qd::Step<double> const &step) { log(step); }),
  *                                           [](double x) { return std::exp(x); }, 0.0, 1.0);
+ * auto const g = qd::integrate<qd::TanhSinh>([](double x) { return std::exp(-x * x); }, -inf, inf); // sqrt(pi)
  * @endcode
  *
- * The ends are oriented: b < a gives the negated integral, and a == b gives 0 without calling fn. An interval narrow
- * against its position (|a + b| far above |b - a|) rounds each point at which fn is evaluated by about eps |a + b| / 2,
- * so the result errs by about that times the integral of |f'|: fn's conditioning, which no method sees.
+ * The ends are oriented: b < a gives the negated integral, and a == b gives 0 without calling fn. An infinite end is
+ * for TanhSinh only (a method opts in, see estimating_method); every other method returns error::non_finite. An
+ * interval narrow against its position (|a + b| far above |b - a|) rounds each point at which fn is evaluated by about
+ * eps |a + b| / 2, so the result errs by about that times the integral of |f'|: fn's conditioning, which no method
+ * sees.
  */
 
 #pragma once
@@ -60,12 +65,15 @@ namespace nxx::quadrature {
      */
     enum class error {
         /**
-         * An end is NaN or infinite (no method takes an infinite interval yet), a tolerance is negative or not
-         * finite, fn returned a value that is not finite (for GaussKronrod: on a panel of its initial mesh that no
-         * short bisection avoids, such as a region where fn is NaN; for TanhSinh: anywhere but within eps times the
-         * half-width of an end and beyond the points kept towards it, so that 1 / sqrt x on [0, 1] is ok, 1/x
-         * not_converged and sqrt(x - 0.5) non_finite), or a sum overflowed; or a method of one's own returned a result
-         * that is not finite, or reported its own failure so.
+         * An end is NaN, or infinite for a method that does not take infinite ends (every method but TanhSinh); a
+         * tolerance is negative or not finite; fn returned a value that is not finite (for GaussKronrod: on a panel of
+         * its initial mesh that no short bisection avoids, such as a region where fn is NaN; for TanhSinh: anywhere but
+         * within eps times the half-width of an end and beyond the points kept towards it, so that 1 / sqrt x on
+         * [0, 1] is ok, 1/x not_converged and sqrt(x - 0.5) non_finite; towards an infinite end, anywhere its tail
+         * rule does not apply: beyond the kept points, at a distance above 1/eps or after a term already negligible,
+         * so that x^50 e^-x on [0, inf) is ok and x^51 e^-x, whose last term before the overflow is not yet
+         * negligible, non_finite); or a sum
+         * overflowed; or a method of one's own returned a result that is not finite, or reported its own failure so.
          */
         non_finite,
 
@@ -76,7 +84,8 @@ namespace nxx::quadrature {
          * endpoint singularity, or a piece where fn is not finite that a short bisection did not avoid).
          * Failure::best then holds the estimate reached and its error estimate, for Romberg and GaussKronrod always; a
          * method of one's own may have none. TanhSinh has none where the interval has no point of T strictly inside,
-         * or where its bound beyond an end is unbounded: the terms grow towards the end (1/x, a divergent integral) or
+         * or where its bound beyond an end is unbounded: the terms grow towards the end (1/x on [0, 1] or [1, inf),
+         * a divergent integral) or
          * converge too slowly for T's range (x^-0.999 on [0, 1]; substitute x = u^k with fn written in u, since
          * fn(u^k) underflows and gains nothing, or use a type with a wider exponent range; the default is no
          * better).
@@ -2506,6 +2515,30 @@ namespace nxx::quadrature {
                 assert(0 <= i && i < outward);
                 return piece_of(i).x[index_of(i)];
             }
+
+            /**
+             * @brief @p visit(i, piece, index) on the nodes of one side from @p first, t ascending, until it returns
+             * false: a walk through the pieces in order, as TanhSinhLevel::each, with the piece's columns and the
+             * node's index in it, so that a sweep reads only the columns it needs.
+             * @param first The first node, at least 0.
+             * @param infinite Whether the side is toward infinity (or the line's): the first `outward` nodes; else
+             *        the `inward` nodes toward the finite end.
+             * @param visit The visitor.
+             */
+            template<typename V>
+            constexpr void each(int first, bool infinite, V &&visit) const
+            {
+                // Plain loops, as TanhSinhLevel::each's: the hot path of constant evaluation (design.md). A piece
+                // after the side's last holds none of its nodes.
+                std::size_t const from = static_cast<std::size_t>(first);
+                for (std::size_t p = from / piece_size; p < most; ++p) {
+                    Piece const &piece = pieces[p];
+                    std::size_t const size = infinite ? piece.e.size() : piece.q.size();
+                    std::size_t const start = p * piece_size;
+                    for (std::size_t index = from > start ? from - start : 0; index < size; ++index)
+                        if (!visit(static_cast<int>(start + index), piece, index)) return;
+                }
+            }
         };
 
         /**
@@ -2625,7 +2658,9 @@ namespace nxx::quadrature {
 
         /**
          * @brief A side of the tanh-sinh sum, towards b (right) or a (left), the centre included in both: its cut, the
-         * outermost kept point and the two others its end term needs, and the slivers' weights.
+         * outermost kept point and the two others its end term needs, and the slivers' weights. For exp-sinh and
+         * sinh-sinh the sides are as mapping says; a side towards infinity is never cut by rounding, so its W and
+         * distinct point go unused.
          *
          * The points of a side are monotone in t (adjacent nodes differ in q by far more than a rounding), so the
          * distance to the end does not grow with t. Two points then stand for the whole side: the kept point with the
@@ -2694,6 +2729,22 @@ namespace nxx::quadrature {
                     weights = T(weights + w);
                     return true;
                 });
+            }
+
+            /**
+             * @brief Adds level @p level's weights f q beyond the outermost kept node to W, for exp-sinh's side
+             * toward its finite end, as the tanh-sinh form; the side toward infinity has no W (PHASE4_API.md D).
+             * @param nodes The level's nodes.
+             * @param level The level.
+             */
+            constexpr void add_weights(ExpSinhLevel<T> const &nodes, int level)
+            {
+                if (cause != cut_by::table && cause != cut_by::rounding) return;
+                nodes.each(detail::first_beyond(level, outer.position), false,
+                    [this](int, typename ExpSinhLevel<T>::Piece const &piece, std::size_t i) {
+                        weights = T(weights + T(piece.f[i] * piece.q[i]));
+                        return true;
+                    });
             }
         };
 
@@ -2783,8 +2834,54 @@ namespace nxx::quadrature {
         }
 
         /**
+         * @brief TanhSinh's map, from the ends (PHASE4_API.md B), and the roles of its two sides: the right side is
+         * swept first except on (-inf, b], where the side toward -inf is.
+         */
+        enum class mapping {
+            interval, ///< tanh-sinh on [a, b]: the right side toward b, the left toward a
+            upper,    ///< exp-sinh on [a, inf): a + E toward infinity on the right, a + q toward a on the left
+            lower,    ///< exp-sinh on (-inf, b]: b - E toward -inf on the left, b - q toward b on the right
+            line      ///< sinh-sinh on (-inf, inf): x on the right, -x on the left, both toward infinity
+        };
+
+        /**
+         * @brief Whether a side of exp-sinh or sinh-sinh is toward infinity: both on the line, else the right on
+         * [a, inf) and the left on (-inf, b].
+         * @param map The map, not interval.
+         * @param right Whether the side is the right one.
+         * @return Whether it is toward infinity.
+         */
+        constexpr bool toward_infinity(mapping map, bool right)
+        { return map == mapping::line || (map == mapping::upper) == right; }
+
+        /**
+         * @brief A term w y of exp-sinh or sinh-sinh (PHASE4_API.md C): no half-width, the weight carries the scale
+         * and reaches max / 2, so the term is checked rather than shortcut (no safe_value).
+         * @param w The weight, finite.
+         * @param y fn's value, finite.
+         * @return The term, or nothing where it is not finite (at run time) or could exceed max / 2 (in constant
+         *         evaluation, where an overflow is not a constant expression): non_finite.
+         */
+        template<real T>
+        constexpr std::optional<T> exp_sinh_term(T const &w, T const &y)
+        {
+            if consteval {
+                if (!detail::small_product(w, y)) return std::nullopt;
+                return T(w * y);
+            }
+            else {
+                T const t = T(w * y);
+                if (!nxx::math::isfinite(t)) return std::nullopt;
+                return t;
+            }
+        }
+
+        /**
          * @brief TanhSinh as an iterative method: the state after level k (PHASE3B_API.md C). It holds no table and no
          * reference to fn, is independent of fn's type, of fixed size, and allocates nothing.
+         *
+         * One state for the three maps (start returns one type): the map, and for exp-sinh and sinh-sinh an interval
+         * that holds only the finite end, the origin of the points (0 on the line).
          * @tparam T The real type.
          */
         template<real T>
@@ -2792,7 +2889,13 @@ namespace nxx::quadrature {
         {
             static constexpr int min_level = 4; // the first exit, as Romberg's (PHASE3_API.md E)
 
-            /** @brief The interval [a, b], a < b. */
+            /** @brief The map; tanh-sinh where the ends are finite. */
+            mapping map = mapping::interval;
+
+            /**
+             * @brief The interval [a, b], a < b; for exp-sinh and sinh-sinh the finite end (0 on the line) as c, lo
+             * and hi, with hw and width 0: b - a is never formed there.
+             */
             Interval<T> interval;
 
             /** @brief max / 2, formed once: in constant evaluation every step counts against the compiler's limit. */
@@ -2801,13 +2904,14 @@ namespace nxx::quadrature {
             /**
              * @brief The largest |fn| for which a term cannot make Interval::checked_term refuse: max / 8 over
              * max(|hw|, 1), every weight being at most 1; below it, term() alone, which saves checked_term's guards.
+             * 0 for exp-sinh and sinh-sinh, whose terms are always checked.
              */
             T safe_value;
 
-            /** @brief The side towards b. */
+            /** @brief The side towards b (for the other maps, as mapping says). */
             Side<T> right;
 
-            /** @brief The side towards a. */
+            /** @brief The side towards a (for the other maps, as mapping says). */
             Side<T> left;
 
             /** @brief The step, 2^-k. */
@@ -2886,8 +2990,8 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief Level k's step from its sums: the slivers of the sides cut by rounding, the end terms, the reported
-         * value V_k = R_k + the slivers, the floor F_k with the slivers' sizes, and the estimate
+         * @brief Level k's step from its sums, for every map: the slivers of the sides cut by rounding, the end terms,
+         * the reported value V_k = R_k + the slivers, the floor F_k with the slivers' sizes, and the estimate
          * E_k = max(|V_k - V_(k-1)|, F_k) + the end terms (PHASE3_API.md E, PHASE3B_API.md D3).
          * @param s The state, with R_k and L1_k formed.
          * @return Nothing, or non_finite.
@@ -2905,8 +3009,12 @@ namespace nxx::quadrature {
             auto const end_of = [&](Side<T> const &side, T const &end) {
                 if (side.cause == cut_by::rounding) {
                     // The sliver between the last kept point and the end, narrower than an ulp of the end, keeps its
-                    // share of the rule: W at the last kept value (no fn calls).
-                    std::optional<T> const piece = s.interval.checked_term(T(s.h * side.weights), side.outer.value);
+                    // share of the rule: W at the last kept value (no fn calls); on exp-sinh's side toward its finite
+                    // end the term has no half-width.
+                    std::optional<T> const piece =
+                        s.map == mapping::interval
+                            ? s.interval.checked_term(T(s.h * side.weights), side.outer.value)
+                            : detail::exp_sinh_term(T(s.h * side.weights), side.outer.value);
                     if (!piece || !detail::fits(sliver, *piece) || !detail::fits(sliver_size, *piece)) {
                         refused = true;
                         return;
@@ -3188,6 +3296,369 @@ namespace nxx::quadrature {
             });
         }
 
+        /**
+         * @brief A node of exp-sinh or sinh-sinh on a side: its distance from the origin, as the tail rule reads it,
+         * its point and its weight, formed at use from the table's columns (PHASE4_API.md B).
+         * @tparam T The real type.
+         */
+        template<real T>
+        struct ExpSinhNode
+        {
+            /** @brief E toward infinity, q toward the finite end, x on the line. */
+            T distance;
+
+            /** @brief a + E, a + q; b - E, b - q; x, -x. */
+            T point;
+
+            /** @brief f E, f q, or (f E + f q) / 2 on the line. */
+            T weight;
+        };
+
+        /**
+         * @brief Node @p i of @p piece on a side of exp-sinh or sinh-sinh.
+         * @param s The state, its map not interval.
+         * @param right Whether the side is the right one.
+         * @param infinite Whether it is toward infinity.
+         * @param piece The node's piece.
+         * @param i The node's index in it.
+         * @return The node.
+         */
+        template<real T>
+        constexpr ExpSinhNode<T> exp_sinh_node(TanhSinhState<T> const &s, bool right, bool infinite,
+            typename ExpSinhLevel<T>::Piece const &piece, std::size_t i)
+        {
+            T const &f = piece.f[i];
+            if (s.map == mapping::line) {
+                T const &x = piece.x[i];
+                return ExpSinhNode<T>{ x, right ? x : T(-x), T(T(T(f * piece.e[i]) + T(f * piece.q[i])) / T(2)) };
+            }
+            T const &d = infinite ? piece.e[i] : piece.q[i];
+            T const &origin = s.interval.lo;
+            return ExpSinhNode<T>{ d, s.map == mapping::upper ? T(origin + d) : T(origin - d), T(f * d) };
+        }
+
+        /**
+         * @brief Whether a point of exp-sinh or sinh-sinh is strictly inside: beyond the finite end, and finite (the
+         * line's +-x, at most max / 6, always is).
+         * @param s The state, its map not interval.
+         * @param p The point.
+         * @return Whether fn may be evaluated there.
+         */
+        template<real T>
+        constexpr bool exp_sinh_inside(TanhSinhState<T> const &s, T const &p)
+        {
+            if (s.map == mapping::upper) return s.interval.lo < p && nxx::math::isfinite(p);
+            if (s.map == mapping::lower) return p < s.interval.lo && nxx::math::isfinite(p);
+            return true;
+        }
+
+        /**
+         * @brief TanhSinh's start on an infinite interval (PHASE4_API.md C and D): exp-sinh on [a, inf), x = a + E
+         * and a + q, or (-inf, b], x = b - E and b - q; sinh-sinh on the line, x = +-sinh u. Level 0: the centre
+         * (a + 1, b - 1 or 0, weight c = 3/2), then each side outward at t = 1, 2, ..., the side toward infinity first
+         * (on the line the positive side), each node's term stored; a point not strictly inside ends the side, a
+         * value not finite is a tail where its distance is beyond 1/eps (toward infinity) or below eps (toward the
+         * finite end), is pending toward infinity, else non_finite. Then the threshold eps L1 of the centre and every
+         * stored term; each pending value a tail where the side's last stored |term| is below it, else non_finite;
+         * the underflow rule toward infinity in increasing t; and Phase 3's pruning from the outside in. With no
+         * point strictly inside (a + 1 rounds onto a), a step exhausted with no current, and fn never called.
+         * @param fn The function.
+         * @param a The lower end, -inf or finite.
+         * @param b The upper end, inf or finite, a < b, not both finite.
+         * @return The state after level 0, or non_finite.
+         */
+        template<real T, typename F>
+        constexpr std::expected<TanhSinhState<T>, Failure<T>> exp_sinh_start(F &fn, T const &a, T const &b)
+        {
+            using result = std::expected<TanhSinhState<T>, Failure<T>>;
+            Failure<T> const invalid{ error::non_finite, std::nullopt };
+            bool const upward = !nxx::math::isfinite(b);
+            mapping const map = upward && !nxx::math::isfinite(a) ? mapping::line
+                                                                   : (upward ? mapping::upper : mapping::lower);
+            T const origin = map == mapping::line ? T(0) : (upward ? a : b);
+            T const half_max = T(T((std::numeric_limits<T>::max)()) / T(2));
+            Kept<T> const unsampled{ 0, origin, T(0), T(0) };
+            Side<T> const fresh{ -1, cut_by::table, unsampled, std::nullopt, std::nullopt, T(0) };
+            TanhSinhState<T> s{ .map = map,
+                .interval = Interval<T>{ origin, T(0), T(0), true, false, origin, origin },
+                .half_max = half_max,
+                .safe_value = T(0),
+                .right = fresh,
+                .left = fresh,
+                .h = T(1),
+                .value = T(0),
+                .l1 = T(0),
+                .previous = std::nullopt,
+                .k = 0,
+                .step = Step<T>{} };
+            T const centre = map == mapping::upper ? T(origin + T(1))
+                                                   : (map == mapping::lower ? T(origin - T(1)) : T(0));
+            // No point strictly inside (from |a| about 2 / eps): nothing can be sampled.
+            bool const inside =
+                map == mapping::upper ? origin < centre : (map == mapping::lower ? centre < origin : true);
+            if (!inside) {
+                s.step = Step<T>{ .ready = false, .exhausted = true };
+                return s;
+            }
+            if consteval {
+                // origin +- E stays within max where |origin| <= max / 2, since E <= max / 3 (f E <= max / 2 and
+                // f >= 3/2); beyond it a + 1 rounds onto a in any type with max above 4 / eps, so this refuses
+                // nothing that run time would sample.
+                if (detail::large(origin)) return std::unexpected(invalid);
+            }
+            // The right side is swept first, except on (-inf, b], where the side toward -inf is the left.
+            bool const left_first = map == mapping::lower;
+            return detail::with_exp_sinh_level<T>(0, [&](ExpSinhLevel<T> const &nodes) -> result {
+                T const eps = T(std::numeric_limits<T>::epsilon());
+                T const inverse_eps = T(T(1) / eps);
+                T const smallest = T((std::numeric_limits<T>::min)());
+                T const centre_value = detail::evaluate(fn, centre);
+                if (!nxx::math::isfinite(centre_value)) return std::unexpected(invalid);
+                std::optional<T> const centre_term = detail::exp_sinh_term(nodes.f(0), centre_value); // f(0) = c
+                if (!centre_term) return std::unexpected(invalid);
+                T const centre_size = nxx::math::abs(*centre_term);
+                Kept<T> const middle{ 0, centre, centre_value, centre_size };
+                s.right.outer = middle;
+                s.left.outer = middle;
+
+                struct Sample
+                {
+                    int position;
+                    T point;
+                    T value;
+                    T term;
+                    T weight;
+                };
+                // Level 0's samples of a side in a fixed array, as tanh_sinh_start's, and the position of a value not
+                // finite toward infinity whose decision waits for the threshold.
+                constexpr std::size_t most = static_cast<std::size_t>(detail::level_capacity<T>(0));
+                struct Swept
+                {
+                    std::array<std::optional<Sample>, most> samples{};
+                    std::size_t count = 0;
+                    std::optional<int> pending{};
+
+                    constexpr std::span<std::optional<Sample> const> held() const
+                    { return std::span(samples).first(count); }
+                };
+                // A side outward from t = 1; false where fn is not finite outside a tail and not pending, or a term
+                // is refused: non_finite.
+                auto const sweep = [&](Side<T> &side, bool right, Swept &swept) {
+                    bool const infinite = detail::toward_infinity(map, right);
+                    bool failed = false;
+                    nodes.each(1, infinite,
+                        [&](int i, typename ExpSinhLevel<T>::Piece const &piece, std::size_t index) {
+                            int const j = detail::position(0, i);
+                            ExpSinhNode<T> const node = detail::exp_sinh_node(s, right, infinite, piece, index);
+                            if (!detail::exp_sinh_inside(s, node.point)) {
+                                side.cut = j;
+                                side.cause = infinite ? cut_by::table : cut_by::rounding;
+                                return false;
+                            }
+                            T const y = detail::evaluate(fn, node.point);
+                            if (!nxx::math::isfinite(y)) {
+                                if (infinite ? node.distance > inverse_eps : node.distance < eps) {
+                                    side.cut = j;
+                                    side.cause = cut_by::value;
+                                }
+                                else if (infinite) swept.pending = j;
+                                else failed = true;
+                                return false;
+                            }
+                            std::optional<T> const t = detail::exp_sinh_term(node.weight, y);
+                            if (!t) {
+                                failed = true;
+                                return false;
+                            }
+                            assert(swept.count < most);
+                            swept.samples[swept.count++] = Sample{ j, node.point, y, *t, node.weight };
+                            return true;
+                        });
+                    return !failed;
+                };
+                Side<T> &first = left_first ? s.left : s.right;
+                Side<T> &second = left_first ? s.right : s.left;
+                Swept first_swept;
+                Swept second_swept;
+                if (!sweep(first, !left_first, first_swept) || !sweep(second, left_first, second_swept))
+                    return std::unexpected(invalid);
+                // The threshold: eps times the L1 of the whole sweep, the centre included (h = 1), summed in the order
+                // centre, first side, second side.
+                Sum<T> sizes;
+                auto const add_sizes = [&](Swept const &swept) {
+                    return std::ranges::all_of(swept.held(), [&](std::optional<Sample> const &x) {
+                        return detail::add_within(sizes, nxx::math::abs(x->term), half_max);
+                    });
+                };
+                bool refused = !detail::add_within(sizes, centre_size, half_max) || !add_sizes(first_swept)
+                               || !add_sizes(second_swept);
+                std::optional<T> const l1_sweep = detail::compensated(sizes);
+                if (refused || !l1_sweep || !nxx::math::isfinite(*l1_sweep)) return std::unexpected(invalid);
+                T const small = T(eps * *l1_sweep);
+                // The tail rule's second clause (PHASE4_API.md Q3): a pending value is a tail where the side's last
+                // stored term is already below the threshold.
+                auto const decide = [&](Side<T> &side, Swept const &swept) {
+                    if (!swept.pending) return true;
+                    T const last = swept.count > 0 ? nxx::math::abs(swept.samples[swept.count - 1]->term) : centre_size;
+                    if (!(last < small)) return false;
+                    side.cut = *swept.pending;
+                    side.cause = cut_by::value;
+                    return true;
+                };
+                if (!decide(first, first_swept) || !decide(second, second_swept)) return std::unexpected(invalid);
+                // The underflow rule toward infinity (Q4), in increasing t: the first stored node with |y| < min(),
+                // w min() at least the threshold, after a value of at least min() (the centre's for the first), cuts
+                // the side as a table's end, dropped with every node beyond it.
+                auto const truncate = [&](Side<T> &side, bool right, Swept &swept) {
+                    if (!detail::toward_infinity(map, right)) return;
+                    auto const indices = std::views::iota(std::size_t{ 0 }, swept.count);
+                    auto const at = std::ranges::find_if(indices, [&](std::size_t i) {
+                        Sample const &x = *swept.samples[i];
+                        T const &before = i > 0 ? swept.samples[i - 1]->value : centre_value;
+                        return nxx::math::abs(x.value) < smallest && T(x.weight * smallest) >= small
+                               && nxx::math::abs(before) >= smallest;
+                    });
+                    if (at == indices.end()) return;
+                    side.cut = swept.samples[*at]->position;
+                    side.cause = cut_by::table;
+                    swept.count = *at;
+                };
+                truncate(first, !left_first, first_swept);
+                truncate(second, left_first, second_swept);
+                // Each side drops its run of outermost small terms, from the outside in (Phase 3).
+                auto const prune = [&](Side<T> &side, Swept &swept) {
+                    auto const outward = swept.held() | std::views::reverse;
+                    auto const large = std::ranges::find_if(outward, [&](std::optional<Sample> const &x) {
+                        return !(nxx::math::abs(x->term) < small);
+                    });
+                    std::size_t const dropped = static_cast<std::size_t>(std::ranges::distance(outward.begin(), large));
+                    if (dropped == 0) return;
+                    swept.count -= dropped;
+                    side.cut = swept.samples[swept.count]->position;
+                    side.cause = cut_by::pruning;
+                };
+                prune(first, first_swept);
+                prune(second, second_swept);
+                // V_0 and L1_0 from the kept terms only: the centre, the first side, the second side; W for the side
+                // toward the finite end.
+                Sum<T> values;
+                Sum<T> magnitudes;
+                auto const add_kept = [&](Side<T> &side, bool right, Swept const &swept) {
+                    bool const added = std::ranges::all_of(swept.held(), [&](std::optional<Sample> const &x) {
+                        T const size = nxx::math::abs(x->term);
+                        side.keep(Kept<T>{ x->position, x->point, x->value, size }, origin);
+                        return detail::add_within(values, x->term, half_max)
+                               && detail::add_within(magnitudes, size, half_max);
+                    });
+                    if (!detail::toward_infinity(map, right)) side.add_weights(nodes, 0);
+                    return added;
+                };
+                refused = !detail::add_within(values, *centre_term, half_max)
+                          || !detail::add_within(magnitudes, centre_size, half_max)
+                          || !add_kept(first, !left_first, first_swept) || !add_kept(second, left_first, second_swept);
+                std::optional<T> const v_0 = detail::compensated(values);
+                std::optional<T> const a_0 = detail::compensated(magnitudes);
+                if (refused || !v_0 || !a_0) return std::unexpected(invalid);
+                s.value = *v_0;
+                s.l1 = *a_0;
+                return detail::tanh_sinh_report(s).transform([&] { return s; });
+            });
+        }
+
+        /**
+         * @brief TanhSinh's next level k on an infinite interval (PHASE4_API.md D): per side, in the order of the
+         * start, the odd multiples of 2^-k up to its cut. A new node beyond the outermost kept one cuts the side where
+         * it is not strictly inside; where fn is not finite there and its distance is beyond 1/eps (toward infinity)
+         * or below eps (toward the finite end), or toward infinity where the outermost kept |term| is below the
+         * threshold eps L1_(k-1) / (2h) (a tail); toward infinity where |y| < min() after a kept value of at least
+         * min() (pruning if w min() is below the threshold, else a table's end, the node not kept); where its |term|
+         * is below the threshold (pruning). Elsewhere a value not finite is non_finite. Then the sums and the step,
+         * as tanh_sinh_advance.
+         * @param fn The function.
+         * @param s The state, not exhausted, its map not interval.
+         * @return Nothing, or non_finite.
+         */
+        template<real T, typename F>
+        constexpr std::expected<void, Failure<T>> exp_sinh_advance(F &fn, TanhSinhState<T> &s)
+        {
+            Failure<T> const invalid{ error::non_finite, std::nullopt };
+            T const eps = T(std::numeric_limits<T>::epsilon());
+            T const inverse_eps = T(T(1) / eps);
+            T const smallest = T((std::numeric_limits<T>::min)());
+            s.k += 1;
+            s.h = T(s.h / T(2));
+            T const threshold = T(T(eps * s.l1) / T(T(2) * s.h));
+            using result = std::expected<void, Failure<T>>;
+            return detail::with_exp_sinh_level<T>(s.k, [&](ExpSinhLevel<T> const &nodes) -> result {
+                Sum<T> new_values;
+                Sum<T> new_magnitudes;
+                auto const sweep = [&](Side<T> &side, bool right) {
+                    bool const infinite = detail::toward_infinity(s.map, right);
+                    bool failed = false;
+                    bool refused = false;
+                    nodes.each(0, infinite,
+                        [&](int i, typename ExpSinhLevel<T>::Piece const &piece, std::size_t index) {
+                            int const j = detail::position(s.k, i);
+                            if (side.cut >= 0 && j >= side.cut) return false;
+                            ExpSinhNode<T> const node = detail::exp_sinh_node(s, right, infinite, piece, index);
+                            bool const outer = j > side.outer.position;
+                            if (!detail::exp_sinh_inside(s, node.point)) {
+                                side.cut = j;
+                                side.cause = infinite ? cut_by::table : cut_by::rounding;
+                                return false;
+                            }
+                            T const y = detail::evaluate(fn, node.point);
+                            if (!nxx::math::isfinite(y)) {
+                                bool const far = infinite ? node.distance > inverse_eps : node.distance < eps;
+                                if (outer && (far || (infinite && side.outer.size < threshold))) {
+                                    side.cut = j;
+                                    side.cause = cut_by::value;
+                                }
+                                else failed = true;
+                                return false;
+                            }
+                            std::optional<T> const t = detail::exp_sinh_term(node.weight, y);
+                            if (!t) {
+                                failed = true;
+                                return false;
+                            }
+                            if (outer && infinite && nxx::math::abs(y) < smallest
+                                && !(nxx::math::abs(side.outer.value) < smallest)) {
+                                side.cut = j;
+                                side.cause = T(node.weight * smallest) < threshold ? cut_by::pruning : cut_by::table;
+                                return false;
+                            }
+                            T const size = nxx::math::abs(*t);
+                            if (outer && size < threshold) {
+                                side.cut = j;
+                                side.cause = cut_by::pruning;
+                                return false;
+                            }
+                            refused = refused || !detail::add_within(new_values, T(s.h * *t), s.half_max);
+                            refused = refused || !detail::add_within(new_magnitudes, T(s.h * size), s.half_max);
+                            side.keep(Kept<T>{ j, node.point, y, size }, s.interval.lo);
+                            return true;
+                        });
+                    if (!infinite) side.add_weights(nodes, s.k);
+                    return !failed && !refused;
+                };
+                bool const left_first = s.map == mapping::lower;
+                Side<T> &first = left_first ? s.left : s.right;
+                Side<T> &second = left_first ? s.right : s.left;
+                if (!sweep(first, !left_first) || !sweep(second, left_first)) return std::unexpected(invalid);
+                std::optional<T> const added = detail::compensated(new_values);
+                std::optional<T> const added_l1 = detail::compensated(new_magnitudes);
+                if (!added || !added_l1) return std::unexpected(invalid);
+                T const half_value = T(s.value / T(2));
+                T const half_l1 = T(s.l1 / T(2));
+                if (!detail::fits(half_value, *added) || !detail::fits(half_l1, *added_l1))
+                    return std::unexpected(invalid);
+                s.value = T(half_value + *added);
+                s.l1 = T(half_l1 + *added_l1);
+                return detail::tanh_sinh_report(s);
+            });
+        }
+
     } // namespace detail
     /** @endcond */
 
@@ -3244,6 +3715,25 @@ namespace nxx::quadrature {
             else return (fn);
         }
 
+        /**
+         * @brief M takes infinite ends: its static member `infinite_ends` is true (PHASE4_API.md Q1). Absent or false,
+         * integrate() refuses an infinite end with non_finite.
+         * @tparam M The method.
+         */
+        template<typename M>
+        concept takes_infinite_ends = requires {
+            { M::infinite_ends } -> std::convertible_to<bool>;
+        } && bool(M::infinite_ends);
+
+        /**
+         * @brief Whether @p x is NaN, the one value not equal to itself.
+         * @param x A value.
+         * @return x != x.
+         */
+        template<real T>
+        constexpr bool is_nan(T const &x)
+        { return !(x == x); } // NOLINT(misc-redundant-expression)
+
     } // namespace detail
     /** @endcond */
 
@@ -3287,6 +3777,12 @@ namespace nxx::quadrature {
      *   without a best, or not_converged with or without one (integrate() turns anything else into non_finite);
      *   abs_error estimates |value - exact| and covers the rounding of the method's own sum; success means its own stop
      *   test against max(abs_tol, rel_tol |value|), or its floor, was met.
+     * - **Infinite ends, opt-in:** a method that declares `static constexpr bool infinite_ends = true;` (TanhSinh does)
+     *   may also receive a = -inf, b = +inf or both, always a < b after integrate()'s ordering; b - a and a/2 + b/2 are
+     *   then not finite: it must not form them, nor call fn at an infinite end. Without the member, or with it false,
+     *   integrate() returns non_finite for an infinite end and the method never sees one. A combinator around a method
+     *   must forward the member to pass the inner method's opt-in on (observer() does). The member must be a constant
+     *   expression: a static member that is not constexpr fails to compile rather than reading as false.
      *
      * @tparam M The method.
      * @tparam T The real type.
@@ -3332,6 +3828,7 @@ namespace nxx::quadrature {
      *   the compiler's limit); settle refines `step` without taking a step, leaves `ready` and `exhausted` as they
      *   are, and calling it twice gives the step calling it once gives; `attainable` is an error the method can
      *   certify.
+     * - **Infinite ends, opt-in:** as for estimating_method.
      *
      * A type that is both an iterative method and a method of another kind is outside the contract. Check a method
      * where it is defined: `static_assert(nxx::quadrature::iterative_method<MyMethod, double>)`; a failure there names
@@ -3406,6 +3903,9 @@ namespace nxx::quadrature {
 
             /** @brief The observer, called as a non-const callable: a mutable lambda can count its calls. */
             mutable kept<O> observer;
+
+            /** @brief The method's opt-in to infinite ends, forwarded, so that an observed TanhSinh takes them. */
+            static constexpr bool infinite_ends = takes_infinite_ends<M>;
 
             // Self = M makes each declaration dependent, so that an observer on a method without these members fails
             // the concept softly instead of where the class is instantiated.
@@ -3613,6 +4113,8 @@ namespace nxx::quadrature {
      * and then kept (a function-local static, initialised once by the language; a type that changed its precision at
      * run time would see the nodes of its first).
      *
+     * An infinite end is error::non_finite; use TanhSinh.
+     *
      * @tparam N The number of points, 1 to 64.
      */
     template<int N>
@@ -3648,7 +4150,7 @@ namespace nxx::quadrature {
      * fn; it may stop from level 4 (17 evaluations) and certifies down to its rounding floor. The cap is 16 levels,
      * 65,537 evaluations, then error::not_converged with the best estimate; fn with a kink or a singular derivative
      * reach it. It needs more evaluations than a Gauss rule for the same accuracy; its uses are teaching and equally
-     * spaced data.
+     * spaced data. An infinite end is error::non_finite; use TanhSinh.
      */
     struct Romberg
     {
@@ -3701,7 +4203,8 @@ namespace nxx::quadrature {
      * outermost points, which neither rule samples. An endpoint singularity stronger than about (x - a)^-0.65 is
      * underestimated by a ratio that bisection does not change; substitute x = a + u^k with k (1 + alpha) >= 1 for
      * (x - a)^alpha (and u = b - x for the other end), or use TanhSinh. Full precision in a 50-digit type is costly:
-     * the estimate converges at the 7-point rule's order.
+     * the estimate converges at the 7-point rule's order. An infinite end is error::non_finite; use TanhSinh (alone,
+     * or on the infinite part of a split interval).
      *
      * @tparam N The number of Kronrod points: 15.
      */
@@ -3752,7 +4255,8 @@ namespace nxx::quadrature {
      * @brief The tanh-sinh rule (Takahasi and Mori 1974): the trapezoidal rule after the substitution
      * x = tanh(sinh t), the step halved level by level; an iterative method, one step per level. For endpoint
      * singularities, smooth fn and high precision; weak on kinks, steps and narrow peaks inside the interval, where
-     * the default, GaussKronrod<15>, subdivides. Finite intervals.
+     * the default, GaussKronrod<15>, subdivides. It is the one method that takes infinite ends, with the map the
+     * ends choose: tanh-sinh on [a, b], exp-sinh on [a, inf) and (-inf, b], sinh-sinh on (-inf, inf) (below).
      *
      * Level 0 samples fn at the centre and at t = 1, 2, ..., level k at the odd multiples of 2^-k, so each level reuses
      * every earlier evaluation. The points crowd towards the ends double exponentially but never reach them, so log x
@@ -3778,30 +4282,71 @@ namespace nxx::quadrature {
      *   its end (1.6 half-ulps at most on widths from 1e-10 to 1e-8 next to 1), so it matters on an interval a few
      *   million ulps wide or less.
      * - Compile time: its node tables are instantiated wherever integrate<TanhSinh> is for float, double or long
-     *   double, about 0.3 s more per translation unit for double (GCC, Clang), more for long double; instantiate it
-     *   in one.
+     *   double, more for long double; instantiate it in one translation unit (the figure for both tables below).
      * - Constant evaluation: fn rational, or built from one's own constexpr functions (std::sqrt and the like are not
      *   constexpr on Clang and MSVC); about 240 constexpr steps per evaluation on Clang in float, double and long
      *   double. A class type has no compile-time table, so each level reached is generated in the same evaluation,
      *   about 940 steps per node on Clang: only a run that stops by about level 5 fits the default limit.
      * - High precision: the first call in a type without a table builds the levels it reaches, about 14 us per node in
      *   cpp_bin_float_50 (36 us in cpp_dec_float_50), 154 ms (343 ms) for all, then keeps them; a type that changes
-     *   its precision at run time sees its first.
+     *   its precision at run time sees its first. The infinite maps' table likewise: about 16 us a node, 0.17 s for all
+     *   in cpp_bin_float_50.
+     *
+     * Infinite ends (PHASE4_API.md): exp-sinh x = a + E on [a, inf) (b - E on (-inf, b]), sinh-sinh x = +-sinh u on the
+     * line, with u = c sinh t, E = e^u and c = 3/2; the side towards a finite end takes x = a + e^-u. Level 0 samples
+     * the centre (a + 1, b - 1, or 0) and t = 1, 2, ..., at most 13 points in double (43 in cpp_bin_float_50); it
+     * calls fn at |x| up to about 1e131 in double, later levels up to about 1e305 on a side that is not pruned. A
+     * value that is not finite towards infinity, beyond the kept points, ends the side as a tail where |x| exceeds
+     * 1/eps or the last kept term is already negligible, and is error::non_finite elsewhere; a value below min()
+     * there is not taken as negligible, since its weight reaches max / 2. e^-x on [0, inf) costs 100 evaluations,
+     * e^-x^2 on the line 99, x^-1.5 on [1, inf) 141, x^2 e^-x 156. The limits, measured in double:
+     * - The maps centre at 0 (the line) or at the finite end, at scale 1. A peak far from 0 on the line is missed:
+     *   e^-(x - x0)^2 is ok up to x0 = 39, then an honest not_converged; from about 180 the outcome alternates between
+     *   that, a best below its error and a false success; from about 1,600 every run is a false success (ok, 0). Split
+     *   at the peak, or substitute x = x0 + u: each half of e^-(x - 1e3)^2 split at 1e3 is ok in 85. A half line far
+     *   from 0 is cut by rounding near a, its abs_error growing with ulp(a): a = 1e10, ok +- 1.1e-6; a = 1e15, ok
+     *   +- 0.094, far above the request; from |a| about 1e16 no point is inside. Substitute x = a + u with fn written
+     *   in u. A narrow feature on the line (e^-(x / 1e-3)^2) is an honest not_converged in 33 evaluations,
+     *   substituted ok in 99; a wide one costs evaluations, not accuracy (e^(-x / L) on [0, inf): 81 to 868 for L
+     *   from 1e-2 to 1e6).
+     * - A value not finite nearer than the tail rule allows is error::non_finite: x^k e^-x is ok up to k = 50 in
+     *   double and 16 in float (x^k overflows before e^-x underflows); write fn so that it stays finite where its
+     *   factors do not, as x^k e^-x = exp(k log x - x).
+     * - Values below min() towards infinity are not used: 1e-300 x^-1.5 on [1, inf) is an honest not_converged
+     *   (error 2.8e-3), 1e-250 x^-1.01 likewise. Scale fn.
+     * - Slow decay: x^-1.01 on [1, inf) is an honest not_converged in double (best 99.91, error 0.09); ok in
+     *   binary128 and cpp_bin_float_50.
+     * - Oscillation and no integral (sin x / x, sin x, 1/x, 1 on [0, inf)): not_converged; their bests, where any,
+     *   are not reliable (sin x / x has one below its error).
+     * - A singular end other than 0 is limited by the spacing near it, as on a finite interval: (x - 1)^-0.5 e^-x on
+     *   [1, inf) is ok at 1e-6 and an honest not_converged at the default; with u = x - 1 written in fn, ok in 111.
+     * - A large number written for infinity integrates that finite interval: e^-x on [0, 1e10] is ok, on [0, 1e300]
+     *   an honest not_converged.
+     * - Compile time and constant evaluation: integrate<TanhSinh> instantiates both tables, about 1.0 s more per
+     *   translation unit than the default method for double (GCC; Clang 0.8 s), whatever the ends; about 180 Clang
+     *   steps per evaluation on the infinite maps in double, about 1,050 per node of a level generated for a class
+     *   type.
      */
     struct TanhSinh
     {
+        /** @brief It takes infinite ends: exp-sinh on a half line, sinh-sinh on the line. */
+        static constexpr bool infinite_ends = true;
+
         /**
-         * @brief Level 0 (iterative_method).
+         * @brief Level 0 (iterative_method), of the map the ends choose.
          * @tparam T The real type.
          * @tparam F fn's type.
          * @param fn The function.
-         * @param a The lower end, finite.
-         * @param b The upper end, finite, a < b.
+         * @param a The lower end, finite or -inf.
+         * @param b The upper end, finite or inf, a < b.
          * @return The state after level 0, or error::non_finite.
          */
         template<real T, typename F>
         constexpr std::expected<detail::TanhSinhState<T>, Failure<T>> start(F &fn, T const &a, T const &b) const
-        { return detail::tanh_sinh_start(fn, a, b); }
+        {
+            if (nxx::math::isfinite(a) && nxx::math::isfinite(b)) return detail::tanh_sinh_start(fn, a, b);
+            return detail::exp_sinh_start(fn, a, b);
+        }
 
         /**
          * @brief The next level (iterative_method).
@@ -3813,7 +4358,10 @@ namespace nxx::quadrature {
          */
         template<real T, typename F>
         constexpr std::expected<void, Failure<T>> advance(F &fn, detail::TanhSinhState<T> &s) const
-        { return detail::tanh_sinh_advance(fn, s); }
+        {
+            if (s.map == detail::mapping::interval) return detail::tanh_sinh_advance(fn, s);
+            return detail::exp_sinh_advance(fn, s);
+        }
 
         /**
          * @brief Nothing to refine (iterative_method).
@@ -3830,7 +4378,8 @@ namespace nxx::quadrature {
      * @brief The integral of @p fn from @p a to @p b by the fixed rule @p m, given as a value: a plain number, no error
      * estimate and no criteria.
      *
-     * The ends are validated (NaN or infinite: error::non_finite) and put in order; a == b is 0 without calling fn;
+     * The ends are validated (NaN or infinite: error::non_finite, since no fixed rule takes an infinite end) and put
+     * in order; a == b is 0 without calling fn;
      * b < a negates. The rule's value is checked: one that is not finite is error::non_finite. fn's exceptions pass
      * through unchanged.
      *
@@ -3869,7 +4418,10 @@ namespace nxx::quadrature {
      * iterative_method, whose loop integrate() runs, or an estimating_method.
      *
      * The criteria are validated (negative or not finite: error::non_finite) and rel_tol clamped to 1; the ends are
-     * validated and put in order; a == b is {0, 0} without calling fn; b < a negates the value and a best's value.
+     * validated (NaN: error::non_finite; infinite: error::non_finite unless the method takes infinite ends, which
+     * TanhSinh alone of the library's methods does) and put in order, (inf, a) as (a, inf) and (inf, -inf) as
+     * (-inf, inf); a == b, the same infinity included, is {0, 0} without calling fn; b < a negates the value and a
+     * best's value.
      * An iterative method stops when its step is ready and its estimate meets max(criteria.abs_tol,
      * criteria.rel_tol |value|) or the error the method can certify (for the library's methods, the rounding floor;
      * see Criteria). The result is checked: a value or an estimate that is not finite, or a negative estimate, is
@@ -3913,7 +4465,11 @@ namespace nxx::quadrature {
         // rel_tol |value| stays finite (constant evaluation rejects an overflow); abs_tol enters only a max of finite
         // values, so it needs no clamp, and the floor is the effective minimum of both.
         Criteria<T> const validated{ criteria.abs_tol, criteria.rel_tol > T(1) ? T(1) : criteria.rel_tol };
-        if (!nxx::math::isfinite(a) || !nxx::math::isfinite(b)) return std::unexpected(invalid);
+        if (detail::is_nan(a) || detail::is_nan(b)) return std::unexpected(invalid);
+        if constexpr (!detail::takes_infinite_ends<M>) {
+            if (!nxx::math::isfinite(a) || !nxx::math::isfinite(b)) return std::unexpected(invalid);
+        }
+        // Equal infinities too: the same infinity is an empty interval, and fn is never called at an end.
         if (a == b) return Integral<T>{ T(0), T(0) };
         auto &&f = detail::as_object(fn);
         std::expected<Integral<T>, Failure<T>> const r = b < a ? detail::estimate_on(m, f, b, a, validated)
@@ -3968,6 +4524,7 @@ namespace nxx::quadrature {
      * auto const r = qd::integrate([](double x) { return std::exp(x); }, 0.0, 1.0);
      * auto const s = qd::integrate<qd::Romberg>([](double x) { return std::exp(x); }, 0.0, 1.0, {.rel_tol = 1e-12});
      * auto const t = qd::integrate<qd::TanhSinh>([](double x) { return std::log(x); }, 0.0, 1.0); // -1
+     * auto const e = qd::integrate<qd::TanhSinh>([](double x) { return x * x * std::exp(-x); }, 0.0, inf); // 2
      * if (r) use(r->value, r->abs_error);
      * else if (r.error().best) report(r.error().best->value, r.error().best->abs_error);
      * @endcode
@@ -3978,11 +4535,14 @@ namespace nxx::quadrature {
      * - Kinks, steps, narrow peaks inside the interval, or an fn whose shape is unknown: the default, which
      *   subdivides. TanhSinh usually fails honestly there, with not_converged, which is why it is not the default.
      * - An fn too expensive for about 100 evaluations: GaussLegendre<N>, which has no estimate.
+     * - An infinite interval: TanhSinh, the only method that takes an infinite end (see TanhSinh for its limits).
      *
      * A fallback from TanhSinh to the default for interior features. It accepts the default's success only where it
      * agrees with TanhSinh's best within the two estimates, since at an endpoint singularity the default can succeed
      * falsely where TanhSinh failed honestly. It cannot catch an error both methods share, as at a singular end other
-     * than 0, where both lose what lies within an ulp of the end: substitute (see TanhSinh) instead.
+     * than 0, where both lose what lies within an ulp of the end: substitute (see TanhSinh) instead. It is for finite
+     * intervals: the default rejects an infinite end, so there it returns TanhSinh's failure unchanged. On a half line
+     * with interior features, split at a finite c: the default on [a, c], TanhSinh on [c, inf).
      *
      * @code
      * auto const t = qd::integrate<qd::TanhSinh>(g, a, b);

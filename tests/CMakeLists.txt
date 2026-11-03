@@ -31,7 +31,7 @@ add_executable(numerixx_tests test_math.cpp test_deriv.cpp test_stencils.cpp tes
         test_roots_numerical.cpp test_roots_toms_anderson.cpp test_roots_search.cpp test_roots_classic.cpp
         test_roots_examples.cpp test_quadrature_gauss.cpp
         test_quadrature_romberg.cpp test_quadrature_kronrod.cpp test_quadrature_protocol.cpp
-        test_quadrature_tanh_sinh.cpp test_quadrature_exp_sinh.cpp)
+        test_quadrature_tanh_sinh.cpp test_quadrature_exp_sinh.cpp test_quadrature_infinite.cpp)
 target_link_libraries(numerixx_tests PRIVATE numerixx::numerixx doctest::doctest_with_main boost_multiprecision)
 if (MSVC)
     # /bigobj: test_quadrature_tanh_sinh.cpp instantiates TanhSinh in seven types, past COFF's section limit (C1128).

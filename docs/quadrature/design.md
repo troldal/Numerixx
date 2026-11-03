@@ -83,7 +83,8 @@ every module (the library, real types, the general test rules) is in `docs/desig
 ## Behaviour
 
 - **Validation, in order** (A): the tolerances (a method with an estimate; negative or not finite: `non_finite`, then
-  `rel_tol` clamped to at most 1), the ends (NaN or infinite: `non_finite`), a == b (0, or `{0, 0}`, without calling
+  `rel_tol` clamped to at most 1), the ends (NaN, or infinite for a method that does not take infinite ends:
+  `non_finite`), a == b (0, or `{0, 0}`, without calling
   fn). b < a negates: since Phase 3a in `integrate`, which passes the method a < b (it was the signed scale's).
 - **The interval** (`detail::Interval`, built once by `detail::interval_of` and used by both methods): the nodes
   `c + hw u`, c = a / 2 + b / 2, hw = b / 2 - a / 2 (no overflow on [-max, max]), each clamped into
@@ -731,6 +732,105 @@ Run-time generation in `cpp_bin_float_50` (GCC 16, every piece of every level ge
 three): 15.7 us a node at -O2 (tanh-sinh 15.6), 79 us at -O0 -g (78); the whole table, 10,962 nodes, 0.17 s and
 0.87 s, once per program (cached).
 
+### TanhSinh on infinite intervals (Phase 4 step 2, `PHASE4_API.md` A to F)
+
+- **The opt-in** (Q1): `detail::takes_infinite_ends<M>`, a concept true where `M::infinite_ends` exists, converts to
+  bool and is true. The estimating forms of `integrate` test NaN first (`detail::is_nan`, x != x, since `nxx::math`
+  has no isnan), then an infinite end against the concept (`if constexpr`, so a method without it is unchanged), then
+  a == b, the same infinity included; the ordering and the negation were already right for (inf, a) and
+  (inf, -inf). The fixed-rule form is untouched. `detail::Observed` declares `infinite_ends` as the concept on its
+  method, so an observed `TanhSinh` takes infinite ends and an observed `Romberg` does not.
+- **One state** (`detail::TanhSinhState`, since `start` returns one type): a member `map` (`detail::mapping`:
+  `interval`, `upper` for [a, inf), `lower` for (-inf, b], `line`), defaulted to `interval` so that
+  `tanh_sinh_start`'s initializer is as it was. For the other maps the `Interval` holds the finite end (0 on the line)
+  as c, lo and hi, with hw and width 0: b - a is never formed, and `tanh_sinh_report`'s ends (hi for the right side,
+  lo for the left) are that end for the side toward it, unused by a side toward infinity. `safe_value` is 0 there.
+  The sides keep their names and roles by map: on [a, inf) the right is toward infinity (a + E) and the left toward a
+  (a + q); on (-inf, b] the left is toward -inf (b - E), the right toward b (b - q); on the line right x, left -x.
+  The right side is swept first except on (-inf, b], where the left is (C's order).
+- **Dispatch:** `TanhSinh::start` calls `tanh_sinh_start` where both ends are finite, else `exp_sinh_start`;
+  `advance` dispatches on `map`. The finite path is the same code: its counts, results and the tanh-sinh tests are
+  unchanged, and 1/x on [0, 1] to the cap in a constant expression takes 871,875 Clang steps (871,680 at step 1): the
+  dispatch and the report's one new branch.
+- **The points and weights at use** (B): `detail::exp_sinh_node` forms a node's distance (E toward infinity, q toward
+  the finite end, x on the line), its point (a + d, b - d, +-x) and its weight (f E, f q, (f E + f q) / 2) from the
+  piece's columns. The prototype runs (-inf, b] as fn(-u) on [-b, inf); the C++ forms b - E directly, the same value
+  since round to nearest is symmetric (fl(-b + E) = -fl(b - E)). A point is inside where it lies beyond the finite end
+  and is finite (on the line always: |x| <= max / 6). In constant evaluation an end above max / 2 would be refused
+  after the test of the centre, so that origin +- E (E <= max / 3) cannot overflow; but such an end already has
+  a + 1 = a in any type with max > 4 / eps, so the guard acts only in a type with max below 4 / eps.
+- **A step at a node** (the numerics review of step 2): a jump of fn exactly at a node, such as (x < 1) on [0, inf)
+  at the centre, leaves an error -A h + B h^2 per level, A = g(0-) / 2 and B = g'(0-) / 12 in t, so |V_k - V_(k-1)|
+  falls short of the error by 2 B h^2 where B > 0 (about 0.05 % for (x < 1) / (1 + x)); as on [a, b] in Phase 3, an
+  interior feature, honest only to that order. The tests' step lies between nodes.
+- **The term** (C): `detail::exp_sinh_term`, w y with each product checked by `small_product` in constant evaluation
+  and refused at run time where not finite; no `safe_value` shortcut, since the weights reach max / 2. The sliver of
+  exp-sinh's side toward its finite end is h W y by the same function (`tanh_sinh_report` branches on `map`); W adds
+  f q at use (`Side::add_weights` for an `ExpSinhLevel`).
+- **The walk:** `ExpSinhLevel::each(first, infinite, visit)` passes visit the node's index, its piece and its index
+  in the piece, so that a sweep reads only the columns it needs; plain loops, as `TanhSinhLevel::each`'s (the hot path
+  of constant evaluation), over the first `outward` nodes toward infinity or the `inward` ones.
+- **Level 0** (`exp_sinh_start`, D): the centre (a + 1, b - 1, 0) with weight f(0) = c; each side's sweep stores
+  position, point, value, term and weight in a fixed array; a value not finite is a tail where its distance is above
+  1/eps toward infinity or below eps toward the finite end, else pending toward infinity (the side's sweep ends) or
+  non_finite. Then, in es.py's order: the threshold eps L1 from the centre and every stored term (centre, first side,
+  second side); each pending value a tail where the side's last stored |term| (the centre's if none) is below it, else
+  non_finite; the underflow rule toward infinity in increasing t (`std::ranges::find_if` over the indices: |y| < min(),
+  w min() at least the threshold, the value before it, the centre's for the first, at least min()), cutting as the
+  table's end and dropping that node and all beyond; then Phase 3's pruning from the outside in; then the sums and W.
+- **Level k** (`exp_sinh_advance`): per side up to its cut, a new node beyond the outermost kept one: not inside, a
+  cut (the table's end toward infinity, rounding toward the finite end); a value not finite, a tail by the distance
+  or, toward infinity, where the outermost kept size is below the threshold eps L1_(k-1) / (2h), else non_finite; the
+  term; toward infinity, |y| < min() after a kept value of at least min() cuts (pruning where w min() is below the
+  threshold, else the table's end), the node not kept; pruning on |term| below the threshold. The sums and the step
+  as `tanh_sinh_advance`. The end terms need nothing new: a side toward infinity is never cut by rounding, so it has
+  0 after pruning and the geometric term after the table's end or a tail, as D says.
+
+### Evidence (Phase 4 step 2)
+
+The kept prototype (`tanh-sinh-prototype/es.py`, its default the approved design, Q6) loads the C++ double table
+with `cpp=True` (`es_double.txt`, the weights formed as the C++ forms them); without it, Python's exp builds its own.
+Its finite path still reproduces `ts.py`'s 19 checked cases bit for bit (status, value, `abs_error`, best,
+evaluations), and its default results on seven infinite cases equal the scratchpad's es.py's (only the loader, the
+table's path and comments changed). With the C++ table, 26 cases of + - * / and sqrt on the three maps (pruning, the
+rounding cut at a = 1 and 1e10, the table's end, the underflow rule at levels 0 and 7, the level-k tail, the level-0
+pending value decided non_finite, the cap with and without a best, no point inside, reversed ends) agree with the C++
+bit for bit, value, `abs_error`, best and the evaluations after every level; 20 are asserted
+(`quadrature: infinite: evaluation counts in double`). Among them:
+
+| Case | Status | Evaluations by level |
+|---|---|---|
+| 1 / (1 + x)^2 on [0, inf) | ok | 13, 21, 37, 69, 133 |
+| x^-1.5 by sqrt on [1, inf) (a rounding cut at 1) | ok | 10, 19, 37, 72, 141 |
+| x^-(1 + 1/64) by six sqrt on [1, inf) (the table's end, underflow at level 7) | not_converged, honest best | 5,428 at the cap |
+| x^-2 sqrt((x - X1)(x - X2)) / x on [1, inf), X1 = 2 1.05^400 (a tail at level 4) | ok | 10, 18, 33, 63, 121 |
+| sqrt(10 - x) / (1 + x)^2 on [0, inf) (pending at t = 2, then non_finite) | non_finite | 9 in all, no report |
+| 1 / (1 + x^2)^2 on (-inf, 0] | ok | 13, 20, 34, 62, 117 |
+| 1 / (1 + x^2) on the line | ok | 13, 21, 37, 69, 133 |
+| 1/x on [0, inf); 1 on [0, inf) | not_converged, no best | 7,011; 3,519 at the cap |
+| the step at 2, (x < 2) / (1 + x^2) on [0, inf) | not_converged, honest best | 2,233 at the cap |
+
+How each side ended, read from the state after a level, is the prototype's record of the same run: e^-x pruned on
+both sides; x^-1.01 at the table's end; x^50 e^-x a tail at level 0 then pruned at t = 2; the level-k tail cut by
+pruning to level 3 and by the tail at level 4; 1e-250 x^-(1 + 1/64) cut by the underflow rule at t = 6 at level 0;
+x^-0.99 e^-x at the table's end toward 0; (x - 1)^-0.5 e^-x by rounding at 1.
+
+Accuracy: S's 26 cases in double (`quadrature: infinite: accuracy on S in double`) are ok at 1e-6, the default,
+1e-12 and 0 with no estimate below its error and the error within rel_tol |ref|, with the toolchain's libm; seven
+cases on the three maps in `cpp_bin_float_50` (with and without expression templates) and `cpp_dec_float_50` at 1e-25
+and 1e-45 likewise.
+
+Constant evaluation (Clang 22, the least step limit that compiles, by bisection): the line's and the half line's runs
+of 133 evaluations, alone or four in one expression, fit under the largest table piece's own 283,155 steps (27.0 %);
+the step at 2 to the cap, 2,233 evaluations, 408,612 steps (39.0 % of the default, the test's case); 1/x on [1, inf)
+to the cap, 5,431 evaluations, 955,838 (91.2 %, not used); about 180 steps an evaluation. A class wrapping double (no
+table): 1/(1 + x)^2 on [0, inf), its levels 0 to 4 generated in the same expression, 312,971 steps (29.8 %).
+
+Compile time (Debug, -O0 -g, this machine, the best of three): a translation unit with one `integrate<TanhSinh>` in
+double takes 2.03 s on GCC 16 against 0.98 s with the default method (1.44 s before this step) and 1.53 s against 0.76
+on Clang 22 (1.07 s before): `start` chooses the map at run time, so both tables are instantiated wherever the method
+is, whatever the ends.
+
 ### The references of the tanh-sinh tests
 
 `tests/quadrature_tanh_sinh_reference.hpp`, run as `python -I ts_references.py > quadrature_tanh_sinh_reference.hpp`:
@@ -1054,6 +1154,15 @@ if __name__ == '__main__':
   TanhSinh joins the edge template (`test_quadrature_kronrod.cpp`) with its statuses of `PHASE3_API.md` F and an
   allowance from its table's bound, and the protocol's tests (`test_quadrature_protocol.cpp`): the concept, named and
   as a value, reversed ends exactly negated, observed equal to unobserved, in constant evaluation too.
+- TanhSinh on infinite intervals (`tests/test_quadrature_infinite.cpp`, `quadrature: infinite: *`): the opt-in
+  (every other method non_finite in every form, an observed TanhSinh, NaN ends, equal infinities {0, 0} without calling
+  fn, reversed infinite ends exactly negated); S in double at four tolerances and seven cases in the 50-digit types,
+  with the honesty check; the counts per level against the kept prototype with the C++ table; how the sides end, from
+  the state after a level, with each rule's status and honest best; the limits' remedies (the split and the shift for
+  a far peak, x = a + u for a far half line); static_asserts on the line, the half line, the cap and a class type, with
+  run-time twins. The edge template's infinite ends are non_finite for Romberg and GaussKronrod<15>, and the protocol's
+  tests add a user's estimating method that opts in (it receives the ends in order) and TanhSinh's infinite ends
+  observed and reversed in constant evaluation.
 - The exp-sinh table (`tests/test_quadrature_exp_sinh.cpp`, `quadrature: exp_sinh: *`): the sampled nodes of the
   double and `cpp_bin_float_50` tables (q, E, f, x and the three weights formed as at use) within the derived bound,
   t = 0 exact in every type; the nodes per level and side in float, double, long double and the 50-digit types (with

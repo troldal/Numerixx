@@ -233,6 +233,22 @@ namespace {
         }
     };
 
+    // An estimating method that takes infinite ends (PHASE4_API.md A): the spy, opted in.
+    struct UnboundedSpy
+    {
+        static constexpr bool infinite_ends = true;
+
+        Seen *seen = nullptr;
+
+        template<nxx::real T, typename F>
+        constexpr std::expected<qd::Integral<T>, qd::Failure<T>> estimate(F &, T const &a, T const &b,
+            qd::Criteria<T> const &c) const
+        {
+            *seen = Seen{ a, b, c.abs_tol, c.rel_tol, seen->calls + 1 };
+            return qd::Integral<T>{ T(1), T(0) };
+        }
+    };
+
     // Methods that break the contract's checkable part: integrate() returns non_finite for each.
     template<typename R>
     struct Returning
@@ -439,6 +455,10 @@ static_assert(qd::integrate<qd::Romberg>(runge, 1.25, 0.0, { .rel_tol = 0.0 })
               == negated(qd::integrate<qd::Romberg>(runge, 0.0, 1.25, { .rel_tol = 0.0 })));
 static_assert(qd::integrate<qd::TanhSinh>(runge, 1.25, 0.0, { .rel_tol = 0.0 })
               == negated(qd::integrate<qd::TanhSinh>(runge, 0.0, 1.25, { .rel_tol = 0.0 })));
+// Infinite ends too, for the method that takes them (PHASE4_API.md A): ordered as (0, inf) and (-inf, inf).
+static_assert(qd::integrate<qd::TanhSinh>(runge, dinf, 0.0) == negated(qd::integrate<qd::TanhSinh>(runge, 0.0, dinf)));
+static_assert(qd::integrate<qd::TanhSinh>(runge, dinf, -dinf)
+              == negated(qd::integrate<qd::TanhSinh>(runge, -dinf, dinf)));
 
 TEST_CASE("quadrature: protocol: reversed ends give exactly the negated result")
 {
@@ -480,6 +500,24 @@ TEST_CASE("quadrature: protocol: an estimating method receives the ends in order
     CHECK(qd::integrate(Spy{ &seen }, square, 0.0, 1.0, { .rel_tol = dnan }) == std::unexpected(non_finite));
     CHECK(qd::integrate(Spy{ &seen }, square, 2.0, 2.0) == qd::Integral<double>{ 0.0, 0.0 });
     CHECK(seen.calls == 0);
+
+    // A method that opts in to infinite ends receives them in order (b - a and a/2 + b/2 are its to avoid), the
+    // result negated for reversed ends; a NaN end and the same infinity twice never reach it.
+    CHECK(qd::integrate(UnboundedSpy{ &seen }, square, dinf, 0.0) == qd::Integral<double>{ -1.0, 0.0 });
+    CHECK(seen.calls == 1);
+    CHECK(seen.a == 0.0);
+    CHECK(seen.b == dinf);
+    CHECK(qd::integrate(UnboundedSpy{ &seen }, square, dinf, -dinf) == qd::Integral<double>{ -1.0, 0.0 });
+    CHECK(seen.calls == 2);
+    CHECK(seen.a == -dinf);
+    CHECK(seen.b == dinf);
+    CHECK(qd::integrate(UnboundedSpy{ &seen }, square, -dinf, 1.0) == qd::Integral<double>{ 1.0, 0.0 });
+    CHECK(seen.calls == 3);
+    CHECK(seen.a == -dinf);
+    CHECK(seen.b == 1.0);
+    CHECK(qd::integrate(UnboundedSpy{ &seen }, square, dnan, dinf) == std::unexpected(non_finite));
+    CHECK(qd::integrate(UnboundedSpy{ &seen }, square, -dinf, -dinf) == qd::Integral<double>{ 0.0, 0.0 });
+    CHECK(seen.calls == 3);
 }
 
 // --- The checked results ----------------------------------------------------------------------------------------------
@@ -675,6 +713,9 @@ static_assert(qd::integrate<qd::TanhSinh>(qd::observer(quiet), runge, 1.0, 0.0)
               == qd::integrate<qd::TanhSinh>(runge, 1.0, 0.0));
 static_assert(qd::integrate(qd::TanhSinh{}, qd::observer(quiet), runge, 1.0, 0.0)
               == qd::integrate(qd::TanhSinh{}, runge, 1.0, 0.0));
+// An observed TanhSinh takes infinite ends: Observed forwards the opt-in.
+static_assert(qd::integrate<qd::TanhSinh>(qd::observer(quiet), runge, dinf, -dinf)
+              == qd::integrate<qd::TanhSinh>(runge, dinf, -dinf));
 // In constant evaluation an observer may record, here into a transient vector.
 static_assert([] {
     std::vector<qd::Step<double>> steps;

@@ -5,6 +5,7 @@
 #include <cmath>
 #include <expected>
 #include <format>
+#include <limits>
 #include <print>
 #include <string_view>
 
@@ -72,7 +73,18 @@ int main()
     show("e^x (1 + 1e-10 sin 1e7 x), 1e-12", [](double x) { return std::exp(x) * (1.0 + 1e-10 * std::sin(1e7 * x)); },
          0.0, 1.0, std::exp(1.0) - 1.0, { .rel_tol = 1e-12 });
 
-    // 4. A multiprecision integral: in a 50-digit type the default rel_tol is sqrt(eps), about 1e-25; a caller who
+    // 4. Infinite intervals: TanhSinh alone takes an infinite end, by exp-sinh on a half line and sinh-sinh on the
+    //    line; every other method returns non_finite. The maps centre at 0 or at the finite end at scale 1: a peak
+    //    far from there is split at the peak, or shifted into fn.
+    std::println("\nInfinite intervals, by TanhSinh:");
+    double const inf = std::numeric_limits<double>::infinity();
+    show<qd::TanhSinh>("x^2 e^-x on [0, inf)", [](double x) { return x * x * std::exp(-x); }, 0.0, inf, 2.0);
+    show<qd::TanhSinh>("e^-x^2 on (-inf, inf)", [](double x) { return std::exp(-x * x); }, -inf, inf,
+                       1.7724538509055160);
+    show<qd::TanhSinh>("x^-1.5 on [1, inf)", [](double x) { return 1.0 / (x * std::sqrt(x)); }, 1.0, inf, 2.0);
+    std::println("   the default on [0, inf): {}", qd::integrate([](double x) { return std::exp(-x); }, 0.0, inf).error());
+
+    // 5. A multiprecision integral: in a 50-digit type the default rel_tol is sqrt(eps), about 1e-25; a caller who
     //    chose the type for its digits sets rel_tol. The nodes are computed once, at the first use.
 #ifdef NUMERIXX_DEMO_MULTIPRECISION
     using mp = boost::multiprecision::cpp_bin_float_50;

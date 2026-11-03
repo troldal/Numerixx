@@ -702,16 +702,21 @@ TEST_CASE_TEMPLATE("quadrature: estimating methods: edges", M, qd::Romberg, gk15
 {
     qd::Failure<double> const invalid{ qd::error::non_finite, std::nullopt };
 
-    // a == b: {0, 0}, fn not called; NaN and infinite ends and invalid tolerances: non_finite, fn not called.
+    // a == b: {0, 0}, fn not called; NaN ends and invalid tolerances: non_finite, fn not called; an infinite end
+    // likewise for a method that does not take one (PHASE4_API.md A: TanhSinh's are in test_quadrature_infinite.cpp).
     int n = 0;
     auto const c = Counted{ square, &n };
     auto const same = qd::integrate<M>(c, 2.0, 2.0);
     REQUIRE(same.has_value());
     CHECK(same->value == 0.0); // defined as 0 (A3), not computed
     CHECK(same->abs_error == 0.0);
-    for (auto const &[a, b] : { std::pair{ dnan, 1.0 }, std::pair{ 0.0, dnan }, std::pair{ -dinf, 1.0 },
-                                std::pair{ 0.0, dinf } })
+    for (auto const &[a, b] : { std::pair{ dnan, 1.0 }, std::pair{ 0.0, dnan }, std::pair{ dnan, dinf } })
         CHECK(qd::integrate<M>(c, a, b) == std::unexpected(invalid));
+    if constexpr (!qd::detail::takes_infinite_ends<M>) {
+        for (auto const &[a, b] : { std::pair{ -dinf, 1.0 }, std::pair{ 0.0, dinf }, std::pair{ dinf, 0.0 },
+                                    std::pair{ -dinf, dinf }, std::pair{ dinf, dinf } })
+            CHECK(qd::integrate<M>(c, a, b) == std::unexpected(invalid));
+    }
     for (qd::Criteria<double> const criteria :
          { qd::Criteria<double>{ .abs_tol = -1e-12 }, qd::Criteria<double>{ .rel_tol = -1e-12 },
            qd::Criteria<double>{ .abs_tol = dnan }, qd::Criteria<double>{ .rel_tol = dnan },

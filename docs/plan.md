@@ -256,7 +256,10 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
     derived bound (largest ratio 0.40 double, 0.46 `cpp_bin_float_50`), the counts per level and side the
     prototype's, compile-time and run-time tables bit-identical; all five presets locally and the docs build
     (2026-11-03)
-  - [ ] Step 2, the infinite ends: the opt-in, `TanhSinh`'s maps and sides; tests in every type; docs build clean
+  - [x] Step 2, the infinite ends: the opt-in, `TanhSinh`'s maps and sides; tests in every type; docs build clean
+    (all five presets locally and the docs build, 2026-11-03; the kept `es.py` with the C++ table agrees bit for bit on
+    26 counted cases; the numerics review of the implementation: no defect, its corrections to comments and tests
+    adopted)
   - [ ] CI passes on all five toolchains
   - [ ] The independent review (Codex) and its adopted findings
 - The milestone ends with its chapter on the documentation site, as Milestone 3 did for roots and deriv.

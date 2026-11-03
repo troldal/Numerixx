@@ -60,7 +60,7 @@ namespace nxx::quadrature {
   - `error::non_finite`: an end is NaN, or infinite for a method that does not take infinite ends (every method but
     `TanhSinh`); for `TanhSinh`, a value not finite where D's tail rule does not apply.
   - `TanhSinh`: the three maps; F's limits; the cost (e^-x on [0, inf) in 100 evaluations, at most 13 at level 0 in
-    double, 43 in `cpp_bin_float_50`; level 0 calls fn at |x| up to about 1e238 in double, later levels up to about
+    double, 43 in `cpp_bin_float_50`; level 0 calls fn at |x| up to about 1e131 in double, later levels up to about
     1e305 on a side that is not pruned).
   - `integrate`: an infinite end is for `TanhSinh` only. The `or_else` fallback is for finite intervals (the default
     rejects an infinite end, so it would return TanhSinh's failure unchanged); on a half line, split at a finite c:
@@ -131,7 +131,7 @@ order, (inf, a) as (a, inf) and (inf, -inf) as (-inf, inf), the result negated.
   - **The tail rule (Q3):** a value not finite at a node beyond every kept point is a tail (the side cut there) where
     E (sinh u on the line) exceeds 1/eps, or where the side's outermost kept |term| is already below the pruning
     threshold; anywhere else it is `non_finite`.
-  - **The underflow rule (Q4):** a value below min() is no evidence of a negligible term where the weight is 1e305
+  - **The underflow rule (Q4):** a value below min() is no evidence of a negligible term where the weight reaches max / 2
     (without the rule 1e-15 x^-1.02 on [1, inf) ended ok with an error of 8.9e-7 at the default, and 1e-250 x^-1.01 ok
     with an error of 19 % at 1e-3). A node beyond every kept point with |y| < min(), after a kept value of at least
     min(), cuts the side there and is not kept: as pruning if w min() is below the threshold, else as the table's end
