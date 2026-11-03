@@ -199,6 +199,11 @@ ticked when the docs build with no warning locally and in CI, and the examples' 
     "Where to go next" split into Tutorial, Guide and Reference, so that the PDF shows them (c648bbf: run 41682779179)
   - [x] Step 3: layout, a read of the whole PDF, reviews and Codex (b57129c: run 41689684905; Codex: four edge cases,
     three adopted, `docs/sphinx/PHASE6_PLAN.md`)
+- Phase 7: plots in the manual, drawn by matplotlib at build time from data a tested program checks; the first, in
+  the quadrature guide, where the default and `TanhSinh` evaluate 1/sqrt x. Plan approved: `docs/sphinx/PHASE7_PLAN.md`
+  (2026-11-03).
+  - [ ] The figure, its program and its script; built and read on the site and in the PDF; the program passing on the
+    five toolchains, locally and in CI; `docs-reviewer`
 
 Open decisions: hosting (GitHub Pages from CI, or Read the Docs) and versioning (one site per release, or `dev` only),
 with `linkcheck` and the install section of getting-started;
@@ -397,8 +402,6 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
   `docs/<module>/design.md`, `costs.py`); ASCII math and curly-quoted code in reference prose; `@tparam` on a concept
   rendered as "tparam T"; declarations split from their template line at page breaks, near-empty pages, and the
   hyphenated headers of the roots costs table. Changes to `include/` need the user's approval.
-- Plots built at documentation time (matplotlib's plot directive from CSV the example programs write), asked about
-  on 2026-11-03; not planned.
 
 ### Derivatives (`nxx::deriv`)
 

@@ -10,3 +10,9 @@
 [data-layout="wide"] #lumina-content {
     max-width: 70rem;
 }
+
+/* A matplotlib figure (plots/*.py, PHASE7_PLAN.md) spans the content column like the text, its SVG scaled to fit. */
+img.plot-directive {
+    width: 100%;
+    height: auto;
+}

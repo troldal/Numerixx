@@ -33,7 +33,16 @@ html_static_path = ["_static"]
 html_css_files = ["numerixx.css"]
 # The theme loads sphinx-sitemap, which warns without html_baseurl, the site's public URL.
 suppress_warnings = ["sitemap.configuration"]
-extensions = ["breathe", "myst_parser", "numerixx_breathe", "numerixx_latex"]
+extensions = ["breathe", "myst_parser", "numerixx_breathe", "numerixx_latex", "matplotlib.sphinxext.plot_directive"]
+# Figures drawn by matplotlib at build time from plots/*.py (PHASE7_PLAN.md): SVG on the site, PDF in the PDF manual,
+# without the directive's links to the script and to other formats.
+plot_formats = ["svg", "pdf"]
+plot_html_show_formats = False
+plot_html_show_source_link = False
+plot_include_source = False
+# A page names its script from this folder ("plots/<name>.py"): under MyST the directive does not resolve a path from
+# the page's own folder, and a leading / is the drive's root on Windows.
+plot_basedir = str(Path(__file__).parent)
 exclude_patterns = ["PHASE*.md", "examples", "_ext"]
 
 # One source, two manuals (PHASE6_PLAN.md). The PDF build passes -t pdf: its root is manual.md, whose toctree makes
@@ -88,6 +97,8 @@ latex_elements = {
     "fncychap": "",
     # The index's two columns are narrower than names such as std::formatter<nxx::quadrature::Failure<T>>::format.
     "printindex": r"\footnotesize\raggedright\printindex",
+    # A figure stays where the text puts it, beside the paragraph about it, instead of floating to another page.
+    "figure_align": "H",
 }
 latex_show_pagerefs = True
 # The title page's logo, as PDF since pdflatex includes no SVG (make_logo.py writes it beside the site's SVGs).
