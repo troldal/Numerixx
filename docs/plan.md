@@ -260,8 +260,10 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
     (all five presets locally and the docs build, 2026-11-03; the kept `es.py` with the C++ table agrees bit for bit on
     26 counted cases; the numerics review of the implementation: no defect, its corrections to comments and tests
     adopted)
-  - [ ] CI passes on all five toolchains
-  - [ ] The independent review (Codex) and its adopted findings
+  - [x] CI passes on all five toolchains (cc7e889: run 41637250176)
+  - [x] The independent review (Codex) and its adopted findings (three findings, all adopted with the user's
+    approval, all in a type whose max() is small against 1 / eps: the centre overflowing, 1 / eps not fitting, the
+    radix wording; `PHASE4_API.md`, "The independent review")
 - The milestone ends with its chapter on the documentation site, as Milestone 3 did for roots and deriv.
 
 ## Deferred

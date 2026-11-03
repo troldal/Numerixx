@@ -78,7 +78,7 @@ order, (inf, a) as (a, inf) and (inf, -inf) as (-inf, inf), the result negated.
 ### B. The maps and their table
 
 - **The map:** [a, inf), x = a + E; (-inf, b], x = b - E; (-inf, inf), x = +-sinh u; with u = c sinh t, E = exp(u)
-  and c = 3/2 (Q2), exact in every radix; tanh-sinh keeps c = 1.
+  and c = 3/2 (Q2), exact in even radices (2 and 10 among them); tanh-sinh keeps c = 1.
 - **One table for both maps,** per t >= 0, from exp on its present domain (no widening): q = exp(-u), then E = 1/q;
   sinh t and cosh t by their series below t = 1/2, as Phase 3. Its columns: q, E and c cosh t, and for the 167 nodes
   where u < 1/2 (t <= 167/512, in every type) the line's x by sinh's series.
@@ -235,8 +235,8 @@ Each step committed, pushed and checked on the five toolchains; the user approve
     (simplicity review); the member is non-breaking to add later, and a later finer opt-in (half lines but not the
     line) would break code that wrote the member now. Q10 chose the open protocol; the member is its smallest form.
   - Alternative: `TanhSinh` named in `integrate`, the member deferred.
-- **Q2. The constant c of the two new maps: 3/2.** Recommended: yes. Exact in every radix, below pi/2, so no pi in T;
-  tanh-sinh keeps c = 1.
+- **Q2. The constant c of the two new maps: 3/2.** Recommended: yes. Exact in even radices (2 and 10), below pi/2, so
+  no pi in T; tanh-sinh keeps c = 1.
   - **Evaluations:** on S, 12 % fewer than c = 1 in double (15,446 against 17,514 over the four tolerances), 5 % at
     113 bits, 8 % at 168.
   - **Honesty:** on the 35 cases, fewer false successes than c = 1 in every type: the interior kink e^-|x - 1| at 1e-6
@@ -295,6 +295,29 @@ From the numerics review of draft 2 (each rerun on the prototype):
   variant for y = 0 only measured and refused (Q4); the table's columns; the level-k tail cases for the tests; the
   figures requoted from runs of this design (x^k e^-x to k = 50 in double, not 60; the weights within 1.9 eps; fn's
   largest arguments at level 0).
+
+## The independent review
+
+By Codex (gpt-6.1-sol, read-only) on 2026-11-03, on c4a791e, 3ef98e5, 52b2b2e and cc7e889 against this document,
+`PHASE3_API.md`, `PHASE3B_API.md`, `PHASE3A_API.md` A to D, `docs/design.md`, `docs/quadrature/design.md` and
+`CLAUDE.md`. It found the table, the side order, pruning, the underflow cuts, the end terms, the slivers, the raw sums
+and floors, the opt-in's validation, reversal and forwarding, and the finite path (bit for bit Phase 3's) correct, and
+three defects, all in a type whose max() is small against 1 / eps, each reproduced before acting and fixed with the
+user's approval:
+
+1. **The centre could overflow:** in `cpp_bin_float<53, digit_base_2, void, int, -1022, 39>` (max() about 2^40),
+   a + 1 is infinite on [max(), inf), the inside test passed, and fn was called at infinity; in constant evaluation the
+   overflow was a compile error. Fixed: the centre is formed only where it cannot overflow (a at most max() - 1, the
+   mirror on (-inf, b]), and must be finite; otherwise no point is inside, not_converged without a best, fn not called.
+2. **1 / eps did not fit** in such a type, so the tail rule's distance clause made fn = 0 on [0, inf) fail in a
+   constant expression. Fixed: 1 / eps is formed only where eps max() > 1; otherwise no finite node lies beyond it, and
+   that clause of the rule never holds.
+3. **"c = 3/2, exact in every radix" was false** (no radix-3 value equals 3/2): now "exact in even radices (2 and 10
+   among them)".
+
+Tests: the Boost type at run time ([max(), inf) and (-inf, -max()] sample nothing; 1/(1 + x)^2 on [0, inf) honest)
+and a double wrapper with max() 2^40 in constant evaluation (fn = 0 and 1/(1 + x)^2 on [0, inf), [max(), inf)), with
+run-time twins. In every type tested before, every result is bit for bit unchanged.
 
 ## Deferred
 

@@ -2320,7 +2320,7 @@ namespace nxx::quadrature {
 
         /**
          * @brief A piece of a level of the exp-sinh table, from exp() on its domain alone (PHASE4_API.md B): c = 3/2,
-         * exact in every radix, so no pi.
+         * exact in even radices (2 and 10 among them), so no pi.
          *
          * Levels and positions as the tanh-sinh table's. The side toward the finite end ends at the first node whose
          * q = exp(-u) is 0, below x_min: q >= min() for the nodes kept. The side toward infinity ends at the first
@@ -3367,6 +3367,20 @@ namespace nxx::quadrature {
          * @param b The upper end, inf or finite, a < b, not both finite.
          * @return The state after level 0, or non_finite.
          */
+        /**
+         * @brief 1/eps, the tail rule's distance toward infinity, where T can hold it (eps max() > 1, formed without
+         * overflow); empty in a type whose exponents end below it, where no finite node lies beyond it and that clause
+         * of the rule never holds (Phase 4's independent review).
+         * @return 1/eps, or empty.
+         */
+        template<real T>
+        constexpr std::optional<T> inverse_epsilon()
+        {
+            T const eps = T(std::numeric_limits<T>::epsilon());
+            if (!(T(eps * T((std::numeric_limits<T>::max)())) > T(1))) return std::nullopt;
+            return T(T(1) / eps);
+        }
+
         template<real T, typename F>
         constexpr std::expected<TanhSinhState<T>, Failure<T>> exp_sinh_start(F &fn, T const &a, T const &b)
         {
@@ -3391,11 +3405,19 @@ namespace nxx::quadrature {
                 .previous = std::nullopt,
                 .k = 0,
                 .step = Step<T>{} };
-            T const centre = map == mapping::upper ? T(origin + T(1))
-                                                   : (map == mapping::lower ? T(origin - T(1)) : T(0));
+            // The centre a + 1 (b - 1) is formed only where it cannot overflow, at most max - 1 from 0 (in double
+            // max - 1 is max itself, so this excludes nothing there); beyond, in a type whose max is small against
+            // 1 / eps, a + 1 would be infinite (Phase 4's independent review), and nothing is sampled either.
+            T const room = T(T((std::numeric_limits<T>::max)()) - T(1));
+            bool const fits =
+                map == mapping::upper ? !(room < origin) : (map == mapping::lower ? !(origin < T(-room)) : true);
+            T const centre = !fits ? origin
+                                   : (map == mapping::upper ? T(origin + T(1))
+                                                            : (map == mapping::lower ? T(origin - T(1)) : T(0)));
             // No point strictly inside (from |a| about 2 / eps): nothing can be sampled.
-            bool const inside =
-                map == mapping::upper ? origin < centre : (map == mapping::lower ? centre < origin : true);
+            bool const inside = fits && nxx::math::isfinite(centre)
+                                && (map == mapping::upper ? origin < centre
+                                                          : (map == mapping::lower ? centre < origin : true));
             if (!inside) {
                 s.step = Step<T>{ .ready = false, .exhausted = true };
                 return s;
@@ -3410,7 +3432,7 @@ namespace nxx::quadrature {
             bool const left_first = map == mapping::lower;
             return detail::with_exp_sinh_level<T>(0, [&](ExpSinhLevel<T> const &nodes) -> result {
                 T const eps = T(std::numeric_limits<T>::epsilon());
-                T const inverse_eps = T(T(1) / eps);
+                std::optional<T> const inverse_eps = detail::inverse_epsilon<T>();
                 T const smallest = T((std::numeric_limits<T>::min)());
                 T const centre_value = detail::evaluate(fn, centre);
                 if (!nxx::math::isfinite(centre_value)) return std::unexpected(invalid);
@@ -3457,7 +3479,7 @@ namespace nxx::quadrature {
                             }
                             T const y = detail::evaluate(fn, node.point);
                             if (!nxx::math::isfinite(y)) {
-                                if (infinite ? node.distance > inverse_eps : node.distance < eps) {
+                                if (infinite ? inverse_eps && node.distance > *inverse_eps : node.distance < eps) {
                                     side.cut = j;
                                     side.cause = cut_by::value;
                                 }
@@ -3583,7 +3605,7 @@ namespace nxx::quadrature {
         {
             Failure<T> const invalid{ error::non_finite, std::nullopt };
             T const eps = T(std::numeric_limits<T>::epsilon());
-            T const inverse_eps = T(T(1) / eps);
+            std::optional<T> const inverse_eps = detail::inverse_epsilon<T>();
             T const smallest = T((std::numeric_limits<T>::min)());
             s.k += 1;
             s.h = T(s.h / T(2));
@@ -3609,7 +3631,8 @@ namespace nxx::quadrature {
                             }
                             T const y = detail::evaluate(fn, node.point);
                             if (!nxx::math::isfinite(y)) {
-                                bool const far = infinite ? node.distance > inverse_eps : node.distance < eps;
+                                bool const far =
+                                    infinite ? inverse_eps && node.distance > *inverse_eps : node.distance < eps;
                                 if (outer && (far || (infinite && side.outer.size < threshold))) {
                                     side.cut = j;
                                     side.cause = cut_by::value;

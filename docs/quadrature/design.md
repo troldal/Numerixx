@@ -644,9 +644,9 @@ takes 0.32 s longer than with the default method on GCC 16 (1.20 against 0.89 s)
 
 One table for exp-sinh on a half line and sinh-sinh on the line (Q5), internal; step 2 builds the maps on it.
 
-- **The nodes** (`detail::exp_sinh_piece<T, L, P>`): c = 3/2, formed as T(3) / T(2), exact in every radix (Q2); per
-  t >= 0 at the tanh-sinh table's levels and positions, sinh t and cosh t by `sinh_cosh`, u = c sinh t, q = exp(-u)
-  on exp's domain as it is (not widened), f = c cosh t. The side toward the finite end keeps a node while q >= min()
+- **The nodes** (`detail::exp_sinh_piece<T, L, P>`): c = 3/2, formed as T(3) / T(2), exact in even radices (2 and 10;
+  Q2); per t >= 0 at the tanh-sinh table's levels and positions, sinh t and cosh t by `sinh_cosh`, u = c sinh t,
+  q = exp(-u) on exp's domain as it is (not widened), f = c cosh t. The side toward the finite end keeps a node while q >= min()
   (exp gives 0 below x_min, which ends it); the side toward infinity while f <= (max / 2) q, decided before E = 1/q is
   formed, so that 1/q cannot overflow and E and f E stay at most about max / 2 in every T. The sides end at different
   t, the one toward infinity first or with the other: a piece records both counts (`inward`, `outward`).
