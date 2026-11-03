@@ -101,12 +101,9 @@ error; the stencils leave it empty, since they cannot estimate their error witho
 a guaranteed bound: it assumes that `fn` is accurate to about the type's epsilon, and it can be too small for a function
 that is noisier than that. [Working with Numerixx](../basics.md#what-a-result-holds) says how to read it.
 
-## Where to go next
+## Tutorial
 
-The [tutorial](tutorial.md) differentiates a function that is itself computed by a root solve, step by step. [Choose a
-method](choose-a-method.md) says which method suits which function, and the other sections of the guide each solve one
-task. The book on `nxx::deriv` explains the theory in full ([the book](book.md)), and the [reference](reference.md)
-documents every name.
+The tutorial differentiates a function that is itself computed by a root solve, step by step.
 
 ```{toctree}
 :maxdepth: 1
@@ -114,8 +111,12 @@ documents every name.
 tutorial
 ```
 
+## Guide
+
+Each section of the guide solves one task. [Choose a method](choose-a-method.md) says which method suits which
+function.
+
 ```{toctree}
-:caption: Guide
 :maxdepth: 1
 
 choose-a-method
@@ -126,8 +127,13 @@ derivative-of
 handle-failures
 ```
 
+## Reference
+
+[Accuracy](accuracy.md) compares the methods' evaluations and accuracy on three functions, the
+[reference](reference.md) documents every name, and the book on `nxx::deriv` explains the theory in full
+([the book](book.md)).
+
 ```{toctree}
-:caption: Reference
 :maxdepth: 1
 
 accuracy

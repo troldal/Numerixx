@@ -194,8 +194,9 @@ locally and in CI, and the examples' tests pass on all five toolchains.
     findings, all adopted (`docs/sphinx/PHASE5_PLAN.md`)
 - Phase 6: one source, two manuals: the site and a PDF through Sphinx's LaTeX builder, with wording for both media.
   Plan approved: `docs/sphinx/PHASE6_PLAN.md` (2026-11-03; A4, the author's name, the book beside the PDF).
-  - [ ] Step 1: wording for both media, the voice rule and its check, the project texts
-  - [ ] Step 2: the PDF build (`manual.md`, `introduction.md`, the `pdf` tag, `numerixx_docs_pdf`)
+  - [x] Step 1: wording for both media, the voice rule and its check, the project texts (36e59c4: run 41677577233)
+  - [ ] Step 2: the PDF build (`manual.md`, `introduction.md`, the `pdf` tag, `numerixx_docs_pdf`); each overview's
+    "Where to go next" split into Tutorial, Guide and Reference, so that the PDF shows them
   - [ ] Step 3: layout, a read of the whole PDF, reviews and Codex
 
 Open decisions: hosting (GitHub Pages from CI, or Read the Docs) and versioning (one site per release, or `dev` only),

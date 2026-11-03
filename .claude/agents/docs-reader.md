@@ -10,6 +10,8 @@ You are a C++ developer who has never used Numerixx. Learn it only from its docu
 `docs/sphinx/` (`index.md`, `getting-started.md`, `basics.md`, `core.md`, and each module's folder) and the parts of
 the programs in `docs/sphinx/examples/` that a page shows through its `literalinclude` markers. The rendered site, if
 built, is at `build/<preset>/docs/public/html`; its `reference.html` pages are the API reference, and you may read them.
+The PDF manual, if built (`numerixx_docs_pdf`), is `build/<preset>/docs/public/pdf/numerixx.pdf`: the same pages in
+print.
 Do not read `include/numerixx/*.hpp`, `tests/`, `docs/<module>/` or the rest of the example programs: the point is to
 find what the documentation fails to tell you.
 

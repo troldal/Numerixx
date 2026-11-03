@@ -33,7 +33,7 @@ A module may use another module's public API, never its `detail`.
 - `CMakePresets.json` one preset per toolchain, used locally and in CI (`.github/workflows/ci.yml`)
 - `docs/plan.md` the plan; `docs/design.md` the decisions for every module; `docs/<module>/` per module (above)
 - `docs/Doxyfile` the API documentation settings, used by the docs targets in `docs/CMakeLists.txt`
-- `docs/sphinx/` the user manual, read on screen and (from Milestone 3 Phase 6) in print, so worded for both,
+- `docs/sphinx/` the user manual, built as a site (root `index.md`) and a PDF (root `manual.md`), so worded for both,
   organised by module (`roots/`, `deriv/`, each with its overview, tutorial, guide pages and reference;
   `getting-started.md`, `basics.md` and `core.md` beside them; MyST pages; Breathe directives only on the reference
   pages), with `conf.py`, the local extension `_ext/numerixx_breathe.py` (the Breathe patch and
@@ -53,12 +53,15 @@ Presets: `clang-cl`, `cl`, `gcc`, `clang`, `emscripten`; each builds Debug into 
 - Run affected tests: `build/<preset>/tests/numerixx_tests --test-case="roots:*"` (the module's prefixes, above)
 - Full suite: `ctest --preset <preset>`
 - Docs: `cmake --build --preset <preset> --target numerixx_docs` writes the Sphinx site to
-  `build/<preset>/docs/public/html` (Doxygen XML, then Sphinx with Breathe and MyST through `uv run` with
-  `docs/sphinx/requirements.txt`); a Doxygen or Sphinx warning, or a failed check in `docs/sphinx/conf.py`, fails it.
+  `build/<preset>/docs/public/html` and the PDF manual's LaTeX to `build/<preset>/docs/public/latex` (Doxygen XML,
+  then Sphinx with Breathe and MyST through `uv run` with `docs/sphinx/requirements.txt`; the PDF's root is
+  `manual.md`, under `-t pdf`); a Doxygen or Sphinx warning, or a failed check in `docs/sphinx/conf.py` or
+  `_ext/numerixx_breathe.py`, fails it. `numerixx_docs_pdf`, where latexmk is found, compiles the PDF to
+  `build/<preset>/docs/public/pdf/numerixx.pdf`, with the deriv book's released PDF beside it.
   It needs uv and Doxygen 1.18 or later (in `C:/Program Files/doxygen/bin`; a build directory configured earlier may
   have cached Strawberry Perl's 1.10: pass `-DDOXYGEN_EXECUTABLE`). `numerixx_docs_internal` writes Doxygen's HTML
   with the `detail` namespaces to `build/<preset>/docs/internal/html`, with Doxygen 1.10 or later.
-  `numerixx_docs_all` builds the whole documentation: both, and the deriv book (`numerixx_book`) where latexmk is
+  `numerixx_docs_all` builds the whole documentation: these, and the deriv book (`numerixx_book`) where latexmk is
   found.
 - `clang-cl` and `cl` need the MSVC environment, which the agent's shell lacks: run them from a batch file that first
   calls `"C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"`.

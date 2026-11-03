@@ -1,5 +1,8 @@
 # Numerixx
 
+% The PDF manual includes the text from here to the end marker as its introduction (introduction.md).
+% intro-start
+
 Numerixx is a header-only C++23 library of numerical algorithms: finding the root of an equation, computing a derivative
 or an integral from a function's values, and, planned for later versions, minima, interpolation and fitting. It is a
 collection of small libraries, one per task, that you can use on their own or together, in the spirit of the standard
@@ -31,6 +34,8 @@ the reference generated from the headers.
 
 Every piece of code in this manual comes from a program that is built and run as a test, and that program checks the
 results and the output this manual quotes from it.
+
+% intro-end
 
 ```{toctree}
 :caption: Start here

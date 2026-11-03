@@ -1,8 +1,10 @@
 # The documentation targets, run on demand and never part of the default build (docs/sphinx/PHASE2_PLAN.md):
 # - numerixx_docs: the public site. Doxygen writes XML without the detail namespaces, then Sphinx renders it with
-#   Breathe and MyST (docs/sphinx), through uv with the pinned requirements, and fails on any warning or check;
+#   Breathe and MyST (docs/sphinx), through uv with the pinned requirements, and fails on any warning or check; it
+#   also writes the PDF manual's LaTeX source, from the same pages;
+# - numerixx_docs_pdf: the PDF manual, compiled by latexmk, where latexmk is found;
 # - numerixx_docs_internal: Doxygen's HTML with the detail namespaces, for developers;
-# - numerixx_docs_all: both, and the deriv book's PDF (numerixx_book) where its target exists.
+# - numerixx_docs_all: all of these, and the deriv book's PDF (numerixx_book) where its target exists.
 # The doxygen targets run docs/Doxyfile from the project root, through a small Doxyfile here that includes it.
 function(numerixx_write_doxyfile target)
     set(doxyfile ${CMAKE_CURRENT_BINARY_DIR}/${target}.doxyfile)
@@ -29,6 +31,8 @@ endif ()
 
 set(xml ${CMAKE_CURRENT_BINARY_DIR}/public/xml)
 set(html ${CMAKE_CURRENT_BINARY_DIR}/public/html)
+set(latex ${CMAKE_CURRENT_BINARY_DIR}/public/latex)
+set(pdf ${CMAKE_CURRENT_BINARY_DIR}/public/pdf)
 # The only [[deprecated]] declarations are derivative's low-precision warnings, not deprecations: no list of them.
 numerixx_write_doxyfile(numerixx_docs
         "OUTPUT_DIRECTORY = \"${CMAKE_CURRENT_BINARY_DIR}/public\""
@@ -40,21 +44,48 @@ numerixx_write_doxyfile(numerixx_docs
 # The site is written afresh: an old search index or a removed page would otherwise survive (sphinx_immaterial reads
 # the search index it finds). -E re-reads every page, so that -W sees every warning on a rebuild too.
 # --managed-python: uv's own Python, whose environment holds only requirements.txt, never a package installed globally.
-add_custom_target(numerixx_docs
-        COMMAND Doxygen::doxygen ${numerixx_docs_doxyfile}
-        COMMAND ${CMAKE_COMMAND} -E rm -rf ${html}
-        COMMAND ${CMAKE_COMMAND} -E env NUMERIXX_DOXYGEN_XML=${xml}
+# The same pages are also the PDF manual's source (docs/sphinx/PHASE6_PLAN.md): the LaTeX pass needs no TeX, so the
+# site's target, and CI, check it with every warning and check; numerixx_docs_pdf compiles it.
+set(sphinx ${CMAKE_COMMAND} -E env NUMERIXX_DOXYGEN_XML=${xml}
         ${NUMERIXX_UV} run --no-project --managed-python --python 3.14
                 --with-requirements ${PROJECT_SOURCE_DIR}/docs/sphinx/requirements.txt
-                python -m sphinx -E -W -b html ${PROJECT_SOURCE_DIR}/docs/sphinx ${html}
+                python -m sphinx -E -W)
+add_custom_target(numerixx_docs
+        COMMAND Doxygen::doxygen ${numerixx_docs_doxyfile}
+        COMMAND ${CMAKE_COMMAND} -E rm -rf ${html} ${latex}
+        COMMAND ${sphinx} -b html ${PROJECT_SOURCE_DIR}/docs/sphinx ${html}
+        COMMAND ${sphinx} -t pdf -b latex ${PROJECT_SOURCE_DIR}/docs/sphinx ${latex}
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-        COMMENT "Generating ${html}/index.html"
+        COMMENT "Generating ${html}/index.html and ${latex}/numerixx.tex"
         VERBATIM)
+
+# The PDF manual, with the deriv book's released PDF beside it, which its book section names. On demand, and not in
+# CI (TeX is a large install), as the book's own target.
+find_program(NUMERIXX_LATEXMK latexmk)
+if (NUMERIXX_LATEXMK)
+    add_custom_target(numerixx_docs_pdf
+            COMMAND ${NUMERIXX_LATEXMK} -pdf -interaction=nonstopmode -halt-on-error numerixx.tex
+            COMMAND ${CMAKE_COMMAND} -E rm -rf ${pdf}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${pdf}
+            COMMAND ${CMAKE_COMMAND} -E copy ${latex}/numerixx.pdf ${pdf}/numerixx.pdf
+            COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/docs/deriv-book/book.pdf
+                    ${pdf}/numerixx-deriv-book.pdf
+            WORKING_DIRECTORY ${latex}
+            COMMENT "Generating ${pdf}/numerixx.pdf"
+            USES_TERMINAL
+            VERBATIM)
+    add_dependencies(numerixx_docs_pdf numerixx_docs)
+else ()
+    message(STATUS "latexmk not found: no target numerixx_docs_pdf")
+endif ()
 
 # The whole documentation. The site offers the book's released PDF (docs/deriv-book/book.pdf); numerixx_book builds
 # and checks the current one.
 add_custom_target(numerixx_docs_all)
 add_dependencies(numerixx_docs_all numerixx_docs numerixx_docs_internal)
+if (TARGET numerixx_docs_pdf)
+    add_dependencies(numerixx_docs_all numerixx_docs_pdf)
+endif ()
 if (TARGET numerixx_book)
     add_dependencies(numerixx_docs_all numerixx_book)
 else ()

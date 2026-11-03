@@ -1,6 +1,6 @@
 # Milestone 3, Phase 6: one source, two manuals (online and PDF)
 
-Status: approved (2026-11-03), at the user's request; step 1 in progress.
+Status: approved (2026-11-03), at the user's request; steps 1 and 2 done, step 3 next.
 
 The pages in `docs/sphinx/` become the source of two manuals: the HTML site, as now, and a PDF built by Sphinx's LaTeX
 builder and latexmk. Nothing is written twice. The pages stop speaking of a site, and the PDF gets its own root and
@@ -119,6 +119,27 @@ a line, and a "call site" (each reported with its line, the call site not); `CLA
 major; adopted the broader check, "this tutorial" and "All the output quoted in this section" where "section" would
 read as a subsection, the step page's link to where its output is, "throughout this manual", the aliases sentence and
 two re-wraps; the guide's edge in the PDF goes to step 2.
+
+## Step 2, done
+
+As designed, with the author's name in `latex_documents`. One finding of the build: each module overview's toctrees
+sat in its last section, "Where to go next", so the PDF put the tutorial, the guide and the reference all inside it
+(5.3, 5.3.1, ...). The overviews now end with three sections, Tutorial, Guide and Reference, each with its sentence
+and an uncaptioned toctree: in the PDF, 5.3 Tutorial, 5.4 Guide with a numbered section per task, 5.5 Reference,
+which also gives the guide the visible edge step 1's review asked for; on the site, the same three headings replace
+the toctree captions, which the sidebar never showed. `numerixx_docs` runs the LaTeX pass after the HTML one;
+`numerixx_docs_pdf` builds a 116-page PDF and puts `numerixx-deriv-book.pdf` beside it.
+
+The user's check of the PDF's tables, before the commit: `tabulary` sizes a column by its average text, and code it
+cannot break runs under the next column, unreported. All eleven tables read in the PDF:
+- the quadrature overview's "Four methods" and the roots guide's method table clipped their first or second column
+  (`GaussKronrod<1`, `nxx::roots::Bisectio`): fixed with `{tabularcolumns}` widths;
+- the deriv guide's method table had two rows broken in both the site and the PDF since Phase 5: the `|x|` in
+  `$\max(|x|, 1)$` split the cells. Now `\lvert x \rvert`; a cell count of every table row against its header finds
+  no other;
+- the roots costs table "From a bracket" (12 columns) clips the headers "Bracket", "Brent" and "Toms748", words TeX
+  cannot hyphenate: it does not fit the line at the body's size and padding, so it goes to step 3 with the layout;
+- the other seven are fine.
 
 ## The user's decisions (2026-11-03)
 

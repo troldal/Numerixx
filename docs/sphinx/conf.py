@@ -30,6 +30,17 @@ html_css_files = ["numerixx.css"]
 suppress_warnings = ["sitemap.configuration"]
 extensions = ["breathe", "myst_parser", "numerixx_breathe"]
 exclude_patterns = ["PHASE*.md", "examples", "_ext"]
+
+# One source, two manuals (PHASE6_PLAN.md). The PDF build passes -t pdf: its root is manual.md, whose toctree makes
+# each page a chapter, with introduction.md (index.md's text without its toctrees) first. index.md cannot be the PDF's
+# root, since the LaTeX builder would put every page inside its last section, and each root is excluded from the
+# other build.
+if tags.has("pdf"):
+    root_doc = "manual"
+    exclude_patterns += ["index.md"]
+else:
+    exclude_patterns += ["manual.md", "introduction.md"]
+latex_documents = [("manual", "numerixx.tex", "Numerixx", "Kenneth Troldal Balslev", "manual", True)]
 # Formulas in $...$ and $$...$$, rendered by MathJax from its CDN (a site read offline shows the TeX); anchors on
 # headings down to level 3, so that links such as basics.md#results resolve.
 myst_enable_extensions = ["dollarmath"]

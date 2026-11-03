@@ -68,7 +68,8 @@ jobs:
       - run: cmake --build --preset ${{ matrix.compiler }}
       - run: ctest --preset ${{ matrix.compiler }}
 
-  # The documentation site (docs/sphinx): Doxygen's XML, then Sphinx through uv, failing on any warning or check.
+  # The user manual (docs/sphinx): Doxygen's XML, then Sphinx through uv, the site and the PDF's LaTeX source,
+  # failing on any warning or check. The PDF itself is compiled locally (numerixx_docs_pdf): no TeX here.
   docs:
     runs-on: ubuntu-26.04
     env:

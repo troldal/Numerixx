@@ -11,6 +11,9 @@ one-word change. Newton's and Halley's methods also need derivatives ([Give deri
 
 ## From what you have to a method
 
+```{tabularcolumns} \Y{0.3}\Y{0.33}\Y{0.37}
+```
+
 | You have | Use | Why |
 |---|---|---|
 | A bracket, and `fn`'s values only | {cpp:struct}`nxx::roots::Brent` | The recommended method: fast on a smooth `fn`; at worst about the square of bisection's count |

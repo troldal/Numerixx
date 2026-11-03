@@ -48,6 +48,9 @@ dominate any estimate.
 
 ## Four methods
 
+```{tabularcolumns} \Y{0.3}\Y{0.7}
+```
+
 | Method | When to use it |
 |---|---|
 | `GaussKronrod<15>`, the default | Most integrals on a finite interval: it finds the hard places by itself |
@@ -125,11 +128,9 @@ complex or vector-valued functions, or functions of several variables, though yo
 ([Choose a method](choose-a-method.md#an-integral-inside-another-algorithm)). It has no method for principal values or
 for oscillating integrands on an infinite interval, such as $\sin x / x$ on $[0, \infty)$.
 
-## Where to go next
+## Tutorial
 
-The [tutorial](tutorial.md) computes the period of a pendulum, step by step. [Choose a method](choose-a-method.md) says
-which method suits which integrand, and the other sections of the guide each solve one task. [Costs](costs.md) compares
-the methods on a few functions, and the [reference](reference.md) documents every name.
+The tutorial computes the period of a pendulum, step by step.
 
 ```{toctree}
 :maxdepth: 1
@@ -137,8 +138,12 @@ the methods on a few functions, and the [reference](reference.md) documents ever
 tutorial
 ```
 
+## Guide
+
+Each section of the guide solves one task. [Choose a method](choose-a-method.md) says which method suits which
+integrand.
+
 ```{toctree}
-:caption: Guide
 :maxdepth: 1
 
 choose-a-method
@@ -150,8 +155,11 @@ handle-failures
 method-of-your-own
 ```
 
+## Reference
+
+[Costs](costs.md) compares the methods on a few functions, and the [reference](reference.md) documents every name.
+
 ```{toctree}
-:caption: Reference
 :maxdepth: 1
 
 costs

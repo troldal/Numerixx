@@ -93,11 +93,9 @@ the tolerance there: a statement about $f$ as computed, not about the root. Writ
 computed with the right sign everywhere, and the root comes out within its bound of 1. When a root matters to many
 digits, write $f$ so that it does not cancel near the root.
 
-## Where to go next
+## Tutorial
 
-The [tutorial](tutorial.md) solves Kepler's equation step by step. [Choose a method](choose-a-method.md) says when a
-method other than Brent's does better, and the other sections of the guide each solve one task. The
-[reference](reference.md) documents every name.
+The tutorial solves Kepler's equation step by step.
 
 ```{toctree}
 :maxdepth: 1
@@ -105,8 +103,12 @@ method other than Brent's does better, and the other sections of the guide each 
 tutorial
 ```
 
+## Guide
+
+Each section of the guide solves one task. [Choose a method](choose-a-method.md) says when a method other than
+Brent's does better.
+
 ```{toctree}
-:caption: Guide
 :maxdepth: 1
 
 choose-a-method
@@ -118,8 +120,11 @@ other-types
 handle-failures
 ```
 
+## Reference
+
+[Costs](costs.md) counts the evaluations of each method, and the [reference](reference.md) documents every name.
+
 ```{toctree}
-:caption: Reference
 :maxdepth: 1
 
 costs

@@ -1,8 +1,15 @@
 # Numerical derivatives: the book
 
 The ideas behind `nxx::deriv` are explained at length in the book *Numerical Derivatives with Numerixx*, a textbook
-and reference for finite differences and Ridders' extrapolation in C++:
-{download}`Numerical Derivatives with Numerixx (PDF) <../../deriv-book/book.pdf>`.
+and reference for finite differences and Ridders' extrapolation in C++.
+
+```{only} html
+Get it as a PDF: {download}`Numerical Derivatives with Numerixx (PDF) <../../deriv-book/book.pdf>`.
+```
+
+```{only} latex
+It comes with this manual as the file `numerixx-deriv-book.pdf`, beside `numerixx.pdf`.
+```
 
 Its first part builds the subject from the start: why derivatives are computed numerically, finite differences from
 Taylor's theorem, rounding and the choice of step, higher-order and one-sided stencils, second to fourth derivatives,
