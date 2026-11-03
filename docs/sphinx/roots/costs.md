@@ -16,6 +16,15 @@ a library function such as `std::sin` in `fn`, counts also differ between platfo
 
 ## From a bracket
 
+% Twelve columns fit the printed line only in a smaller type with less padding (PHASE6_PLAN.md, step 3).
+
+```{raw} latex
+\begingroup\footnotesize\setlength{\tabcolsep}{3pt}
+```
+
+```{tabularcolumns} \Y{0.105}\Y{0.085}\Y{0.08}\Y{0.07}\Y{0.09}\Y{0.1}\Y{0.075}\Y{0.075}\Y{0.085}\Y{0.07}\Y{0.065}\Y{0.1}
+```
+
 | $f$ | Bracket | Bisection | Brent | Toms748 | AndersonBjorck | Ridders | Illinois | RegulaFalsi | Newton | Halley | Newton, numerical |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | $x^2 - 2$ | [1, 2] | 52 | 9 | 9 | 9 | 12 | 11 | 20 | 8 | 6 | 24 |
@@ -23,6 +32,10 @@ a library function such as `std::sin` in `fn`, counts also differ between platfo
 | $x^{20} - 1$ | [0, 5] | 55 | 19 | 21 | 30 | 18 | 30 | 45 | 11 | 11 | 33 |
 | $(x - 1)^3$ | [0, 3] | 54 | 156 | 149 | 152 | 86 | 148 | 145 | 91 | 54 | 549 |
 | $1/x - 1$ | [0.5, 3] | 54 | 11 | 6 | 5 | 12 | 12 | 25 | 9 | 6 | 27 |
+
+```{raw} latex
+\endgroup
+```
 
 ## From a guess
 

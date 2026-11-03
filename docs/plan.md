@@ -129,8 +129,8 @@ entity is documented; Sphinx with Breathe and MyST (Markdown) renders the site, 
 PDF, so they are worded for both. The manual is organised by module (the user's choice, 2026-10-29, replacing
 Diataxis at the top level chosen 2026-10-27), with Diataxis's four kinds of writing inside each module: an overview,
 a tutorial, guide pages, reference. The deriv book stays the long explanation of `nxx::deriv` and is offered as its
-PDF, not repeated. `numerixx_docs_all` builds the whole documentation: the site, Doxygen's internal HTML and the book. Each phase gets its plan approved
-before it is written, and the pages get the reviews of a phase. A box is ticked when the docs build with no warning
+PDF, not repeated. `numerixx_docs_all` builds the whole documentation: the site and the PDF manual, Doxygen's
+internal HTML and the book. Each phase gets its plan approved before it is written, and the pages get the reviews of a phase. A box is ticked when the docs build with no warning
 locally and in CI, and the examples' tests pass on all five toolchains.
 
 - Phase 1: spike. Render `roots.hpp`, `deriv.hpp` and `math.hpp` through Doxygen XML, Breathe and Sphinx in a scratch
@@ -195,8 +195,8 @@ locally and in CI, and the examples' tests pass on all five toolchains.
 - Phase 6: one source, two manuals: the site and a PDF through Sphinx's LaTeX builder, with wording for both media.
   Plan approved: `docs/sphinx/PHASE6_PLAN.md` (2026-11-03; A4, the author's name, the book beside the PDF).
   - [x] Step 1: wording for both media, the voice rule and its check, the project texts (36e59c4: run 41677577233)
-  - [ ] Step 2: the PDF build (`manual.md`, `introduction.md`, the `pdf` tag, `numerixx_docs_pdf`); each overview's
-    "Where to go next" split into Tutorial, Guide and Reference, so that the PDF shows them
+  - [x] Step 2: the PDF build (`manual.md`, `introduction.md`, the `pdf` tag, `numerixx_docs_pdf`); each overview's
+    "Where to go next" split into Tutorial, Guide and Reference, so that the PDF shows them (c648bbf: run 41682779179)
   - [ ] Step 3: layout, a read of the whole PDF, reviews and Codex
 
 Open decisions: hosting (GitHub Pages from CI, or Read the Docs) and versioning (one site per release, or `dev` only),
@@ -391,6 +391,13 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
 - The same purpose-first Doxygen pass for `roots.hpp`, `deriv.hpp` and `math.hpp`, if the user wants it after
   `quadrature.hpp`'s.
 - In the quadrature chapter: combinators over methods (a substitution as a method), until a reader asks.
+- The reference in print (Milestone 3 Phase 6's read of the PDF, items 6 and 7): `@code` examples in the headers that
+  lose their indentation (on the site too); header comments that cite internal files (`PHASE4_API.md`,
+  `docs/<module>/design.md`, `costs.py`); ASCII math and curly-quoted code in reference prose; `@tparam` on a concept
+  rendered as "tparam T"; declarations split from their template line at page breaks, near-empty pages, and the
+  hyphenated headers of the roots costs table. Changes to `include/` need the user's approval.
+- Plots built at documentation time (matplotlib's plot directive from CSV the example programs write), asked about
+  on 2026-11-03; not planned.
 
 ### Derivatives (`nxx::deriv`)
 

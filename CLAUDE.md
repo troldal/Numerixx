@@ -36,8 +36,9 @@ A module may use another module's public API, never its `detail`.
 - `docs/sphinx/` the user manual, built as a site (root `index.md`) and a PDF (root `manual.md`), so worded for both,
   organised by module (`roots/`, `deriv/`, each with its overview, tutorial, guide pages and reference;
   `getting-started.md`, `basics.md` and `core.md` beside them; MyST pages; Breathe directives only on the reference
-  pages), with `conf.py`, the local extension `_ext/numerixx_breathe.py` (the Breathe patch and
-  the checks) and the pinned `requirements.txt`; a page shows code only from `docs/sphinx/examples/`, programs built and
+  pages), with `conf.py`, the local extensions `_ext/numerixx_breathe.py` (the Breathe patch and the checks) and
+  `_ext/numerixx_latex.py` (the PDF's writer, and its check that code fits the PDF: 115 columns, 122 in the
+  reference), and the pinned `requirements.txt`; a page shows code only from `docs/sphinx/examples/`, programs built and
   run as tests (`numerixx_docs_example_<name>`, a glob in `tests/CMakeLists.txt`), each checking its page's claims and
   comparing the output the page quotes, held in a raw string, with what it printed (`examples/printed.hpp`);
   `docs-reviewer` reviews the pages

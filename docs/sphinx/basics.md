@@ -80,15 +80,14 @@ and `int` is not a real type.
 ## Results
 
 Every algorithm returns a [`std::expected`](https://en.cppreference.com/w/cpp/utility/expected): either the result, or
-an error saying why there is none. Test it before you read it. Here the first bracket holds the root of $x^2 - 2$ and
-the second does not:
-
-The program includes both modules' headers:
+an error saying why there is none. Test it before you read it. The program includes the headers of all three modules:
 
 ```{literalinclude} examples/basics_results.cpp
 :start-after: // <includes>
 :end-before: // </includes>
 ```
+
+Here the first bracket holds the root of $x^2 - 2$ and the second does not:
 
 ```{literalinclude} examples/basics_results.cpp
 :start-after: // <test>

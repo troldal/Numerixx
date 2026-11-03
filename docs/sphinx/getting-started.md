@@ -29,4 +29,5 @@ Ridders' estimate of its error, not a guaranteed bound. Every algorithm returns 
 before reading it with `->` or `*`, and print or inspect `error()` when there is no result.
 
 Next, [Working with Numerixx](basics.md) explains what these results hold and how to work with them in any real type.
-[Roots of functions](roots/index.md) and [Numerical derivatives](deriv/index.md) are the chapters on the two modules.
+[Roots of functions](roots/index.md), [Numerical derivatives](deriv/index.md) and [Integrals of
+functions](quadrature/index.md) are the chapters on the three modules.

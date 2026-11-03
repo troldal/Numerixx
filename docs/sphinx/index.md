@@ -15,6 +15,9 @@ time as well as at run time.
 
 ## What it does
 
+```{tabularcolumns} \Y{0.47}\Y{0.26}\Y{0.27}
+```
+
 | You want to | Module | Header |
 |---|---|---|
 | Solve an equation $f(x) = 0$ in one variable: from an interval, from a guess, or with a search for an interval | [Roots of functions](roots/index.md), `nxx::roots` | `numerixx/roots.hpp` |

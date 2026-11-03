@@ -54,7 +54,7 @@ add_custom_target(numerixx_docs
         COMMAND Doxygen::doxygen ${numerixx_docs_doxyfile}
         COMMAND ${CMAKE_COMMAND} -E rm -rf ${html} ${latex}
         COMMAND ${sphinx} -b html ${PROJECT_SOURCE_DIR}/docs/sphinx ${html}
-        COMMAND ${sphinx} -t pdf -b latex ${PROJECT_SOURCE_DIR}/docs/sphinx ${latex}
+        COMMAND ${sphinx} -t pdf -D release=${PROJECT_VERSION} -b latex ${PROJECT_SOURCE_DIR}/docs/sphinx ${latex}
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
         COMMENT "Generating ${html}/index.html and ${latex}/numerixx.tex"
         VERBATIM)

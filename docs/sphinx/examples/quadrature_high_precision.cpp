@@ -43,7 +43,8 @@ int main(int, char **argv)
     if (forty) std::println("rel_tol 1e-40: abs_error {}, {} evaluations", forty->abs_error.str(2), evaluations);
     evaluations = 0;
     auto const tanh_sinh = qd::integrate<qd::TanhSinh>(fn, bin50(0), bin50(1), {.rel_tol = bin50("1e-40")});
-    if (tanh_sinh) std::println("TanhSinh:     abs_error {}, {} evaluations", tanh_sinh->abs_error.str(2), evaluations);
+    if (tanh_sinh)
+        std::println("TanhSinh:     abs_error {}, {} evaluations", tanh_sinh->abs_error.str(2), evaluations);
     // </request>
 
     // <pendulum>

@@ -27,8 +27,8 @@
 // <rule>
 namespace qd = nxx::quadrature;
 
-// The composite Simpson rule on `panels` equal panels of [a, b]: each panel integrated from its ends and its midpoint,
-// with the weights h/6, 4h/6 and h/6, h the panel's width
+// The composite Simpson rule on `panels` equal panels of [a, b]: each panel integrated from its ends and its
+// midpoint, with the weights h/6, 4h/6 and h/6, h the panel's width
 struct Simpson
 {
     int panels = 10;

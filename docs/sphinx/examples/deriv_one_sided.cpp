@@ -60,8 +60,10 @@ int main(int, char **argv)
     auto const kink = [](double x) { return x >= 0.0 ? 1.0 / (1.0 + x) : 1.0 - 3.0 * x; };
     auto const both_sides = dv::derivative<dv::Ridders>(kink, 0.0);
     auto const one_side = dv::derivative<dv::ForwardRidders>(kink, 0.0);
-    if (both_sides) std::println("Ridders:        {:.9f}, abs_error {:.1e}", both_sides->value, *both_sides->abs_error);
-    if (one_side) std::println("ForwardRidders: {:.9f}, abs_error {:.1e}", one_side->value, *one_side->abs_error);
+    if (both_sides)
+        std::println("Ridders:        {:.9f}, abs_error {:.1e}", both_sides->value, *both_sides->abs_error);
+    if (one_side)
+        std::println("ForwardRidders: {:.9f}, abs_error {:.1e}", one_side->value, *one_side->abs_error);
     // </kink>
     // clang-format on
 

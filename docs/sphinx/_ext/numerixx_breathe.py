@@ -79,6 +79,11 @@ def _compounddef_with_definition(self, node):
         text = "".join(compounddef.find("initializer").itertext())
         head, newline, rest = text.partition("\n")
         if head.startswith("template<") and newline:
+            # Doxygen writes "concept <qualified name> =  " and the definition on one line. A requires-expression
+            # goes on a line of its own, at the indent its body has in the header, which also keeps the line within
+            # the printed reference's width (_ext/numerixx_latex.py); any other definition stays, after one space.
+            rest = re.sub(r"^(concept \S+ =) +(requires\()", r"\1\n    \2", rest, count=1)
+            rest = re.sub(r"^(concept \S+ =) +", r"\1 ", rest, count=1)
             text = _template_head(compounddef) + newline + rest
         result.insert(0, nodes.literal_block(text, text, language="cpp"))
         emitted["concepts"][node.id] += 1

@@ -28,7 +28,7 @@ html_static_path = ["_static"]
 html_css_files = ["numerixx.css"]
 # The theme loads sphinx-sitemap, which warns without html_baseurl, the site's public URL.
 suppress_warnings = ["sitemap.configuration"]
-extensions = ["breathe", "myst_parser", "numerixx_breathe"]
+extensions = ["breathe", "myst_parser", "numerixx_breathe", "numerixx_latex"]
 exclude_patterns = ["PHASE*.md", "examples", "_ext"]
 
 # One source, two manuals (PHASE6_PLAN.md). The PDF build passes -t pdf: its root is manual.md, whose toctree makes
@@ -41,6 +41,21 @@ if tags.has("pdf"):
 else:
     exclude_patterns += ["manual.md", "introduction.md"]
 latex_documents = [("manual", "numerixx.tex", "Numerixx", "Kenneth Troldal Balslev", "manual", True)]
+# A4, no blank pages before chapters, and code small enough that the examples' 120-column lines fit the text width,
+# as on the site. A link to a chapter or a section prints its page, since a printed reader cannot follow it
+# (_ext/numerixx_latex.py keeps the page off the C++ names). The CMake target passes the project's version as
+# release, for the title page.
+latex_elements = {
+    "papersize": "a4paper",
+    "extraclassoptions": "openany,oneside",
+    "sphinxsetup": "hmargin=2cm, vmargin=2.5cm",
+    "fvset": r"\fvset{fontsize=\footnotesize}",
+    # The default chapter style (fncychap's Bjarne) sets titles in capitals, which would misspell nxx::real.
+    "fncychap": "",
+    # The index's two columns are narrower than names such as std::formatter<nxx::quadrature::Failure<T>>::format.
+    "printindex": r"\footnotesize\raggedright\printindex",
+}
+latex_show_pagerefs = True
 # Formulas in $...$ and $$...$$, rendered by MathJax from its CDN (a site read offline shows the TeX); anchors on
 # headings down to level 3, so that links such as basics.md#results resolve.
 myst_enable_extensions = ["dollarmath"]

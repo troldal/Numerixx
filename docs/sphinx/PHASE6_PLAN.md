@@ -1,6 +1,6 @@
 # Milestone 3, Phase 6: one source, two manuals (online and PDF)
 
-Status: approved (2026-11-03), at the user's request; steps 1 and 2 done, step 3 next.
+Status: approved (2026-11-03), at the user's request; steps 1 to 3 done, the independent review next.
 
 The pages in `docs/sphinx/` become the source of two manuals: the HTML site, as now, and a PDF built by Sphinx's LaTeX
 builder and latexmk. Nothing is written twice. The pages stop speaking of a site, and the PDF gets its own root and
@@ -115,8 +115,8 @@ One commit each, the user deciding the next.
 
 The 35 lines reworded; voice rule 7 in `PHASE4_PLAN.md`; the `source-read` check, which fails the build on "page",
 "site" (but "call site"), "click" or "scroll", tried on a scratch copy with added web-only words, one broken across
-a line, and a "call site" (each reported with its line, the call site not); `CLAUDE.md`, `docs/plan.md` and the two docs agents. `docs-reviewer`: nothing
-major; adopted the broader check, "this tutorial" and "All the output quoted in this section" where "section" would
+a line, and a "call site" (each reported with its line, the call site not); `CLAUDE.md`, `docs/plan.md` and the two
+docs agents. `docs-reviewer`: nothing major; adopted the broader check, "this tutorial" and "All the output quoted in this section" where "section" would
 read as a subsection, the step page's link to where its output is, "throughout this manual", the aliases sentence and
 two re-wraps; the guide's edge in the PDF goes to step 2.
 
@@ -140,6 +140,33 @@ cannot break runs under the next column, unreported. All eleven tables read in t
 - the roots costs table "From a bracket" (12 columns) clips the headers "Bracket", "Brent" and "Toms748", words TeX
   cannot hyphenate: it does not fit the line at the body's size and padding, so it goes to step 3 with the layout;
 - the other seven are fine.
+
+## Step 3, done
+
+- **Layout** (`conf.py`): A4, 2 cm margins, `openany,oneside` (no blank pages: 116 pages became 95), code at 8 pt
+  (`\footnotesize`), the release (2.0.0, from CMake) and the author on the title page, a smaller ragged index for
+  names such as `std::formatter<nxx::quadrature::Failure<T>>::format`, and the default LaTeX chapter heading, since
+  fncychap's Bjarne set "NXX::REAL" in capitals.
+- **Page references** (`_ext/numerixx_latex.py`, a LaTeX writer): `latex_show_pagerefs` put "(page n)" after every C++
+  name too, template parameters included ("T (page 87)"), which pushed the quadrature signatures 96 pt past the
+  margin. Only links to a chapter or a section keep it, the same-page ones included (145 in all); a C++ name's anchor
+  (`_CPPv...` or a Doxygen ID) or code text marks the others.
+- **Code width.** 8 pt fits 115 columns: the user chose to re-wrap the three wider example lines (116, 116, 119) in
+  `quadrature_method_of_your_own.cpp`, `quadrature_high_precision.cpp` and `deriv_one_sided.cpp`, outputs unchanged.
+  Code inside an API description is at 7 pt (the user's choice, over re-wrapping `include/`) and fits 122 columns at
+  its indent; the patch in `_ext/numerixx_breathe.py` puts a concept's requires-expression on its own line, which
+  brings `estimating_method` from 128 to 87 columns. A check fails the build on a wider line in either place; it
+  found the reference's code, which a check of the examples alone had missed.
+- **Tables**: `{tabularcolumns}` on the introduction's table; the 12-column roots costs table at `\footnotesize` with
+  3 pt padding.
+- **Primes**: Sphinx writes f'' as two closing quotes, which TeX joined into a closing double quote; the writer keeps
+  them apart.
+- **Text**: "Getting started" named two module chapters and `basics.md` "both modules' headers" (both since Milestone
+  4); the includes sentence now precedes its block.
+- **The read of the whole PDF** (`docs-reader`): it works as a manual; the guides are clean. Its findings 1 to 5 are
+  fixed above; the reference's text from the headers and the page-break polish (items 6 and 7) are deferred in
+  `docs/plan.md`, at the user's choice.
+- Overfull boxes: none but one `\vbox` of 1.2 pt.
 
 ## The user's decisions (2026-11-03)
 
