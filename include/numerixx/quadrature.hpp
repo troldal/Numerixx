@@ -121,10 +121,10 @@ namespace nxx::quadrature {
     struct Failure
     {
         /** @brief Why there is no result. */
-        error reason;
+        error reason {};
 
         /** @brief For error::not_converged the last estimate and its error estimate, if any; empty for non_finite. */
-        std::optional<Integral<T>> best;
+        std::optional<Integral<T>> best {};
 
         /** @brief Compares both members. */
         friend constexpr bool operator==(Failure const &, Failure const &) = default;
