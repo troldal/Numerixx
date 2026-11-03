@@ -336,7 +336,12 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
   test that asserts its claims; the missing ones are added.
 
   Steps, each built on the five toolchains, locally and in CI, with the docs build clean:
-  - [ ] 5a: the Doxygen pass, shown to the user as a diff before it is committed (`include/`)
+  - [x] 5a: the Doxygen pass, shown to the user as a diff before it is committed (`include/`): every entity, `detail`
+    included, purpose first; code tokens unchanged (compared with comments stripped); TanhSinh's measured figures in
+    `design.md`, "TanhSinh's measured limits"; three comment defects fixed (the heap's tie-break described backwards,
+    `exp_sinh_start`'s comment above `inverse_epsilon`, `KronrodState`'s undocumented constants); the header's
+    examples run as written in `tests/test_quadrature_examples.cpp`, and `Midpoint{.panels = 1000}` in the protocol
+    tests. All five presets locally, both Doxygen builds clean (2026-11-03)
   - [ ] 5b: the chapter's pages and programs, and the `index.md` and `basics.md` changes
   - [ ] 5b reviews, as in Milestone 3 Phase 5: `docs-reviewer`, `numerics-reviewer`, `docs-reader` (tasks: the
     probability that a standard normal variable exceeds 3; an integrand with a kink at a known interior point; a time

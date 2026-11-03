@@ -1,20 +1,29 @@
 /**
  * @file
- * @brief Integrals of a real function of one variable over a finite interval, or for TanhSinh an infinite one:
- * adaptive Gauss-Kronrod, the default; the tanh-sinh rule and its exp-sinh and sinh-sinh forms; Romberg's method; and
- * the fixed Gauss-Legendre rule.
+ * @brief Integrals of a real function of one variable, computed from its values: the module nxx::quadrature.
  *
- * integrate(fn, a, b) integrates fn from a to b by adaptive Gauss-Kronrod, the default method, and integrate<M>(fn, a,
- * b) by a method M: `GaussKronrod<15>`, the default named; `TanhSinh`, for endpoint singularities, high precision and
- * infinite intervals; `Romberg`; or `GaussLegendre<N>`, a fixed rule that returns a plain number. integrate(m, fn, a,
- * b) takes the method as a value, for a method with parameters. The methods with an estimate return an Integral, the
- * value and an estimate of its error, or a Failure. Every method returns a std::expected; Numerixx itself never
- * throws, but the result's own value() throws std::bad_expected_access on a failure, so test the result and read it
- * with `->` or `*`.
+ * Use it when you need the integral of f from a to b and cannot write down an antiderivative, or f exists only as a
+ * program: a callable that returns f(x). integrate(fn, a, b) returns the integral and an estimate of its error by the
+ * method that suits most integrands on a finite interval; integrate<M>(fn, a, b) chooses another method M:
+ * - `GaussKronrod<15>`, the default: adaptive, it subdivides the interval where fn is hard, so it copes with kinks,
+ *   peaks and mild endpoint singularities without being told where they are.
+ * - `TanhSinh`: for a singularity at an end (log x, 1 / sqrt x), for many digits in a multiprecision type, and the one
+ *   method for an infinite interval.
+ * - `Romberg`: extrapolated trapezoidal sums, for teaching and comparison.
+ * - `GaussLegendre<N>`: a fixed rule of N points, with no error estimate and no tolerance, so that its result is a
+ *   smooth function of the parameters inside fn: the rule for an integral inside a root solve, an optimiser or another
+ *   integral.
  *
- * A method is a type: a fixed_rule, an iterative_method or an estimating_method, and a user's type that is one works
- * as the library's do. An iterative method (GaussKronrod<15>, TanhSinh, Romberg) computes and reports a Step after each
- * iteration; integrate() runs the loop and decides when the criteria are met. observer(o) passes each Step to o.
+ * integrate(m, fn, a, b) takes the method as a value instead, for a method with parameters. The methods with an
+ * estimate return an Integral (the value and its estimated error) or a Failure (why, and the best estimate reached);
+ * GaussLegendre returns a plain number or an error. Every form returns a std::expected. Numerixx itself never throws,
+ * except std::bad_alloc where GaussKronrod, or TanhSinh in a type without a compile-time table, cannot allocate; the
+ * result's own value() throws std::bad_expected_access on a failure, so test the result and read it with `->` or `*`.
+ *
+ * A method is a type, so a type of one's own works as the library's do: a fixed_rule, an iterative_method or an
+ * estimating_method, whose concepts state the contract. An iterative method (GaussKronrod<15>, TanhSinh, Romberg)
+ * computes one step at a time and reports a Step; integrate() runs the loop and decides when the criteria are met, and
+ * observer(o) shows each Step to o, to watch a method converge.
  *
  * @code
  * namespace qd = nxx::quadrature;
@@ -54,47 +63,66 @@
 #include <utility>
 #include <vector>
 
-/** @brief Integrals of real functions of one variable. */
+/**
+ * @brief Numerical integration (quadrature): the integral of a real function of one variable over a finite or infinite
+ * interval, computed from the function's values at chosen points.
+ */
 namespace nxx::quadrature {
 
     /**
-     * @brief Why integrate() returned no result.
+     * @brief Why integrate() returned no result, so that the caller can decide what to try next.
+     *
+     * non_finite means that a number was not finite where the method cannot accept one: in the input or in fn's
+     * values. A different tolerance does not help; the interval, the method or the way fn is written must change.
+     * not_converged means that the method ran out of work before its error estimate met the request: the integral may
+     * need another method or a substitution, or it may not exist.
      *
      * More values may be added, and a listed cause may move to a new value: a switch on it should have a default. It
      * is formattable: std::format("{}", e) writes the enumerator's name, such as `not_converged`.
      */
     enum class error {
         /**
-         * An end is NaN, or infinite for a method that does not take infinite ends (every method but TanhSinh); a
-         * tolerance is negative or not finite; fn returned a value that is not finite (for GaussKronrod: on a panel of
-         * its initial mesh that no short bisection avoids, such as a region where fn is NaN; for TanhSinh: anywhere but
-         * within eps times the half-width of an end and beyond the points kept towards it, so that 1 / sqrt x on
-         * [0, 1] is ok, 1/x not_converged and sqrt(x - 0.5) non_finite; towards an infinite end, anywhere its tail
-         * rule does not apply: beyond the kept points, at a distance above 1/eps or after a term already negligible,
-         * so that x^50 e^-x on [0, inf) is ok and x^51 e^-x, whose last term before the overflow is not yet
-         * negligible, non_finite); or a sum
-         * overflowed; or a method of one's own returned a result that is not finite, or reported its own failure so.
+         * A number was not finite where the method cannot accept one, so no estimate could be formed.
+         *
+         * The causes:
+         * - An end is NaN, or infinite for a method that does not take infinite ends (every method but TanhSinh).
+         * - A tolerance is negative or not finite.
+         * - fn returned a value that is not finite where the method cannot step around it. GaussKronrod: on a panel
+         *   of its initial mesh that no short bisection avoids, such as a region where fn is NaN. TanhSinh: anywhere
+         *   but within eps times the half-width of an end and beyond the points kept towards it, so that 1 / sqrt x
+         *   on [0, 1] is ok, 1/x not_converged and sqrt(x - 0.5) non_finite; towards an infinite end, anywhere its
+         *   tail rule does not apply (beyond the kept points, at a distance above 1/eps, or after a term already
+         *   negligible), so that x^50 e^-x on [0, inf) is ok and x^51 e^-x, whose last term before the overflow is
+         *   not yet negligible, non_finite.
+         * - A sum overflowed.
+         * - A method of one's own returned a result that is not finite, or reported its own failure so.
          */
         non_finite,
 
         /**
-         * The tolerance was not met: within the method's cap (for TanhSinh, 10 levels); or, for GaussKronrod, by
-         * stagnation, when its bisections stop lowering the estimate's excess over the floor (fn noisier than the
-         * request, or a divergent integral); or with every panel final and their errors above the tolerance (a strong
-         * endpoint singularity, or a piece where fn is not finite that a short bisection did not avoid).
-         * Failure::best then holds the estimate reached and its error estimate, for Romberg and GaussKronrod always; a
-         * method of one's own may have none. TanhSinh has none where the interval has no point of T strictly inside,
-         * or where its bound beyond an end is unbounded: the terms grow towards the end (1/x on [0, 1] or [1, inf),
-         * a divergent integral) or
-         * converge too slowly for T's range (x^-0.999 on [0, 1]; substitute x = u^k with fn written in u, since
-         * fn(u^k) underflows and gains nothing, or use a type with a wider exponent range; the default is no
-         * better).
+         * The method ran out of work before its error estimate met the request; Failure::best holds the estimate it
+         * reached, where it has one.
+         *
+         * The ways a method runs out:
+         * - Its cap (for TanhSinh, 10 levels).
+         * - For GaussKronrod, stagnation: its bisections stop lowering the estimate's excess over the floor (fn
+         *   noisier than the request, or a divergent integral).
+         * - For GaussKronrod, every panel final with their errors above the tolerance (a strong endpoint singularity,
+         *   or a piece where fn is not finite that a short bisection did not avoid).
+         *
+         * Romberg and GaussKronrod always give a best; a method of one's own may have none. TanhSinh has none where
+         * the interval has no point of T strictly inside, or where its bound beyond an end is unbounded: the terms grow
+         * towards the end (1/x on [0, 1] or [1, inf), a divergent integral) or converge too slowly for T's range
+         * (x^-0.999 on [0, 1]; substitute x = u^k with fn written in u, since fn(u^k) underflows and gains nothing, or
+         * use a type with a wider exponent range; the default is no better). A best from a divergent integral is a
+         * number with no meaning.
          */
         not_converged
     };
 
     /**
-     * @brief An integral, and an estimate of its error.
+     * @brief What a method with an error estimate returns on success: the integral, and an estimate of how far it is
+     * from the exact value, to compare with the accuracy you need.
      *
      * abs_error estimates |value - exact|; it is not a bound. No method that samples fn at finitely many points can
      * bound the error: a narrow peak between the points is missed, and an fn that vanishes at every point sampled
@@ -119,8 +147,8 @@ namespace nxx::quadrature {
     };
 
     /**
-     * @brief Why a method with an error estimate returned no Integral, and, for error::not_converged, the best
-     * estimate it reached.
+     * @brief What a method with an error estimate returns instead of an Integral: why it failed, and, where it ran out
+     * of work, the best estimate it reached, which may still serve a caller who can accept its error.
      *
      * Formattable: std::format("{}", f) writes the reason's name, such as `not_converged`.
      *
@@ -132,7 +160,10 @@ namespace nxx::quadrature {
         /** @brief Why there is no result. */
         error reason {};
 
-        /** @brief For error::not_converged the last estimate and its error estimate, if any; empty for non_finite. */
+        /**
+         * @brief For error::not_converged the last estimate and its error estimate, if the method has one; empty for
+         * non_finite. Meaningless where the integral diverges.
+         */
         std::optional<Integral<T>> best {};
 
         /** @brief Compares both members. */
@@ -140,18 +171,22 @@ namespace nxx::quadrature {
     };
 
     /**
-     * @brief When to stop: when the error estimate is at most max(abs_tol, rel_tol |value|), or at the rounding floor.
+     * @brief The accuracy you ask of a method with an error estimate: it stops once its estimate is at most
+     * max(abs_tol, rel_tol |value|), or at the least error it can certify.
      *
-     * The rounding floor of the library's methods is 50 max(eps L1, denorm_min), L1 the integral of |fn| by the same
-     * method on the same evaluations (for GaussKronrod the sum of every panel's): the scale of the sum's own rounding.
-     * It is the effective minimum of every request (about 1e-14 relative in double): GaussKronrod and TanhSinh accept at
-     * twice the floor, Romberg at the floor, and each ends an integral that cancels to 0 there, so abs_tol = 0 works.
-     * TanhSinh's floor includes the slivers between its last points and the ends, each up to about an ulp of its end,
-     * so on a narrow interval it can exceed the request (1 on [1, 1 + 1e-9]: 2.0e-7 relative). A method of one's own
-     * certifies its own minimum (Step::attainable), or none. The defaults ask for
-     * sqrt(eps) relative, not full precision: no estimate from samples certifies the last digits. A caller who chose a
-     * 50-digit type for its digits sets rel_tol. nxx::roots::Criteria asks for full precision by default; under
-     * using-directives for both namespaces this name and `error` collide with nxx::roots', so qualify them.
+     * The defaults ask for about half the type's digits (rel_tol = sqrt(eps), 1.5e-8 in double), not full precision:
+     * no estimate from samples certifies the last digits. Set rel_tol for more digits; a caller who chose a 50-digit
+     * type for its digits must. Set abs_tol where the integral may be near 0 and a distance from 0 is close enough: it
+     * saves evaluations. nxx::roots::Criteria asks for full precision by default; under using-directives for both
+     * namespaces this name and `error` collide with nxx::roots', so qualify them.
+     *
+     * Below a rounding floor no request can be met, since the rounding of fn's values and of the sum then dominates the
+     * method's error. The floor of the library's methods is 50 max(eps L1, denorm_min), L1 the integral of |fn| by the
+     * same method on the same evaluations (for GaussKronrod the sum of every panel's): about 1e-14 relative in double
+     * for an fn of one sign. GaussKronrod and TanhSinh accept at twice the floor, Romberg at the floor, and each ends
+     * an integral that cancels to 0 there, so abs_tol = 0 works. TanhSinh's floor includes the slivers between its last
+     * points and the ends, each up to about an ulp of its end, so on an interval a few million ulps wide or less its
+     * abs_error can exceed the request. A method of one's own certifies its own minimum (Step::attainable), or none.
      *
      * Every estimate assumes fn accurate to about eps: noise in fn above the floor is invisible to the samples before
      * it shows, so a noisy fn can stop early with an estimate below its true error, or run to the cap.
@@ -176,10 +211,13 @@ namespace nxx::quadrature {
     };
 
     /**
-     * @brief Where an iterative method stands after its start or a step: its current result, the least error it can
-     * certify, and whether it may stop, can go on, and can succeed. integrate() decides on it; an observer receives it.
+     * @brief What an iterative method reports after its start and after each step, so that integrate() can decide
+     * whether to stop and an observer can watch the method converge.
      *
-     * The defaults are the neutral values, so a method sets only the limits it has:
+     * A method knows its own limits (the minimum work before an estimate is trusted, the least error it can certify,
+     * when it cannot go on); integrate() owns the decision against the caller's criteria. Step carries the one to the
+     * other, so that no method sees the criteria and every method is stopped by the same test. The defaults are the
+     * neutral values, so a method sets only the limits it has:
      * `Step<T>{.current = Integral<T>{value, estimate}, .attainable = floor, .ready = level >= 4}`.
      *
      * @tparam T The real type.
@@ -194,23 +232,31 @@ namespace nxx::quadrature {
         std::optional<Integral<T>> current{};
 
         /**
-         * @brief The least error the method can certify (Romberg its rounding floor F, Gauss-Kronrod and TanhSinh 2 F,
-         * TanhSinh's F with its slivers): integrate()
-         * accepts an estimate at most max(abs_tol, rel_tol |value|, attainable). Finite and not negative; 0, the
-         * default, certifies nothing beyond the request.
+         * @brief The least error the method can certify, so that a request below it still ends: integrate() accepts an
+         * estimate at most max(abs_tol, rel_tol |value|, attainable).
+         *
+         * Romberg's is its rounding floor F, Gauss-Kronrod's and TanhSinh's 2 F (TanhSinh's F with its slivers).
+         * Finite and not negative; 0, the default, certifies nothing beyond the request.
          */
         T attainable = T(0);
 
-        /** @brief Whether the method has done the minimum work to stop (Romberg, TanhSinh: level 4); true by default. */
+        /**
+         * @brief Whether the method has done the minimum work for its estimate to be trusted (Romberg, TanhSinh: level
+         * 4), so that an early estimate that is small by chance does not stop it; true by default.
+         */
         bool ready = true;
 
         /**
-         * @brief Whether the method cannot go on: its cap, stagnation, every panel final, or (TanhSinh) no point
-         * strictly inside; false by default.
+         * @brief Whether the method cannot go on (its cap, stagnation, every panel final, or for TanhSinh no point
+         * strictly inside), so that integrate() returns not_converged instead of asking for another step; false by
+         * default.
          */
         bool exhausted = false;
 
-        /** @brief Whether a result that meets the request may be returned as a success; true by default. */
+        /**
+         * @brief Whether a result that meets the request may be returned as a success; false where the method knows its
+         * estimate is unreliable (Gauss-Kronrod after it gave up on a piece of the interval). True by default.
+         */
         bool trusted = true;
     };
 
@@ -218,15 +264,19 @@ namespace nxx::quadrature {
     namespace detail {
 
         /**
-         * @brief The types whose Gauss-Legendre rules are computed at compile time: float, double and long double,
-         * named, since std::is_floating_point_v also admits the unmeasured std::float16_t and std::bfloat16_t.
+         * @brief The types whose rules and tables are computed at compile time, once per program, so that the common
+         * types pay no run-time setup; every other type builds them at first use and keeps them.
+         *
+         * float, double and long double, named, since std::is_floating_point_v also admits std::float16_t and
+         * std::bfloat16_t, whose tables have not been measured.
+         *
          * @tparam T The real type.
          */
         template<typename T>
         concept tabled = std::same_as<T, float> || std::same_as<T, double> || std::same_as<T, long double>;
 
         /**
-         * @brief The name of an error's enumerator.
+         * @brief The name of an error's enumerator: the text both formatters write, kept in one place.
          * @param e The error.
          * @return The name, such as `non_finite`.
          */
@@ -243,7 +293,7 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The larger of @p a and @p b.
+         * @brief The larger of @p a and @p b, by value: the maxima of the floor and of the stop test.
          * @param a A value.
          * @param b A value.
          * @return b if a < b, else a.
@@ -253,8 +303,13 @@ namespace nxx::quadrature {
         { return a < b ? b : a; }
 
         /**
-         * @brief Whether |@p x| > max / 2: the constant-evaluation guard, below which a sum of two such values, or a
-         * difference, cannot overflow.
+         * @brief Whether |@p x| > max / 2: the threshold of the constant-evaluation guards (design.md, "Constant
+         * evaluation").
+         *
+         * An overflow is not a constant expression, so in constant evaluation the methods must refuse a sum before it
+         * could overflow rather than detect the overflow after it. A sum or difference of two values at most max / 2
+         * cannot overflow; a value above max / 2 is refused instead, and the method returns error::non_finite.
+         *
          * @param x A finite value.
          * @return |x| > max / 2.
          */
@@ -263,8 +318,12 @@ namespace nxx::quadrature {
         { return nxx::math::abs(x) > T(T((std::numeric_limits<T>::max)()) / T(2)); }
 
         /**
-         * @brief Whether |@p a b| <= max / 2, decided without an overflow: for |a| <= 1 the product, at most |b|, is
-         * formed and compared; else |b| <= (max / 2) / |a|, which bounds the product by (max / 2)(1 + eps) < max.
+         * @brief Whether the product @p a @p b stays within max / 2, decided without forming an overflow: the
+         * constant-evaluation guard for a product, as large() is for a sum.
+         *
+         * For |a| <= 1 the product, at most |b|, is formed and compared; else |b| <= (max / 2) / |a|, which bounds the
+         * product by (max / 2)(1 + eps) < max.
+         *
          * @param a A finite value.
          * @param b A finite value.
          * @return Whether a b is safe for the constant-evaluation guard.
@@ -279,9 +338,11 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief Whether @p a + @p b may be formed: at run time always (an overflow is found by a later check of the
-         * sum); in constant evaluation, where an overflow is not a constant expression, only if neither exceeds
-         * max / 2.
+         * @brief Whether @p a + @p b may be formed, so that one call site serves run time and constant evaluation.
+         *
+         * At run time always: an overflow is found by a later check of the sum, which costs nothing per addition. In
+         * constant evaluation, where an overflow is not a constant expression, only if neither exceeds max / 2.
+         *
          * @param a A finite value.
          * @param b A finite value.
          * @return Whether the sum is safe to form.
@@ -296,7 +357,8 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief An array of M elements, each T(0): nxx::real does not require T to be default constructible.
+         * @brief An array of M elements, each T(0), for the rules' and states' arrays: nxx::real does not require T to
+         * be default constructible, so std::array<T, M>{} may not compile.
          * @tparam M The size.
          * @return The array.
          */
@@ -309,7 +371,8 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief fn at @p x, converted to T.
+         * @brief fn at @p x, converted to T: the one way the methods call fn, so that fn may return any type
+         * convertible to T (a double for a float T) and the conversion happens in one place.
          * @param fn The function.
          * @param x The point, a T const lvalue as the constraint promises.
          * @return fn(x) as a T.
@@ -319,8 +382,11 @@ namespace nxx::quadrature {
         { return static_cast<T>(std::invoke(fn, x)); }
 
         /**
-         * @brief A sum compensated by Neumaier's variant of Kahan's method: the rounding error of each addition is
-         * accumulated separately, so that the result errs by about eps |sum| rather than n eps sum |terms|.
+         * @brief A sum compensated by Neumaier's variant of Kahan's method, so that a sum of many terms errs by about
+         * one rounding of the result rather than by the number of terms times eps (design.md, "Sums").
+         *
+         * The rounding error of each addition is accumulated separately and added at the end. The methods sum hundreds
+         * to thousands of terms, and their rounding floor, 50 eps L1, assumes the sum's own error is far below it.
          *
          * A non-finite term makes the sum, and value(), non-finite (the correction becomes NaN or infinite), as does
          * an overflow of the running sum, so the caller checks value() once.
@@ -358,9 +424,13 @@ namespace nxx::quadrature {
         };
 
         /**
-         * @brief The compensated value of @p s, or nothing where constant evaluation could not form it: sum +
-         * correction overflows only where |sum| > max / 2 and the correction is nonzero (the correction of terms within
-         * max / 2 stays far below max / 2), and an overflow is not a constant expression. At run time always the value.
+         * @brief The compensated value of @p s, or nothing where constant evaluation could not form it, so that a sum
+         * near max / 2 becomes error::non_finite there instead of a failed compilation.
+         *
+         * sum + correction overflows only where |sum| > max / 2 and the correction is nonzero (the correction of terms
+         * within max / 2 stays far below max / 2), and an overflow is not a constant expression. At run time always the
+         * value.
+         *
          * @param s The sum.
          * @return s.value(), or std::nullopt.
          */
@@ -374,36 +444,43 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The interval [a, b], a != b, both finite, as the methods use it: its centre and half-width, which
-         * place the points, and the scale of each term.
+         * @brief A finite interval [a, b], a != b, in the form the methods need: where to place a point, and how to
+         * scale a term, without ever overflowing or losing a tiny value (design.md, "The interval" and "The scale of
+         * each term").
+         *
+         * The obvious forms fail at the extremes: (a + b) / 2 and b - a overflow on [-max, max], and a scale
+         * (b - a) w / 2 formed first can be subnormal on a tiny interval or make a tiny value subnormal on a wide one.
+         * Interval keeps the centre and half-width, which never overflow, b - a where it is finite, and clamps every
+         * point into [lo, hi]. interval_of() builds it once per integral, and every finite-interval method uses it.
+         *
          * @tparam T The real type.
          */
         template<real T>
         struct Interval
         {
-            /** @brief a / 2 + b / 2. */
+            /** @brief The centre, a / 2 + b / 2: the origin of the points. */
             T c;
 
-            /** @brief b / 2 - a / 2, signed; neither it nor c can overflow, on [-max, max] included. */
+            /** @brief The half-width, b / 2 - a / 2, signed; neither it nor c can overflow, on [-max, max] included. */
             T hw;
 
-            /** @brief b - a, where finite. */
+            /** @brief b - a, where finite; the scale of the terms. */
             T width;
 
-            /** @brief Whether b - a is finite. */
+            /** @brief Whether b - a is finite, which decides how a term is formed. */
             bool finite;
 
-            /** @brief Whether |b - a| >= 1. */
+            /** @brief Whether |b - a| >= 1, which decides the order of a term's products. */
             bool wide;
 
-            /** @brief min(a, b). */
+            /** @brief min(a, b), the lower bound of every point. */
             T lo;
 
-            /** @brief max(a, b). */
+            /** @brief max(a, b), the upper bound of every point. */
             T hi;
 
             /**
-             * @brief The point @p x, clamped into [lo, hi].
+             * @brief The point @p x, clamped into [lo, hi], so that fn is never called outside the interval.
              *
              * c + hw u can leave the interval where the halves round: on [denorm_min, 3 denorm_min], a / 2 = 0 and
              * b / 2 = 2 denorm_min, so c = hw = 2 denorm_min and the points reach 0 and 4 denorm_min. Clamped, a point
@@ -416,15 +493,16 @@ namespace nxx::quadrature {
             { return x < lo ? lo : (hi < x ? hi : x); }
 
             /**
-             * @brief The term hw w y, formed before it is summed (a sum of values formed first could overflow).
+             * @brief The term hw w y, formed before it is summed, in the order that keeps every intermediate normal
+             * unless the term itself is subnormal or overflows.
              *
-             * The order keeps every intermediate normal unless the term itself is subnormal or overflows. Where b - a
-             * is finite, the term is (b - a) (w / 2) y: with |b - a| >= 1 the scale (b - a) (w / 2) is formed first,
-             * which lies between w / 2 and max (w / 2 <= 1), so that a tiny y on a wide interval is not made subnormal
-             * first; with |b - a| < 1 the value is multiplied first, so that a subnormal scale (b - a) w / 2 is never
-             * formed. Where b - a overflows, |hw| > max / 2: (hw y) w for |y| <= 1, where hw y cannot overflow and is
-             * normal unless y is 0, else hw (w y), where |w y| >= w is normal (hw w would overflow for w > 1). w / 2
-             * is exact in radix 2.
+             * Forming the term before the sum matters: a sum of values formed first could overflow. The order of the
+             * products is chosen by the interval. Where b - a is finite, the term is (b - a) (w / 2) y: with
+             * |b - a| >= 1 the scale (b - a) (w / 2) is formed first, which lies between w / 2 and max (w / 2 <= 1), so
+             * that a tiny y on a wide interval is not made subnormal first; with |b - a| < 1 the value is multiplied
+             * first, so that a subnormal scale (b - a) w / 2 is never formed. Where b - a overflows, |hw| > max / 2:
+             * (hw y) w for |y| <= 1, where hw y cannot overflow and is normal unless y is 0, else hw (w y), where
+             * |w y| >= w is normal (hw w would overflow for w > 1). w / 2 is exact in radix 2.
              *
              * @param w The weight relative to the half-width: a Gauss weight on [-1, 1], or Romberg's 2^(1-k).
              * @param y fn's value.
@@ -442,7 +520,8 @@ namespace nxx::quadrature {
             }
 
             /**
-             * @brief The term, or nothing where constant evaluation could not form it within max / 2.
+             * @brief The term, or nothing where constant evaluation could not form it within max / 2, so that such a
+             * term becomes error::non_finite there instead of a failed compilation.
              *
              * In constant evaluation an overflow, or arithmetic on a NaN, is not a constant expression (GCC and Clang
              * reject them at different operations), so a value of fn that is not finite, or a product of term() that
@@ -457,6 +536,7 @@ namespace nxx::quadrature {
             {
                 if consteval {
                     if (!nxx::math::isfinite(y)) return std::nullopt;
+                    // The same four orders as term(), each product checked before it is formed.
                     bool fits = false;
                     T const half = T(w / T(2));
                     if (!finite && nxx::math::abs(y) <= T(1))
@@ -474,7 +554,8 @@ namespace nxx::quadrature {
         };
 
         /**
-         * @brief a / 2 + b / 2, which cannot overflow: the centre of an interval, and where a panel is bisected.
+         * @brief The midpoint a / 2 + b / 2, the form that cannot overflow: the centre of an interval, and the point at
+         * which Gauss-Kronrod bisects a panel. (a + b) / 2 overflows where a + b does.
          * @param a An end.
          * @param b The other end.
          * @return The midpoint.
@@ -484,7 +565,13 @@ namespace nxx::quadrature {
         { return T(T(a / T(2)) + T(b / T(2))); }
 
         /**
-         * @brief The rounding floor of an estimate: 50 max(eps L1, denorm_min), QUADPACK's constant.
+         * @brief The rounding floor: the least error estimate a method trusts, below which the rounding of fn's values
+         * and of the sum, not the method, dominates the error (design.md, "The floor").
+         *
+         * 50 max(eps L1, denorm_min), with QUADPACK's constant 50. A request below the floor cannot be met, so the
+         * methods accept an estimate at the floor (or twice it) instead of running to their cap; an integral that
+         * cancels to 0 then ends too, without an abs_tol.
+         *
          * @param l1 The integral of |fn| by the method on the same evaluations.
          * @return The floor.
          */
@@ -497,13 +584,13 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The estimate a method accepts: max(abs_tol, rel_tol |value|, floor), with the floor its own
-         * (Romberg's, or twice Gauss-Kronrod's).
+         * @brief The largest error estimate at which an integration may stop: the caller's request, or the error the
+         * method can certify where the request is below it. integrate()'s stop test compares the estimate with it.
          * @param abs_tol The absolute tolerance.
          * @param rel_tol The relative tolerance, at most 1.
          * @param value The integral.
-         * @param floor The floor the method accepts at.
-         * @return The largest estimate accepted.
+         * @param floor The least error the method can certify (Step::attainable).
+         * @return max(abs_tol, rel_tol |value|, floor).
          */
         template<real T>
         constexpr T wanted(T const &abs_tol, T const &rel_tol, T const &value, T const &floor)
@@ -513,7 +600,7 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The interval [a, b] for the methods.
+         * @brief The Interval of [a, b], built once per integral by the finite-interval methods.
          * @param a The lower end, finite.
          * @param b The upper end, finite, not a.
          * @return Its centre, half-width and scale.
@@ -539,7 +626,12 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The number of bits of T's significand: digits times the bits of a digit of its radix, rounded up.
+         * @brief An upper bound on the bits of T's significand, which sizes the iteration caps that must scale with
+         * T's precision: the bisections of the node generators, Gauss-Kronrod's cap (64 per bit) and exp()'s reach.
+         *
+         * digits times the bits of a digit of T's radix, rounded up: exact in radix 2, 4 bits per digit in radix 10
+         * (cpp_dec_float_50). It needs only std::numeric_limits, which every nxx::real provides, and no logarithm.
+         *
          * @tparam T The real type.
          * @return The bits.
          */
@@ -556,21 +648,28 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief A value of P_N and of its derivative.
+         * @brief A polynomial's value and derivative at a point, which Newton's method needs together: what
+         * bracketed_zero() asks of P_N for the Gauss nodes and of E_8 for the Kronrod nodes, and what the weights'
+         * formulas read.
          * @tparam T The real type.
          */
         template<real T>
         struct Legendre
         {
-            /** @brief P_N(x). */
+            /** @brief The value, P_N(x) or E_8(x). */
             T p;
 
-            /** @brief P_N'(x). */
+            /** @brief The derivative, P_N'(x) or E_8'(x). */
             T dp;
         };
 
         /**
-         * @brief P_(k+1)(x) from P_k(x) and P_(k-1)(x): (k + 1) P_(k+1) = (2k + 1) x P_k - k P_(k-1).
+         * @brief One step of the Legendre recurrence, shared by every evaluation of a Legendre polynomial or series,
+         * so that the Gauss nodes, the Sturm count and the Kronrod polynomial all round the same way.
+         *
+         * P_(k+1)(x) from P_k(x) and P_(k-1)(x): (k + 1) P_(k+1) = (2k + 1) x P_k - k P_(k-1). The recurrence is the
+         * stable way to evaluate P_n on [-1, 1], and it needs only + - * / in T (design.md, "GaussLegendre<N> (D)").
+         *
          * @param k The degree of p1, at least 1.
          * @param x The point.
          * @param p1 P_k(x).
@@ -582,7 +681,8 @@ namespace nxx::quadrature {
         { return T(T(T(T(T(2 * k + 1) * x) * p1) - T(T(k) * p0)) / T(k + 1)); }
 
         /**
-         * @brief P'_(k+1)(x), the recurrence differentiated: (k + 1) P'_(k+1) = (2k + 1) (P_k + x P'_k) - k P'_(k-1).
+         * @brief One step of the differentiated recurrence, for the derivative that Newton's method and the weights
+         * need: (k + 1) P'_(k+1) = (2k + 1) (P_k + x P'_k) - k P'_(k-1).
          * @param k The degree of p1, at least 1.
          * @param x The point.
          * @param p1 P_k(x).
@@ -595,7 +695,11 @@ namespace nxx::quadrature {
         { return T(T(T(T(2 * k + 1) * T(p1 + T(x * d1))) - T(T(k) * d0)) / T(k + 1)); }
 
         /**
-         * @brief P_n(x) and P_n'(x) by the three-term recurrence and its derivative.
+         * @brief P_n(x) and P_n'(x), the polynomial whose zeros are the Gauss-Legendre nodes: for Newton's method on
+         * them, and for the weights 2 / ((1 - x)(1 + x) P_n'(x)^2).
+         *
+         * By the three-term recurrence and its derivative, from P_0 = 1 and P_1 = x.
+         *
          * @param n The degree, at least 1.
          * @param x The point, in [-1, 1].
          * @return P_n(x) and P_n'(x).
@@ -620,12 +724,16 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The number of zeros of P_n strictly above @p x: the sign changes of P_0(x), ..., P_n(x).
+         * @brief The number of zeros of P_n strictly above @p x, so that the node generator can isolate each zero by
+         * bisection, by counting alone, before Newton's method refines it (design.md, "GaussLegendre<N> (D)").
          *
-         * The sequence is a Sturm sequence (the recurrence of orthogonal polynomials): its sign changes fall by one
-         * as x passes a zero of P_n upward, from n below -1 to 0 above 1. A zero term is skipped and the last nonzero
-         * sign kept: where an intermediate P_k vanishes its neighbours have opposite signs, and where P_n vanishes at
-         * x, x itself is not counted.
+         * The usual starting guesses for the nodes need pi and cos, which an nxx::real need not have; a count of zeros
+         * above a point needs only the recurrence, and bisection on it brackets exactly one zero.
+         *
+         * The count is the number of sign changes of P_0(x), ..., P_n(x). The sequence is a Sturm sequence (the
+         * recurrence of orthogonal polynomials): its sign changes fall by one as x passes a zero of P_n upward, from
+         * n below -1 to 0 above 1. A zero term is skipped and the last nonzero sign kept: where an intermediate P_k
+         * vanishes its neighbours have opposite signs, and where P_n vanishes at x, x itself is not counted.
          *
          * @param n The degree, at least 1.
          * @param x The point.
@@ -655,8 +763,15 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The zero of a polynomial in (@p lower, @p upper) by Newton's method, safeguarded by bisection: P_n for
-         * the Gauss nodes, the Stieltjes polynomial for the Kronrod nodes.
+         * @brief The one zero of a polynomial in (@p lower, @p upper), to T's precision: the step that turns an
+         * isolated zero into a node, for P_n (the Gauss nodes) and for the Stieltjes polynomial E_8 (the Kronrod
+         * nodes).
+         *
+         * Newton's method converges fast but can leave the bracket; bisection cannot, so a Newton step is taken only
+         * where it lands strictly inside, and the bracket otherwise halves (design.md, "GaussLegendre<N> (D)"). The
+         * first iterate is the midpoint. It stops when a Newton step is at most 2 eps |x|, or when a step below
+         * sqrt(eps) |x| stops shrinking (rounding); the second stop never fires on the library's rules but guards a
+         * type whose rounding stalls Newton above 2 eps |x|.
          *
          * The orientation of the bracket is given, not computed: a computed value of exactly 0 at an end would turn it
          * around. The result lies strictly inside the bracket: every iterate does.
@@ -713,7 +828,11 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The non-negative half of the N-point Gauss-Legendre rule: nodes ascending, and their weights.
+         * @brief The N-point Gauss-Legendre rule as the methods store and apply it: the non-negative half, since the
+         * rule is symmetric about 0, with the nodes ascending and their weights.
+         *
+         * apply() evaluates fn at c + hw x and c - hw x for each stored x, and once at c for x = 0 (odd N).
+         *
          * @tparam T The real type.
          * @tparam N The number of points.
          */
@@ -731,11 +850,15 @@ namespace nxx::quadrature {
         };
 
         /**
-         * @brief The N-point Gauss-Legendre rule, from + - * / in T alone (no pi, no cos).
+         * @brief The N-point Gauss-Legendre rule computed in T, so that any nxx::real gets nodes and weights to its own
+         * precision, from + - * / alone (no pi, no cos), at compile time or at run time (design.md,
+         * "GaussLegendre<N> (D)").
          *
          * The positive zeros of P_N are isolated one by one, from the largest, by bisection on zeros_above(), then
          * found by bracketed_zero(); the negative nodes are their mirror images, and 0 is a node for odd N. The weights
-         * are 2 / ((1 - x)(1 + x) P_N'(x)^2).
+         * are 2 / ((1 - x)(1 + x) P_N'(x)^2); (1 - x)(1 + x) rather than 1 - x^2, whose subtraction cancels near the
+         * outer nodes, while 1 - x is exact there. float, double and long double read the result from a compile-time
+         * table (gauss_legendre_table); other types generate it at first use and keep it (with_generated()).
          *
          * @tparam N The number of points.
          * @tparam T The real type.
@@ -784,7 +907,7 @@ namespace nxx::quadrature {
 
         /**
          * @brief The N-point Gauss-Legendre rule for float, double and long double (tabled), computed at compile time
-         * once per program.
+         * once per program, so that integrate<GaussLegendre<N>> costs N evaluations of fn and nothing more at run time.
          * @tparam N The number of points.
          * @tparam T float, double or long double.
          */
@@ -792,9 +915,15 @@ namespace nxx::quadrature {
         inline constexpr Rule<T, N> gauss_legendre_table = detail::gauss_legendre_rule<N, T>();
 
         /**
-         * @brief The rule @p generate makes, built at its first use and kept: one function-local static per generator,
-         * so per rule and T, whatever fn is (initialised once, thread-safely, by the language; never changed). Not
-         * for constant evaluation.
+         * @brief The rule @p generate makes, built at its first use and kept, so that a type without a compile-time
+         * table, such as a Boost.Multiprecision number, pays for its nodes once per program rather than on every call
+         * (design.md, "The node cache").
+         *
+         * One function-local static per generator, so per rule and T, whatever fn is (initialised once,
+         * thread-safely, by the language; never changed). Keyed on the generator alone, not on a function templated on
+         * fn's type, where each lambda would build its own copy. A type that changed its precision at run time would
+         * see the nodes of its first; no nxx::real type does. Not for constant evaluation, where a static is not
+         * allowed.
          * @tparam generate The generator, such as gauss_legendre_rule<N, T>.
          * @return The rule.
          */
@@ -806,8 +935,11 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief @p use applied to the rule @p generate makes for a type without a compile-time table: the generator
-         * itself in constant evaluation, the cached rule at run time.
+         * @brief @p use applied to the rule @p generate makes, for a type without a compile-time table: one call site
+         * for both contexts, since constant evaluation cannot read the cache.
+         *
+         * The generator itself in constant evaluation (each evaluation generates the rule anew), the cached rule at
+         * run time.
          * @tparam generate The generator.
          * @param use A callable taking the rule.
          * @return What use returns.
@@ -824,8 +956,9 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief @p use applied to the N-point rule in T: the compile-time table for float, double and long double,
-         * with_generated() for every other T.
+         * @brief @p use applied to the N-point Gauss-Legendre rule in T, so that GaussLegendre<N> need not know where
+         * its rule comes from: the compile-time table for float, double and long double, with_generated() for every
+         * other T.
          * @param use A callable taking the rule.
          * @return What use returns.
          */
@@ -837,8 +970,11 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The coefficients of the Stieltjes polynomial E_8 of the G7-K15 pair in the Legendre basis:
-         * E_8 = sum_k a_k P_k, a_8 = 1, orthogonal to P_7 P_j for every j < 8.
+         * @brief The coefficients of the Stieltjes polynomial E_8 of the G7-K15 pair in the Legendre basis, whose zeros
+         * are the 8 Kronrod nodes added to the 7 Gauss nodes (design.md, "Gauss-Kronrod (Phase 2)").
+         *
+         * E_8 = sum_k a_k P_k, a_8 = 1, orthogonal to P_7 P_j for every j < 8 (Kronrod 1965; Laurie 1997). Computing it
+         * in T, rather than reading published nodes, gives the pair to T's precision for any nxx::real.
          *
          * The integrals of three Legendre polynomials have Adams' closed form,
          * int_{-1}^{1} P_a P_b P_c = 2 A(s - a) A(s - b) A(s - c) / ((2s + 1) A(s)), a + b + c = 2s, with
@@ -879,7 +1015,11 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief sum_k a_k P_k(x) and its derivative, by the three-term recurrence.
+         * @brief E_8(x) and E_8'(x) from E_8's Legendre coefficients, for Newton's method on the Kronrod nodes and for
+         * the Kronrod weights.
+         *
+         * sum_k a_k P_k(x) and its derivative, with each P_k from the three-term recurrence as legendre() forms it.
+         *
          * @param a The coefficients a_0 ... a_8.
          * @param x The point, in [-1, 1].
          * @return The value and the derivative.
@@ -908,9 +1048,13 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The non-negative half of the G7-K15 pair: the 8 nodes ascending, the 7-point Gauss nodes at the even
-         * indices (x[0] = 0), the Kronrod nodes at the odd ones, with both rules' weights (the Gauss weight 0 where a
-         * node is Kronrod's only).
+         * @brief The G7-K15 pair as Gauss-Kronrod's panels apply it: two rules on the same 15 points, so that their
+         * difference estimates the error at no extra evaluation.
+         *
+         * The non-negative half, since both rules are symmetric about 0: the 8 nodes ascending, the 7-point Gauss
+         * nodes at the even indices (x[0] = 0), the Kronrod nodes at the odd ones, with both rules' weights (the Gauss
+         * weight 0 where a node is Kronrod's only).
+         *
          * @tparam T The real type.
          */
         template<real T>
@@ -922,15 +1066,16 @@ namespace nxx::quadrature {
             /** @brief The non-negative nodes, ascending. */
             std::array<T, size> x;
 
-            /** @brief The 15-point Kronrod weights. */
+            /** @brief The 15-point Kronrod weights: the rule whose value a panel returns. */
             std::array<T, size> wk;
 
-            /** @brief The 7-point Gauss weights at the even indices, 0 at the odd ones. */
+            /** @brief The 7-point Gauss weights at the even indices, 0 at the odd ones: the rule compared with. */
             std::array<T, size> wg;
         };
 
         /**
-         * @brief The G7-K15 pair, from + - * / in T alone.
+         * @brief The G7-K15 pair computed in T, from + - * / alone, so that any nxx::real gets the pair to its own
+         * precision (design.md, "Gauss-Kronrod (Phase 2)").
          *
          * The Gauss part is GaussLegendre<7>'s. The Kronrod nodes are the zeros of E_8, each between two Gauss nodes or
          * between the largest one and 1, found by bracketed_zero() with the orientation from the node's index (E_8 > 0
@@ -966,14 +1111,17 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The G7-K15 pair for float, double and long double, computed at compile time once per program.
+         * @brief The G7-K15 pair for float, double and long double, computed at compile time once per program, so
+         * that the default method pays nothing for its rule at run time.
          * @tparam T float, double or long double.
          */
         template<typename T>
         inline constexpr Kronrod<T> gauss_kronrod_table = detail::gauss_kronrod_rule<T>();
 
         /**
-         * @brief @p use applied to the G7-K15 pair in T, as with_gauss_legendre(): the table, or with_generated().
+         * @brief @p use applied to the G7-K15 pair in T, so that Gauss-Kronrod need not know where its rule comes from:
+         * the compile-time table for float, double and long double, with_generated() for every other T, as
+         * with_gauss_legendre().
          * @param use A callable taking the pair.
          * @return What use returns.
          */
@@ -985,7 +1133,13 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief A rule applied to fn on an interval: sum over the nodes of hw w_i fn(c + hw x_i), compensated.
+         * @brief GaussLegendre<N>'s whole computation: the N-point rule applied to fn on an interval, as one
+         * compensated sum of N terms.
+         *
+         * sum over the nodes of hw w_i fn(c + hw x_i), each term formed by Interval::checked_term() in the order that
+         * keeps it normal, each point clamped into the interval. The centre first for odd N, then each pair c + d,
+         * c - d with the nodes ascending.
+         *
          * @param rule The non-negative half of the rule.
          * @param fn The function.
          * @param interval The interval.
@@ -1024,29 +1178,51 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief Romberg's method as an iterative method: the state after level k, T_k and its Richardson row.
+         * @brief What Romberg's method keeps between its levels, so that it can run as an iterative method whose loop
+         * integrate() owns (PHASE3A_API.md): the state after level k, T_k's Richardson row and the row before it.
+         *
+         * Level k is the trapezoidal sum T_k on 2^k panels, which reuses T_(k-1)'s points and adds the 2^(k-1) new
+         * midpoints; Richardson's extrapolation then turns T_0 ... T_k into R(k, k). Only two rows of the table are
+         * needed, so the state is a fixed size (design.md, "Romberg (E)").
+         *
          * @tparam T The real type.
          */
         template<real T>
         struct RombergState
         {
-            static constexpr int cap = 16;      // 2^16 + 1 evaluations; fixed, not from T (docs/quadrature/design.md)
-            static constexpr int min_level = 4; // 17 evaluations: fewer samples of sin^2 on [0, 2 pi] all vanish
+            /**
+             * @brief The last level: 2^16 + 1 = 65,537 evaluations, then not_converged, so that an fn Romberg suits
+             * badly (sqrt x, a kink) cannot run on. Fixed, not from T: smooth fn need at most 9 levels in double and 14
+             * at 50 digits for 1e-45 (PHASE1_API.md, "The cap").
+             */
+            static constexpr int cap = 16;
+
+            /**
+             * @brief The first level at which the method may stop, 17 evaluations, so that a few samples that happen
+             * to agree do not end it: with fewer, the samples of sin^2 on [0, 2 pi] all vanish (Numerixx 1.x returned
+             * 0 for it after level 2).
+             */
+            static constexpr int min_level = 4;
+
+            /** @brief The length of a Richardson row: R(k, 0..k) for k up to the cap. */
             static constexpr std::size_t row_size = cap + 1;
 
-            /** @brief The interval [a, b], a < b. */
+            /** @brief The interval [a, b], a < b: the points and the terms' scale. */
             Interval<T> interval;
 
-            /** @brief The weight of level k's new terms relative to the half-width: 1 for T_0 and level 1, then 2^(1-k). */
+            /**
+             * @brief The weight of level k's new terms relative to the half-width: 1 for T_0 and level 1, then
+             * 2^(1-k), the trapezoidal rule's step halving with each level.
+             */
             T weight;
 
-            /** @brief The trapezoidal sum of |terms| at level k, for the rounding floor. */
+            /** @brief The trapezoidal sum of |terms| at level k, L1, from which the rounding floor is formed. */
             T l1;
 
-            /** @brief The Richardson row of level k - 1, R(k-1, 0..k-1). */
+            /** @brief The Richardson row of level k - 1, R(k-1, 0..k-1): what level k extrapolates against. */
             std::array<T, row_size> previous;
 
-            /** @brief The Richardson row of level k, R(k, 0..k). */
+            /** @brief The Richardson row of level k, R(k, 0..k); R(k, k) is the method's value. */
             std::array<T, row_size> row;
 
             /** @brief The level. */
@@ -1057,8 +1233,13 @@ namespace nxx::quadrature {
         };
 
         /**
-         * @brief Adds level k's new terms, at the midpoints u_j = (2j - 1 - m) / m of level k - 1's panels, to sum and
-         * abs_sum, in order; in constant evaluation each term and sum is kept within max / 2 (Interval::checked_term).
+         * @brief Level k's new evaluations: fn at the midpoints of level k - 1's panels, the only points level k adds,
+         * so that each level costs 2^(k-1) evaluations and reuses every earlier one.
+         *
+         * The midpoints are u_j = (2j - 1 - m) / m on [-1, 1], m = 2^(k-1), mapped to c + hw u_j. Each term is added
+         * to sum (compensated, for T_k) and its magnitude to abs_sum (for L1), in order; in constant evaluation each
+         * term and sum is kept within max / 2 (Interval::checked_term).
+         *
          * @param fn The function.
          * @param s The state.
          * @param sum The compensated sum of the terms.
@@ -1084,9 +1265,13 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief Richardson's extrapolation of level k: R(k, i) = R(k, i-1) + (R(k, i-1) - R(k-1, i-1)) / (4^i - 1) for
-         * i = 1 ... k, from R(k, 0) = T_k. 4^i - 1 is exact in radix 2 up to the cap for double, and for float up to
-         * i = 12, beyond which the correction is at rounding level anyway.
+         * @brief Richardson's extrapolation of level k, which removes the trapezoidal rule's error terms in h^2, h^4,
+         * ... one by one, so that R(k, k) converges far faster than T_k on smooth fn.
+         *
+         * R(k, i) = R(k, i-1) + (R(k, i-1) - R(k-1, i-1)) / (4^i - 1) for i = 1 ... k, from R(k, 0) = T_k. 4^i - 1 is
+         * exact in radix 2 up to the cap for double, and in radix 10 (cpp_dec_float_50), and for float up to i = 12,
+         * beyond which the correction is at rounding level anyway.
+         *
          * @param s The state, with row[0] formed.
          * @return false where constant evaluation could not keep an entry within max / 2: non_finite.
          */
@@ -1106,8 +1291,12 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief Level s.k of Romberg's method: T_k, its Richardson row, the estimate and the floor, as Phase 1's loop
-         * formed them, with the stop test left to integrate().
+         * @brief One level of Romberg's method, shared by its start and its steps: T_k, its Richardson row, the
+         * estimate and the floor, as Phase 1's loop formed them, reported in s.step for integrate()'s stop test.
+         *
+         * T_k = T_(k-1) / 2 plus the new midpoints' terms; L1 likewise, which is also the level's finiteness check.
+         * The estimate is |R(k, k) - R(k-1, k-1)| and abs_error max(estimate, floor) (design.md, "Romberg (E)").
+         *
          * @param fn The function.
          * @param s The state, with level k - 1 in previous and k set.
          * @return Nothing, or non_finite.
@@ -1116,6 +1305,7 @@ namespace nxx::quadrature {
         constexpr std::expected<void, Failure<T>> romberg_level(F &fn, RombergState<T> &s)
         {
             Failure<T> const overflow{ error::non_finite, std::nullopt };
+            // Level 1's midpoint has T_0's weight, 1; each later level halves it, as h halves.
             if (s.k > 1) s.weight = T(s.weight / T(2));
             Sum<T> sum;
             T abs_sum = T(0);
@@ -1149,7 +1339,11 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief Romberg's start: T_0 from the ends, fn(a) then fn(b), then level 1.
+         * @brief Romberg's start (iterative_method's start): T_0 from the ends, fn(a) then fn(b), then level 1, so
+         * that the first Step reported has an estimate.
+         *
+         * The ends are evaluated as they are, not clamped or moved: a singularity at an end is error::non_finite.
+         *
          * @param fn The function.
          * @param a The lower end.
          * @param b The upper end, a < b.
@@ -1173,7 +1367,8 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief Romberg's next level.
+         * @brief Romberg's step (iterative_method's advance): the current row becomes the previous one, and the next
+         * level is formed.
          * @param fn The function.
          * @param s The state, below the cap.
          * @return Nothing, or non_finite.
@@ -1187,7 +1382,12 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief A panel of the adaptive Gauss-Kronrod loop, with its 15-point value and its estimate.
+         * @brief A panel of the adaptive Gauss-Kronrod loop: a piece of [a, b] with its own 15-point value and error
+         * estimate, the unit the loop sums, ranks and bisects (design.md, "Gauss-Kronrod", "A panel").
+         *
+         * The integral is the sum of the panels' values and the estimate the sum of their estimates, so a panel keeps
+         * what each running sum needs (value, floor, excess) and what the heap needs to rank it (difference, order).
+         *
          * @tparam T The real type.
          */
         template<real T>
@@ -1199,32 +1399,56 @@ namespace nxx::quadrature {
             /** @brief The upper end. */
             T hi;
 
-            /** @brief The 15-point Kronrod value. */
+            /** @brief The 15-point Kronrod value: the panel's share of the integral. */
             T value;
 
-            /** @brief |K15 - G7|, which orders the heap. */
+            /**
+             * @brief |K15 - G7|, the panel's raw estimate: it ranks the panel in the heap, so that the panel with the
+             * largest error is bisected first.
+             */
             T difference;
 
-            /** @brief The rounding floor, 50 max(eps L1, denorm_min), L1 the panel's integral of |fn|. */
+            /**
+             * @brief The rounding floor, 50 max(eps L1, denorm_min), L1 the panel's integral of |fn|: the least error
+             * the panel can certify; summed into F.
+             */
             T floor;
 
-            /** @brief The estimate's excess over the floor, max(difference, floor) - floor. */
+            /**
+             * @brief The estimate's excess over the floor, max(difference, floor) - floor: what bisection can still
+             * reduce; summed into X, which the stagnation rule watches.
+             */
             T excess;
 
-            /** @brief The order of creation: panels of equal difference leave the heap in it. */
+            /**
+             * @brief The order of creation, the heap's tie-breaker, so that the order of bisection is deterministic:
+             * panels of equal difference leave the heap in it.
+             */
             std::size_t order;
         };
 
-        /** @brief Why a panel has no estimate. */
+        /**
+         * @brief Why a panel has no estimate, which decides what the loop does next: a descent around a value that is
+         * not finite, or the end of the run (design.md, "Values that are not finite").
+         */
         enum class fault {
-            not_finite, ///< L1 not finite: fn not finite at a point of the panel (or an overflow of its terms)
+            not_finite, ///< L1 not finite: fn not finite at a point of the panel (or an overflow of its terms); the
+                        ///< loop bisects around it (resolve())
             overflow    ///< a finite L1 but a value or difference that overflowed, or (in constant evaluation) a value
                         ///< or a sum the checks refuse: the run is non_finite
         };
 
         /**
-         * @brief The G7-K15 pair on [lo, hi], lo < hi: the two rules on the same 15 evaluations of fn, each a
-         * compensated sum, and L1, the plain sum of |term| (positive terms).
+         * @brief The G7-K15 pair on [lo, hi], lo < hi: one panel's value, its estimate and its floor from 15
+         * evaluations of fn (PHASE2_API.md B and C).
+         *
+         * Both rules run on the same 15 evaluations: the 7 Gauss nodes are among the 15 Kronrod nodes (at the even
+         * indices), so the estimate |K15 - G7| costs no extra evaluation. Each rule's value is a compensated sum; L1,
+         * the sum of |term| that sets the floor, is a plain sum, since its terms are not negative and do not cancel.
+         * The points are evaluated in a fixed order, the centre then c + d and c - d for the nodes ascending, which
+         * the prototype's evaluation counts reproduce. One finiteness check per panel, on L1, separates a value of fn
+         * that is not finite (not_finite: the loop can bisect around it) from an overflow of the sums (overflow).
+         *
          * @param rule The pair.
          * @param fn The function.
          * @param lo The lower end.
@@ -1241,6 +1465,8 @@ namespace nxx::quadrature {
             Sum<T> gauss;
             T l1 = T(0);
             bool refused = false;
+            // One node: its term enters K15, L1 and, at a Gauss node (even index), G7. In constant evaluation a term or
+            // a sum the guards refuse stops the panel (overflow) instead of failing to compile.
             auto const add = [&](std::size_t i, T const &x) {
                 if (refused) return;
                 T const y = detail::evaluate(fn, interval.point(x));
@@ -1262,6 +1488,7 @@ namespace nxx::quadrature {
                 add(i, T(interval.c - d));
             }
             if (refused) return std::unexpected(fault::overflow);
+            // A value of fn that is not finite makes L1 not finite: the one check that tells it from an overflow.
             if (!nxx::math::isfinite(l1)) return std::unexpected(fault::not_finite);
             std::optional<T> const kv = detail::compensated(kronrod);
             std::optional<T> const gv = detail::compensated(gauss);
@@ -1277,8 +1504,13 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief Whether [lo, hi] can be bisected: its midpoint lies strictly inside, and the outer nodes of both
-         * children lie strictly inside them (else the nodes round onto the ends).
+         * @brief Whether [lo, hi] can be bisected usefully, so that a panel too narrow to split becomes final instead
+         * of being bisected forever (PHASE2_API.md C).
+         *
+         * It can where its midpoint lies strictly inside and the outer nodes of both children lie strictly inside
+         * them. On a panel a few ulps wide the children's nodes round onto their ends: a split would then evaluate fn
+         * at the ends, where an endpoint singularity may lie, and gain nothing.
+         *
          * @param rule The pair.
          * @param lo The lower end.
          * @param hi The upper end.
@@ -1299,7 +1531,8 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief A panel waiting in the descent, with its depth below the panel that started it.
+         * @brief A piece waiting to be sampled in a descent, with its depth, so that the descent stops at its limit of
+         * bisections below the panel that started it (KronrodState::depth).
          * @tparam T The real type.
          */
         template<real T>
@@ -1316,111 +1549,151 @@ namespace nxx::quadrature {
         };
 
         /**
-         * @brief The sums of the adaptive loop, compensated: the value K, the floor F and the excess X = sum (e_p -
-         * floor_p); the estimate is E = F + X.
+         * @brief The three sums of the adaptive loop, compensated: the value K, the floor F and the excess
+         * X = sum (e_p - floor_p); the estimate is E = F + X.
+         *
+         * F and X are kept apart, rather than E alone, because the loop needs each: the stop test accepts at 2 F, and
+         * stagnation watches X, which falls as bisection works, where E barely moves once it nears the floor
+         * (PHASE2_API.md C and E).
+         *
          * @tparam T The real type.
          */
         template<real T>
         struct KronrodTotals
         {
-            /** @brief The sum of the panels' 15-point values. */
+            /** @brief The sum of the panels' 15-point values: the integral. */
             Sum<T> value;
 
-            /** @brief The sum of the panels' floors. */
+            /** @brief The sum of the panels' floors: the least error the run can certify. */
             Sum<T> floor;
 
-            /** @brief The sum of the panels' excesses over their floors. */
+            /** @brief The sum of the panels' excesses over their floors: the error bisection can still reduce. */
             Sum<T> excess;
         };
 
         /**
-         * @brief The values of a set of sums.
+         * @brief The values of a set of KronrodTotals, checked finite: what a Step and the stagnation rule are formed
+         * from.
          * @tparam T The real type.
          */
         template<real T>
         struct KronrodValues
         {
-            /** @brief K. */
+            /** @brief K, the integral. */
             T value;
 
-            /** @brief F. */
+            /** @brief F, the floor. */
             T floor;
 
-            /** @brief X. */
+            /** @brief X, the excess over the floor. */
             T excess;
 
-            /** @brief E = F + X. */
+            /** @brief E = F + X, the estimate. */
             T estimate;
         };
 
         /**
-         * @brief Adaptive Gauss-Kronrod as an iterative method (docs/quadrature/PHASE2_API.md C to E): the panels, the
-         * heap of active panels and the running sums, a step per bisection, the stop test left to integrate(). The rule
-         * is copied, because for a type without a table, in constant evaluation, with_gauss_kronrod passes a temporary.
+         * @brief Adaptive Gauss-Kronrod as an iterative method (PHASE2_API.md C to E, PHASE3A_API.md): the state that
+         * lets GaussKronrod<15> take one bisection per step and report a Step, while integrate() owns the stop test.
+         *
+         * The state holds every panel, the heap of the active ones (those above their floor that can still be split)
+         * and the running sums. A step bisects the active panel with the largest difference. The rule is copied,
+         * because for a type without a table, in constant evaluation, with_gauss_kronrod passes a temporary.
+         *
          * @tparam T The real type.
          */
         template<real T>
         struct KronrodState
         {
-            static constexpr int mesh = 10;       // Shampine's quadgk: one panel cannot accept K = G on a peak it missed
-            static constexpr int depth = 2;       // bisections below a panel whose L1 is not finite
-            static constexpr int stagnation = 32; // bisections without a new minimum of the excess X
+            /**
+             * @brief The panels of the initial mesh, so that a feature one panel's 15 points straddle is still seen
+             * (PHASE2_API.md C and Q1, as Shampine's quadgk).
+             *
+             * One panel can accept K = G on a peak it missed. On 100 Gaussian peaks of width 1e-3 the prototype had 36
+             * false successes with 1 panel, 2 with 2, 1 with 4 and none with 10. No mesh cures a feature narrower than
+             * the spacing of the nodes.
+             */
+            static constexpr int mesh = 10;
+
+            /**
+             * @brief The bisections below a panel whose L1 is not finite, so that a value of fn that is not finite at a
+             * node is stepped around, but a region where fn is not finite is not walked into (PHASE2_API.md Q8).
+             */
+            static constexpr int depth = 2;
+
+            /**
+             * @brief The bisections without a new minimum of the excess X after which the run ends not_converged, so
+             * that a noisy fn or a divergent integral stops long before the cap (PHASE2_API.md Q2).
+             */
+            static constexpr int stagnation = 32;
 
             /** @brief The G7-K15 pair. */
             Kronrod<T> rule;
 
             /**
-             * @brief Bisections and descent splits together, 64 per bit of T: x^-0.9 on [0, 1] at cpp_bin_float_50's
-             * default needs 3,550 of its 10,752.
+             * @brief The cap on bisections and descent splits together, 64 per bit of T, so that every run ends: x^-0.9
+             * on [0, 1] at cpp_bin_float_50's default needs 3,550 of its 10,752.
              */
             int cap;
 
             /**
              * @brief Every current panel, active and final, in the order it was committed. Removing a parent's
-             * contribution from a compensated sum is not exact (a small contribution absorbed into the correction beside
-             * much larger ones is lost when they are subtracted again), so every decision to stop is made on sums formed
-             * afresh from these panels (settle; independent review, 2098416).
+             * contribution from a compensated sum is not exact (a small contribution absorbed into the correction
+             * beside much larger ones is lost when they are subtracted again), so every decision to stop is made on
+             * sums formed afresh from these panels (settle; independent review, 2098416).
              */
             std::vector<Panel<T>> panels;
 
-            /** @brief Whether each panel was bisected. */
+            /**
+             * @brief Whether each panel was bisected: a bisected parent is flagged rather than erased, so that the
+             * indices in the heap stay valid and fresh() skips it.
+             */
             std::vector<bool> removed;
 
-            /** @brief The running sums, updated per bisection. */
+            /** @brief The running sums, updated per bisection: cheap, and what stagnation watches between settles. */
             KronrodTotals<T> running;
 
-            /** @brief Whether constant evaluation refused a sum outside max / 2. */
+            /** @brief Whether constant evaluation refused a sum outside max / 2: the run then ends non_finite. */
             bool refused;
 
-            /** @brief The active panels, a heap of indices into panels by difference (the estimate's order). */
+            /**
+             * @brief The active panels, a heap of indices into panels by difference (the estimate's order), so that
+             * the panel with the largest error is found in logarithmic time; a final panel never enters it.
+             */
             std::vector<std::size_t> heap;
 
             /** @brief The order of the next panel sampled, the heap's tie-breaker. */
             std::size_t order;
 
-            /** @brief Bisections and descent splits so far. */
+            /** @brief Bisections and descent splits so far, against the cap. */
             int work;
 
-            /** @brief The panels of the current bisection or mesh panel, before they are committed. */
+            /**
+             * @brief The panels of the current bisection or mesh panel, before they are committed: held apart, so that
+             * a bisection whose descent fails can be undone by not committing them.
+             */
             std::vector<Panel<T>> pieces;
 
             /** @brief The work list of a descent below a panel whose L1 is not finite. */
             std::vector<Pending<T>> stack;
 
-            /** @brief Whether a piece no descent avoided was undone: then the run cannot end as a success. */
+            /**
+             * @brief Whether a piece no descent avoided was undone: then the run cannot end as a success, since the
+             * estimate no longer covers that piece (Step::trusted).
+             */
             bool tainted;
 
-            /** @brief The least excess so far. */
+            /** @brief The least excess so far, from the completed mesh on: stagnation's reference. */
             T least;
 
-            /** @brief Bisections since the excess last reached a new minimum. */
+            /** @brief Bisections since the excess last reached a new minimum; at stagnation the run is exhausted. */
             int since;
 
             /** @brief The step: {K, max(E, F)}, 2F attainable, exhausted by an empty heap, the cap or stagnation. */
             Step<T> step;
 
             /**
-             * @brief An empty state with the rule.
+             * @brief An empty state with the rule and the cap of T; kronrod_start() samples the mesh into it.
              * @param r The G7-K15 pair.
              */
             constexpr explicit KronrodState(Kronrod<T> const &r)
@@ -1429,8 +1702,8 @@ namespace nxx::quadrature {
             {}
 
             /**
-             * @brief Adds a panel's contribution to a set of sums, or subtracts it; refuses (refused) a sum constant
-             * evaluation could not form within max / 2.
+             * @brief Adds a panel's contribution to a set of sums, or subtracts it (a bisected parent's); refuses
+             * (refused) a sum constant evaluation could not form within max / 2.
              * @param t The sums.
              * @param p The panel.
              * @param add Whether to add (else subtract).
@@ -1450,7 +1723,8 @@ namespace nxx::quadrature {
             }
 
             /**
-             * @brief The sums formed afresh from the current panels, in the order they were committed.
+             * @brief The sums formed afresh from the current panels, in the order they were committed: free of the
+             * drift that subtracting parents leaves in the running sums, for every decision to stop.
              * @return The sums.
              */
             constexpr KronrodTotals<T> fresh()
@@ -1463,10 +1737,12 @@ namespace nxx::quadrature {
             }
 
             /**
-             * @brief The heap's order: by difference, the same order as the estimate, then the later panel first.
+             * @brief The heap's order: by difference, the same order as the estimate (only panels above their floor
+             * enter the heap), then by creation. With std::push_heap's max-heap, the panel with the largest difference
+             * is bisected next, and of panels with equal differences the one created first.
              * @param p A panel's index.
              * @param q Another's.
-             * @return Whether p comes before q.
+             * @return Whether p ranks below q.
              */
             constexpr bool precedes(std::size_t p, std::size_t q) const
             {
@@ -1476,9 +1752,15 @@ namespace nxx::quadrature {
             }
 
             /**
-             * @brief [p, q] sampled into pieces: the panel itself, or, where its L1 is not finite, the pieces of a
-             * descent of at most depth bisections below it, each counted against the cap, each child first its lower
-             * half.
+             * @brief [p, q] sampled into pieces, stepping around values of fn that are not finite: a singularity at a
+             * node is usually avoided by one or two bisections, which make it an end of the children, where no node
+             * lies (design.md, "Values that are not finite").
+             *
+             * The pieces are the panel itself, or, where its L1 is not finite, those of a descent of at most depth
+             * bisections below it, each counted against the cap, each child first its lower half. The descent is
+             * bounded, since an unbounded one walks towards a region where fn is not finite (sqrt(x - 0.5) on [0, 1]
+             * walked to 0.5 through 1,063 levels in double).
+             *
              * @param fn The function.
              * @param p The lower end.
              * @param q The upper end.
@@ -1502,6 +1784,7 @@ namespace nxx::quadrature {
                     if (top.level < depth && detail::splittable(rule, top.lo, top.hi) && work < cap) {
                         ++work;
                         T const mid = detail::midpoint(top.lo, top.hi);
+                        // The upper half is pushed first, so the lower half is sampled first.
                         stack.push_back(Pending<T>{ mid, top.hi, top.level + 1 });
                         stack.push_back(Pending<T>{ top.lo, mid, top.level + 1 });
                     }
@@ -1513,7 +1796,8 @@ namespace nxx::quadrature {
 
             /**
              * @brief The pieces enter the panels and the running sums, and the heap unless final: at its floor
-             * (splitting cannot lower it below its floor, since L1 adds up), or not splittable.
+             * (splitting cannot lower it below its floor, since L1 adds up), or not splittable. A final panel still
+             * counts in the sums; it is never bisected again.
              */
             constexpr void commit()
             {
@@ -1530,7 +1814,8 @@ namespace nxx::quadrature {
             }
 
             /**
-             * @brief The values of a set of sums.
+             * @brief The values of a set of sums, checked once: a value of fn or an overflow that made a sum not
+             * finite shows here.
              * @param t The sums.
              * @return The values, or nothing where they are not finite or constant evaluation refuses them.
              */
@@ -1562,8 +1847,13 @@ namespace nxx::quadrature {
         };
 
         /**
-         * @brief Gauss-Kronrod's start: the initial mesh of 10 equal panels; equal adjacent points (an interval too
-         * narrow for 10) give empty panels, which are skipped. A mesh panel with no finite estimate is non_finite.
+         * @brief Gauss-Kronrod's start: the initial mesh of 10 equal panels, 150 evaluations, so that a narrow feature
+         * a single panel would miss is seen before any estimate is trusted (PHASE2_API.md C, Q1).
+         *
+         * The mesh points are clamped into [a, b], and the last is b itself, so the panels tile the interval. Equal
+         * adjacent points (an interval too narrow for 10) give empty panels, which are skipped. A mesh panel with no
+         * finite estimate, after its descent, is non_finite: there is no estimate of the whole to fall back on.
+         *
          * @param rule The G7-K15 pair.
          * @param fn The function.
          * @param a The lower end.
@@ -1594,6 +1884,7 @@ namespace nxx::quadrature {
             if (!meshed) return std::unexpected(invalid);
             std::optional<KronrodValues<T>> const after_mesh = KronrodState<T>::values_of(s.running);
             if (!after_mesh) return std::unexpected(invalid);
+            // Stagnation counts from the completed mesh's excess (independent review of Phase 2, finding 3).
             s.least = after_mesh->excess;
             s.since = 0;
             s.report(*after_mesh);
@@ -1601,9 +1892,13 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief Gauss-Kronrod's step: the panel with the largest estimate bisected, and the stagnation count updated.
+         * @brief Gauss-Kronrod's step: the panel with the largest estimate bisected, where the error is, and the
+         * stagnation count updated (PHASE2_API.md C to E).
+         *
          * A bisection whose descent leaves a piece where fn is not finite is undone: the parent stays, final, with its
-         * own estimate, and the run is tainted.
+         * own estimate, and the run is tainted. Stagnation, 32 bisections without a new minimum of the excess X, ends
+         * a run that bisection no longer improves: fn noisier than the request, or a divergent integral.
+         *
          * @param fn The function.
          * @param s The state, not exhausted (so the heap is not empty).
          * @return Nothing, or non_finite.
@@ -1625,6 +1920,7 @@ namespace nxx::quadrature {
             std::optional<fault> const upper_half = s.resolve(fn, mid, parent.hi);
             if (upper_half == fault::overflow) return std::unexpected(invalid);
             if (lower_half || upper_half) {
+                // Undone: the pieces are not committed, and the parent, already out of the heap, stays as it was.
                 s.tainted = true;
             }
             else {
@@ -1644,6 +1940,7 @@ namespace nxx::quadrature {
             }
             std::optional<KronrodValues<T>> const current = KronrodState<T>::values_of(s.running);
             if (!current) return std::unexpected(invalid);
+            // X, not E: E barely moves near the floor, and a peak found late raises it (PHASE2_API.md E).
             if (current->excess < s.least) {
                 s.least = current->excess;
                 s.since = 0;
@@ -1654,7 +1951,11 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief Gauss-Kronrod's settle: the step from the sums formed afresh, which then replace the running ones.
+         * @brief Gauss-Kronrod's settle: the step from the sums formed afresh, which then replace the running ones, so
+         * that integrate() decides, and the result is taken, on sums free of the running sums' drift.
+         *
+         * Where the fresh sums fail the stop test that the running ones passed, the loop simply goes on from them.
+         *
          * @param s The state.
          * @return Nothing, or non_finite.
          */
@@ -1672,22 +1973,30 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief A value as the unevaluated sum hi + lo of two T, |lo| at most about half an ulp of hi: twice T's
-         * precision, for ln 2 in exp()'s reduction.
+         * @brief A value carried to about twice T's precision, as the unevaluated sum hi + lo of two T, so that ln 2 is
+         * known well enough for exp()'s reduction in any T (design.md, "TanhSinh": exp in T).
+         *
+         * exp() reduces x by k ln 2 with k up to a few hundred, or millions in a type with a wide exponent range; ln 2
+         * rounded to T would make the reduced argument err by k times its rounding. ln 2 cannot come from a literal: a
+         * double literal holds no more than a double's digits, which is too few for a 50-digit type. So ln_two() sums
+         * its series in Pairs, and exp_constants() splits the Pair into c1 and c2. |lo| is at most about half an ulp
+         * of hi.
+         *
          * @tparam T The real type.
          */
         template<real T>
         struct Pair
         {
-            /** @brief The leading part. */
+            /** @brief The leading part: the value rounded to T. */
             T hi;
 
-            /** @brief The rest. */
+            /** @brief The rest: what rounding to T left out. */
             T lo;
         };
 
         /**
-         * @brief @p a + @p b as a Pair, exactly (Knuth's two-sum, for any magnitudes).
+         * @brief @p a + @p b as a Pair, exactly, for operands of any magnitudes (Knuth's two-sum): the building block
+         * of pair_sum().
          * @param a A value.
          * @param b A value.
          * @return The rounded sum and its rounding error.
@@ -1701,7 +2010,8 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief @p a + @p b as a Pair, exactly, for |a| >= |b| (Dekker's fast two-sum).
+         * @brief @p a + @p b as a Pair, exactly, for |a| >= |b| (Dekker's fast two-sum): the cheaper form, used where
+         * the order of the magnitudes is known, as when a Pair is renormalised.
          * @param a The larger value.
          * @param b The smaller value.
          * @return The rounded sum and its rounding error.
@@ -1714,7 +2024,8 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief radix^n, exactly.
+         * @brief radix^n, exactly: the scale of Veltkamp's splitter in two_product(), in T's own radix, so that the
+         * split holds in radix 10 as in radix 2.
          * @param n The power, at least 0.
          * @return radix^n.
          */
@@ -1728,8 +2039,13 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief @p a @p b as a Pair, exactly: Dekker's product, with Veltkamp's split by radix^ceil(digits / 2) + 1,
-         * which needs no fused multiply-add and holds in any radix.
+         * @brief @p a @p b as a Pair, exactly, without a fused multiply-add: the product that pair_quotient() and
+         * pair_product() need, from + - * / alone as nxx::real allows.
+         *
+         * Dekker's product: each factor is split by Veltkamp's method into a high part of about half its digits and the
+         * rest, with the splitter radix^ceil(digits / 2) + 1, so that the products of the parts are exact, and their
+         * sum less the rounded product is its rounding error. It holds in any radix.
+         *
          * @param a A value.
          * @param b A value.
          * @return The rounded product and its rounding error.
@@ -1753,7 +2069,7 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief @p a + @p b for Pairs (the double-word addition).
+         * @brief @p a + @p b for Pairs (the double-word addition): the running sum of ln_two()'s series.
          * @param a A Pair.
          * @param b A Pair.
          * @return The sum, renormalised.
@@ -1761,6 +2077,8 @@ namespace nxx::quadrature {
         template<real T>
         constexpr Pair<T> pair_sum(Pair<T> const &a, Pair<T> const &b)
         {
+            // The leading parts and the trailing parts are added exactly, then the errors are folded in and the
+            // result renormalised so that |lo| is again at most about half an ulp of hi.
             Pair<T> const s = detail::two_sum(a.hi, b.hi);
             Pair<T> const t = detail::two_sum(a.lo, b.lo);
             T e = T(s.lo + t.hi);
@@ -1770,7 +2088,8 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief @p a / @p n for a small integer n held exactly in T.
+         * @brief @p a / @p n for a small integer n held exactly in T: the divisions by 3 and by 2i + 1 in ln_two()'s
+         * series.
          * @param a A Pair.
          * @param n The divisor.
          * @return The quotient.
@@ -1778,6 +2097,7 @@ namespace nxx::quadrature {
         template<real T>
         constexpr Pair<T> pair_quotient(Pair<T> const &a, T const &n)
         {
+            // A first quotient, then the exact remainder a - q1 n (two_product), divided again for the low part.
             T const q1 = T(a.hi / n);
             Pair<T> const p = detail::two_product(q1, n);
             T const r = T(T(T(a.hi - p.hi) - p.lo) + a.lo);
@@ -1785,7 +2105,7 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief @p a @p n for a small integer n held exactly in T.
+         * @brief @p a @p n for a small integer n held exactly in T: the final doubling in ln_two().
          * @param a A Pair.
          * @param n The factor.
          * @return The product.
@@ -1798,7 +2118,13 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief ln 2 = 2 atanh(1/3) = 2 sum_i 3^-(2i+1) / (2i + 1), in Pairs, to a term below eps^2 / 16.
+         * @brief ln 2 to about twice T's precision, computed in T itself, so that exp() needs no constant beyond what
+         * + - * / can form (BRIEF.md 3.10, D11).
+         *
+         * ln 2 = 2 atanh(1/3) = 2 sum_i 3^-(2i+1) / (2i + 1): a series of rational terms that shrink by a factor of
+         * about 9 each, summed in Pairs to a term below eps^2 / 16. It works in any radix and any precision, where a
+         * literal would hold only a double's digits.
+         *
          * @return ln 2 as a Pair.
          */
         template<real T>
@@ -1821,47 +2147,60 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The constants of exp() in T: the reduction x = k ln 2 + r by Cody and Waite's split of ln 2, a table
-         * of powers of 2 for k (T has no conversion to an integer), and the length of the Taylor series of expm1 on r.
+         * @brief Everything exp() needs that depends only on T, computed once by exp_constants() and passed in, so that
+         * the many calls that build a table do not recompute it.
          *
-         * The domain is the tables' (B): from x_min = ln 2^-m moved a few eps inward, 2^-m the smallest power of 2 at
-         * or above min(), up to about 22. k counts powers of 2, at most -log2 min() <= (1 - min_exponent) times the
-         * bits of a digit; reach adds a margin.
+         * The reduction x = k ln 2 + r by Cody and Waite's split of ln 2 into c1 + c2; tables of powers of 2 that
+         * stand in for k, since T has no conversion to an integer (nxx::real does not require one); and the length
+         * of the Taylor series of expm1 on r.
+         *
+         * The domain is the tables' (PHASE3_API.md B): from x_min = ln 2^-m moved a few eps inward, 2^-m the smallest
+         * power of 2 at or above min(), up to about 22. k counts powers of 2, at most -log2 min() <= (1 - min_exponent)
+         * times the bits of a digit; reach adds a margin.
          *
          * @tparam T The real type.
          */
         template<real T>
         struct ExpConstants
         {
-            /** @brief The largest |k| the reduction meets, with a margin. */
+            /** @brief The largest |k| the reduction meets, with a margin: the size of the tables of powers of 2. */
             static constexpr long long reach =
                 (1LL - std::numeric_limits<T>::min_exponent)
                     * static_cast<long long>(detail::significand_bits<T>() / std::numeric_limits<T>::digits)
                 + 4;
 
-            /** @brief The bits of reach: the length of the tables. */
+            /** @brief The bits of reach: the length of the tables, one entry per bit of k. */
             static constexpr std::size_t bits =
                 static_cast<std::size_t>(std::bit_width(static_cast<unsigned long long>(reach)));
 
-            /** @brief 1 / ln 2, rounded. */
+            /** @brief 1 / ln 2, rounded: k is the nearest integer to x / ln 2. */
             T inverse_ln2;
 
-            /** @brief ln 2 cut to digits - m radix digits, m the digits of reach, so that k c1 is exact. */
+            /**
+             * @brief ln 2 cut to digits - m radix digits, m the digits of reach, so that k c1 is exact for every k the
+             * domain needs and x - k c1 loses nothing.
+             */
             T c1;
 
-            /** @brief The rest of ln 2, from the Pair: ln 2 - c1. */
+            /** @brief The rest of ln 2, from the Pair: ln 2 - c1, whose product with k carries the only rounding. */
             T c2;
 
-            /** @brief Where the domain ends below: exp(x) is 0 for x <= x_min. */
+            /**
+             * @brief Where the domain ends below: exp(x) is 0 for x <= x_min, so that every nonzero result is at least
+             * min() and no table holds a subnormal value.
+             */
             T x_min;
 
             /** @brief The terms of the Taylor series of expm1 for |r| <= ln 2 / 2: until one is below eps / 8. */
             int terms;
 
-            /** @brief 2^i. */
+            /** @brief 2^i: the values the greedy search for k compares against. */
             std::array<T, bits> powers;
 
-            /** @brief The factors of 2^k for k > 0: 2 for bit 0, 2^(2^(i-1)) for bit i applied twice, 0 past max(). */
+            /**
+             * @brief The factors of 2^k for k > 0: 2 for bit 0, 2^(2^(i-1)) for bit i applied twice, so that 2^k is
+             * formed as two factors that each stay in range; 0 past max(), never taken.
+             */
             std::array<T, bits> up;
 
             /** @brief Their inverses, for k < 0. */
@@ -1869,7 +2208,8 @@ namespace nxx::quadrature {
         };
 
         /**
-         * @brief The constants of exp() in T, from + - * / alone.
+         * @brief The constants of exp() in T, from + - * / alone, so that they can be formed in constant evaluation and
+         * in any nxx::real.
          * @return The constants.
          */
         template<real T>
@@ -1953,13 +2293,20 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief e^x on the tables' domain, from + - * / in T (Cody and Waite's reduction, an expm1 Taylor core).
+         * @brief e^x on the tables' domain, the library's own: the tanh-sinh and exp-sinh tables are built from it
+         * (design.md, "TanhSinh": exp in T; PHASE3_API.md B and Q10).
+         *
+         * std::exp will not do. T may be any nxx::real, which offers + - * / and comparisons but no exp; the tables
+         * are built in constant evaluation, where std::exp is not constexpr on Clang and MSVC; and a library's exp
+         * can be poor where the tables need it (Boost's in cpp_bin_float_50 errs by 1,568 ulp at x = 1096). This one
+         * uses + - * / in T alone, so the same code gives every table, at compile time or at run time.
          *
          * x = k ln 2 + r with k the nearest integer to x / ln 2, found by a greedy comparison against powers of 2,
          * r = (x - k c1) - k c2, and e^x = (1 + p(r)) 2^k, p the series by Horner's scheme. The error: the final
-         * rounding of 1 + p (0.5 ulp), Horner's (0.73), the rounding of r (0.25): at most 1.48 ulp. No NaN test, no
-         * overflow guard, no subnormal results: x <= x_min gives 0, and x up to about 22 (the tables need t_max) is
-         * far from overflow.
+         * rounding of 1 + p (0.5 ulp), Horner's (0.73), the rounding of r (0.25): at most 1.48 ulp.
+         *
+         * Only the tables' domain, as Q10 decided, which keeps it short: no NaN test, no overflow guard, no subnormal
+         * results. x <= x_min gives 0, and x up to about 22 (the tables need t_max) is far from overflow.
          *
          * @param x The argument, x_min < x <= 22 (or x <= x_min for 0).
          * @param constants The constants.
@@ -1971,6 +2318,8 @@ namespace nxx::quadrature {
             if (!(x > constants.x_min)) return T(0);
             T const y = T(x * constants.inverse_ln2);
             bool const negative = y < T(0);
+            // k = round(|y|): add 1/2, then take the powers of 2 it holds, largest first (T has no floor or
+            // conversion to an integer). Each power taken also takes its factor of 2^k.
             T rest = T(T(negative ? T(-y) : y) + T(T(1) / T(2)));
             std::array<T, ExpConstants<T>::bits> const &factors = negative ? constants.down : constants.up;
             T k = T(0);
@@ -1987,13 +2336,14 @@ namespace nxx::quadrature {
             assert(scale_1 > T(0)); // no upward factor left 0 by exp_constants() was taken
             T const signed_k = negative ? T(-k) : k;
             T const r = T(T(x - T(signed_k * constants.c1)) - T(signed_k * constants.c2));
+            // expm1(r) by Horner's scheme: p = r (1 + r/2 (1 + r/3 (1 + ...))).
             T p = T(0);
             for (int n = constants.terms; n >= 1; --n) p = T(T(r / T(n)) * T(T(1) + p));
             return T(T(T(T(1) + p) * scale_1) * scale_2);
         }
 
         /**
-         * @brief sinh t and cosh t.
+         * @brief sinh t and cosh t together, as the tables need both for a node: sinh t places it, cosh t weights it.
          * @tparam T The real type.
          */
         template<real T>
@@ -2007,8 +2357,11 @@ namespace nxx::quadrature {
         };
 
         /**
-         * @brief sinh t and cosh t for t >= 0: by their Taylor series below t = 1/2, where e - 1/e cancels, else from
-         * e = exp(t) as (e - 1/e) / 2 and (e + 1/e) / 2.
+         * @brief sinh t and cosh t for t >= 0, accurate near 0 as well, from one call of exp().
+         *
+         * Below t = 1/2, by their Taylor series, since there e - 1/e cancels and would lose the digits of a small
+         * sinh t; else from e = exp(t) as (e - 1/e) / 2 and (e + 1/e) / 2.
+         *
          * @param t The argument, t >= 0.
          * @param constants exp()'s constants.
          * @return sinh t and cosh t.
@@ -2025,6 +2378,8 @@ namespace nxx::quadrature {
                 T even = T(1);
                 T s = t;
                 T c = T(1);
+                // Stop when the next terms are below eps / 8 of their sums: cosh t >= 1, so the even term's test is
+                // relative too.
                 for (int n = 1;; ++n) {
                     even = T(T(even * tt) / T(T(2 * n - 1) * T(2 * n)));
                     odd = T(T(odd * tt) / T(T(2 * n) * T(2 * n + 1)));
@@ -2039,18 +2394,29 @@ namespace nxx::quadrature {
             return Hyperbolic<T>{ T(T(e - inverse) / T(2)), T(T(e + inverse) / T(2)) };
         }
 
-        /** @brief The levels of the tanh-sinh rule and of the exp-sinh table: h = 1 down to 2^-9 (PHASE3_API.md Q2). */
+        /**
+         * @brief The levels of the tanh-sinh rule and of the exp-sinh table: h = 1 down to 2^-9, the same for every
+         * type (PHASE3_API.md Q2: nine levels lose nothing in double, but in binary128 at rel_tol 1e-32 they lose 39 of
+         * 340 cases, and 168 bits needs the tenth too).
+         */
         inline constexpr int tanh_sinh_levels = 10;
 
-        /** @brief The nodes of a piece at most: the unit of the tables, one initializer each (the constexpr budget). */
+        /**
+         * @brief The most nodes in a piece, the unit of the tables: each piece is its own constexpr initializer, so
+         * that each stays within the compiler's constexpr budget, which a whole table exceeds (PHASE3_API.md Q3: in
+         * pieces the largest takes at most 42 % of Clang's or Emscripten's default limit).
+         */
         inline constexpr int piece_size = 1024;
 
         /**
-         * @brief Ten times an upper bound on the tables' t_max, from T's limits in integers: a node is kept while
-         * 2 sinh t < L in the tanh-sinh table and while (3/2) sinh t < L in the exp-sinh table (both of its sides keep
-         * q >= min()), L = -ln min() <= n ln 2, n = (1 - min_exponent) times the bits of a digit rounded up (4 in
-         * radix 10, so that n ln 2 >= (1 - min_exponent) ln 10), so t_max <= asinh(2L / 3) <= ln(4L / 3 + 1) <= ln n
-         * (n >= 14) < 0.7 bit_width(n).
+         * @brief Ten times an upper bound on the tables' t_max, computed from T's limits in integers, so that the
+         * pieces' arrays can be sized at compile time before any node is generated.
+         *
+         * A node is kept while 2 sinh t < L in the tanh-sinh table and while (3/2) sinh t < L in the exp-sinh table
+         * (both of its sides keep q >= min()), L = -ln min() <= n ln 2, n = (1 - min_exponent) times the bits of a
+         * digit rounded up (4 in radix 10, so that n ln 2 >= (1 - min_exponent) ln 10), so t_max <= asinh(2L / 3) <=
+         * ln(4L / 3 + 1) <= ln n (n >= 14) < 0.7 bit_width(n).
+         *
          * @return 10 times the bound.
          */
         template<real T>
@@ -2063,8 +2429,8 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief An upper bound on the nodes of a level: t = 0, 1, ... at level 0, the odd multiples of 2^-level
-         * above, up to reach_tenths() / 10.
+         * @brief An upper bound on the nodes of a level, which sizes its pieces: t = 0, 1, ... at level 0, the odd
+         * multiples of 2^-level above, up to reach_tenths() / 10.
          * @param level The level.
          * @return The bound.
          */
@@ -2077,7 +2443,7 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The pieces of a level.
+         * @brief The pieces of a level: how many initializers hold it.
          * @param level The level.
          * @return ceil(level_capacity / piece_size).
          */
@@ -2086,7 +2452,8 @@ namespace nxx::quadrature {
         { return (detail::level_capacity<T>(level) + piece_size - 1) / piece_size; }
 
         /**
-         * @brief The capacity of a piece: piece_size, or what is left of the level's bound.
+         * @brief The capacity of a piece: piece_size, or, for a level's last piece, what is left of the level's bound,
+         * so that no piece's array is larger than it can need.
          * @param level The level.
          * @param piece The piece.
          * @return The capacity.
@@ -2099,10 +2466,14 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The storage of a column of a piece of N nodes: std::array for float, double and long double, whose
-         * pieces are compile-time tables; std::vector for every other T, whose pieces are built at run time: a column
-         * of 1,024 cpp_bin_float_50 values takes about 40 KB, and a piece holds two (tanh-sinh) or four (exp-sinh),
-         * past Emscripten's default stack of 64 KB.
+         * @brief The storage of a column of a piece of N nodes, chosen by where the piece is built.
+         *
+         * std::array for float, double and long double, whose pieces are compile-time tables: a constexpr variable
+         * can hold an array, but not a std::vector, whose allocation cannot outlive constant evaluation. std::vector
+         * for every other T, whose pieces are built at run time, so that a piece lives on the heap: a column of 1,024
+         * cpp_bin_float_50 values takes about 40 KB, and a piece holds two (tanh-sinh) or four (exp-sinh), past
+         * Emscripten's default stack of 64 KB.
+         *
          * @tparam T The real type.
          * @tparam N The capacity.
          */
@@ -2110,7 +2481,8 @@ namespace nxx::quadrature {
         using Column = std::conditional_t<tabled<T>, std::array<T, N>, std::vector<T>>;
 
         /**
-         * @brief N nodes of value 0 in either storage (T need not be default constructible).
+         * @brief N nodes of value 0 in either storage, the starting value of a piece's column (T need not be default
+         * constructible).
          * @return The column.
          */
         template<real T, std::size_t N>
@@ -2121,8 +2493,13 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The nodes of a piece of a level of the tanh-sinh rule, t ascending: each node's complement 1 - x and
-         * weight dx/dt (without the step h).
+         * @brief What a step of the tanh-sinh rule reads per node, for a piece of a level, t ascending: each node's
+         * complement 1 - x and its weight dx/dt (without the step h).
+         *
+         * The complement is stored instead of x because near the ends x rounds to 1 and loses its distance to the
+         * end, which is what an integrand singular at an end needs: the points are formed as b - hw comp and
+         * a + hw comp.
+         *
          * @tparam T The real type.
          * @tparam N The capacity.
          */
@@ -2140,11 +2517,15 @@ namespace nxx::quadrature {
         };
 
         /**
-         * @brief A piece of a level of the tanh-sinh table, from exp() alone (c = 1, so no pi: x = tanh(sinh t)).
+         * @brief Generates a piece of a level of the tanh-sinh table, the nodes x = tanh(sinh t), from exp() alone; the
+         * one generator for both the compile-time and the run-time tables (PHASE3_API.md B).
          *
-         * Level 0 holds t = i, level L >= 1 the odd multiples t = (2i + 1) 2^-L, i = piece 1024 + index. The table
-         * ends at the first node whose q = exp(-2 sinh t) is 0, that is below x_min: q >= min() for the nodes kept, so
-         * that no stored value is subnormal. Nothing overflows: q only underflows.
+         * The map is x = tanh(c sinh t) with c = 1 rather than the literature's pi/2: no pi is needed in T, and it
+         * costs fewer evaluations on smooth integrands (PHASE3_API.md B). Level 0 holds t = i, level L >= 1 the odd
+         * multiples t = (2i + 1) 2^-L, i = piece 1024 + index. The table ends at the first node whose
+         * q = exp(-2 sinh t) is 0, that is below x_min: q >= min() for the nodes kept, so that no stored value is
+         * subnormal (subnormal values would lose their digits for no change in any result). Nothing overflows: q only
+         * underflows.
          *
          * @tparam T The real type.
          * @tparam L The level, 0 to 9.
@@ -2176,7 +2557,8 @@ namespace nxx::quadrature {
 
         /**
          * @brief A piece of the tanh-sinh table for float, double and long double, computed at compile time once per
-         * program; each piece is its own initializer, within the constexpr budget.
+         * program, so that these types pay nothing at run time; each piece is its own initializer, within the
+         * constexpr budget.
          * @tparam T float, double or long double.
          * @tparam L The level.
          * @tparam P The piece.
@@ -2185,8 +2567,9 @@ namespace nxx::quadrature {
         inline constexpr Nodes<T, piece_capacity<T>(L, P)> tanh_sinh_table = detail::tanh_sinh_piece<T, L, P>();
 
         /**
-         * @brief @p use applied to a piece of the tanh-sinh table in T: the compile-time table for float, double and
-         * long double, with_generated() (keyed per level, piece and T) for every other T.
+         * @brief @p use applied to a piece of the tanh-sinh table in T, so that the caller need not know where the
+         * piece comes from: the compile-time table for float, double and long double, with_generated() (keyed per
+         * level, piece and T) for every other T.
          * @param use A callable taking the piece.
          * @return What use returns.
          */
@@ -2198,15 +2581,19 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The nodes of one level of the tanh-sinh table across its pieces, t ascending: node i is t = i at
-         * level 0 and t = (2i + 1) 2^-level above. A view, valid only inside with_tanh_sinh_level()'s callback, so
-         * that a step reads its level's pieces once for both sides and the slivers' weights (PHASE3B_API.md C).
+         * @brief A view of one level of the tanh-sinh table across its pieces, so that a step reads its level once for
+         * both sides and the slivers' weights (PHASE3B_API.md C).
+         *
+         * Node i is t = i at level 0 and t = (2i + 1) 2^-level above, t ascending. The view holds spans into the
+         * pieces, valid only inside with_tanh_sinh_level()'s callback: in constant evaluation a piece of a type
+         * without a table exists only for the call that generated it.
+         *
          * @tparam T The real type.
          */
         template<real T>
         struct TanhSinhLevel
         {
-            /** @brief The most pieces of any level: the finest level's. */
+            /** @brief The most pieces of any level: the finest level's, the size of the arrays of spans. */
             static constexpr std::size_t most =
                 static_cast<std::size_t>(detail::level_pieces<T>(tanh_sinh_levels - 1));
 
@@ -2220,7 +2607,8 @@ namespace nxx::quadrature {
             int size;
 
             /**
-             * @brief @p use applied to piece P of level L, for with_level().
+             * @brief @p use applied to piece P of level L, for with_level(): how the generic assembly names this
+             * table's pieces.
              * @param use A callable taking the piece.
              * @return What use returns.
              */
@@ -2232,7 +2620,8 @@ namespace nxx::quadrature {
              * @brief Adds the nodes of piece @p p, for with_level().
              * @param p The piece, after those added.
              * @param nodes Its nodes.
-             * @return Whether the piece is full, so that the level may go on.
+             * @return Whether the piece is full, so that the level may go on: a piece that is not full holds the end of
+             *         the table.
              */
             template<std::size_t N>
             constexpr bool add(std::size_t p, Nodes<T, N> const &nodes)
@@ -2244,7 +2633,8 @@ namespace nxx::quadrature {
             }
 
             /**
-             * @brief The complement 1 - x of node @p i.
+             * @brief The complement 1 - x of node @p i, by its index in the level, for the steps that read single
+             * nodes.
              * @param i The node, 0 <= i < size.
              * @return Its complement.
              */
@@ -2255,7 +2645,7 @@ namespace nxx::quadrature {
             }
 
             /**
-             * @brief The weight dx/dt of node @p i.
+             * @brief The weight dx/dt of node @p i, by its index in the level.
              * @param i The node, 0 <= i < size.
              * @return Its weight.
              */
@@ -2266,8 +2656,9 @@ namespace nxx::quadrature {
             }
 
             /**
-             * @brief @p visit(i, comp, w) on the nodes from @p first, t ascending, until it returns false: a walk
-             * through the pieces in order, cheaper than complement() and weight() per node in constant evaluation.
+             * @brief @p visit(i, comp, w) on the nodes from @p first, t ascending, until it returns false: the sweep of
+             * a side, a walk through the pieces in order, cheaper than complement() and weight() per node in constant
+             * evaluation.
              * @param first The first node, at least 0.
              * @param visit The visitor.
              */
@@ -2286,12 +2677,16 @@ namespace nxx::quadrature {
         };
 
         /**
-         * @brief The nodes of a piece of a level of the exp-sinh table, t ascending (PHASE4_API.md B), for both maps
-         * with c = 3/2 and u = c sinh t: on [a, inf) the nodes a + E toward infinity and a + q toward a, on the line
-         * +-x. The weights are formed at use: f E, f q, and (f E + f q) / 2 on the line.
+         * @brief What the exp-sinh and sinh-sinh maps read per node, for a piece of a level, t ascending: one table for
+         * both infinite maps (PHASE4_API.md B, Q5).
          *
-         * The nodes toward infinity are a prefix of those toward the finite end: their columns hold the first
-         * `outward` entries, the others the first `inward`.
+         * With c = 3/2 and u = c sinh t: on [a, inf) the nodes are a + E toward infinity and a + q toward a, on the
+         * line +-x. The weights are formed at use from these columns: f E, f q, and (f E + f q) / 2 on the line.
+         * c = 3/2 rather than 1 or pi/2: it needs no pi, and it measured fewer evaluations and fewer false successes
+         * than c = 1 (PHASE4_API.md Q2).
+         *
+         * The two sides end at different t: the nodes toward infinity are a prefix of those toward the finite end, so
+         * their columns hold the first `outward` entries, the others the first `inward`.
          *
          * @tparam T The real type.
          * @tparam N The capacity.
@@ -2308,7 +2703,10 @@ namespace nxx::quadrature {
             /** @brief E = 1 / q, the distance toward infinity. */
             Column<T, N> e;
 
-            /** @brief The line's node x = sinh u: by its series where u < 1/2, where E - q cancels, else (E - q) / 2. */
+            /**
+             * @brief The line's node x = sinh u: by its series where u < 1/2, where E - q cancels, else (E - q) / 2;
+             * stored rather than formed at use, so that the line costs one load per node and no branch.
+             */
             Column<T, N> x;
 
             /** @brief The nodes toward the finite end: N, or fewer where the table ends. */
@@ -2319,13 +2717,13 @@ namespace nxx::quadrature {
         };
 
         /**
-         * @brief A piece of a level of the exp-sinh table, from exp() on its domain alone (PHASE4_API.md B): c = 3/2,
-         * exact in even radices (2 and 10 among them), so no pi.
+         * @brief Generates a piece of a level of the exp-sinh table, from exp() on its domain alone; the one generator
+         * for both the compile-time and the run-time tables (PHASE4_API.md B).
          *
-         * Levels and positions as the tanh-sinh table's. The side toward the finite end ends at the first node whose
-         * q = exp(-u) is 0, below x_min: q >= min() for the nodes kept. The side toward infinity ends at the first
-         * node with f > (max / 2) q, decided before E = 1/q is formed, so that 1/q cannot overflow and E and f E stay
-         * at most about max / 2 in every T.
+         * c = 3/2 is formed as T(3) / T(2), exact in even radices (2 and 10 among them). Levels and positions are the
+         * tanh-sinh table's. The side toward the finite end ends at the first node whose q = exp(-u) is 0, below x_min:
+         * q >= min() for the nodes kept. The side toward infinity ends at the first node with f > (max / 2) q, decided
+         * before E = 1/q is formed, so that 1/q cannot overflow and E and f E stay at most about max / 2 in every T.
          *
          * @tparam T The real type.
          * @tparam L The level, 0 to 9.
@@ -2357,6 +2755,7 @@ namespace nxx::quadrature {
                     nodes.q[index] = q;
                     nodes.f[index] = f;
                     nodes.inward = index + 1;
+                    // Once a node is refused toward infinity, so is every later one: the side ends at its first.
                     outward = outward && f <= T(half_max * q);
                     if (!outward) continue;
                     T const e = T(T(1) / q);
@@ -2379,7 +2778,8 @@ namespace nxx::quadrature {
         inline constexpr ExpSinhNodes<T, piece_capacity<T>(L, P)> exp_sinh_table = detail::exp_sinh_piece<T, L, P>();
 
         /**
-         * @brief @p use applied to a piece of the exp-sinh table in T, as with_tanh_sinh_piece().
+         * @brief @p use applied to a piece of the exp-sinh table in T, wherever the piece comes from, as
+         * with_tanh_sinh_piece().
          * @param use A callable taking the piece.
          * @return What use returns.
          */
@@ -2391,15 +2791,18 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The nodes of one level of the exp-sinh table across its pieces, t ascending, positions as
-         * TanhSinhLevel's: q and f for the nodes toward the finite end, E and x for the first `outward` of them. A
-         * view, valid only inside with_exp_sinh_level()'s callback.
+         * @brief A view of one level of the exp-sinh table across its pieces, so that a step of the infinite maps reads
+         * its level once, as TanhSinhLevel does for the finite one.
+         *
+         * Positions as TanhSinhLevel's: q and f for the nodes toward the finite end, E and x for the first `outward` of
+         * them. Valid only inside with_exp_sinh_level()'s callback, for the same reason as TanhSinhLevel.
+         *
          * @tparam T The real type.
          */
         template<real T>
         struct ExpSinhLevel
         {
-            /** @brief The most pieces of any level: the finest level's. */
+            /** @brief The most pieces of any level: the finest level's, the size of the array of pieces. */
             static constexpr std::size_t most =
                 static_cast<std::size_t>(detail::level_pieces<T>(tanh_sinh_levels - 1));
 
@@ -2429,7 +2832,8 @@ namespace nxx::quadrature {
             int outward;
 
             /**
-             * @brief @p use applied to piece P of level L, for with_level().
+             * @brief @p use applied to piece P of level L, for with_level(): how the generic assembly names this
+             * table's pieces.
              * @param use A callable taking the piece.
              * @return What use returns.
              */
@@ -2438,8 +2842,11 @@ namespace nxx::quadrature {
             { return detail::with_exp_sinh_piece<T, L, P>(use); }
 
             /**
-             * @brief Adds the nodes of piece @p p, for with_level(). The side toward infinity of a piece is taken
-             * only while every earlier piece's was full, so that the side ends at its first refused node in t.
+             * @brief Adds the nodes of piece @p p, for with_level().
+             *
+             * The side toward infinity of a piece is taken only while every earlier piece's was full, so that the side
+             * ends at its first refused node in t.
+             *
              * @param p The piece, after those added.
              * @param nodes Its nodes.
              * @return Whether the piece is full toward the finite end, so that the level may go on.
@@ -2457,7 +2864,7 @@ namespace nxx::quadrature {
             }
 
             /**
-             * @brief The piece of node @p i.
+             * @brief The piece of node @p i, for the accessors below.
              * @param i The node, at least 0.
              * @return Its piece.
              */
@@ -2465,15 +2872,18 @@ namespace nxx::quadrature {
             { return pieces[static_cast<std::size_t>(i / piece_size)]; }
 
             /**
-             * @brief The index of node @p i in its piece.
+             * @brief The index of node @p i in its piece, for the accessors below.
              * @param i The node, at least 0.
              * @return Its index.
              */
             static constexpr std::size_t index_of(int i)
             { return static_cast<std::size_t>(i % piece_size); }
 
+            // One accessor per column, each indexing its own: a pointer to member shared by the four crashed cl 19.51
+            // in constant evaluation (design.md, "The exp-sinh table").
+
             /**
-             * @brief q = exp(-u) of node @p i.
+             * @brief q = exp(-u) of node @p i, by its index in the level.
              * @param i The node, 0 <= i < inward.
              * @return Its q.
              */
@@ -2484,7 +2894,7 @@ namespace nxx::quadrature {
             }
 
             /**
-             * @brief f = c cosh t of node @p i.
+             * @brief f = c cosh t of node @p i, by its index in the level.
              * @param i The node, 0 <= i < inward.
              * @return Its f.
              */
@@ -2495,7 +2905,7 @@ namespace nxx::quadrature {
             }
 
             /**
-             * @brief E = 1/q of node @p i.
+             * @brief E = 1/q of node @p i, by its index in the level.
              * @param i The node, 0 <= i < outward.
              * @return Its E.
              */
@@ -2506,7 +2916,7 @@ namespace nxx::quadrature {
             }
 
             /**
-             * @brief The line's node x = sinh u of node @p i.
+             * @brief The line's node x = sinh u of node @p i, by its index in the level.
              * @param i The node, 0 <= i < outward.
              * @return Its x.
              */
@@ -2518,8 +2928,11 @@ namespace nxx::quadrature {
 
             /**
              * @brief @p visit(i, piece, index) on the nodes of one side from @p first, t ascending, until it returns
-             * false: a walk through the pieces in order, as TanhSinhLevel::each, with the piece's columns and the
-             * node's index in it, so that a sweep reads only the columns it needs.
+             * false: the sweep of a side, a walk through the pieces in order, as TanhSinhLevel::each.
+             *
+             * It passes the piece's columns and the node's index in the piece, rather than values, so that a sweep
+             * reads only the columns its side needs.
+             *
              * @param first The first node, at least 0.
              * @param infinite Whether the side is toward infinity (or the line's): the first `outward` nodes; else
              *        the `inward` nodes toward the finite end.
@@ -2542,8 +2955,15 @@ namespace nxx::quadrature {
         };
 
         /**
-         * @brief @p use applied to level L of a table once pieces P onward are added to @p level: each piece in turn,
-         * until one that is not full ends the level.
+         * @brief @p use applied to level L of a table once pieces P onward are added to @p level: the assembly of a
+         * level from its pieces, shared by both tables (design.md, "The exp-sinh table": a level at once,
+         * generalised).
+         *
+         * Each piece is a distinct template (its level and index are template arguments), and in constant evaluation a
+         * generated piece lives only for the callback it is passed to. So the pieces are visited by nested callbacks,
+         * one per piece, and use runs innermost, where every piece the view refers to is still alive. A piece that is
+         * not full ends the level.
+         *
          * @tparam T The real type.
          * @tparam L The level.
          * @tparam P The next piece.
@@ -2564,9 +2984,14 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief @p use applied to a level of a table in T, every piece of it at once: the compile-time tables for
-         * float, double and long double, with_generated() for every other T (in constant evaluation, each piece
-         * generated as a temporary for the call).
+         * @brief @p use applied to a level of a table in T, every piece of it at once: the entry from a level known at
+         * run time to the pieces, which are named at compile time.
+         *
+         * The level is matched against L = 0, 1, ... by recursion, so that the matching L can name the pieces as
+         * template arguments. The pieces are the compile-time tables for float, double and long double,
+         * with_generated() for every other T (in constant evaluation, each piece generated as a temporary for the
+         * call).
+         *
          * @tparam T The real type.
          * @tparam View The view of a level: TanhSinhLevel<T> or ExpSinhLevel<T>.
          * @param level The level, 0 to 9.
@@ -2585,7 +3010,8 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief @p use applied to a level of the tanh-sinh table in T, as with_level().
+         * @brief @p use applied to a level of the tanh-sinh table in T, as with_level(): what a step of TanhSinh on a
+         * finite interval calls.
          * @param level The level, 0 to 9.
          * @param use A callable taking a TanhSinhLevel<T> const &.
          * @return What use returns.
@@ -2595,7 +3021,8 @@ namespace nxx::quadrature {
         { return detail::with_level<T, TanhSinhLevel<T>>(level, use); }
 
         /**
-         * @brief @p use applied to a level of the exp-sinh table in T, as with_level().
+         * @brief @p use applied to a level of the exp-sinh table in T, as with_level(): what a step of TanhSinh on a
+         * half line or the line calls.
          * @param level The level, 0 to 9.
          * @param use A callable taking an ExpSinhLevel<T> const &.
          * @return What use returns.
@@ -2604,11 +3031,14 @@ namespace nxx::quadrature {
         constexpr decltype(auto) with_exp_sinh_level(int level, U &&use)
         { return detail::with_level<T, ExpSinhLevel<T>>(level, use); }
 
-        /** @brief The finest level: positions are kept as t 2^9, an integer. */
+        /**
+         * @brief The finest level, whose step 2^-9 makes every node's t times 2^9 an integer: positions are kept so,
+         * which lets a side compare its kept points across levels exactly, without arithmetic in T.
+         */
         inline constexpr int finest_level = tanh_sinh_levels - 1;
 
         /**
-         * @brief The position of node @p i of a level, as t 2^9.
+         * @brief The position of node @p i of a level, as t 2^9, the integer form in which a side records its points.
          * @param level The level.
          * @param i The node's index in its level.
          * @return t 2^9.
@@ -2617,7 +3047,8 @@ namespace nxx::quadrature {
         { return level == 0 ? i << finest_level : (2 * i + 1) << (finest_level - level); }
 
         /**
-         * @brief The index of the first node of a level beyond the position @p after (t 2^9).
+         * @brief The index of the first node of a level beyond the position @p after (t 2^9): where a side's sweep at a
+         * new level starts, past the outermost point it kept.
          * @param level The level.
          * @param after The position, at least 0.
          * @return The index.
@@ -2628,39 +3059,56 @@ namespace nxx::quadrature {
             return ((after >> (finest_level - level)) + 1) / 2;
         }
 
-        /** @brief How a side of the tanh-sinh sum ended (PHASE3_API.md E, PHASE3B_API.md C). */
+        /**
+         * @brief How a side of the tanh-sinh sum ended, which decides its end term: the bound on what lies beyond the
+         * side's last kept point (PHASE3_API.md E, PHASE3B_API.md C, PHASE4_API.md D).
+         *
+         * A side may change kind as levels refine it: the table's end becomes any kind; rounding becomes rounding,
+         * pruning or a tail; pruning and a tail become each other, never rounding, since their cut node was strictly
+         * inside and so is every node before it.
+         */
         enum class cut_by {
-            table,    ///< at the table's end, no cut
-            rounding, ///< a point not strictly inside the interval
-            value,    ///< a value of fn not finite in the tail
-            pruning   ///< a term below eps L1 beyond the kept ones
+            table,    ///< at the table's end, no cut: geometric end term (PHASE3B_API.md D1)
+            rounding, ///< a point not strictly inside the interval: the sliver and the power-law end term
+            value,    ///< a value of fn not finite in the tail: geometric end term
+            pruning   ///< a term below eps L1 beyond the kept ones: end term 0
         };
 
         /**
-         * @brief A point of a side whose term entered the sums.
+         * @brief A point of a side whose term entered the sums, kept so that the side's end term can be formed from
+         * its last points without storing them all.
          * @tparam T The real type.
          */
         template<real T>
         struct Kept
         {
-            /** @brief t 2^9. */
+            /**
+             * @brief Its position, t 2^9: an integer on the finest level's grid, so that nodes of every level compare
+             * exactly (detail::position).
+             */
             int position;
 
-            /** @brief The point. */
+            /** @brief The point, for its distance to the end in the power-law end term. */
             T point;
 
-            /** @brief fn's value there. */
+            /** @brief fn's value there, for the sliver and the power-law end term. */
             T value;
 
-            /** @brief |term|, without h. */
+            /**
+             * @brief |term| without the step h, for the geometric end term, which applies the current h itself, and
+             * for the pruning threshold.
+             */
             T size;
         };
 
         /**
-         * @brief A side of the tanh-sinh sum, towards b (right) or a (left), the centre included in both: its cut, the
-         * outermost kept point and the two others its end term needs, and the slivers' weights. For exp-sinh and
-         * sinh-sinh the sides are as mapping says; a side towards infinity is never cut by rounding, so its W and
-         * distinct point go unused.
+         * @brief A side of the tanh-sinh sum, towards b (right) or a (left), the centre included in both: what the
+         * method must remember of a side between levels so that each level evaluates only its new nodes and still
+         * knows where the side ends and how to bound what lies beyond (PHASE3B_API.md C).
+         *
+         * It holds the cut and its kind, the outermost kept point and the two others its end term needs, and W, the
+         * slivers' weights. For exp-sinh and sinh-sinh the sides are as mapping says; a side towards infinity is never
+         * cut by rounding, so its W and distinct point go unused.
          *
          * The points of a side are monotone in t (adjacent nodes differ in q by far more than a rounding), so the
          * distance to the end does not grow with t. Two points then stand for the whole side: the kept point with the
@@ -2674,30 +3122,39 @@ namespace nxx::quadrature {
         template<real T>
         struct Side
         {
-            /** @brief The cut, t 2^9; -1 for none: nodes at or beyond it are not sampled. */
+            /**
+             * @brief The cut, t 2^9; -1 for none: nodes at or beyond it are not sampled, so later levels stop the
+             * side's sweep there.
+             */
             int cut;
 
-            /** @brief How the side ended. */
+            /** @brief How the side ended, which decides its end term. */
             cut_by cause;
 
-            /** @brief The outermost kept point (position 0: the centre). */
+            /** @brief The outermost kept point (position 0: the centre): Te of the end terms. */
             Kept<T> outer;
 
-            /** @brief The kept point with the largest t below the outermost; absent while that is the centre. */
+            /** @brief The kept point with the largest t below the outermost (Tp); absent while that is the centre. */
             std::optional<Kept<T>> below;
 
-            /** @brief The kept point with the largest t farther from the end than the outermost. */
+            /**
+             * @brief The kept point with the largest t farther from the end than the outermost: the power law's second
+             * point, which needs a distinct distance (points near the end can round to the same one).
+             */
             std::optional<Kept<T>> distinct;
 
             /**
-             * @brief W: the table's weights beyond the outermost kept node, every level so far, added level by level
-             * in increasing t (the suffix sum of PHASE3_API.md E, term for term), while the side is uncut or cut by
-             * rounding; a side cut by pruning or a tail never returns to rounding, since its cut node was inside.
+             * @brief W: the table's weights beyond the outermost kept node, every level so far, so that a side cut by
+             * rounding can restore the sliver between its last point and the end without calling fn.
+             *
+             * Added level by level in increasing t (the suffix sum of PHASE3_API.md E, term for term), while the side
+             * is uncut or cut by rounding; a side cut by pruning or a tail never returns to rounding, since its cut
+             * node was inside, so it never needs W again.
              */
             T weights;
 
             /**
-             * @brief Records a kept point.
+             * @brief Records a kept point, updating the outermost point and the two the end terms need.
              * @param k The point.
              * @param end The end the side approaches.
              */
@@ -2711,6 +3168,8 @@ namespace nxx::quadrature {
                     outer = k;
                     return;
                 }
+                // A point inside the outermost (a later level fills the gaps): it may be nearer the outermost than the
+                // current below, or the farthest-out point still at a distance above the outermost's.
                 if (!below || k.position > below->position) below = k;
                 if (nxx::math::abs(T(end - k.point)) > nxx::math::abs(T(end - outer.point))
                     && (!distinct || k.position > distinct->position))
@@ -2718,12 +3177,18 @@ namespace nxx::quadrature {
             }
 
             /**
-             * @brief Adds level @p level's weights beyond the outermost kept node to W, after the side's sweep.
+             * @brief Adds level @p level's weights beyond the outermost kept node to W, after the side's sweep, so that
+             * W covers every node of every level beyond the last kept point.
+             *
+             * No node of an earlier level lies between the old and the new outermost node, so adding each level's
+             * nodes beyond the new outermost gives the suffix sum term for term.
+             *
              * @param nodes The level's nodes.
              * @param level The level.
              */
             constexpr void add_weights(TanhSinhLevel<T> const &nodes, int level)
             {
+                // A side cut by pruning or a tail never needs W again (see weights).
                 if (cause != cut_by::table && cause != cut_by::rounding) return;
                 nodes.each(detail::first_beyond(level, outer.position), [this](int, T const &, T const &w) {
                     weights = T(weights + w);
@@ -2733,7 +3198,8 @@ namespace nxx::quadrature {
 
             /**
              * @brief Adds level @p level's weights f q beyond the outermost kept node to W, for exp-sinh's side
-             * toward its finite end, as the tanh-sinh form; the side toward infinity has no W (PHASE4_API.md D).
+             * toward its finite end, which can be cut by rounding as a tanh-sinh side can; the side toward infinity
+             * has no W (PHASE4_API.md D).
              * @param nodes The level's nodes.
              * @param level The level.
              */
@@ -2749,8 +3215,13 @@ namespace nxx::quadrature {
         };
 
         /**
-         * @brief A side's end term, or unbounded: a flag, not inf (constant evaluation rejects a computed overflow, and
-         * nxx::real does not promise an infinity).
+         * @brief A side's end term: the bound on the integral beyond the side's last kept point, which the estimate
+         * adds so that a cut side cannot hide the mass it did not sample (PHASE3_API.md E).
+         *
+         * Unbounded is a flag, not inf: constant evaluation rejects a computed overflow, other compilers reject
+         * inf - inf and inf times 0, and nxx::real does not promise an infinity. An unbounded end term leaves the
+         * step without a current result, and a run that ends so has no best.
+         *
          * @tparam T The real type.
          */
         template<real T>
@@ -2764,9 +3235,16 @@ namespace nxx::quadrature {
         };
 
         /**
-         * @brief The end term of a side cut by a value of fn that is not finite, or at the table's end: the geometric
-         * extrapolation of the last two kept terms, h Te / (1 - r), r = Te / Tp (an upper bound for log-concave tails
-         * such as x^-alpha's); unbounded where the terms do not decrease, or where the bound would exceed max / 2.
+         * @brief The end term of a side cut by a value of fn that is not finite, or at the table's end: the bound on
+         * the terms beyond the cut, from the last two kept ones (PHASE3_API.md E; PHASE3B_API.md D1 for the table's
+         * end).
+         *
+         * The geometric extrapolation h Te / (1 - r), r = Te / Tp, bounds the tail of a sequence of terms that is
+         * log-concave, as x^-alpha's are near a singular end and as decaying tails towards infinity are where they
+         * were measured (PHASE4_API.md D, "Soundness"). It is unbounded where the terms do not decrease (1/x: the
+         * integral diverges), or where the bound would exceed max / 2. Bailey's h Te alone, which this replaced, gave
+         * false successes near singular ends, where r is close to 1.
+         *
          * @param h The step.
          * @param outer Te, the outermost kept term without h.
          * @param inner Tp, the next one inward.
@@ -2785,10 +3263,18 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The end term of a side cut by rounding: the excess of a power law through the last two kept points of
-         * distinct positions over the restored sliver (PHASE3_API.md E). With d_e < d_p their distances to the end and
-         * y_e, y_p their values, R = d |y|, rho = d_e / d_p and q = R_e / R_p: R_e max(0, (1 - rho) q / (rho (1 - q))
-         * - 1), 0 for a constant and an upper bound for x^a; unbounded if q >= 1, or with no two such points.
+         * @brief The end term of a side cut by rounding: what the sliver between the last kept point and the end may
+         * hold beyond the share the sliver term already restored, so that an integrable singularity at the end is not
+         * reported as converged too early (PHASE3_API.md E).
+         *
+         * The sliver term restores W y_e, the rule's share of the sliver at the last kept value; for a function that
+         * grows towards the end, the true mass of the sliver is larger. The excess is that of a power law through the
+         * last two kept points of distinct distances: with d_e < d_p their distances to the end and y_e, y_p their
+         * values, R = d |y|, rho = d_e / d_p and q = R_e / R_p, it is R_e max(0, (1 - rho) q / (rho (1 - q)) - 1):
+         * 0 for a constant and an upper bound for x^a. Unbounded if q >= 1 (the mass does not shrink towards the end,
+         * as for 1/x), or with no two such points. A first form without it ended (1 - x)^-0.9 ok with an error 8 times
+         * its estimate.
+         *
          * @param side The side.
          * @param end The end it approaches.
          * @return The end term.
@@ -2799,6 +3285,7 @@ namespace nxx::quadrature {
             EndTerm<T> const unbounded{ T(0), true };
             T const half_max = T(T((std::numeric_limits<T>::max)()) / T(2));
             if (!side.distinct) return unbounded;
+            // The distances are formed as end - p, exact there; every product is checked before it is formed.
             T const d_e = nxx::math::abs(T(end - side.outer.point));
             T const d_p = nxx::math::abs(T(end - side.distinct->point));
             T const y_e = nxx::math::abs(side.outer.value);
@@ -2811,6 +3298,7 @@ namespace nxx::quadrature {
             // d_e (|y_e| factor); every other case keeps the products.
             T const smallest = T((std::numeric_limits<T>::min)());
             bool const lost = (r_e < smallest && y_e > T(0)) || (r_p < smallest && y_p > T(0));
+            // No power law through a zero inner point: fn 0 at both points bounds nothing beyond (0), else unbounded.
             if (lost ? y_p == T(0) : r_p == T(0)) return !lost && r_e == T(0) ? EndTerm<T>{ T(0), false } : unbounded;
             T const rho = T(d_e / d_p);
             T const scaled = lost ? T(rho * y_e) : r_e;
@@ -2820,6 +3308,7 @@ namespace nxx::quadrature {
             if (q >= T(1)) return unbounded;
             T const numerator = T(T(T(1) - rho) * q);
             T const denominator = T(rho * T(T(1) - q));
+            // The quotient within max / 2, decided before it is formed (1 - q goes down to an ulp).
             if (!(denominator > T(0)) || numerator > T(denominator * half_max)) return unbounded;
             T const ratio = T(T(numerator / denominator) - T(1));
             T const factor = ratio < T(0) ? T(0) : ratio;
@@ -2834,8 +3323,11 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief TanhSinh's map, from the ends (PHASE4_API.md B), and the roles of its two sides: the right side is
-         * swept first except on (-inf, b], where the side toward -inf is.
+         * @brief TanhSinh's map, chosen by which ends are infinite, so that one method and one state serve finite and
+         * infinite intervals (PHASE4_API.md B; design.md, "TanhSinh on infinite intervals").
+         *
+         * It also fixes the roles of the two sides: the right side is swept first except on (-inf, b], where the side
+         * toward -inf is (each map sweeps its side toward infinity first, PHASE4_API.md C).
          */
         enum class mapping {
             interval, ///< tanh-sinh on [a, b]: the right side toward b, the left toward a
@@ -2845,8 +3337,11 @@ namespace nxx::quadrature {
         };
 
         /**
-         * @brief Whether a side of exp-sinh or sinh-sinh is toward infinity: both on the line, else the right on
-         * [a, inf) and the left on (-inf, b].
+         * @brief Whether a side of exp-sinh or sinh-sinh is toward infinity, which decides its rules: its nodes
+         * (E or q), its tail rule, the underflow rule, and whether it can be cut by rounding.
+         *
+         * Both sides on the line, else the right on [a, inf) and the left on (-inf, b].
+         *
          * @param map The map, not interval.
          * @param right Whether the side is the right one.
          * @return Whether it is toward infinity.
@@ -2855,8 +3350,12 @@ namespace nxx::quadrature {
         { return map == mapping::line || (map == mapping::upper) == right; }
 
         /**
-         * @brief A term w y of exp-sinh or sinh-sinh (PHASE4_API.md C): no half-width, the weight carries the scale
-         * and reaches max / 2, so the term is checked rather than shortcut (no safe_value).
+         * @brief A term w y of exp-sinh or sinh-sinh, formed so that an overflow becomes error::non_finite in constant
+         * evaluation and at run time alike (PHASE4_API.md C).
+         *
+         * There is no half-width: the weight carries the scale and reaches max / 2, so every term is checked; the
+         * tanh-sinh shortcut past the check (safe_value, which assumes weights at most 1) does not apply.
+         *
          * @param w The weight, finite.
          * @param y fn's value, finite.
          * @return The term, or nothing where it is not finite (at run time) or could exceed max / 2 (in constant
@@ -2877,34 +3376,51 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief TanhSinh as an iterative method: the state after level k (PHASE3B_API.md C). It holds no table and no
-         * reference to fn, is independent of fn's type, of fixed size, and allocates nothing.
+         * @brief TanhSinh's state between levels: everything a level needs from the earlier ones, so that each level
+         * evaluates fn only at its new nodes (PHASE3B_API.md C).
+         *
+         * Each level halves the step and adds the nodes between the earlier ones, so the state keeps the sums of every
+         * term so far (R_k, L1_k), the previous reported value for the estimate, and per side where it ends and the
+         * few points its end term needs. It holds no table and no reference to fn, is independent of fn's type, of
+         * fixed size, and allocates nothing.
          *
          * One state for the three maps (start returns one type): the map, and for exp-sinh and sinh-sinh an interval
          * that holds only the finite end, the origin of the points (0 on the line).
+         *
          * @tparam T The real type.
          */
         template<real T>
         struct TanhSinhState
         {
-            static constexpr int min_level = 4; // the first exit, as Romberg's (PHASE3_API.md E)
+            /**
+             * @brief The first level at which a result may be returned, as Romberg's (PHASE3_API.md E), so that an
+             * estimate from the early levels, which can fall below the error, does not end the run: level 4 rather
+             * than Boost's 3 removed the battery's remaining estimates below the error.
+             */
+            static constexpr int min_level = 4;
 
             /** @brief The map; tanh-sinh where the ends are finite. */
             mapping map = mapping::interval;
 
             /**
-             * @brief The interval [a, b], a < b; for exp-sinh and sinh-sinh the finite end (0 on the line) as c, lo
-             * and hi, with hw and width 0: b - a is never formed there.
+             * @brief The interval [a, b], a < b, which places the points and scales the terms; for exp-sinh and
+             * sinh-sinh the finite end (0 on the line) as c, lo and hi, with hw and width 0: b - a is never formed
+             * there.
              */
             Interval<T> interval;
 
-            /** @brief max / 2, formed once: in constant evaluation every step counts against the compiler's limit. */
+            /**
+             * @brief max / 2, formed once for the constant-evaluation guards of the sums: in constant evaluation every
+             * step counts against the compiler's limit.
+             */
             T half_max;
 
             /**
-             * @brief The largest |fn| for which a term cannot make Interval::checked_term refuse: max / 8 over
-             * max(|hw|, 1), every weight being at most 1; below it, term() alone, which saves checked_term's guards.
-             * 0 for exp-sinh and sinh-sinh, whose terms are always checked.
+             * @brief The largest |fn| for which a term cannot make Interval::checked_term refuse, so that constant
+             * evaluation can skip checked_term's guards on the hot path.
+             *
+             * max / 8 over max(|hw|, 1), every weight being at most 1; below it, term() alone. 0 for exp-sinh and
+             * sinh-sinh, whose terms are always checked.
              */
             T safe_value;
 
@@ -2914,16 +3430,22 @@ namespace nxx::quadrature {
             /** @brief The side towards a (for the other maps, as mapping says). */
             Side<T> left;
 
-            /** @brief The step, 2^-k. */
+            /** @brief The step, 2^-k, which scales each new term before it is summed. */
             T h;
 
-            /** @brief R_k, the trapezoidal sum of the kept terms, without the slivers (PHASE3B_API.md D3). */
+            /**
+             * @brief R_k, the trapezoidal sum of the kept terms, without the slivers (PHASE3B_API.md D3): the slivers
+             * change with each level, so they are added to the reported value only, never carried in the running sum.
+             */
             T value;
 
             /** @brief L1_k, the same sum of |terms|, for the rounding floor and the pruning threshold. */
             T l1;
 
-            /** @brief V_(k-1), the previous level's reported value (with its slivers); empty at level 0. */
+            /**
+             * @brief V_(k-1), the previous level's reported value (with its slivers), for the estimate
+             * |V_k - V_(k-1)|; empty at level 0.
+             */
             std::optional<T> previous;
 
             /** @brief The level. */
@@ -2934,8 +3456,12 @@ namespace nxx::quadrature {
         };
 
         /**
-         * @brief A term of the tanh-sinh sum: Interval::checked_term, or term() alone where |y| <= safe_value in
-         * constant evaluation.
+         * @brief A term of the tanh-sinh sum, formed so that an overflow becomes error::non_finite in constant
+         * evaluation and at run time alike, at the least cost on the hot path.
+         *
+         * In constant evaluation Interval::checked_term, or term() alone where |y| <= safe_value; at run time term(),
+         * refused where it is not finite.
+         *
          * @param s The state.
          * @param w The weight.
          * @param y fn's value, finite.
@@ -2958,8 +3484,8 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief x added to @p sum, unless constant evaluation could not keep the sum within max / 2 (detail::fits,
-         * with max / 2 formed once).
+         * @brief x added to @p sum, unless constant evaluation could not keep the sum within max / 2: detail::fits
+         * for the sweeps' sums, with max / 2 passed in, formed once, since in constant evaluation every step counts.
          * @param sum The sum.
          * @param x The term.
          * @param half_max max / 2.
@@ -2976,8 +3502,12 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief The point of a node on a side: b - hw comp on the right, a + hw comp on the left, formed from the
-         * complement, never from x.
+         * @brief The point of a node on a side, formed from the node's complement 1 - x, never from x, so that the
+         * points near an end stay distinct where x itself rounds to 1.
+         *
+         * b - hw comp on the right, a + hw comp on the left: c + hw x with x = 1 - comp, rewritten so that the
+         * complement, which the table holds to full relative accuracy, sets the distance to the end.
+         *
          * @param s The state.
          * @param right Whether the side is the right one.
          * @param comp The node's complement.
@@ -2990,9 +3520,16 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief Level k's step from its sums, for every map: the slivers of the sides cut by rounding, the end terms,
-         * the reported value V_k = R_k + the slivers, the floor F_k with the slivers' sizes, and the estimate
-         * E_k = max(|V_k - V_(k-1)|, F_k) + the end terms (PHASE3_API.md E, PHASE3B_API.md D3).
+         * @brief Level k's step from its sums, for every map: what the level reports to integrate(), so that one
+         * function forms the result, the estimate and the limits for every level and map (PHASE3_API.md E,
+         * PHASE3B_API.md D3).
+         *
+         * It forms the slivers of the sides cut by rounding, the end terms, the reported value V_k = R_k + the
+         * slivers, the floor F_k with the slivers' sizes, and the estimate E_k = max(|V_k - V_(k-1)|, F_k) + the end
+         * terms. The plain level difference serves as the estimate because successive levels roughly square the
+         * error, so the difference bounds the previous level's error. Level 0, which has no previous value, and a level
+         * whose end terms are unbounded report no current result.
+         *
          * @param s The state, with R_k and L1_k formed.
          * @return Nothing, or non_finite.
          */
@@ -3022,6 +3559,9 @@ namespace nxx::quadrature {
                     sliver = T(sliver + *piece);
                     sliver_size = T(sliver_size + nxx::math::abs(*piece));
                 }
+                // The end term by how the side ended: rounding, the power-law excess; pruning, 0 (the dropped term is
+                // below eps L1, F / 50); a tail or the table's end, the geometric bound, or h Te where only the centre
+                // was kept; a last term of 0, 0.
                 EndTerm<T> end_term{ T(0), false };
                 if (side.cause == cut_by::rounding) end_term = detail::power_end(side, end);
                 else if (side.cause == cut_by::pruning || side.outer.size == T(0)) end_term = EndTerm<T>{ T(0), false };
@@ -3039,9 +3579,11 @@ namespace nxx::quadrature {
             T const total_floor = T(floor + sliver_size);
             if (!nxx::math::isfinite(total) || !nxx::math::isfinite(total_floor)) return std::unexpected(invalid);
             if consteval {
+                // The attainable error below is 2 F, which must not overflow in a constant expression.
                 if (detail::large(total_floor)) return std::unexpected(invalid);
             }
             std::optional<Integral<T>> current;
+            // Level 0 has no previous value, so no estimate: its step has no current result.
             if (s.previous) {
                 if (!detail::fits(total, T(-*s.previous))) return std::unexpected(invalid);
                 T const difference = nxx::math::abs(T(total - *s.previous));
@@ -3051,7 +3593,8 @@ namespace nxx::quadrature {
                 if (!nxx::math::isfinite(estimate)) return std::unexpected(invalid);
                 if (!ends.unbounded) current = Integral<T>{ total, detail::larger(estimate, total_floor) };
             }
-            // Twice the floor (Phase 2's test): E >= F plus the end terms, so F alone could not pass.
+            // Twice the floor (Phase 2's test): E >= F plus the end terms, so F alone could not pass. The cap is the
+            // table's finest level: exhausted there.
             s.step = Step<T>{ .current = current,
                 .attainable = T(T(2) * total_floor),
                 .ready = s.k >= TanhSinhState<T>::min_level,
@@ -3061,10 +3604,16 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief TanhSinh's start: level 0, the centre, then each side outward at t = 1, 2, ..., right side first, until
-         * its first point not strictly inside (a rounding cut) or its first non-finite value in the tail; then each
-         * side drops its run of outermost terms below eps L1 of the whole sweep, from the outside in (PHASE3B_API.md
-         * D2). With no point strictly inside, a step exhausted with no current, and fn never called.
+         * @brief TanhSinh's start on a finite interval: level 0, which samples the centre and each side out to where
+         * the side ends, and sets the cuts and sums every later level builds on (PHASE3_API.md C and D, PHASE3B_API.md
+         * D2).
+         *
+         * The centre first, then each side outward at t = 1, 2, ..., right side first, until its first point not
+         * strictly inside (a rounding cut), its first non-finite value in the tail (a tail cut), or the table's end.
+         * The terms are stored, not summed, because the pruning threshold needs the L1 of the whole sweep: each side
+         * then drops its run of outermost terms below eps L1, from the outside in, and V_0 and L1_0 are the sums of
+         * the kept terms only. With no point strictly inside, a step exhausted with no current, and fn never called.
+         *
          * @param fn The function.
          * @param a The lower end.
          * @param b The upper end, a < b.
@@ -3115,7 +3664,7 @@ namespace nxx::quadrature {
                     T value;
                     T term;
                 };
-                // Level 0's samples of a side in a fixed array (its nodes are at most level_capacity(0)): no allocation.
+                // Level 0's samples of a side in a fixed array (at most level_capacity(0) nodes): no allocation.
                 constexpr std::size_t most = static_cast<std::size_t>(detail::level_capacity<T>(0));
                 struct Swept
                 {
@@ -3132,6 +3681,7 @@ namespace nxx::quadrature {
                     nodes.each(1, [&](int i, T const &comp, T const &w) {
                         int const j = detail::position(0, i);
                         T const p = detail::tanh_sinh_point(s, right, comp);
+                        // A point that rounds onto the end, or past it, is never evaluated: fn may be singular there.
                         if (!(a < p && p < b)) {
                             side.cut = j;
                             side.cause = cut_by::rounding;
@@ -3139,7 +3689,10 @@ namespace nxx::quadrature {
                         }
                         T const y = detail::evaluate(fn, p);
                         if (!nxx::math::isfinite(y)) {
-                            if (comp < eps) { // a tail: beyond every kept point of the side (t > 0), within eps
+                            // A tail, the endpoint singularity the method exists for: within eps hw of the end and
+                            // beyond every kept point of the side (level 0 sweeps outward, t > 0). Elsewhere a value
+                            // that is not finite is non_finite (PHASE3_API.md D).
+                            if (comp < eps) {
                                 side.cut = j;
                                 side.cause = cut_by::value;
                             }
@@ -3174,8 +3727,10 @@ namespace nxx::quadrature {
                 std::optional<T> const l1_sweep = detail::compensated(sizes);
                 if (refused || !l1_sweep || !nxx::math::isfinite(*l1_sweep)) return std::unexpected(invalid);
                 // Each side drops its run of outermost small terms, from the outside in, and is cut at the innermost
-                // dropped node; a small term with a larger one beyond it is kept (PHASE3B_API.md D2). A pruned side's
-                // end term is 0, below the floor's eps L1 by a factor 50.
+                // dropped node; a small term with a larger one beyond it is kept (PHASE3B_API.md D2), since cutting at
+                // the first small term going outward gave a false success where one term was exactly 0. A pruned
+                // side's end term is 0, below the floor's eps L1 by a factor 50. Pruning saves the evaluations a
+                // smooth fn does not need: 2.8 to 3.4 times fewer in double (PHASE3_API.md C).
                 T const small = T(eps * *l1_sweep);
                 auto const prune = [&](Side<T> &side, Swept &swept) {
                     auto const outward = swept.held() | std::views::reverse;
@@ -3190,7 +3745,8 @@ namespace nxx::quadrature {
                 };
                 prune(s.right, right_swept);
                 prune(s.left, left_swept);
-                // V_0 and L1_0 from the kept terms only: the centre, the right side, the left side.
+                // V_0 and L1_0 from the kept terms only: the centre, the right side, the left side; each kept point
+                // recorded on its side, and W formed beyond the outermost.
                 Sum<T> values;
                 Sum<T> magnitudes;
                 auto const add_kept = [&](Side<T> &side, Swept const &swept, T const &end) {
@@ -3216,10 +3772,15 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief TanhSinh's next level k: per side, from the centre outward, the odd multiples of 2^-k up to its cut;
-         * a new node beyond the outermost kept one cuts the side where it is not strictly inside (rounding), where fn
-         * is not finite there and comp < eps (a tail), or where |h term| < eps L1_(k-1) / 2 (pruning, PHASE3B_API.md
-         * D2). Then R_k = R_(k-1) / 2 + the new terms, L1 likewise, W, and the step.
+         * @brief TanhSinh's next level k on a finite interval: the step halved, fn evaluated only at the new nodes, so
+         * that every earlier evaluation is reused (PHASE3_API.md C, PHASE3B_API.md D2).
+         *
+         * Per side, from the centre outward, the odd multiples of 2^-k up to its cut. At most one new node lies beyond
+         * the side's outermost kept one (PHASE3B_API.md C); it cuts the side where it is not strictly inside
+         * (rounding), where fn is not finite there and comp < eps (a tail), or where |h term| < eps L1_(k-1) / 2
+         * (pruning). A value that is not finite at any other node is non_finite. Then R_k = R_(k-1) / 2 + the new
+         * terms, L1 likewise, W, and the step.
+         *
          * @param fn The function.
          * @param s The state, not exhausted.
          * @return Nothing, or non_finite.
@@ -3232,7 +3793,8 @@ namespace nxx::quadrature {
             s.k += 1;
             s.h = T(s.h / T(2));
             // The pruning threshold in term scale: |h term| < eps L1_(k-1) / 2, eps times the running L1 at the start
-            // of the level (PHASE3B_API.md D2).
+            // of the level (PHASE3B_API.md D2). Known before the level starts, it is the same for both sides and
+            // independent of the order of evaluation.
             T const threshold = T(T(eps * s.l1) / T(T(2) * s.h));
             using result = std::expected<void, Failure<T>>;
             return detail::with_tanh_sinh_level<T>(s.k, [&](TanhSinhLevel<T> const &nodes) -> result {
@@ -3246,8 +3808,11 @@ namespace nxx::quadrature {
                     bool refused = false;
                     nodes.each(0, [&](int i, T const &comp, T const &w) {
                         int const j = detail::position(s.k, i);
+                        // A cut side is never sampled at or beyond its cut again.
                         if (side.cut >= 0 && j >= side.cut) return false;
                         T const p = detail::tanh_sinh_point(s, right, comp);
+                        // Only a node beyond every kept point can be a tail or be pruned; a node between kept points
+                        // refines the sum and is always kept, and a value there that is not finite is non_finite.
                         bool const outer = j > side.outer.position;
                         if (!(s.interval.lo < p && p < s.interval.hi)) {
                             side.cut = j;
@@ -3286,6 +3851,8 @@ namespace nxx::quadrature {
                 std::optional<T> const added = detail::compensated(new_values);
                 std::optional<T> const added_l1 = detail::compensated(new_magnitudes);
                 if (!added || !added_l1) return std::unexpected(invalid);
+                // Halving the step halves every earlier term: R_k = R_(k-1) / 2 + the new terms, each already
+                // multiplied by the new h.
                 T const half_value = T(s.value / T(2));
                 T const half_l1 = T(s.l1 / T(2));
                 if (!detail::fits(half_value, *added) || !detail::fits(half_l1, *added_l1))
@@ -3297,8 +3864,11 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief A node of exp-sinh or sinh-sinh on a side: its distance from the origin, as the tail rule reads it,
-         * its point and its weight, formed at use from the table's columns (PHASE4_API.md B).
+         * @brief A node of exp-sinh or sinh-sinh on a side, formed at use from the shared table's columns, so that one
+         * table serves both maps and both kinds of side (PHASE4_API.md B).
+         *
+         * Its distance from the origin, as the tail rule reads it, its point and its weight.
+         *
          * @tparam T The real type.
          */
         template<real T>
@@ -3315,7 +3885,13 @@ namespace nxx::quadrature {
         };
 
         /**
-         * @brief Node @p i of @p piece on a side of exp-sinh or sinh-sinh.
+         * @brief Node @p i of @p piece on a side of exp-sinh or sinh-sinh: the one place the maps' points and weights
+         * are formed from the table.
+         *
+         * The line's weight is dx/dt = f cosh u = (f E + f q) / 2, from the columns the half lines use. On (-inf, b]
+         * the point is b - d, formed directly: the same value as the prototype's reflection, fn(-x) on [-b, inf),
+         * since round to nearest is symmetric (design.md, "TanhSinh on infinite intervals").
+         *
          * @param s The state, its map not interval.
          * @param right Whether the side is the right one.
          * @param infinite Whether it is toward infinity.
@@ -3338,8 +3914,12 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief Whether a point of exp-sinh or sinh-sinh is strictly inside: beyond the finite end, and finite (the
-         * line's +-x, at most max / 6, always is).
+         * @brief Whether a point of exp-sinh or sinh-sinh is strictly inside, so that fn is never called at the finite
+         * end or at an infinity.
+         *
+         * Beyond the finite end, and finite (the line's +-x, at most max / 6, always is). Toward the finite end a
+         * point fails by rounding onto the end; toward infinity only by overflowing, where the finite end is large.
+         *
          * @param s The state, its map not interval.
          * @param p The point.
          * @return Whether fn may be evaluated there.
@@ -3353,24 +3933,13 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief TanhSinh's start on an infinite interval (PHASE4_API.md C and D): exp-sinh on [a, inf), x = a + E
-         * and a + q, or (-inf, b], x = b - E and b - q; sinh-sinh on the line, x = +-sinh u. Level 0: the centre
-         * (a + 1, b - 1 or 0, weight c = 3/2), then each side outward at t = 1, 2, ..., the side toward infinity first
-         * (on the line the positive side), each node's term stored; a point not strictly inside ends the side, a
-         * value not finite is a tail where its distance is beyond 1/eps (toward infinity) or below eps (toward the
-         * finite end), is pending toward infinity, else non_finite. Then the threshold eps L1 of the centre and every
-         * stored term; each pending value a tail where the side's last stored |term| is below it, else non_finite;
-         * the underflow rule toward infinity in increasing t; and Phase 3's pruning from the outside in. With no
-         * point strictly inside (a + 1 rounds onto a), a step exhausted with no current, and fn never called.
-         * @param fn The function.
-         * @param a The lower end, -inf or finite.
-         * @param b The upper end, inf or finite, a < b, not both finite.
-         * @return The state after level 0, or non_finite.
-         */
-        /**
-         * @brief 1/eps, the tail rule's distance toward infinity, where T can hold it (eps max() > 1, formed without
-         * overflow); empty in a type whose exponents end below it, where no finite node lies beyond it and that clause
-         * of the rule never holds (Phase 4's independent review).
+         * @brief 1/eps, the distance beyond which the tail rule toward infinity accepts a value that is not finite,
+         * where T can hold it; empty otherwise, so that a type with a small max() neither overflows nor misreads the
+         * rule.
+         *
+         * Present where eps max() > 1, tested without overflow. In a type whose exponents end below 1/eps no finite
+         * node lies beyond it, so that clause of the rule never holds (Phase 4's independent review).
+         *
          * @return 1/eps, or empty.
          */
         template<real T>
@@ -3381,6 +3950,26 @@ namespace nxx::quadrature {
             return T(T(1) / eps);
         }
 
+        /**
+         * @brief TanhSinh's start on an infinite interval: level 0 of exp-sinh or sinh-sinh, which samples the centre
+         * and each side out to where it ends, and sets the cuts and sums every later level builds on (PHASE4_API.md C
+         * and D).
+         *
+         * The maps: exp-sinh on [a, inf), x = a + E toward infinity and a + q toward a, or (-inf, b], x = b - E and
+         * b - q; sinh-sinh on the line, x = +-sinh u. Level 0 evaluates the centre (a + 1, b - 1 or 0, weight
+         * c = 3/2), then each side outward at t = 1, 2, ..., the side toward infinity first (on the line the positive
+         * side), each node's term stored. A point not strictly inside ends the side. A value not finite is a tail
+         * where its distance is beyond 1/eps (toward infinity) or below eps (toward the finite end), is pending
+         * toward infinity, else non_finite. The rest waits for the threshold, eps L1 of the centre and every stored
+         * term: each pending value is a tail where the side's last stored |term| is below it, else non_finite; then
+         * the underflow rule toward infinity in increasing t; then Phase 3's pruning from the outside in. With no
+         * point strictly inside (a + 1 rounds onto a), a step exhausted with no current, and fn never called.
+         *
+         * @param fn The function.
+         * @param a The lower end, -inf or finite.
+         * @param b The upper end, inf or finite, a < b, not both finite.
+         * @return The state after level 0, or non_finite.
+         */
         template<real T, typename F>
         constexpr std::expected<TanhSinhState<T>, Failure<T>> exp_sinh_start(F &fn, T const &a, T const &b)
         {
@@ -3472,6 +4061,8 @@ namespace nxx::quadrature {
                         [&](int i, typename ExpSinhLevel<T>::Piece const &piece, std::size_t index) {
                             int const j = detail::position(0, i);
                             ExpSinhNode<T> const node = detail::exp_sinh_node(s, right, infinite, piece, index);
+                            // Toward infinity a point fails only by overflowing, which ends the side as the table's
+                            // end would; toward the finite end it rounds onto the end, a cut by rounding.
                             if (!detail::exp_sinh_inside(s, node.point)) {
                                 side.cut = j;
                                 side.cause = infinite ? cut_by::table : cut_by::rounding;
@@ -3479,6 +4070,8 @@ namespace nxx::quadrature {
                             }
                             T const y = detail::evaluate(fn, node.point);
                             if (!nxx::math::isfinite(y)) {
+                                // The tail rule's first clause, by distance; toward infinity its second clause needs
+                                // the threshold, known only after both sweeps, so the value waits as pending.
                                 if (infinite ? inverse_eps && node.distance > *inverse_eps : node.distance < eps) {
                                     side.cut = j;
                                     side.cause = cut_by::value;
@@ -3528,9 +4121,11 @@ namespace nxx::quadrature {
                     return true;
                 };
                 if (!decide(first, first_swept) || !decide(second, second_swept)) return std::unexpected(invalid);
-                // The underflow rule toward infinity (Q4), in increasing t: the first stored node with |y| < min(),
-                // w min() at least the threshold, after a value of at least min() (the centre's for the first), cuts
-                // the side as a table's end, dropped with every node beyond it.
+                // The underflow rule toward infinity (PHASE4_API.md Q4), in increasing t: the first stored node with
+                // |y| < min(), w min() at least the threshold, after a value of at least min() (the centre's for the
+                // first), cuts the side as a table's end, dropped with every node beyond it. Toward infinity the
+                // weights reach max / 2, so a value that underflowed is no evidence of a negligible term; where w min()
+                // is below the threshold the term is negligible anyway, and pruning below drops it.
                 auto const truncate = [&](Side<T> &side, bool right, Swept &swept) {
                     if (!detail::toward_infinity(map, right)) return;
                     auto const indices = std::views::iota(std::size_t{ 0 }, swept.count);
@@ -3588,14 +4183,21 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief TanhSinh's next level k on an infinite interval (PHASE4_API.md D): per side, in the order of the
-         * start, the odd multiples of 2^-k up to its cut. A new node beyond the outermost kept one cuts the side where
-         * it is not strictly inside; where fn is not finite there and its distance is beyond 1/eps (toward infinity)
-         * or below eps (toward the finite end), or toward infinity where the outermost kept |term| is below the
-         * threshold eps L1_(k-1) / (2h) (a tail); toward infinity where |y| < min() after a kept value of at least
-         * min() (pruning if w min() is below the threshold, else a table's end, the node not kept); where its |term|
-         * is below the threshold (pruning). Elsewhere a value not finite is non_finite. Then the sums and the step,
-         * as tanh_sinh_advance.
+         * @brief TanhSinh's next level k on an infinite interval: the step halved, fn evaluated only at the new nodes,
+         * with the tail and underflow rules of the side toward infinity (PHASE4_API.md D).
+         *
+         * Per side, in the order of the start, the odd multiples of 2^-k up to its cut. A new node beyond the
+         * outermost kept one cuts the side, in this order:
+         * - where it is not strictly inside;
+         * - where fn is not finite there and its distance is beyond 1/eps (toward infinity) or below eps (toward the
+         *   finite end), or toward infinity where the outermost kept |term| is below the threshold eps L1_(k-1) / (2h)
+         *   (a tail);
+         * - toward infinity, where |y| < min() after a kept value of at least min() (pruning if w min() is below the
+         *   threshold, else a table's end; the node not kept);
+         * - where its |term| is below the threshold (pruning).
+         *
+         * Elsewhere a value not finite is non_finite. Then the sums and the step, as tanh_sinh_advance.
+         *
          * @param fn The function.
          * @param s The state, not exhausted, its map not interval.
          * @return Nothing, or non_finite.
@@ -3623,6 +4225,7 @@ namespace nxx::quadrature {
                             int const j = detail::position(s.k, i);
                             if (side.cut >= 0 && j >= side.cut) return false;
                             ExpSinhNode<T> const node = detail::exp_sinh_node(s, right, infinite, piece, index);
+                            // As in tanh_sinh_advance, only a node beyond every kept point can cut the side.
                             bool const outer = j > side.outer.position;
                             if (!detail::exp_sinh_inside(s, node.point)) {
                                 side.cut = j;
@@ -3631,6 +4234,8 @@ namespace nxx::quadrature {
                             }
                             T const y = detail::evaluate(fn, node.point);
                             if (!nxx::math::isfinite(y)) {
+                                // The tail rule: by distance, or toward infinity after a term already negligible
+                                // (PHASE4_API.md Q3); the threshold is known here, so nothing waits.
                                 bool const far =
                                     infinite ? inverse_eps && node.distance > *inverse_eps : node.distance < eps;
                                 if (outer && (far || (infinite && side.outer.size < threshold))) {
@@ -3645,6 +4250,8 @@ namespace nxx::quadrature {
                                 failed = true;
                                 return false;
                             }
+                            // The underflow rule (PHASE4_API.md Q4), as at level 0: a value below min() is no evidence
+                            // of a negligible term where the weight is large.
                             if (outer && infinite && nxx::math::abs(y) < smallest
                                 && !(nxx::math::abs(side.outer.value) < smallest)) {
                                 side.cut = j;
@@ -3659,9 +4266,11 @@ namespace nxx::quadrature {
                             }
                             refused = refused || !detail::add_within(new_values, T(s.h * *t), s.half_max);
                             refused = refused || !detail::add_within(new_magnitudes, T(s.h * size), s.half_max);
+                            // The end is the finite end (0 on the line): distances matter only on the side toward it.
                             side.keep(Kept<T>{ j, node.point, y, size }, s.interval.lo);
                             return true;
                         });
+                    // W only toward the finite end: a side toward infinity is never cut by rounding.
                     if (!infinite) side.add_weights(nodes, s.k);
                     return !failed && !refused;
                 };
@@ -3672,6 +4281,7 @@ namespace nxx::quadrature {
                 std::optional<T> const added = detail::compensated(new_values);
                 std::optional<T> const added_l1 = detail::compensated(new_magnitudes);
                 if (!added || !added_l1) return std::unexpected(invalid);
+                // R_k = R_(k-1) / 2 + the new terms, as in tanh_sinh_advance.
                 T const half_value = T(s.value / T(2));
                 T const half_l1 = T(s.l1 / T(2));
                 if (!detail::fits(half_value, *added) || !detail::fits(half_l1, *added_l1))
@@ -3689,7 +4299,8 @@ namespace nxx::quadrature {
     namespace detail {
 
         /**
-         * @brief R is std::expected<S, Failure<T>> for some state S: what an iterative method's start returns.
+         * @brief Whether R is std::expected<S, Failure<T>> for some state S, so that iterative_method can require that
+         * shape of start()'s result without naming the method's state type.
          * @tparam R The type.
          * @tparam T The real type.
          */
@@ -3698,7 +4309,8 @@ namespace nxx::quadrature {
                                  && std::same_as<R, std::expected<typename R::value_type, Failure<T>>>;
 
         /**
-         * @brief A callable as an Observer keeps it: an lvalue by reference, an rvalue by value.
+         * @brief How an Observer stores its callable: an lvalue by reference, so that a recorder the caller owns sees
+         * every step; an rvalue by value, so that a temporary lambda lives as long as the Observer.
          * @tparam O The callable's type as given to observer().
          */
         template<typename O>
@@ -3706,7 +4318,8 @@ namespace nxx::quadrature {
             std::reference_wrapper<std::remove_reference_t<O>>, std::remove_cvref_t<O>>;
 
         /**
-         * @brief What an iterative method's start returns: std::expected<S, Failure<T>> for its state S.
+         * @brief The type an iterative method's start returns for an fn of type F, from which state_t takes the state:
+         * std::expected<S, Failure<T>> for its state S.
          * @tparam M The method.
          * @tparam T The real type.
          * @tparam F fn's type as the method receives it.
@@ -3716,8 +4329,8 @@ namespace nxx::quadrature {
             std::declval<F &>(), std::declval<T const &>(), std::declval<T const &>()));
 
         /**
-         * @brief fn's type as integrate() passes it to a method: a function as a pointer to it, any other callable as
-         * itself (reference removed).
+         * @brief fn's type as integrate() passes it to a method, so that the concepts are checked against what a
+         * method actually receives: a function as a pointer to it, any other callable as itself (reference removed).
          * @tparam F fn's type as integrate() received it.
          */
         template<typename F>
@@ -3725,9 +4338,12 @@ namespace nxx::quadrature {
             std::add_pointer_t<std::remove_reference_t<F>>, std::remove_reference_t<F>>;
 
         /**
-         * @brief fn as integrate() passes it to a method: a function as a pointer to it, so that no method's lambda
-         * captures a reference to a function (MSVC's constant evaluator reads such a capture as uninitialized); any
-         * other callable as the lvalue it is.
+         * @brief fn in the form integrate() passes to a method, so that a plain function works in constant evaluation
+         * on every compiler.
+         *
+         * A function is passed as a pointer to it, so that no method's lambda captures a reference to a function
+         * (MSVC's constant evaluator reads such a capture as uninitialized); any other callable as the lvalue it is.
+         *
          * @param fn The function.
          * @return A pointer to fn, or fn.
          */
@@ -3739,8 +4355,9 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief M takes infinite ends: its static member `infinite_ends` is true (PHASE4_API.md Q1). Absent or false,
-         * integrate() refuses an infinite end with non_finite.
+         * @brief Whether M has opted in to infinite ends (its static member `infinite_ends` is true), so that
+         * integrate() refuses an infinite end with non_finite for every other method before the method could form
+         * b - a (PHASE4_API.md Q1).
          * @tparam M The method.
          */
         template<typename M>
@@ -3749,7 +4366,8 @@ namespace nxx::quadrature {
         } && bool(M::infinite_ends);
 
         /**
-         * @brief Whether @p x is NaN, the one value not equal to itself.
+         * @brief Whether @p x is NaN, so that integrate() can refuse a NaN end while letting an infinite one through to
+         * a method that takes it: nxx::math has no isnan, and isfinite does not tell the two apart.
          * @param x A value.
          * @return x != x.
          */
@@ -3761,8 +4379,12 @@ namespace nxx::quadrature {
     /** @endcond */
 
     /**
-     * @brief A fixed rule: a method M whose const member `m.apply(fn, a, b)` returns `std::expected<T, error>`, the
-     * integral of fn from a to b, without an error estimate. GaussLegendre<N> is one; a user's type can be another.
+     * @brief What a type must provide to work with integrate() as a fixed rule: a rule of your own, such as a midpoint
+     * rule with a number of panels, that returns the integral without an error estimate.
+     *
+     * A fixed rule M has a const member `m.apply(fn, a, b)` returning `std::expected<T, error>`, the integral of fn
+     * from a to b. GaussLegendre<N> is one. integrate() validates and orders the ends, so the rule handles only the
+     * computation.
      *
      * The contract, which integrate() relies on:
      * - **Given:** a < b, both finite, possibly extreme (b - a may overflow; the ends may be subnormal, adjacent, or of
@@ -3779,7 +4401,8 @@ namespace nxx::quadrature {
      *
      * @tparam M The method.
      * @tparam T The real type.
-     * @tparam F fn's type as a method receives it (a function as a pointer to it); by default a pointer to a plain function of T, as integrate() passes one.
+     * @tparam F fn's type as a method receives it (a function as a pointer to it); by default a pointer to a plain
+     *           function of T, as integrate() passes one.
      */
     template<typename M, typename T, typename F = T (*)(T const &)>
     concept fixed_rule = requires(M const &m, F &fn, T const &a, T const &b) {
@@ -3787,10 +4410,13 @@ namespace nxx::quadrature {
     };
 
     /**
-     * @brief A method with an error estimate that does its whole computation in one call: a method M whose const member
-     * `m.estimate(fn, a, b, criteria)` returns `std::expected<Integral<T>, Failure<T>>`. For a method that does not
-     * step (a recursion, a combinator over another method); a method that steps is an iterative_method, whose loop and
-     * stop test integrate() owns and whose steps can be observed.
+     * @brief What a type must provide to work with integrate() as a method with an error estimate that does its whole
+     * computation in one call: for a method that does not step, such as a recursion or a combinator around another
+     * method (a substitution, a split of the interval).
+     *
+     * An estimating method M has a const member `m.estimate(fn, a, b, criteria)` returning
+     * `std::expected<Integral<T>, Failure<T>>`. A method that improves its estimate step by step is better written as
+     * an iterative_method: integrate() then owns its loop and stop test, and observer() can watch its steps.
      *
      * The contract: as for fixed_rule, and
      * - **Given:** criteria with both members finite and not negative, rel_tol at most 1, abs_tol unclamped (it enters
@@ -3817,8 +4443,8 @@ namespace nxx::quadrature {
     };
 
     /**
-     * @brief The state of an iterative method M: what `m.start(fn, a, b)` returns inside its std::expected. A
-     * combinator that keeps an inner method's state names it with this.
+     * @brief The state type of an iterative method M, for a combinator that keeps an inner method's state in its own:
+     * what `m.start(fn, a, b)` returns inside its std::expected.
      * @tparam M The method.
      * @tparam T The real type.
      * @tparam F fn's type, reference removed; by default a pointer to a plain function of T, as integrate() passes one.
@@ -3827,8 +4453,13 @@ namespace nxx::quadrature {
     using state_t = typename detail::start_result<M, T, F>::value_type;
 
     /**
-     * @brief An iterative method: it computes and reports, and integrate() decides when to stop. GaussKronrod<15>,
-     * TanhSinh and Romberg are iterative methods; a user's type can be another.
+     * @brief What a type must provide to work with integrate() as a method that improves its estimate step by step:
+     * the method computes and reports, integrate() runs the loop and decides when to stop, and observer() can watch
+     * the steps.
+     *
+     * GaussKronrod<15>, TanhSinh and Romberg are iterative methods; a user's type can be another. Splitting the work
+     * this way means a method of one's own needs no loop, no stop test and no knowledge of the criteria, and is stopped
+     * by the same test as the library's.
      *
      * Three const members, each returning `std::expected<..., Failure<T>>`:
      * - `m.start(fn, a, b)` returns a state S of the method's own type, movable, whose member `step` is the Step<T>
@@ -3838,9 +4469,9 @@ namespace nxx::quadrature {
      *   with nothing to refine returns `{}`.
      *
      * integrate() runs the loop: it checks each step (a current result as integrate() checks results, an attainable
-     * error finite and not negative; else non_finite), tests `ready` and `abs_error <= max(abs_tol, rel_tol |value|,
-     * attainable)`, settles before any decision, and advances while the step is not exhausted. The method never sees
-     * the criteria.
+     * error finite and not negative; else non_finite), tests `ready` and
+     * `abs_error <= max(abs_tol, rel_tol |value|, attainable)`, settles before any decision, and advances while the
+     * step is not exhausted. The method never sees the criteria.
      *
      * The contract: as for fixed_rule, and
      * - **Given:** advance is never called on an exhausted step; nothing is called after a Failure; settle may be
@@ -3871,7 +4502,8 @@ namespace nxx::quadrature {
     };
 
     /**
-     * @brief A callable marked as the observer of an integration: made by observer(), passed to integrate() before fn.
+     * @brief Marks a callable as the observer of an integration, so that integrate() tells it from fn by its type and
+     * never by trying to call an argument: made by observer(), passed to integrate() before fn.
      * @tparam O The callable's type as given to observer(): an lvalue reference, kept by reference, or a value.
      */
     template<typename O>
@@ -3882,8 +4514,8 @@ namespace nxx::quadrature {
     };
 
     /**
-     * @brief @p o as the observer of an integration by an iterative method: `o(step)` is called with the Step<T> after
-     * the method's start and after each of its steps.
+     * @brief Makes @p o the observer of an integration by an iterative method, to watch it converge, record its steps
+     * or find out why it failed: `o(step)` is called with the Step<T> after the method's start and after each step.
      *
      * The step is for the ends in order (a < b), so for b < a it has the opposite sign to the result; nothing is
      * reported after settle, whose values the result shows. The observed run computes exactly what the unobserved run
@@ -3912,16 +4544,19 @@ namespace nxx::quadrature {
     namespace detail {
 
         /**
-         * @brief An iterative method M whose steps are reported to an observer after the start and after each advance;
-         * itself an iterative method, with M's state, so that the observed run is the same computation.
+         * @brief The method integrate() runs when it is given an observer: M wrapped so that each step is reported,
+         * itself an iterative method with M's state, so that the observed run is the same computation and integrate()
+         * needs no second loop (design.md, "Observing").
          * @tparam M The method.
          * @tparam O The observer's callable, as given to observer().
          */
         template<typename M, typename O>
         struct Observed
         {
-            /** @brief The method, held for the call to integrate() that observes it, so that a method that cannot be
-             * copied can be observed. */
+            /**
+             * @brief The method, held for the call to integrate() that observes it, so that a method that cannot be
+             * copied can be observed.
+             */
             M const &method;
 
             /** @brief The observer, called as a non-const callable: a mutable lambda can count its calls. */
@@ -3934,7 +4569,7 @@ namespace nxx::quadrature {
             // the concept softly instead of where the class is instantiated.
 
             /**
-             * @brief The method's start, reported.
+             * @brief The method's start, then a report of its first step.
              * @tparam T The real type.
              * @tparam F fn's type.
              * @tparam Self The method, as a dependent type.
@@ -3953,7 +4588,7 @@ namespace nxx::quadrature {
             }
 
             /**
-             * @brief The method's step, reported.
+             * @brief The method's step, then a report of it.
              * @tparam F fn's type.
              * @tparam S The method's state.
              * @tparam Self The method, as a dependent type.
@@ -3970,7 +4605,8 @@ namespace nxx::quadrature {
             }
 
             /**
-             * @brief The method's settle, not reported.
+             * @brief The method's settle, not reported: it refines the step integrate() decides on, and the result
+             * shows its values.
              * @tparam S The method's state.
              * @tparam Self The method, as a dependent type.
              * @param s The state.
@@ -3981,7 +4617,7 @@ namespace nxx::quadrature {
             { return method.settle(s); }
 
             /**
-             * @brief Calls the observer with a step.
+             * @brief Calls the observer with a step, with one readable diagnostic where the observer cannot take it.
              * @tparam T The real type.
              * @param step The step.
              */
@@ -4002,7 +4638,7 @@ namespace nxx::quadrature {
         };
 
         /**
-         * @brief The iterative method m observed by o.
+         * @brief The iterative method m observed by o, for the integrate() forms that take an observer.
          * @param m The method, held by reference: it must outlive the result (a temporary does, for the full
          * expression that integrates with it).
          * @param o The observer.
@@ -4013,7 +4649,9 @@ namespace nxx::quadrature {
         { return Observed<M, O>{ m, std::move(o.callable) }; }
 
         /**
-         * @brief Whether an Integral is what every method must return: a finite value, a finite, non-negative estimate.
+         * @brief Whether an Integral is one a caller may be given (a finite value, a finite, non-negative estimate), so
+         * that integrate() turns a broken result of any method, a user's included, into non_finite (design.md,
+         * "Checked results").
          * @param r The result.
          * @return true if it is.
          */
@@ -4024,8 +4662,12 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief Whether a step can be tested: its current result, if any, sound, and its attainable error finite and
-         * not negative. Checked before any arithmetic on it, which in constant evaluation a NaN would make ill-formed.
+         * @brief Whether a step can be tested against the request: its current result, if any, sound, and its
+         * attainable error finite and not negative.
+         *
+         * Checked before any arithmetic on the step, which in constant evaluation a NaN would make ill-formed; a step
+         * that fails it ends the integration with non_finite.
+         *
          * @param p The step.
          * @return true if it can.
          */
@@ -4037,8 +4679,8 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief Whether a step meets the request: ready, with a current result whose estimate is at most
-         * max(abs_tol, rel_tol |value|, attainable), BRIEF.md D5's test for every method.
+         * @brief The stop test, written once for every iterative method (BRIEF.md D5): whether a step is ready and has
+         * a current result whose estimate is at most max(abs_tol, rel_tol |value|, attainable).
          * @param p The step, testable.
          * @param criteria The validated criteria.
          * @return true if it does.
@@ -4052,10 +4694,14 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief integrate() on an iterative method, a < b: each step checked, then tested against the request; on a
-         * pass, or where the method is exhausted, settled and decided on the settled step; otherwise one more step.
-         * A step that passes before settle and fails after it goes on from the settled step (Gauss-Kronrod's running
-         * sums can drift from the sums formed afresh).
+         * @brief The loop of every iterative method, on a < b: it owns the decision to stop, so that each method only
+         * computes and reports its steps (PHASE3A_API.md B, C).
+         *
+         * Each step is checked, then tested against the request. On a pass, or where the method is exhausted, the step
+         * is settled and the decision taken on the settled step; otherwise the method takes one more step. A step that
+         * passes before settle and fails after it goes on from the settled step (Gauss-Kronrod's running sums can drift
+         * from the sums formed afresh).
+         *
          * @param m The method.
          * @param fn The function.
          * @param a The lower end.
@@ -4075,14 +4721,19 @@ namespace nxx::quadrature {
                 if (!detail::testable(s.step)) return std::unexpected(invalid);
                 bool const passed = detail::meets(s.step, criteria);
                 if (passed || s.step.exhausted) {
+                    // Settle before any decision, and only then: Gauss-Kronrod checks its running sums against the
+                    // sums formed afresh before every decision to stop (PHASE3A_API.md, "settle").
                     std::expected<void, Failure<T>> const settled = m.settle(s);
                     if (!settled) return std::unexpected(settled.error());
                     if (!detail::testable(s.step)) return std::unexpected(invalid);
                     if (detail::meets(s.step, criteria)) {
+                        // A method that knows its estimate is unreliable may not succeed, whatever the estimate says.
                         if (!s.step.trusted) return std::unexpected(Failure<T>{ error::not_converged, s.step.current });
                         return *s.step.current;
                     }
+                    // Exhausted and short of the request: the method can do no more.
                     if (!passed) return std::unexpected(Failure<T>{ error::not_converged, s.step.current });
+                    // The pass was the running sums' drift: the settled step is not exhausted, so go on from it.
                     continue;
                 }
                 std::expected<void, Failure<T>> const advanced = m.advance(fn, s);
@@ -4091,7 +4742,8 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief An estimating method on a < b: an iterative method's loop, or an estimating method's estimate.
+         * @brief A method with an estimate on a < b, so that integrate()'s validation and ordering are written once for
+         * both kinds: an iterative method's loop, or an estimating method's estimate.
          * @param m The method.
          * @param fn The function, as passed.
          * @param a The lower end.
@@ -4108,7 +4760,8 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief r, negated: the integral from b to a.
+         * @brief The integral from b to a, given the one from a to b: integrate() runs every method on ordered ends and
+         * negates for b < a, so that integrate(fn, b, a) is exactly -integrate(fn, a, b).
          * @param r The integral from a to b.
          * @return -r, with the same estimate.
          */
@@ -4123,12 +4776,17 @@ namespace nxx::quadrature {
     /** @endcond */
 
     /**
-     * @brief The N-point Gauss-Legendre rule, 1 <= N <= 64, a fixed rule: exact for polynomials of degree 2N - 1, up to
-     * the rounding of its nodes and weights and of the sum.
+     * @brief The N-point Gauss-Legendre rule, for an integral that must be a smooth function of the parameters inside
+     * fn (an integral inside a root solve, an optimiser or another integral), or for an fn too costly for an adaptive
+     * method: exactly N evaluations, no error estimate and no tolerance.
      *
-     * N evaluations of fn at the zeros of the Legendre polynomial P_N mapped to (a, b), no error estimate and no
-     * criteria, so that the result is a smooth function of parameters inside fn (Lyness 1983): the rule for a root
-     * finder, an optimiser or an inner integral. Its error on [a, b] is
+     * An adaptive method chooses its points from fn, so its result jumps as a parameter of fn changes which panels it
+     * bisects; a root finder or an optimiser on such a function can stall (Lyness 1983). A fixed rule samples the same
+     * points whatever fn, so its result is as smooth as fn. Without an estimate, check the accuracy by comparing two
+     * values of N, or one result with a method that estimates its error.
+     *
+     * The rule evaluates fn at the zeros of the Legendre polynomial P_N mapped to (a, b), and is exact for polynomials
+     * of degree 2N - 1, up to the rounding of its nodes and weights and of the sum. Its error on [a, b] is
      * (b - a)^(2N+1) (N!)^4 / ((2N + 1) ((2N)!)^3) f^(2N)(xi) for some xi in (a, b).
      *
      * The nodes and weights come from the three-term recurrence, + - * / in T: for float, double and long double at
@@ -4144,7 +4802,8 @@ namespace nxx::quadrature {
     struct GaussLegendre
     {
         /**
-         * @brief The rule applied to fn on [a, b] (fixed_rule); integrate() calls it.
+         * @brief Applies the rule to fn on [a, b], for integrate(), which validates and orders the ends first
+         * (fixed_rule).
          * @tparam T The real type.
          * @tparam F fn's type.
          * @param fn The function, evaluated at the N interior nodes.
@@ -4164,21 +4823,23 @@ namespace nxx::quadrature {
     };
 
     /**
-     * @brief Romberg's method: the trapezoidal rule on halved steps, extrapolated by Richardson (Romberg 1955); an
-     * iterative method, one step per level.
+     * @brief Romberg's method, to see and teach how extrapolating trapezoidal sums converges, or to compare with the
+     * other methods; for results, prefer the default, GaussKronrod<15>.
      *
-     * Level k samples fn at 2^k + 1 equally spaced points, ends included, so a singularity at an end is
-     * error::non_finite. Its estimate at level k is the difference of the last two extrapolated values,
-     * |R(k, k) - R(k-1, k-1)|, which estimates the error of the previous value, so it overstates the error on smooth
-     * fn; it may stop from level 4 (17 evaluations) and certifies down to its rounding floor. The cap is 16 levels,
-     * 65,537 evaluations, then error::not_converged with the best estimate; fn with a kink or a singular derivative
-     * reach it. It needs more evaluations than a Gauss rule for the same accuracy; its uses are teaching and equally
-     * spaced data. An infinite end is error::non_finite; use TanhSinh.
+     * It needs more evaluations than a Gauss rule for the same accuracy, and its estimate overstates the error on
+     * smooth fn. An iterative method, one step per level: level k is the trapezoidal rule at 2^k + 1 equally spaced
+     * points, ends included, extrapolated by Richardson (Romberg 1955). Its estimate at level k is the difference of
+     * the last two extrapolated values, |R(k, k) - R(k-1, k-1)|, which estimates the error of the previous value. It
+     * may stop from level 4 (17 evaluations) and certifies down to its rounding floor. The cap is 16 levels, 65,537
+     * evaluations, then error::not_converged with the best estimate; fn with a kink or a singular derivative reach it.
+     *
+     * Since it samples the ends, a singularity at an end is error::non_finite; use TanhSinh. An infinite end is
+     * error::non_finite; use TanhSinh.
      */
     struct Romberg
     {
         /**
-         * @brief T_0 from the ends, then level 1 (iterative_method).
+         * @brief Begins the integration, for integrate(): T_0 from the ends, then level 1 (iterative_method).
          * @tparam T The real type.
          * @tparam F fn's type.
          * @param fn The function.
@@ -4191,7 +4852,8 @@ namespace nxx::quadrature {
         { return detail::romberg_start(fn, a, b); }
 
         /**
-         * @brief The next level (iterative_method).
+         * @brief Takes the next level: the step halved, the new midpoints added, the row extrapolated
+         * (iterative_method).
          * @tparam T The real type.
          * @tparam F fn's type.
          * @param fn The function.
@@ -4203,7 +4865,7 @@ namespace nxx::quadrature {
         { return detail::romberg_advance(fn, s); }
 
         /**
-         * @brief Nothing to refine (iterative_method).
+         * @brief Does nothing: Romberg's step is final as reported (iterative_method).
          * @tparam T The real type.
          * @param s The state.
          * @return Nothing.
@@ -4214,29 +4876,35 @@ namespace nxx::quadrature {
     };
 
     /**
-     * @brief The G7-K15 Gauss-Kronrod pair, globally adaptive: the default method; an iterative method, one step per
-     * bisection. Only N = 15 exists.
+     * @brief The default method, adaptive Gauss-Kronrod (G7-K15), for most integrals on a finite interval: it
+     * subdivides where its estimate is largest, so it copes with kinks, steps, peaks and mild endpoint singularities
+     * without being told where they are.
      *
-     * The interval starts as 10 equal panels, 150 evaluations of fn (for an expensive fn that must cost less, use
-     * GaussLegendre<N>, which has no estimate, or Romberg); then the panel with the largest estimate is bisected,
-     * 30 evaluations a step, until the sum of the estimates meets the criteria. A panel's estimate is |K15 - G7| on its
-     * 15 points, or its floor if larger: it estimates the 7-point rule's error, not the returned 15-point result's, so it
-     * usually overstates the error by orders of magnitude, but it is not a bound. What it misses: a feature narrower
-     * than the spacing of the points (a narrow peak between them), and a kink or a step near a panel's ends, outside the
-     * outermost points, which neither rule samples. An endpoint singularity stronger than about (x - a)^-0.65 is
-     * underestimated by a ratio that bisection does not change; substitute x = a + u^k with k (1 + alpha) >= 1 for
-     * (x - a)^alpha (and u = b - x for the other end), or use TanhSinh. Full precision in a 50-digit type is costly:
-     * the estimate converges at the 7-point rule's order. An infinite end is error::non_finite; use TanhSinh (alone,
-     * or on the infinite part of a split interval).
+     * Choose another method for an endpoint singularity stronger than about (x - a)^-0.65, or many digits in a
+     * multiprecision type (TanhSinh); for an infinite end (TanhSinh, alone or on the infinite part of a split
+     * interval); or for an fn that must cost fewer than its 150 evaluations (GaussLegendre<N>, which has no estimate).
      *
-     * @tparam N The number of Kronrod points: 15.
+     * An iterative method, one step per bisection. The interval starts as 10 equal panels, 150 evaluations of fn; then
+     * the panel with the largest estimate is bisected, 30 evaluations a step, until the sum of the estimates meets the
+     * criteria. A panel's estimate is |K15 - G7| on its 15 points, or its floor if larger: it estimates the 7-point
+     * rule's error, not the returned 15-point result's, so it usually overstates the error by orders of magnitude, but
+     * it is not a bound.
+     *
+     * What it misses: a feature narrower than the spacing of the points (a narrow peak between them), and a kink or a
+     * step near a panel's ends, outside the outermost points, which neither rule samples; split the interval at a known
+     * feature. An endpoint singularity stronger than about (x - a)^-0.65 is underestimated by a ratio that bisection
+     * does not change; substitute x = a + u^k with k (1 + alpha) >= 1 for (x - a)^alpha (and u = b - x for the other
+     * end), or use TanhSinh. Full precision in a 50-digit type is costly: the estimate converges at the 7-point rule's
+     * order. An infinite end is error::non_finite.
+     *
+     * @tparam N The number of Kronrod points: only 15 exists.
      */
     template<int N>
     requires(N == 15)
     struct GaussKronrod
     {
         /**
-         * @brief The initial mesh of 10 equal panels (iterative_method).
+         * @brief Begins the integration, for integrate(): the initial mesh of 10 equal panels (iterative_method).
          * @tparam T The real type.
          * @tparam F fn's type.
          * @param fn The function.
@@ -4252,7 +4920,8 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief One bisection of the panel with the largest estimate (iterative_method).
+         * @brief Bisects the panel with the largest estimate, so that the work goes where fn is hardest
+         * (iterative_method).
          * @tparam T The real type.
          * @tparam F fn's type.
          * @param fn The function.
@@ -4264,7 +4933,8 @@ namespace nxx::quadrature {
         { return detail::kronrod_advance(fn, s); }
 
         /**
-         * @brief The step from the sums formed afresh from the panels, before any decision to stop (iterative_method).
+         * @brief Forms the sums afresh from the panels before integrate() decides, so that a decision never rests on
+         * running sums that rounding has drifted (iterative_method).
          * @tparam T The real type.
          * @param s The state.
          * @return Nothing, or error::non_finite.
@@ -4275,88 +4945,76 @@ namespace nxx::quadrature {
     };
 
     /**
-     * @brief The tanh-sinh rule (Takahasi and Mori 1974): the trapezoidal rule after the substitution
-     * x = tanh(sinh t), the step halved level by level; an iterative method, one step per level. For endpoint
-     * singularities, smooth fn and high precision; weak on kinks, steps and narrow peaks inside the interval, where
-     * the default, GaussKronrod<15>, subdivides. It is the one method that takes infinite ends, with the map the
-     * ends choose: tanh-sinh on [a, b], exp-sinh on [a, inf) and (-inf, b], sinh-sinh on (-inf, inf) (below).
+     * @brief The tanh-sinh rule and its forms for infinite intervals, for an integrand singular at an end (log x,
+     * 1 / sqrt x), for many digits in a multiprecision type, and for an infinite interval, which no other method takes.
      *
-     * Level 0 samples fn at the centre and at t = 1, 2, ..., level k at the odd multiples of 2^-k, so each level reuses
-     * every earlier evaluation. The points crowd towards the ends double exponentially but never reach them, so log x
-     * or 1 / sqrt x at an end is integrated as it is. Each side stops at its first point that rounds onto the end, at
-     * a negligible term, or at a value that is not finite within eps times the half-width of the end and beyond its
-     * kept points (a singular end); a value that is not finite elsewhere is error::non_finite. The estimate is the
-     * difference of the last two levels plus a bound on what lies beyond each side's last point; it may stop from
-     * level 4, about 70 to 140 evaluations (the default needs 150), and certifies down to twice its rounding floor.
-     * The cap is 10 levels, then error::not_converged, without a best where the bound beyond an end is unbounded (the
-     * terms grow towards it, as for 1/x).
+     * Not for kinks, steps or narrow peaks inside the interval: there it usually fails honestly, with not_converged,
+     * where the default, GaussKronrod<15>, subdivides; split the interval at a known feature, or fall back to the
+     * default (see integrate()). On smooth fn its cost is comparable to the default's; with an endpoint singularity it
+     * is several times cheaper.
+     *
+     * The trapezoidal rule after the substitution x = tanh(sinh t) (Takahasi and Mori 1974), the step halved level by
+     * level; an iterative method, one step per level. Level 0 samples fn at the centre and at t = 1, 2, ..., level k at
+     * the odd multiples of 2^-k, so each level reuses every earlier evaluation. The points crowd towards the ends
+     * double exponentially but never reach them, so log x or 1 / sqrt x at an end is integrated as it is. Each side
+     * stops at its first point that rounds onto the end, at a negligible term, or at a value that is not finite within
+     * eps times the half-width of the end and beyond its kept points (a singular end); a value that is not finite
+     * elsewhere is error::non_finite. The estimate is the difference of the last two levels plus a bound on what lies
+     * beyond each side's last point; it may stop from level 4 and certifies down to twice its rounding floor. The cap
+     * is 10 levels, then error::not_converged, without a best where the bound beyond an end is unbounded (the terms
+     * grow towards it, as for 1/x).
      *
      * Its steps, observed: report i is level i; level 0 has no current; a later report without one means the estimate
      * is unbounded; `ready` from report 4, `exhausted` only at report 9 (or at report 0, with no point strictly
-     * inside). The evaluations roughly double per level (e^x
-     * on [0, 1]: 10, 18, 33, 62 and 121 in all after each level). A failure at level 0, such as non_finite for
-     * sqrt(x - 0.5), gives no report: record fn's arguments to find it. A run to the cap (1/x: 5,159 evaluations) can
-     * be stopped by an observer that throws.
+     * inside). The evaluations roughly double per level. A failure at level 0, such as non_finite for sqrt(x - 0.5),
+     * gives no report: record fn's arguments to find it. A run to the cap can be stopped by an observer that throws.
      *
+     * The limits on a finite interval, each with its remedy:
      * - A singularity at an end other than 0 is limited by the spacing of T near that end: substitute u = b - x (or
      *   u = x - a) and write fn in u, since fn(b - u) rounds b - u and loses what the substitution gains.
-     * - A success's abs_error can exceed the request where the slivers between the last points and the ends dominate
-     *   the floor: 1 on [1, 1 + 1e-9] ends ok with abs_error 2.0e-7 relative. Each sliver is up to about an ulp of
-     *   its end (1.6 half-ulps at most on widths from 1e-10 to 1e-8 next to 1), so it matters on an interval a few
-     *   million ulps wide or less.
+     * - A success's abs_error can exceed the request on an interval a few million ulps wide or less, where the slivers
+     *   between the last points and the ends, each up to about an ulp of its end, dominate the floor.
      * - Compile time: its node tables are instantiated wherever integrate<TanhSinh> is for float, double or long
-     *   double, more for long double; instantiate it in one translation unit (the figure for both tables below).
+     *   double, both maps' tables whatever the ends, more for long double; instantiate it in one translation unit.
      * - Constant evaluation: fn rational, or built from one's own constexpr functions (std::sqrt and the like are not
-     *   constexpr on Clang and MSVC); about 240 constexpr steps per evaluation on Clang in float, double and long
-     *   double. A class type has no compile-time table, so each level reached is generated in the same evaluation,
-     *   about 940 steps per node on Clang: only a run that stops by about level 5 fits the default limit.
-     * - High precision: the first call in a type without a table builds the levels it reaches, about 14 us per node in
-     *   cpp_bin_float_50 (36 us in cpp_dec_float_50), 154 ms (343 ms) for all, then keeps them; a type that changes
-     *   its precision at run time sees its first. The infinite maps' table likewise: about 16 us a node, 0.17 s for all
-     *   in cpp_bin_float_50.
+     *   constexpr on Clang and MSVC). A class type has no compile-time table, so each level reached is generated in
+     *   the same evaluation: only a run that stops within the first few levels fits the default limit.
+     * - High precision: the first call in a type without a table builds the levels it reaches, which takes a noticeable
+     *   fraction of a second for the whole table, then keeps them; a type that changes its precision at run time sees
+     *   its first.
      *
      * Infinite ends (PHASE4_API.md): exp-sinh x = a + E on [a, inf) (b - E on (-inf, b]), sinh-sinh x = +-sinh u on the
      * line, with u = c sinh t, E = e^u and c = 3/2; the side towards a finite end takes x = a + e^-u. Level 0 samples
-     * the centre (a + 1, b - 1, or 0) and t = 1, 2, ..., at most 13 points in double (43 in cpp_bin_float_50); it
-     * calls fn at |x| up to about 1e131 in double, later levels up to about 1e305 on a side that is not pruned. A
-     * value that is not finite towards infinity, beyond the kept points, ends the side as a tail where |x| exceeds
-     * 1/eps or the last kept term is already negligible, and is error::non_finite elsewhere; a value below min()
-     * there is not taken as negligible, since its weight reaches max / 2. e^-x on [0, inf) costs 100 evaluations,
-     * e^-x^2 on the line 99, x^-1.5 on [1, inf) 141, x^2 e^-x 156. The limits, measured in double:
-     * - The maps centre at 0 (the line) or at the finite end, at scale 1. A peak far from 0 on the line is missed:
-     *   e^-(x - x0)^2 is ok up to x0 = 39, then an honest not_converged; from about 180 the outcome alternates between
-     *   that, a best below its error and a false success; from about 1,600 every run is a false success (ok, 0). Split
-     *   at the peak, or substitute x = x0 + u: each half of e^-(x - 1e3)^2 split at 1e3 is ok in 85. A half line far
-     *   from 0 is cut by rounding near a, its abs_error growing with ulp(a): a = 1e10, ok +- 1.1e-6; a = 1e15, ok
-     *   +- 0.094, far above the request; from |a| about 1e16 no point is inside. Substitute x = a + u with fn written
-     *   in u. A narrow feature on the line (e^-(x / 1e-3)^2) is an honest not_converged in 33 evaluations,
-     *   substituted ok in 99; a wide one costs evaluations, not accuracy (e^(-x / L) on [0, inf): 81 to 868 for L
-     *   from 1e-2 to 1e6).
-     * - A value not finite nearer than the tail rule allows is error::non_finite: x^k e^-x is ok up to k = 50 in
-     *   double and 16 in float (x^k overflows before e^-x underflows); write fn so that it stays finite where its
-     *   factors do not, as x^k e^-x = exp(k log x - x).
-     * - Values below min() towards infinity are not used: 1e-300 x^-1.5 on [1, inf) is an honest not_converged
-     *   (error 2.8e-3), 1e-250 x^-1.01 likewise. Scale fn.
-     * - Slow decay: x^-1.01 on [1, inf) is an honest not_converged in double (best 99.91, error 0.09); ok in
-     *   binary128 and cpp_bin_float_50.
+     * the centre (a + 1, b - 1, or 0) and t = 1, 2, .... It calls fn at very large |x|, up to about 1e305 in double on
+     * a side that is not pruned. A value that is not finite towards infinity, beyond the kept points, ends the side as
+     * a tail where |x| exceeds 1/eps or the last kept term is already negligible, and is error::non_finite elsewhere; a
+     * value below min() there is not taken as negligible, since its weight reaches max / 2. The limits, each with its
+     * remedy:
+     * - The maps centre at 0 (the line) or at the finite end, at scale 1. A peak far from 0 on the line is missed,
+     *   first as an honest not_converged, farther out as a false success (ok, 0): split at the peak, or substitute
+     *   x = x0 + u. A half line far from 0 is cut by rounding near a, its abs_error growing with ulp(a), until from
+     *   |a| about 1/eps no point is inside: substitute x = a + u with fn written in u. A narrow feature on the line is
+     *   not_converged: substitute to widen it. A wide one costs evaluations, not accuracy.
+     * - A value not finite nearer than the tail rule allows is error::non_finite (x^k e^-x for large k, where x^k
+     *   overflows before e^-x underflows): write fn so that it stays finite where its factors do not, as
+     *   x^k e^-x = exp(k log x - x).
+     * - Values below min() towards infinity are not used, so an fn that small is not_converged: scale fn.
+     * - Slow decay (x^-1.01 on [1, inf)) is not_converged in double: use a type with more digits.
      * - Oscillation and no integral (sin x / x, sin x, 1/x, 1 on [0, inf)): not_converged; their bests, where any,
-     *   are not reliable (sin x / x has one below its error).
-     * - A singular end other than 0 is limited by the spacing near it, as on a finite interval: (x - 1)^-0.5 e^-x on
-     *   [1, inf) is ok at 1e-6 and an honest not_converged at the default; with u = x - 1 written in fn, ok in 111.
-     * - A large number written for infinity integrates that finite interval: e^-x on [0, 1e10] is ok, on [0, 1e300]
-     *   an honest not_converged.
-     * - Compile time and constant evaluation: integrate<TanhSinh> instantiates both tables, about 1.0 s more per
-     *   translation unit than the default method for double (GCC; Clang 0.8 s), whatever the ends; about 180 Clang
-     *   steps per evaluation on the infinite maps in double, about 1,050 per node of a level generated for a class
-     *   type.
+     *   are not reliable.
+     * - A singular end other than 0 is limited by the spacing near it, as on a finite interval: substitute.
+     * - A large number written for infinity integrates that finite interval, which may not converge where the infinite
+     *   one would: write the infinity.
+     *
+     * The measured figures behind these limits are in docs/quadrature/design.md, "TanhSinh's measured limits".
      */
     struct TanhSinh
     {
-        /** @brief It takes infinite ends: exp-sinh on a half line, sinh-sinh on the line. */
+        /** @brief Opts in to infinite ends: exp-sinh on a half line, sinh-sinh on the line (estimating_method). */
         static constexpr bool infinite_ends = true;
 
         /**
-         * @brief Level 0 (iterative_method), of the map the ends choose.
+         * @brief Begins the integration, for integrate(): level 0 of the map the ends choose (iterative_method).
          * @tparam T The real type.
          * @tparam F fn's type.
          * @param fn The function.
@@ -4367,12 +5025,13 @@ namespace nxx::quadrature {
         template<real T, typename F>
         constexpr std::expected<detail::TanhSinhState<T>, Failure<T>> start(F &fn, T const &a, T const &b) const
         {
+            // Both ends finite: tanh-sinh; otherwise exp-sinh or sinh-sinh, which exp_sinh_start chooses by the ends.
             if (nxx::math::isfinite(a) && nxx::math::isfinite(b)) return detail::tanh_sinh_start(fn, a, b);
             return detail::exp_sinh_start(fn, a, b);
         }
 
         /**
-         * @brief The next level (iterative_method).
+         * @brief Takes the next level, the step halved, on the map start chose (iterative_method).
          * @tparam T The real type.
          * @tparam F fn's type.
          * @param fn The function.
@@ -4387,7 +5046,7 @@ namespace nxx::quadrature {
         }
 
         /**
-         * @brief Nothing to refine (iterative_method).
+         * @brief Does nothing: TanhSinh's step is final as reported (iterative_method).
          * @tparam T The real type.
          * @param s The state.
          * @return Nothing.
@@ -4398,13 +5057,12 @@ namespace nxx::quadrature {
     };
 
     /**
-     * @brief The integral of @p fn from @p a to @p b by the fixed rule @p m, given as a value: a plain number, no error
-     * estimate and no criteria.
+     * @brief Integrates @p fn from @p a to @p b with a fixed rule given as a value, for a rule that carries parameters
+     * (a user's rule with a number of panels): a plain number, no error estimate and no criteria.
      *
      * The ends are validated (NaN or infinite: error::non_finite, since no fixed rule takes an infinite end) and put
-     * in order; a == b is 0 without calling fn;
-     * b < a negates. The rule's value is checked: one that is not finite is error::non_finite. fn's exceptions pass
-     * through unchanged.
+     * in order; a == b is 0 without calling fn; b < a negates. The rule's value is checked: one that is not finite is
+     * error::non_finite. fn's exceptions pass through unchanged.
      *
      * @code
      * namespace qd = nxx::quadrature;
@@ -4432,23 +5090,26 @@ namespace nxx::quadrature {
         auto &&f = detail::as_object(fn);
         std::expected<T, error> const r =
             b < a ? m.apply(f, b, a).transform([](T const &v) { return T(-v); }) : m.apply(f, a, b);
+        // A user's rule may return a value that is not finite; the contract promises the caller one that is.
         if (r && !nxx::math::isfinite(*r)) return std::unexpected(error::non_finite);
         return r;
     }
 
     /**
-     * @brief The integral of @p fn from @p a to @p b by the method @p m with an error estimate, given as a value: an
-     * iterative_method, whose loop integrate() runs, or an estimating_method.
+     * @brief Integrates @p fn from @p a to @p b with a method given as a value, for a method that carries parameters (a
+     * user's method, a combinator around another method): the integral and an estimate of its error, or why there is
+     * none.
      *
-     * The criteria are validated (negative or not finite: error::non_finite) and rel_tol clamped to 1; the ends are
-     * validated (NaN: error::non_finite; infinite: error::non_finite unless the method takes infinite ends, which
-     * TanhSinh alone of the library's methods does) and put in order, (inf, a) as (a, inf) and (inf, -inf) as
-     * (-inf, inf); a == b, the same infinity included, is {0, 0} without calling fn; b < a negates the value and a
-     * best's value.
-     * An iterative method stops when its step is ready and its estimate meets max(criteria.abs_tol,
-     * criteria.rel_tol |value|) or the error the method can certify (for the library's methods, the rounding floor;
-     * see Criteria). The result is checked: a value or an estimate that is not finite, or a negative estimate, is
-     * error::non_finite. The estimate is not a bound (see Integral). fn's exceptions pass through unchanged.
+     * Every other form with an estimate calls this one. The method is an iterative_method, whose loop integrate() runs,
+     * or an estimating_method. The criteria are validated (negative or not finite: error::non_finite) and rel_tol
+     * clamped to 1; the ends are validated (NaN: error::non_finite; infinite: error::non_finite unless the method takes
+     * infinite ends, which TanhSinh alone of the library's methods does) and put in order, (inf, a) as (a, inf) and
+     * (inf, -inf) as (-inf, inf); a == b, the same infinity included, is {0, 0} without calling fn; b < a negates the
+     * value and a best's value. An iterative method stops when its step is ready and its estimate meets
+     * max(criteria.abs_tol, criteria.rel_tol |value|) or the error the method can certify (for the library's methods,
+     * the rounding floor; see Criteria). The result is checked: a value or an estimate that is not finite, or a
+     * negative estimate, is error::non_finite. The estimate is not a bound (see Integral). fn's exceptions pass through
+     * unchanged.
      *
      * @code
      * namespace qd = nxx::quadrature;
@@ -4512,8 +5173,8 @@ namespace nxx::quadrature {
     }
 
     /**
-     * @brief The integral of @p fn from @p a to @p b by the fixed rule @p M, named: N evaluations of fn for
-     * GaussLegendre<N>, a plain number, no error estimate and no criteria. integrate(M{}, fn, a, b).
+     * @brief Integrates @p fn from @p a to @p b with the fixed rule M, named, for exactly N evaluations and a plain
+     * number: integrate<GaussLegendre<N>>(fn, a, b), the same as integrate(M{}, fn, a, b).
      *
      * fn is evaluated at the N interior nodes, never at an end, except that on an interval a few ulps wide a node can
      * round onto an end. fn's exceptions pass through unchanged.
@@ -4539,8 +5200,10 @@ namespace nxx::quadrature {
     { return nxx::quadrature::integrate(M{}, fn, a, b); }
 
     /**
-     * @brief The integral of @p fn from @p a to @p b by the method @p M with an error estimate, named: GaussKronrod<15>,
-     * the default, TanhSinh, Romberg, or a user's. integrate(M{}, fn, a, b, criteria).
+     * @brief Integrates @p fn from @p a to @p b with the method M, named, or the default GaussKronrod<15>: the form for
+     * most calls, returning the integral and an estimate of its error, or why there is none.
+     *
+     * The same as integrate(M{}, fn, a, b, criteria).
      *
      * @code
      * namespace qd = nxx::quadrature;
@@ -4552,12 +5215,13 @@ namespace nxx::quadrature {
      * else if (r.error().best) report(r.error().best->value, r.error().best->abs_error);
      * @endcode
      *
-     * Choosing a method:
-     * - An endpoint singularity (log x, x^-0.9), or high precision in a multiprecision type: TanhSinh, 3 to 9 times
+     * Choosing a method (each method's comment says more):
+     * - An endpoint singularity (log x, x^-0.9), or high precision in a multiprecision type: TanhSinh, several times
      *   cheaper than the default with an endpoint singularity, comparable on smooth fn.
      * - Kinks, steps, narrow peaks inside the interval, or an fn whose shape is unknown: the default, which
      *   subdivides. TanhSinh usually fails honestly there, with not_converged, which is why it is not the default.
-     * - An fn too expensive for about 100 evaluations: GaussLegendre<N>, which has no estimate.
+     * - An fn too expensive for about 100 evaluations, or an integral inside another algorithm: GaussLegendre<N>,
+     *   which has no estimate.
      * - An infinite interval: TanhSinh, the only method that takes an infinite end (see TanhSinh for its limits).
      *
      * A fallback from TanhSinh to the default for interior features. It accepts the default's success only where it
@@ -4596,8 +5260,8 @@ namespace nxx::quadrature {
     { return nxx::quadrature::integrate(M{}, fn, a, b, criteria); }
 
     /**
-     * @brief The integral of @p fn from @p a to @p b by the iterative method @p M, named, with each step reported to
-     * the observer @p o: the same result as integrate<M>(fn, a, b, criteria).
+     * @brief Integrates @p fn from @p a to @p b with the iterative method M, named, showing each step to the observer
+     * @p o, to watch the method converge or find why it failed: the same result as integrate<M>(fn, a, b, criteria).
      *
      * @code
      * namespace qd = nxx::quadrature;
@@ -4624,8 +5288,8 @@ namespace nxx::quadrature {
     { return nxx::quadrature::integrate(detail::observed(M{}, std::move(o)), fn, a, b, criteria); }
 
     /**
-     * @brief The integral of @p fn from @p a to @p b by the iterative method @p m, given as a value, with each step
-     * reported to the observer @p o: the same result as integrate(m, fn, a, b, criteria).
+     * @brief Integrates @p fn from @p a to @p b with the iterative method @p m, given as a value, showing each step to
+     * the observer @p o: the same result as integrate(m, fn, a, b, criteria).
      *
      * @code
      * namespace qd = nxx::quadrature;
@@ -4652,12 +5316,15 @@ namespace nxx::quadrature {
 
 } // namespace nxx::quadrature
 
-/** @brief The standard library's formatter, specialised for nxx::quadrature::error and nxx::quadrature::Failure. */
+/**
+ * @brief The standard library, for the std::formatter specialisations that let std::format and std::print write
+ * nxx::quadrature::error and nxx::quadrature::Failure.
+ */
 namespace std {
 
     /**
-     * @brief Formats an nxx::quadrature::error as the name of its enumerator, such as `not_converged`, with the format
-     * specification of a string.
+     * @brief Lets std::format and std::print write an nxx::quadrature::error, as the name of its enumerator, such as
+     * `not_converged`, with the format specification of a string.
      *
      * @code
      * if (!g) std::println("no integral: {}", g.error());   // no integral: non_finite
@@ -4667,7 +5334,7 @@ namespace std {
     struct formatter<nxx::quadrature::error> : formatter<string_view>
     {
         /**
-         * @brief Writes the name of @p e.
+         * @brief Writes the name of @p e, for std::format.
          *
          * @tparam FormatContext The format context.
          * @param e The error.
@@ -4680,9 +5347,11 @@ namespace std {
     };
 
     /**
-     * @brief Formats an nxx::quadrature::Failure as the name of its reason, such as `not_converged`, with the format
-     * specification of a string. The best estimate is not written: that would need a formatter for T, which
-     * Boost.Multiprecision's types do not have; format `f.best->value` where T has one.
+     * @brief Lets std::format and std::print write an nxx::quadrature::Failure, as the name of its reason, such as
+     * `not_converged`, with the format specification of a string.
+     *
+     * The best estimate is not written: that would need a formatter for T, which Boost.Multiprecision's types do not
+     * have; format `f.best->value` where T has one.
      *
      * @code
      * if (!r) std::println("no integral: {}", r.error());   // no integral: not_converged
@@ -4694,7 +5363,7 @@ namespace std {
     struct formatter<nxx::quadrature::Failure<T>> : formatter<string_view>
     {
         /**
-         * @brief Writes the name of @p f's reason.
+         * @brief Writes the name of @p f's reason, for std::format.
          *
          * @tparam FormatContext The format context.
          * @param f The failure.

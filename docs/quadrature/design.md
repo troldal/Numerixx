@@ -831,6 +831,50 @@ double takes 2.03 s on GCC 16 against 0.98 s with the default method (1.44 s bef
 on Clang 22 (1.07 s before): `start` chooses the map at run time, so both tables are instantiated wherever the method
 is, whatever the ends.
 
+### TanhSinh's measured limits (moved from the header in Phase 5a)
+
+Until Phase 5a, `TanhSinh`'s comment in `quadrature.hpp` carried the figures behind each limit; the header now keeps
+one sentence per limit with its remedy (the user's decision, `docs/plan.md`, Milestone 4 Phase 5). The figures, in
+double unless noted, with where each was measured:
+
+- **Cost and steps** (`PHASE3B_API.md`, `PHASE3_API.md`): the minimum, 5 levels, is about 70 to 140 evaluations (the
+  default needs 150); with an endpoint singularity 3 to 9 times fewer evaluations than Gauss-Kronrod at the median. The
+  evaluations after each level for e^x on [0, 1]: 10, 18, 33, 62 and 121 in all; 1/x on [0, 1] runs to the cap in
+  5,159 evaluations (both above, "Evidence (Phase 3b)").
+- **Slivers** (`PHASE3B_API.md` D3 and its independent review): 1 on [1, 1 + 1e-9] ends ok with abs_error 2.0e-7
+  relative against a request of 1.5e-8; a sliver reaches 1.6 half-ulps of its end at most on widths from 1e-10 to 1e-8
+  next to 1.
+- **Compile time** (above, "Evidence (Phase 4 step 2)"): `integrate<TanhSinh>` instantiates both tables, about 1.0 s
+  more per translation unit than the default method for double on GCC 16 (2.03 against 0.98 s, Debug, -O0 -g) and
+  0.8 s on Clang 22 (1.53 against 0.76 s), whatever the ends.
+- **Constant evaluation** (above, the evidence of Phases 3b, 4 step 1 and 4 step 2): on Clang, about 240 steps per
+  evaluation in float, double and long double on a finite interval, about 180 on the infinite maps in double; a class
+  type without a table generates each level in the same evaluation, about 940 steps per node (tanh-sinh) and 1,050
+  (exp-sinh), so only a run that stops by about level 5 fits the default limit.
+- **High precision** (`PHASE3_API.md` B, `PHASE3B_API.md`; above, "Evidence (Phase 4 step 1)"): the first call in a
+  type without a table builds the levels it reaches, about 14 us per node in `cpp_bin_float_50` (36 us in
+  `cpp_dec_float_50`), 154 ms (343 ms) for the whole table; the exp-sinh table about 16 us a node, 0.17 s for all in
+  `cpp_bin_float_50`.
+- **Infinite ends** (`PHASE4_API.md` B and F, measured at c = 3/2):
+  - Level 0 samples at most 13 points in double (43 in `cpp_bin_float_50`) and calls fn at |x| up to about 1e131 in
+    double; later levels reach about 1e305 on a side that is not pruned.
+  - e^-x on [0, inf) costs 100 evaluations, e^-x^2 on the line 99, x^-1.5 on [1, inf) 141, x^2 e^-x 156.
+  - A peak far from 0 on the line: e^-(x - x0)^2 is ok up to x0 = 39, then an honest not_converged; from about 180 the
+    outcome alternates between that, a best below its error and a false success; from about 1,600 every run is a
+    false success (ok, 0). Split at 1e3, each half of e^-(x - 1e3)^2 is ok in 85.
+  - A half line far from 0: a = 1e10, ok +- 1.1e-6; a = 1e15, ok +- 0.094, far above the request; from |a| about 1e16
+    no point is inside.
+  - A narrow feature on the line, e^-(x / 1e-3)^2: an honest not_converged in 33 evaluations, substituted ok in 99. A
+    wide one, e^(-x / L) on [0, inf): 81 to 868 evaluations for L from 1e-2 to 1e6.
+  - Values not finite: x^k e^-x is ok up to k = 50 in double and 16 in float, non_finite beyond.
+  - Values below min(): 1e-300 x^-1.5 on [1, inf) is an honest not_converged (error 2.8e-3), 1e-250 x^-1.01 likewise.
+  - Slow decay: x^-1.01 on [1, inf) is an honest not_converged in double (best 99.91, error 0.09); ok in binary128 and
+    `cpp_bin_float_50`.
+  - Oscillation: sin x / x on [0, inf) has a best below its error.
+  - A singular end other than 0: (x - 1)^-0.5 e^-x on [1, inf) is ok at 1e-6 and an honest not_converged at the
+    default; with u = x - 1 written in fn, ok in 111.
+  - A large number for infinity: e^-x on [0, 1e10] is ok, on [0, 1e300] an honest not_converged.
+
 ### The references of the tanh-sinh tests
 
 `tests/quadrature_tanh_sinh_reference.hpp`, run as `python -I ts_references.py > quadrature_tanh_sinh_reference.hpp`:

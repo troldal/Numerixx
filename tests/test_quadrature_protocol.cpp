@@ -476,6 +476,16 @@ TEST_CASE("quadrature: protocol: reversed ends give exactly the negated result")
     REQUIRE(g.has_value());
     CHECK(*g == -*qd::integrate<qd::GaussLegendre<20>>(peak, -0.5, 1.0));
     CHECK(*qd::integrate(Midpoint{ .panels = 3 }, square, 3.0, 0.0) == -8.75);
+
+    // integrate()'s comment for a fixed rule as a value: Midpoint{.panels = 1000} on e^x over [0, 1]. The composite
+    // midpoint rule errs by -(b - a) h^2 f''(xi) / 24 (h = 1/1000, f'' = e^x in [1, e]), so it falls short of e - 1 by
+    // between h^2 / 24 = 4.2e-8 and e h^2 / 24 = 1.2e-7; its plain sum of 1000 terms rounds by at most 1000 eps (e - 1)
+    // = 3.8e-13, which the margin 1e-12 covers.
+    auto const m = qd::integrate(Midpoint{ .panels = 1000 }, [](double x) { return std::exp(x); }, 0.0, 1.0);
+    REQUIRE(m.has_value());
+    double const shortfall = static_cast<double>(bin100(bin100(e_minus_1) - bin100(*m)));
+    CHECK(shortfall >= 1e-6 / 24.0 - 1e-12);
+    CHECK(shortfall <= 2.7183 * 1e-6 / 24.0 + 1e-12);
 }
 
 // --- What a method receives, and the validation before it --------------------------------------------------------------
