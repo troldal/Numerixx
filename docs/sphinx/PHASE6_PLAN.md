@@ -1,6 +1,6 @@
 # Milestone 3, Phase 6: one source, two manuals (online and PDF)
 
-Status: approved (2026-11-03), at the user's request; steps 1 to 3 done, the independent review next.
+Status: done (2026-11-03), at the user's request: steps 1 to 3 and the independent review.
 
 The pages in `docs/sphinx/` become the source of two manuals: the HTML site, as now, and a PDF built by Sphinx's LaTeX
 builder and latexmk. Nothing is written twice. The pages stop speaking of a site, and the PDF gets its own root and
@@ -101,24 +101,27 @@ One commit each, the user deciding the next.
 
 ## Success criteria
 
-- [ ] `numerixx_docs` builds the site and the LaTeX source with no warning, locally and in CI; the site is unchanged
-  but for the wording
-- [ ] `numerixx_docs_pdf` builds the PDF with no LaTeX error; its contents list the seven chapters and the index;
-  every cross-reference shows a page number
-- [ ] No "site" or "page" wording left in the pages; the check fails a build that adds one
-- [ ] No code line wraps; no overfull line over 5 pt in the latexmk log
-- [ ] The book link works in the HTML and the PDF names the file beside it
-- [ ] The examples' tests pass on all five toolchains (the pages' quoted output is unchanged)
-- [ ] The reviews and Codex, with the adopted findings recorded here
+- [x] `numerixx_docs` builds the site and the LaTeX source with no warning, locally and in CI (b57129c: run
+  41689684905); the site changed beyond the wording only where step 2 and 3 say (the overviews' last sections, the
+  deriv table's two rows, the concepts' requires-expressions, two stale sentences)
+- [x] `numerixx_docs_pdf` builds the PDF (95 pages) with no LaTeX error; its contents list the seven chapters and the
+  index; every link to a chapter or a section shows its page (145), a C++ name by design not (step 3)
+- [x] No "site" or "page" wording left in the pages; the check fails a build that adds one (tried on a scratch copy)
+- [x] No code line wraps (the check, and the widest lines read in the PDF); no overfull line over 5 pt in the latexmk
+  log (one `\vbox` of 1.2 pt)
+- [x] The book link works in the HTML and the PDF names the file beside it
+- [x] The examples' tests pass on all five toolchains (run 41689684905; the three re-wrapped programs compare their
+  output with the quoted text)
+- [x] The reviews and Codex, with the adopted findings recorded here
 
 ## Step 1, done
 
 The 35 lines reworded; voice rule 7 in `PHASE4_PLAN.md`; the `source-read` check, which fails the build on "page",
-"site" (but "call site"), "click" or "scroll", tried on a scratch copy with added web-only words, one broken across
-a line, and a "call site" (each reported with its line, the call site not); `CLAUDE.md`, `docs/plan.md` and the two
-docs agents. `docs-reviewer`: nothing major; adopted the broader check, "this tutorial" and "All the output quoted in this section" where "section" would
-read as a subsection, the step page's link to where its output is, "throughout this manual", the aliases sentence and
-two re-wraps; the guide's edge in the PDF goes to step 2.
+"site" (but "call site"), "click" or "scroll", tried on a scratch copy with added web-only words, one broken across a
+line, and a "call site" (each reported with its line, the call site not); `CLAUDE.md`, `docs/plan.md` and the two docs
+agents. `docs-reviewer`: nothing major; adopted the broader check, "this tutorial" and "All the output quoted in this
+section" where "section" would read as a subsection, the step page's link to where its output is, "throughout this
+manual", the aliases sentence and two re-wraps; the guide's edge in the PDF goes to step 2.
 
 ## Step 2, done
 
@@ -167,6 +170,23 @@ cannot break runs under the next column, unreported. All eleven tables read in t
   fixed above; the reference's text from the headers and the page-break polish (items 6 and 7) are deferred in
   `docs/plan.md`, at the user's choice.
 - Overfull boxes: none but one `\vbox` of 1.2 pt.
+
+## The independent review (Codex, on 3149643..b57129c)
+
+No blocking defect; four edge cases in the extensions, each reproduced, none reached by the current pages:
+1. The code-width check counted a tab as one column; LaTeX sets it to the next multiple of 8 (15 tabs and an "x":
+   16 counted, 121 rendered). Adopted: tabs expanded before measuring.
+2. A parsed-literal block in the reference would get the 122-column allowance without the smaller type, and a doctest
+   block is neither checked nor resized. Not adopted: neither occurs, and MyST makes no doctest blocks.
+3. A link whose text is code lost its page even when it points to a section (`` [`Results`](basics.md#results) ``,
+   reproduced in a scratch build). Adopted: the target alone decides; the PDF keeps its 145 page references.
+4. The "call site" exemption missed "call" and "site" on two lines, and the check read link destinations
+   (`.../sites/...`). Adopted: "call" is looked for before "site" across whitespace, and destinations are blanked,
+   keeping line numbers.
+
+Found correct: the writer's context and groups against Sphinx 9.2 and Breathe 5.1, the `visit_Text` rewrite, the
+root switch and the include between markers (no link into an excluded root, no duplicate label), the CMake order and
+cleaning, the case without latexmk, the copied book, the wording, and all 224 code blocks within their limits.
 
 ## The user's decisions (2026-11-03)
 

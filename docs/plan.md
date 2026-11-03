@@ -126,12 +126,12 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
 
 A manual for library users, beside the API reference: Doxygen reads the headers and stays the gate that every public
 entity is documented; Sphinx with Breathe and MyST (Markdown) renders the site, and from Phase 6 the same pages as a
-PDF, so they are worded for both. The manual is organised by module (the user's choice, 2026-10-29, replacing
-Diataxis at the top level chosen 2026-10-27), with Diataxis's four kinds of writing inside each module: an overview,
-a tutorial, guide pages, reference. The deriv book stays the long explanation of `nxx::deriv` and is offered as its
-PDF, not repeated. `numerixx_docs_all` builds the whole documentation: the site and the PDF manual, Doxygen's
-internal HTML and the book. Each phase gets its plan approved before it is written, and the pages get the reviews of a phase. A box is ticked when the docs build with no warning
-locally and in CI, and the examples' tests pass on all five toolchains.
+PDF, so they are worded for both. The manual is organised by module (the user's choice, 2026-10-29, replacing Diataxis
+at the top level chosen 2026-10-27), with Diataxis's four kinds of writing inside each module: an overview, a tutorial,
+guide pages, reference. The deriv book stays the long explanation of `nxx::deriv` and is offered as its PDF, not
+repeated. `numerixx_docs_all` builds the whole documentation: the site and the PDF manual, Doxygen's internal HTML and
+the book. Each phase gets its plan approved before it is written, and the pages get the reviews of a phase. A box is
+ticked when the docs build with no warning locally and in CI, and the examples' tests pass on all five toolchains.
 
 - Phase 1: spike. Render `roots.hpp`, `deriv.hpp` and `math.hpp` through Doxygen XML, Breathe and Sphinx in a scratch
   folder, and list what the C++ domain misrenders or rejects (concepts, `requires` clauses, constrained `auto`,
@@ -197,7 +197,8 @@ locally and in CI, and the examples' tests pass on all five toolchains.
   - [x] Step 1: wording for both media, the voice rule and its check, the project texts (36e59c4: run 41677577233)
   - [x] Step 2: the PDF build (`manual.md`, `introduction.md`, the `pdf` tag, `numerixx_docs_pdf`); each overview's
     "Where to go next" split into Tutorial, Guide and Reference, so that the PDF shows them (c648bbf: run 41682779179)
-  - [ ] Step 3: layout, a read of the whole PDF, reviews and Codex
+  - [x] Step 3: layout, a read of the whole PDF, reviews and Codex (b57129c: run 41689684905; Codex: four edge cases,
+    three adopted, `docs/sphinx/PHASE6_PLAN.md`)
 
 Open decisions: hosting (GitHub Pages from CI, or Read the Docs) and versioning (one site per release, or `dev` only),
 with `linkcheck` and the install section of getting-started;

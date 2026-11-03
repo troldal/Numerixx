@@ -143,13 +143,19 @@ def _check(app, exception):
         raise RuntimeError("documentation checks failed:\n  " + "\n  ".join(problems))
 
 
-# Words that only make sense on a web page. A C++ "call site" is not one.
-_web_only = re.compile(r"(?<!call\s)\b(?:pages?|(?:web)?sites?|click\w*|scroll\w*)\b", re.IGNORECASE)
+# Words that only make sense on a web page. A C++ "call site" is not one, even broken across lines, and a link's
+# destination ("](https://example.org/sites/...)") is not shown; it is blanked, keeping the line breaks.
+_web_only = re.compile(r"\b(?:pages?|(?:web)?sites?|click\w*|scroll\w*)\b", re.IGNORECASE)
+_call_before = re.compile(r"\bcall\s+$", re.IGNORECASE)
+_destination = re.compile(r"\]\([^)]*\)")
 
 
 def _check_wording(app, docname, source):
-    for match in _web_only.finditer(source[0]):
-        line = source[0].count("\n", 0, match.start()) + 1
+    text = _destination.sub(lambda m: "](" + re.sub(r"[^\n]", " ", m.group()[2:-1]) + ")", source[0])
+    for match in _web_only.finditer(text):
+        if match.group().lower() == "site" and _call_before.search(text, 0, match.start()):
+            continue
+        line = text.count("\n", 0, match.start()) + 1
         logger.warning(f'"{match.group()}" reads wrongly in the PDF: say "this manual", "this chapter" or '
                        f'"this section"', location=(docname, line))
 

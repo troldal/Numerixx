@@ -27,13 +27,14 @@ _description_columns = 122
 
 # The anchor of a link to a C++ name: Sphinx's C++ domain ("_CPPv4...") or, for a name Doxygen links in the
 # reference's text, a Doxygen ID ("structnxx_1_1...", "namespacenxx_1_1..._1a..."). A section's anchor is a slug of
-# words and hyphens, and a link to a whole document has none.
+# words and hyphens, and a link to a whole document has none. The target decides, not the link's text, which may be
+# code for a section too.
 _cpp_anchor = re.compile(r"_CPPv|(namespace|struct|class|union|concept)\w*_1")
 
 
 def _links_to_text(node):
     anchor = (node.get("refuri") or node.get("refid", "")).rpartition("#")[2]
-    return not _cpp_anchor.match(anchor) and next(node.findall(nodes.literal), None) is None
+    return not _cpp_anchor.match(anchor)
 
 
 def _inside_description(node):
@@ -80,7 +81,8 @@ class Translator(LaTeXTranslator):
 def _check_code_width(app, doctree, docname):
     for block in doctree.findall(nodes.literal_block):
         limit = _description_columns if _inside_description(block) else _code_columns
-        widest = max((len(line) for line in block.astext().split("\n")), default=0)
+        # LaTeX's code sets a tab to the next multiple of 8 columns.
+        widest = max((len(line.expandtabs(8)) for line in block.astext().split("\n")), default=0)
         if widest > limit:
             logger.warning(f"a code line of {widest} columns wraps in the PDF, which fits {limit} here",
                            location=block)
