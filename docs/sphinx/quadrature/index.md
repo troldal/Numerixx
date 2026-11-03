@@ -25,8 +25,26 @@ the second sum costs nothing extra.
 
 The default method, adaptive Gauss-Kronrod, starts by cutting the interval into 10 equal *panels* and applying the pair
 on each, 150 evaluations of $f$. Then, while the sum of the panels' estimates is too large, it cuts the panel with the
-largest estimate in half. The work goes where $f$ is hard: a peak, a kink, a singularity at an end. Here it integrates
-$4 / (1 + x^2)$ over $[0, 1]$, which is $\pi$. The examples write `qd` for `nxx::quadrature`:
+largest estimate in half. The work goes where $f$ is hard: a peak, a kink, a singularity at an end.
+
+```{eval-rst}
+.. plot:: plots/quadrature_panels.py
+   :alt: A narrow peak at x = 0.3, reaching 10,000, above two rows of ticks at the ends of the final panels. At the
+         default request, 16 panels, the narrowest four, 1/80 wide, covering 0.275 to 0.325; asked for a relative
+         error of 1e-12, 26 panels, the narrowest eight, 1/160 wide, over the same stretch. In both rows the panels
+         from 0 to 0.1 and from 0.5 to 1 are never cut.
+   :caption: The panels the default method ends with on :math:`1 / ((x - 0.3)^2 + 10^{-4})` over :math:`[0, 1]`, at
+             the default request and asked for a relative error of :math:`10^{-12}`. Each tick marks a panel's end.
+```
+
+The figure shows this on a narrow peak. At the default request, which asks for a relative error of about
+$1.5 \times 10^{-8}$, the method cuts six times, each time a panel that ends at the peak, 0.3. It ends with 16 panels,
+and the narrowest, four of width $1/80$, cover $[0.275, 0.325]$ around the peak. Asked for a relative error of
+$10^{-12}$, it cuts 16 times, and eight panels of width $1/160$ cover the same stretch. Far from the peak, $[0, 0.1]$
+and $[0.5, 1]$ keep their first panels whatever the request.
+
+On a smooth integrand the first ten panels can be enough. This program integrates $4 / (1 + x^2)$ over $[0, 1]$,
+which is $\pi$. The examples write `qd` for `nxx::quadrature`:
 
 ```{literalinclude} ../examples/quadrature_overview.cpp
 :start-after: // <first>

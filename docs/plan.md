@@ -204,6 +204,11 @@ ticked when the docs build with no warning locally and in CI, and the examples' 
   (2026-11-03).
   - [x] The figure, its program and its script; built and read on the site and in the PDF; the program passing on the
     five toolchains, locally and in CI; `docs-reviewer` (20fe902: run 41716617342)
+- Phase 8: the quadrature chapter's figures, six where a figure makes a concept or a method easier to see: a weighted
+  sum, where the default cuts, the tanh-sinh map, the rounding floor, evaluations against digits, and the
+  infinite-interval maps; the Phase 7 figure goes. Plan approved: `docs/sphinx/PHASE8_PLAN.md` (2026-11-03).
+  - [ ] The six figures, one commit each, with their programs on the five toolchains and `docs-reviewer`
+  - [ ] CI passes; the independent review (Codex) and its adopted findings
 
 Open decisions: hosting (GitHub Pages from CI, or Read the Docs) and versioning (one site per release, or `dev` only),
 with `linkcheck` and the install section of getting-started;
