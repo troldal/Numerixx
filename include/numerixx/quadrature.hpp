@@ -382,11 +382,14 @@ namespace nxx::quadrature {
         { return static_cast<T>(std::invoke(fn, x)); }
 
         /**
-         * @brief A sum compensated by Neumaier's variant of Kahan's method, so that a sum of many terms errs by about
-         * one rounding of the result rather than by the number of terms times eps (design.md, "Sums").
+         * @brief A sum compensated by Neumaier's variant of Kahan's method, so that the rounding of a sum of many terms
+         * does not grow with their number (design.md, "Sums").
          *
-         * The rounding error of each addition is accumulated separately and added at the end. The methods sum hundreds
-         * to thousands of terms, and their rounding floor, 50 eps L1, assumes the sum's own error is far below it.
+         * The rounding error of each addition is accumulated separately and added at the end. The result errs by about
+         * eps |sum| plus a second-order term of order n eps^2 sum |terms|, where a plain sum errs by up to about
+         * n eps sum |terms|. That is about one rounding of the result unless the terms cancel to far below their size
+         * (2^100, 1, 2^-100, -2^100, -1 sums to 0). The methods sum hundreds to thousands of terms, and their rounding
+         * floor, 50 eps L1, assumes the sum's own error is far below it, which the second-order term keeps.
          *
          * A non-finite term makes the sum, and value(), non-finite (the correction becomes NaN or infinite), as does
          * an overflow of the running sum, so the caller checks value() once.
@@ -1753,8 +1756,9 @@ namespace nxx::quadrature {
 
             /**
              * @brief [p, q] sampled into pieces, stepping around values of fn that are not finite: a singularity at a
-             * node is usually avoided by one or two bisections, which make it an end of the children, where no node
-             * lies (design.md, "Values that are not finite").
+             * node is usually avoided by one or two bisections, whose halves are sampled afresh at points that usually
+             * miss it; the panel's centre becomes their common end, where no node lies (design.md, "Values that are
+             * not finite").
              *
              * The pieces are the panel itself, or, where its L1 is not finite, those of a descent of at most depth
              * bisections below it, each counted against the cap, each child first its lower half. The descent is
@@ -4993,13 +4997,15 @@ namespace nxx::quadrature {
      * - The maps centre at 0 (the line) or at the finite end, at scale 1. A peak far from 0 on the line is missed,
      *   first as an honest not_converged, farther out as a false success (ok, 0): split at the peak, or substitute
      *   x = x0 + u. A half line far from 0 is cut by rounding near a, its abs_error growing with ulp(a), until from
-     *   |a| about 1/eps no point is inside: substitute x = a + u with fn written in u. A narrow feature on the line is
+     *   |a| about 1/eps the map's centre a + 1 rounds onto a and the method stops before evaluating fn: substitute
+     *   x = a + u with fn written in u. A narrow feature on the line is
      *   not_converged: substitute to widen it. A wide one costs evaluations, not accuracy.
      * - A value not finite nearer than the tail rule allows is error::non_finite (x^k e^-x for large k, where x^k
      *   overflows before e^-x underflows): write fn so that it stays finite where its factors do not, as
      *   x^k e^-x = exp(k log x - x).
      * - Values below min() towards infinity are not used, so an fn that small is not_converged: scale fn.
-     * - Slow decay (x^-1.01 on [1, inf)) is not_converged in double: use a type with more digits.
+     * - Slow decay (x^-1.01 on [1, inf)) is not_converged in double, whose range ends before the tail is negligible:
+     *   use a type with a wider exponent range, such as cpp_bin_float_50, or a substitution that speeds the decay.
      * - Oscillation and no integral (sin x / x, sin x, 1/x, 1 on [0, inf)): not_converged; their bests, where any,
      *   are not reliable.
      * - A singular end other than 0 is limited by the spacing near it, as on a finite interval: substitute.

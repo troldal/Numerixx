@@ -342,13 +342,13 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
     `exp_sinh_start`'s comment above `inverse_epsilon`, `KronrodState`'s undocumented constants); the header's
     examples run as written in `tests/test_quadrature_examples.cpp`, and `Midpoint{.panels = 1000}` in the protocol
     tests. All five presets locally, both Doxygen builds clean (2026-11-03); CI (cdca6e1: run 41655023180)
-  - [ ] 5b: the chapter's pages and programs, and the `index.md` and `basics.md` changes. Done as planned, with
+  - [x] 5b: the chapter's pages and programs, and the `index.md` and `basics.md` changes. Done as planned, with
     `std::bad_alloc` stated in `basics.md`, the site's `index.md`, the README and `docs/design.md`; the prototypes
     behind `costs.md` kept in `docs/quadrature/costs-prototype/` (`costs.py` prints every count it reproduces); the
     concepts' definitions rendered with their default argument (Doxygen 1.18 drops the "=" in a concept's initializer;
     the extension rebuilds the template head from the parameter list). All five presets locally and the docs build
-    (2026-11-03)
-  - [ ] 5b reviews, as in Milestone 3 Phase 5: `docs-reviewer`, `numerics-reviewer`, `docs-reader` (tasks: the
+    (2026-11-03); CI (d0e4a10: run 41663101675)
+  - [x] 5b reviews, as in Milestone 3 Phase 5: `docs-reviewer`, `numerics-reviewer`, `docs-reader` (tasks: the
     probability that a standard normal variable exceeds 3; an integrand with a kink at a known interior point; a time
     from an integral, solved for its upper limit with `nxx::roots`; an integral in `cpp_bin_float_50` to 40 digits; a
     fixed rule of one's own), then Codex on the commit; the adopted findings recorded in this entry. The reviews (all
@@ -363,7 +363,19 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
     2e-8, the AGM's error budget, cpp_bin_float_50's epsilon (2^-167) and the Simpson bound corrected; the reader's
     gaps closed (the mesh's panel boundaries and a kink at a tight request, the Boost header, a `Criteria` variable,
     `qd` at file scope); "the default method" throughout, since C++ has one. The tutorial stays one page at about
-    1,450 words with its directives, above the 1,000 of the voice rules: one continuous problem
+    1,450 words with its directives, above the 1,000 of the voice rules: one continuous problem.
+    The independent review (Codex, on cdca6e1 and d0e4a10): nine findings, all reproduced or derived and adopted. In
+    the docs: an inner integral that fails at one outer point is stepped around, the outer one succeeding (asserted,
+    with the advice to count inner failures); Boost's run-time-precision mpfr_float is not an nxx::real
+    (is_specialized false), so the high-precision page no longer names it; GaussLegendre<N> takes no criteria;
+    constant evaluation also refuses sums beyond max / 2 that run time accepts (basics.md); a half line from 1e17
+    stops because the map's centre a + 1 rounds onto a, before any evaluation (also in design.md); slow decay needs a
+    wider exponent range, not more digits (asserted in cpp_bin_float_50); a split kink's error "within a few ulps",
+    and a tolerance derived. In quadrature.hpp, after the user's approval, comments only: Neumaier's sum errs by eps
+    |sum| plus a second-order term, not one rounding whatever the terms (2^100, 1, 2^-100, -2^100, -1 sums to 0);
+    TanhSinh's slow-decay remedy and far-half-line cause as above; a bad node is avoided because the halves are
+    sampled afresh, not because it becomes an end.
+- Milestone 4 is complete: the module, its chapter and the comments of its header.
 
 ## Deferred
 

@@ -78,7 +78,8 @@ times smaller. Every estimate here is larger than the actual error, as it should
 
 ## The call
 
-Every method is called the same way, `integrate<Method>(fn, a, b, criteria)`. `fn` takes an `x` and returns $f(x)$;
+Every method is called the same way, `integrate<Method>(fn, a, b, criteria)`, except that `GaussLegendre<N>`, which
+has no estimate to test, takes no criteria. `fn` takes an `x` and returns $f(x)$;
 the ends `a` and `b` set the type the integral is computed in, so write them as `0.0` and `1.0` for a `double`, and
 they must have the same type. The ends may come in either order: `integrate(fn, b, a)` is the negated integral, and
 `integrate(fn, a, a)` is 0 without calling `fn`. An infinite end, `std::numeric_limits<double>::infinity()`, works with

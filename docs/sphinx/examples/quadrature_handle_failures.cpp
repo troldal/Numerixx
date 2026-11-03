@@ -228,14 +228,18 @@ not_converged after 10 steps and 5159 evaluations
     auto const ts_spike = qd::integrate<qd::TanhSinh>([&at](double x) { at += x == 0.35; return 1.0; }, 0.0, 1.0);
     if (!(ts_spike && at == 0)) return 14;
     // The divergent integral: "at rel_tol 0.2 the default reports ok, about 9.3, after its first 150 evaluations";
-    // "the integral over [10^-k, 1] grows like k ln 10" (exactly k ln 10 = ln(1 / lower); within 1e-6 relative).
+    // "the integral over [10^-k, 1] grows like k ln 10" (exactly k ln 10 = ln(1 / lower)): within the result's own
+    // estimate plus the reference's rounding, std::log within an ulp and the negation exact, 2 eps relative (the
+    // independent review: the first version allowed an unjustified 1e-6).
     int loose_count = 0;
     auto const loose_counted = qd::integrate([&loose_count](double x) { ++loose_count; return 1.0 / x; }, 0.0, 1.0,
                                              {.rel_tol = 0.2});
     if (!(loose_counted == loose && loose_count == 150)) return 15;
     for (double const lower : {1e-2, 1e-4, 1e-8, 1e-16}) {
         auto const moved = qd::integrate(inverse, lower, 1.0);
-        if (!(moved && std::abs(moved->value + std::log(lower)) <= 1e-6 * moved->value)) return 16;
+        double const log_lower = -std::log(lower);
+        double const ulp = std::numeric_limits<double>::epsilon();
+        if (!(moved && std::abs(moved->value - log_lower) <= moved->abs_error + 2.0 * ulp * log_lower)) return 16;
     }
     return 0;
 }

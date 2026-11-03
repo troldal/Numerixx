@@ -115,6 +115,16 @@ rel_tol 1.0e-14: x = 0.99999999999999978, abs_error 4.4e-16, error 2.2e-16
         return i ? i->value : nan;
     }, 0.0, 1.0);
     if (!(!broken && broken.error().reason == qd::error::non_finite)) return 7;
+    // "An isolated failure can be stepped around" (the independent review): the inner integral fails at the one outer
+    // point y = 0.35, a node of the default's mesh, and the outer integral succeeds, 1, ignoring it; counting the
+    // failures in F shows it.
+    int failures = 0;
+    auto const isolated = qd::integrate([nan, &failures](double y) {
+        auto const i = qd::integrate([y, nan](double x) { return y == 0.35 ? nan : 1.0 + 0.0 * x; }, 0.0, 1.0);
+        if (!i) ++failures;
+        return i ? i->value : nan;
+    }, 0.0, 1.0);
+    if (!(isolated && isolated->value == 1.0 && failures == 1)) return 8;
     // The nested integral: 150 inner integrals of 150 evaluations each, both on their initial mesh; within the
     // outer request, and the outer estimate covers the error.
     if (!(count == 150L * 150L && std::abs(outer->value - exact) <= outer->abs_error)) return 8;

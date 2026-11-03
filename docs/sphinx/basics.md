@@ -228,7 +228,9 @@ the type must be a *literal type*, usable in constant expressions: the built-in 
 Boost.Multiprecision types on this site, `cpp_bin_float_50` and `cpp_dec_float_50`, are not.
 
 A constant gives exactly what the same call gives at run time, as long as the compiler does not fuse a multiplication
-and an addition into one instruction (a fused multiply-add) at run time. Compilers for x86-64 and WebAssembly do not by
+and an addition into one instruction (a fused multiply-add) at run time. One more exception: an overflow is not
+allowed in a constant expression, so `nxx::quadrature` refuses, with `non_finite`, a term or a sum beyond half the
+type's largest number in a constant that it would accept at run time. Compilers for x86-64 and WebAssembly do not by
 default, but GCC and Clang do as soon as you target hardware that has the instruction (`-march=native`, `-mfma`);
 `-ffp-contract=off` turns that off. Fused arithmetic also changes the last digits of results, and the counts of
 evaluations, that this site quotes.

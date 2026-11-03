@@ -85,8 +85,8 @@ write the integrand in $u$:
 ```
 
 A half line far from 0 has the opposite problem. Its points near the finite end $a$ are $a + e^{-u}$, which rounds to
-the `double` numbers near $a$, spaced about $a \times 2 \times 10^{-16}$ apart; for $a = 10^{17}$ even $a + 1$ rounds to
-$a$, and no point lies inside at all. The result degrades with $a$:
+the `double` numbers near $a$, spaced about $a \times 2 \times 10^{-16}$ apart; for $a = 10^{17}$ even the map's centre,
+$a + 1$, rounds to $a$, and the method stops before it evaluates $f$ at all. The result degrades with $a$:
 
 ```{literalinclude} ../examples/quadrature_infinite_intervals.cpp
 :start-after: // <far_end>
@@ -137,7 +137,8 @@ Three kinds of integrand fail on an infinite interval, each with
 
 - **Slow decay.** $x^{-1.01}$ over $[1, \infty)$ integrates to 100, but its tail decays so slowly that a `double` runs
   out of range before the terms become negligible: the best estimate is about 99.9, with an error estimate that says
-  so.
+  so. More digits do not help, a wider exponent range does: the tail beyond the largest `double` still holds about
+  0.08 of the integral, while in `cpp_bin_float_50`, whose exponents reach far further, the same integral succeeds.
 - **A large number written for infinity.** $[0, 10^{300}]$ is a finite interval to `TanhSinh`, mapped by the
   tanh-sinh rule onto its own scale. $1 / (1 + x^2)$ has its mass within a few units of 0, a relative width of about
   $10^{-299}$ at one end of that interval, which the points cannot resolve: `not_converged`. Written as `infinity()`,

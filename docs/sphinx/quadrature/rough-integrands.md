@@ -88,7 +88,8 @@ The kink sits at $1/3$ for a reason. The default method's first step cuts $[a, b
 exactly on a panel boundary, $a + k(b - a)/10$, costs nothing extra: $|x^2 - 1|$ on $[0, 2]$, with its kink at 1, takes
 the first 150 evaluations and is exact. Elsewhere an unsplit kink can cost more than evaluations at a tight request:
 on $|x^2 - 2|$ over $[0, 2]$ at a relative tolerance of $10^{-13}$, the method reports success with an `abs_error` of
-$6.1 \times 10^{-14}$ while its actual error is $7.1 \times 10^{-14}$. Split at the kink, the error is 0. The kink at
+$6.1 \times 10^{-14}$ while its actual error is $7.1 \times 10^{-14}$. Split at the kink, the error is within a few
+units in the last place (0 here). The kink at
 $\sqrt 2$ is not a `double`, so split at the nearest one, `std::sqrt(2.0)`: the error this leaves is bounded by the
 jump in the slope of $f$ times the distance to the true kink, here below $10^{-15}$.
 

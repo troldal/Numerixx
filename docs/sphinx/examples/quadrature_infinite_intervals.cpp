@@ -19,6 +19,8 @@
 
 #include "printed.hpp"
 
+#include <boost/multiprecision/cpp_bin_float.hpp>
+
 #include <string>
 
 int main(int, char **argv)
@@ -146,11 +148,16 @@ a = 1e+15: error 1.2e-03, abs_error 7.9e-02
           && std::abs(below->value + above->value - pi) <= 4.0 * eps * pi
           && std::abs(shifted->value - pi) <= 4.0 * eps * pi))
         return 7;
-    // A half line from 1e17: "no point is inside" (a + 1 rounds to a), not_converged without a best; with u = x - a,
-    // pi / 2 to 2 ulps.
-    auto const beyond = qd::integrate<qd::TanhSinh>([](double x) { return 1.0 / (1.0 + (x - 1e17) * (x - 1e17)); },
-                                                    1e17, inf);
-    if (!(!beyond && beyond.error().reason == qd::error::not_converged && !beyond.error().best)) return 8;
+    // A half line from 1e17: "the map's centre, a + 1, rounds to a, and the method stops before it evaluates f at all"
+    // (the independent review), not_converged without a best; with u = x - a, pi / 2 to 2 ulps.
+    int beyond_count = 0;
+    auto const beyond = qd::integrate<qd::TanhSinh>([&beyond_count](double x) {
+        ++beyond_count;
+        return 1.0 / (1.0 + (x - 1e17) * (x - 1e17));
+    }, 1e17, inf);
+    if (!(!beyond && beyond.error().reason == qd::error::not_converged && !beyond.error().best && beyond_count == 0
+          && 1e17 + 1.0 == 1e17))
+        return 8;
     auto const moved = qd::integrate<qd::TanhSinh>([](double u) { return 1.0 / (1.0 + u * u); }, 0.0, inf);
     if (!(moved && std::abs(moved->value - pi / 2.0) <= 2.0 * eps * (pi / 2.0))) return 15;
     // Overflowing factors: e^-x is exactly 0 from x = 745 and x^51 inf from about 1.1e6, so beyond that the product
@@ -198,6 +205,15 @@ a = 1e+15: error 1.2e-03, abs_error 7.9e-02
           && std::abs(slow.error().best->value - 100.0) < 0.2
           && std::abs(slow.error().best->value - 100.0) <= slow.error().best->abs_error))
         return 11;
+    // "More digits do not help, a wider exponent range does" (the independent review): the tail beyond the largest
+    // double, 100 R^-0.01 with R = max = 1.8e308, is 100 e^(-0.01 ln R) = 0.083, "about 0.08"; in cpp_bin_float_50,
+    // whose exponents reach 2^2147483312, the same integral succeeds, within its estimate of 100.
+    double const beyond_max = 100.0 * std::pow(std::numeric_limits<double>::max(), -0.01);
+    if (!(beyond_max > 0.075 && beyond_max < 0.085)) return 22;
+    using bin50 = boost::multiprecision::cpp_bin_float_50;
+    auto const ranged = qd::integrate<qd::TanhSinh>([](bin50 const &x) { return bin50(pow(x, bin50(-101) / 100)); },
+                                                    bin50(1), bin50(std::numeric_limits<bin50>::infinity()));
+    if (!(ranged && bin50(boost::multiprecision::abs(bin50(ranged->value - 100))) <= ranged->abs_error)) return 23;
     // A large number for infinity: [0, 1e300] not_converged, [0, inf) exact; [0, 1e10] is a different integral,
     // atan(1e10) = pi / 2 - 1e-10 to within 1e-30, which it gets within its estimate.
     auto const plain = [](double x) { return 1.0 / (1.0 + x * x); };

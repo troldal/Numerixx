@@ -86,7 +86,7 @@ For `float`, `double` and `long double` the methods' nodes and weights are table
 compiled. A type such as `cpp_bin_float_50` has no such table: the first call in that type computes the nodes it needs,
 to the type's precision, from arithmetic alone, and keeps them for every later call. A program that integrates many
 times in the type pays that cost once. The nodes are computed for the precision the type has at the first call, so a
-type whose precision can be changed at run time, such as Boost's `mpfr_float`, keeps the nodes of its first precision.
+type of your own whose precision can be changed at run time would keep the nodes of its first precision.
 
 ```{note}
 The cost of each evaluation of `fn` grows with the precision too: a `bin50` operation is many times slower than a

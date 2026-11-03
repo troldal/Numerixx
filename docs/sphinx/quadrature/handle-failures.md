@@ -28,10 +28,10 @@ negative or not finite. So can the function: $\sqrt{x - 0.5}$ is NaN on half of 
 $f$ at the ends, where $1/x$ is infinite. So does a sum that overflows. A different tolerance will not help; change the
 interval, the method, or the way $f$ is written.
 
-Not every value that is not finite fails. The default method works on *panels*, equal pieces of the interval, and
-cuts a panel in half, a *bisection*, where its estimate is largest. A value that is not finite at one of its points
-makes it cut that panel, so that the point becomes an end, where no point lies, and go on. A region where $f$ is NaN
-cannot be cut away, and fails:
+Not every value that is not finite fails. The default method works on *panels*, equal pieces of the interval, and cuts a
+panel in half, a *bisection*, where its estimate is largest. A value that is not finite at one of its points makes it
+cut that panel and sample the two halves afresh, at points that usually miss the bad one, and go on. A region where $f$
+is NaN cannot be cut away, and fails:
 
 ```{literalinclude} ../examples/quadrature_handle_failures.cpp
 :start-after: // <isolated>

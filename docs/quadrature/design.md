@@ -863,7 +863,8 @@ double unless noted, with where each was measured:
     outcome alternates between that, a best below its error and a false success; from about 1,600 every run is a
     false success (ok, 0). Split at 1e3, each half of e^-(x - 1e3)^2 is ok in 85.
   - A half line far from 0: a = 1e10, ok +- 1.1e-6; a = 1e15, ok +- 0.094, far above the request; from |a| about 1e16
-    no point is inside.
+    the map's centre a + 1 rounds onto a, and the method stops without evaluating fn (points of the map still lie
+    inside, a + 230 at t = 2 for a = 1e17: the independent review of Phase 5, reproduced).
   - A narrow feature on the line, e^-(x / 1e-3)^2: an honest not_converged in 33 evaluations, substituted ok in 99. A
     wide one, e^(-x / L) on [0, inf): 81 to 868 evaluations for L from 1e-2 to 1e6.
   - Values not finite: x^k e^-x is ok up to k = 50 in double and 16 in float, non_finite beyond.

@@ -80,8 +80,11 @@ root's ([Set tolerances](../roots/tolerances.md) in the roots chapter), and read
 the integral. Each solve here took six integrals.
 
 **A function must return a number.** `fn`, here `F`, cannot return a failure, so it maps one to NaN. `nxx::roots`
-treats a NaN as a point outside the domain, and `nxx::quadrature` as an error: an inner integral that fails makes the
-outer one fail with {cpp:enumerator}`nxx::quadrature::error::non_finite`, instead of returning a wrong number.
+treats a NaN as a point outside the domain. `nxx::quadrature` reports
+{cpp:enumerator}`nxx::quadrature::error::non_finite` where inner failures cover a stretch of the outer interval, but the
+default method steps around a single failed point and can return a number that silently leaves it out ([Handle
+failures](handle-failures.md)). If an inner failure must not pass, count the failures in `fn` and check the count after
+the outer call.
 
 **The result should change smoothly with the parameter.** An adaptive method chooses its points from `fn`, so as a
 parameter of `fn` changes, the panels it cuts can change too, and its result moves in small jumps rather than smoothly
