@@ -264,9 +264,92 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
   - [x] The independent review (Codex) and its adopted findings (three findings, all adopted with the user's
     approval, all in a type whose max() is small against 1 / eps: the centre overflowing, 1 / eps not fitting, the
     radix wording; `PHASE4_API.md`, "The independent review")
-- The milestone ends with its chapter on the documentation site, as Milestone 3 did for roots and deriv.
+- Phase 5: the module's chapter on the documentation site, in the shape and voice of the roots and deriv chapters
+  (`docs/sphinx/PHASE4_PLAN.md`, "The voice"), and a pass over the Doxygen comments of `quadrature.hpp` that puts each
+  entity's purpose first (the user's request). Plan approved 2026-11-03, after the plan's reviews
+  (`simplicity-critic`, `docs-reviewer`, `numerics-reviewer`), with the user's decisions: the header keeps one sentence
+  per limit with its remedy, and its measured figures (the catalogue of TanhSinh's limits, the timings) move to
+  `docs/quadrature/design.md` and to the guide pages whose programs assert them; the pass covers the `detail`
+  namespaces too, so that the implementation can be read from its comments; "Numerixx never throws" gains its
+  exception, `std::bad_alloc` from an allocation (`GaussKronrod` always, `TanhSinh` in a type without a table), in
+  `basics.md` and `docs/design.md` rather than in the code.
+
+  The chapter, `docs/sphinx/quadrature/`, each page's program `docs/sphinx/examples/quadrature_<page>.cpp`:
+  ```
+  index.md               Overview: integrals with no closed form; a weighted sum of samples, and an error estimate
+                         from two answers; the four methods and when each fits; the call; what you get back (an
+                         Integral whose abs_error is an estimate, not a bound; a Failure and its best); what the
+                         module does not do (sampled data, complex or multidimensional integrands, principal values);
+                         where to go
+  tutorial.md            The period of a pendulum at large amplitude, 4 sqrt(L/g) K(k), parametrised by the
+                         complementary modulus k' = cos(theta0/2): K in its smooth form, 1 / sqrt(k'^2 + k^2 cos^2 phi),
+                         by the default method; checked against pi / (2 AGM(1, k')), within abs_error plus the AGM's
+                         bound; K in its algebraic form, whose singularity at t = 1 is moved to 0 by u = 1 - t with fn
+                         written in u, by TanhSinh; k' toward 0 (amplitude toward 180 degrees), where K grows as
+                         ln(4/k'); at k' = 0 the integral diverges, and TanhSinh returns not_converged with no best
+  choose-a-method.md     \  From what you have to a method; an integral inside a root solve, an optimiser or another
+                          |   integral (GaussLegendre<N> smooth in fn's parameters; Newton on F' = fn; inner tolerance
+                          |   tighter than the outer; an inner Failure as NaN); TanhSinh's compile-time cost
+  tolerances.md           | rel_tol and why sqrt(eps) (said here, linked from elsewhere); the floor; abs_tol, which
+                          |   saves evaluations near 0; read abs_error against your request
+  rough-integrands.md     | An endpoint singularity: TanhSinh; at an end other than 0, substitute with fn written in u;
+                          |   the default's limit; kinks, steps and peaks inside: split at the known points; what no
+                          |   estimate sees
+  infinite-intervals.md   | Infinite ends with TanhSinh: the maps' scale and centre, slow decay, factors that overflow,
+                          |   a large number written for infinity, oscillation
+  high-precision.md       | A multiprecision type: rel_tol (the default keeps about half the digits), fn returning T
+                          |   with no double literals, pi in T, the first call's table build; TanhSinh in
+                          |   cpp_bin_float_50 against the AGM in that type
+  handle-failures.md      | What each error means, a failure's best (meaningless for a divergent integral), recovering;
+                          |   observer() to watch the steps
+  method-of-your-own.md  /  The three concepts; one fixed rule with a parameter, checked by a static_assert
+  costs.md               Reference: evaluations and accuracy per method on 4 / (1 + x^2), sqrt x and 1 / sqrt x on
+                         [0, 1], and 1 / (1 + x^2) on the line (TanhSinh); only rows the prototypes reproduce
+  reference.md           The API (as now; its interim introduction replaced)
+  ```
+
+  Outside the chapter: `index.md` gains the module's row and the toctree entry `quadrature/index`, and its opening
+  no longer calls integrals planned; `basics.md` names three modules, states the `std::bad_alloc` exception
+  (as `docs/design.md` does), adds an interval's ends where it says the type
+  comes from the start, and in "What a result holds" gains an integral (an `Integral`'s `abs_error` is an estimate and
+  a `T`; the error side is a `Failure` with a best, not a bare `error`) and the collision of `Criteria` and `error`
+  with `nxx::roots`' under using-directives (said there once, linked from elsewhere).
+
+  Examples: quoted output only in `double` and from integrands built from `+ - * /`, `std::sqrt`, comparisons,
+  `std::abs` and min/max, which IEEE 754 makes the same on every toolchain, under the FMA caveat of `basics.md`
+  ("Compile time"), repeated on each page that quotes; integrands through libm, and the amplitudes whose k is not exact
+  or from a square root, are described by the bounds their programs assert. References are closed forms or, for K, the
+  AGM (stopped at a - b <= 4 eps a then one more step, since `while (a != b)` can cycle between adjacent numbers;
+  never at k' = 0), never Numerixx. The counts in `costs.md` come from the kept prototypes
+  (`docs/quadrature/tanh-sinh-prototype/`, Phase 2's `final2.py`), and its program asserts them.
+
+  Doxygen: every entity of `quadrature.hpp`, public and `detail`, opens with its purpose; for the public ones (the
+  namespace, `error` and its enumerators, `Integral`, `Failure`, `Criteria`, `Step`, the three concepts, `state_t`,
+  `Observer` and `observer`, the four methods and their members, the six forms of `integrate`, the two formatters) what
+  the caller uses it for and when, in the caller's terms; for a `detail` entity why the implementation needs it and
+  which decision of `design.md` it carries out; then what it does; then its limits. Function bodies gain comments where
+  a step's reason is not plain from the code. The `@brief` is one sentence stating the purpose. Known cases: the briefs
+  of `GaussKronrod`, `GaussLegendre`, `TanhSinh` and `Step` say what each is, not when to use it; `Romberg`'s purpose
+  comes last, and "equally spaced data" misleads, since `integrate` takes only fn; the method choice sits in one
+  overload's comment. Comments only, no code token changes; every `@tparam` and `@param` kept (WARN_NO_PARAMDOC fails
+  the build); "a < b" spaced; no line starting with a number or "- " unless a list is meant. Each `@code` block has a
+  test that asserts its claims; the missing ones are added.
+
+  Steps, each built on the five toolchains, locally and in CI, with the docs build clean:
+  - [ ] 5a: the Doxygen pass, shown to the user as a diff before it is committed (`include/`)
+  - [ ] 5b: the chapter's pages and programs, and the `index.md` and `basics.md` changes
+  - [ ] 5b reviews, as in Milestone 3 Phase 5: `docs-reviewer`, `numerics-reviewer`, `docs-reader` (tasks: the
+    probability that a standard normal variable exceeds 3; an integrand with a kink at a known interior point; a time
+    from an integral, solved for its upper limit with `nxx::roots`; an integral in `cpp_bin_float_50` to 40 digits; a
+    fixed rule of one's own), then Codex on the commit; the adopted findings recorded in this entry
 
 ## Deferred
+
+### Documentation
+
+- The same purpose-first Doxygen pass for `roots.hpp`, `deriv.hpp` and `math.hpp`, if the user wants it after
+  `quadrature.hpp`'s.
+- In the quadrature chapter: combinators over methods (a substitution as a method), until a reader asks.
 
 ### Derivatives (`nxx::deriv`)
 
