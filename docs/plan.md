@@ -250,7 +250,12 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
   - [x] The independent review (Codex) and its adopted findings (three findings, all adopted with the user's
     approval: the power law's products below min(), thresholds below min(), the search for x_min overflowing;
     `PHASE3B_API.md`, "The independent review")
-- Phase 4: `TanhSinh` on half lines and the line (exp-sinh, sinh-sinh).
+- Phase 4: `TanhSinh` on half lines and the line (exp-sinh, sinh-sinh), infinite ends opt-in per method.
+  - [x] API approved: `docs/quadrature/PHASE4_API.md` (2026-11-03, Q1 to Q8 as recommended, draft 3)
+  - [ ] Step 1, the table (internal), with Phase 3b's latent fix to `exp_constants`
+  - [ ] Step 2, the infinite ends: the opt-in, `TanhSinh`'s maps and sides; tests in every type; docs build clean
+  - [ ] CI passes on all five toolchains
+  - [ ] The independent review (Codex) and its adopted findings
 - The milestone ends with its chapter on the documentation site, as Milestone 3 did for roots and deriv.
 
 ## Deferred
