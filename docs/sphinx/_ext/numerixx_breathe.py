@@ -4,8 +4,12 @@ Breathe parses a C++ requires clause and a concept's definition from Doxygen's X
 open since 2020). This extension adds both, and after the build fails it unless every class, concept and declaration
 in the XML was rendered exactly once, with its clause and its definition. Loaded by conf.py after Breathe; the XML is
 Breathe's project breathe_default_project.
+
+It also warns, which -W makes an error, on wording that reads wrongly in print, since the pages are the PDF manual too
+(voice rule 7 of PHASE4_PLAN.md).
 """
 
+import re
 import xml.etree.ElementTree as ET
 from collections import Counter
 from pathlib import Path
@@ -14,6 +18,9 @@ import breathe
 from breathe import _parser
 from breathe.renderer import sphinxrenderer
 from docutils import nodes
+from sphinx.util import logging
+
+logger = logging.getLogger(__name__)
 
 # The patch replaces Breathe internals; another version may have moved them. The checks would catch that, but a wrong
 # environment is better reported for what it is.
@@ -131,7 +138,19 @@ def _check(app, exception):
         raise RuntimeError("documentation checks failed:\n  " + "\n  ".join(problems))
 
 
+# Words that only make sense on a web page. A C++ "call site" is not one.
+_web_only = re.compile(r"(?<!call\s)\b(?:pages?|(?:web)?sites?|click\w*|scroll\w*)\b", re.IGNORECASE)
+
+
+def _check_wording(app, docname, source):
+    for match in _web_only.finditer(source[0]):
+        line = source[0].count("\n", 0, match.start()) + 1
+        logger.warning(f'"{match.group()}" reads wrongly in the PDF: say "this manual", "this chapter" or '
+                       f'"this section"', location=(docname, line))
+
+
 def setup(app):
+    app.connect("source-read", _check_wording)
     app.connect("config-inited", _find_xml)
     app.connect("build-finished", _check)
     return {"parallel_read_safe": False}

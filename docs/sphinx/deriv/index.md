@@ -104,9 +104,9 @@ that is noisier than that. [Working with Numerixx](../basics.md#what-a-result-ho
 ## Where to go next
 
 The [tutorial](tutorial.md) differentiates a function that is itself computed by a root solve, step by step. [Choose a
-method](choose-a-method.md) says which method suits which function, and the other guide pages each solve one task. The
-book on `nxx::deriv` explains the theory in full ([the book](book.md)), and the [reference](reference.md) documents
-every name.
+method](choose-a-method.md) says which method suits which function, and the other sections of the guide each solve one
+task. The book on `nxx::deriv` explains the theory in full ([the book](book.md)), and the [reference](reference.md)
+documents every name.
 
 ```{toctree}
 :maxdepth: 1

@@ -90,6 +90,10 @@ program or linked to what asserts it; the reference generated from the headers):
 6. **The book's tutorial voice** (`docs/deriv-book/CLAUDE.md`): second person, short sentences, a paragraph where it
    explains better than a list. An overview fits on about one or two screens; overview and tutorial pages end with
    what to read next.
+7. **Write for the screen and for print** (added in Phase 6, `PHASE6_PLAN.md`): the pages are also the PDF manual.
+   The whole is "this manual"; a page that is a chapter in the PDF (`getting-started`, `basics`, `core`, a module's
+   overview) is a "chapter", and a tutorial or guide page a "section". No "site", "page", "click" or "scroll": a check
+   in `_ext/numerixx_breathe.py` fails the build on any of these words (but "call site").
 
 ## Build changes
 

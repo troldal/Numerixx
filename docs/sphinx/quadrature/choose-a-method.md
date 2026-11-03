@@ -1,9 +1,9 @@
 # Choose a method
 
 The default method, adaptive Gauss-Kronrod, integrates most functions on a finite interval well, and it finds the
-hard places by itself. This page says when another method does better, how to measure the cost on your own function, and
-how to use an integral inside another algorithm, such as a root solve or a second integral. The examples write `qd` for
-`nxx::quadrature`.
+hard places by itself. This section says when another method does better, how to measure the cost on your own function,
+and how to use an integral inside another algorithm, such as a root solve or a second integral. The examples write
+`qd` for `nxx::quadrature`.
 
 ## From what you have to a method
 
@@ -42,9 +42,9 @@ over $[0, 1]$, whose integral is 2, with the default request, a relative error o
 Both meet the request. The default cuts the interval into *panels*, pieces it integrates one at a time, and here it cuts
 the panel next to 0 in half, again and again, 30 evaluations a cut; `TanhSinh` places its points ever closer to 0 from
 the start, and gets the integral to the last digit with ten times fewer evaluations. On a smooth function the two cost
-about the same ([Costs](costs.md)). Output quoted on this site assumes that the compiler does not fuse a multiplication
-and an addition into one instruction ([Working with Numerixx](../basics.md#compile-time)); with fused arithmetic the
-last digits and the counts can differ.
+about the same ([Costs](costs.md)). Output quoted in this manual assumes that the compiler does not fuse a
+multiplication and an addition into one instruction ([Working with Numerixx](../basics.md#compile-time)); with fused
+arithmetic the last digits and the counts can differ.
 
 `integrate<TanhSinh>` also has a cost at compile time: its node tables are built in every translation unit that uses it,
 which makes those files noticeably slower to compile. If several files integrate with it, put the calls in one of them.
@@ -113,7 +113,7 @@ accurate to about the precision of the type. Here is $\int_0^1 \int_0^1 dx\,dy /
 The cost multiplies: 150 inner integrals of 150 evaluations each. Count it before you nest a third level.
 
 ```{note}
-This page uses `nxx::roots` beside `nxx::quadrature`, through the aliases `rt` and `qd`. Both modules have a `Criteria`
-and an `error`, so do not bring both in with `using namespace` ([Working with
+This section uses `nxx::roots` beside `nxx::quadrature`, through the aliases `rt` and `qd`. Both modules have a
+`Criteria` and an `error`, so do not bring both in with `using namespace` ([Working with
 Numerixx](../basics.md#what-a-result-holds)).
 ```

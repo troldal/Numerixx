@@ -2,7 +2,7 @@
 
 You usually know how accurate an integral needs to be: six digits for a design calculation, twelve for a reference
 value, or an absolute error below some small amount. A method with an error estimate stops as soon as its estimate meets
-your request, so the request decides how much work it does. This page shows how to make the request, what the default
+your request, so the request decides how much work it does. This section shows how to make the request, what the default
 asks for and why, and how to read the result against it. The examples write `qd` for `nxx::quadrature`.
 
 ## The request
@@ -129,5 +129,5 @@ integrand that has converged. The remedy is not a better method but a fair reque
 own accuracy: at the default request the same function gives a result well within it. On this function the default
 method notices the noise and gives up instead ([Handle failures](handle-failures.md)).
 
-The output on this page is the same on every toolchain, as long as the compiler does not fuse multiplications and
-additions ([Working with Numerixx](../basics.md#compile-time)).
+All the output quoted in this section is the same on every toolchain, as long as the compiler does not fuse
+multiplications and additions ([Working with Numerixx](../basics.md#compile-time)).

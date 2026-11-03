@@ -3,7 +3,7 @@
 Newton's method replaces $f$ by its tangent line at the current point, and steps to where that line crosses zero. To
 draw the tangent it needs the derivative $f'$. Halley's method fits a curve that also matches the curvature, so it needs
 the second derivative $f''$ as well. In return, both close in on a root in very few steps once they are near it. This
-page shows the three ways to give them the derivatives: from `fn` itself, as separate functions, or computed
+section shows the three ways to give them the derivatives: from `fn` itself, as separate functions, or computed
 numerically.
 
 The examples use $f(x) = x^3 - 2x - 5$, with $f'(x) = 3x^2 - 2$ and $f''(x) = 6x$.

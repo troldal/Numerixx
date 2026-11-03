@@ -2,8 +2,8 @@
 
 The curvature of a function, the rate of change of a slope, a Taylor expansion to a few terms: each needs a derivative
 above the first. `nxx::deriv` computes the second, third and fourth derivatives with every method. They cost more
-evaluations of `fn`, and, more importantly, they are far less accurate than the first derivative. This page shows how to
-ask for them, how accurate they are, and why `float` is not enough.
+evaluations of `fn`, and, more importantly, they are far less accurate than the first derivative. This section shows how
+to ask for them, how accurate they are, and why `float` is not enough.
 
 ## Asking for the N-th derivative
 
@@ -66,7 +66,7 @@ The result, $0.2500806$ for $0.25$, keeps only three or four digits. Use `double
 is enough for your purpose, silence the warning at the call, with your compiler's pragma for deprecation warnings
 (`-Wdeprecated-declarations` for GCC and Clang, C4996 for MSVC), or everywhere, by defining
 `NUMERIXX_NO_PRECISION_WARNING`. Define it on the compiler's command line, so that every file sees it alike, or before
-the header, as this page's one-file program does:
+the header, as this section's one-file program does:
 
 ```{literalinclude} ../examples/deriv_higher.cpp
 :start-after: // <silence>

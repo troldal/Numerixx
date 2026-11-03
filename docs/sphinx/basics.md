@@ -1,9 +1,9 @@
 # Working with Numerixx
 
 Each module of Numerixx solves its own kind of problem, but they all work the same way. You pass a function, written as
-a lambda or any other callable and called `fn` throughout this documentation, together with the numbers that start the
+a lambda or any other callable and called `fn` throughout this manual, together with the numbers that start the
 computation. The type of those numbers sets the type of the whole computation. You get back a result or the reason there
-is none, not an exception. And you can run the same call at compile time. This page explains these conventions once,
+is none, not an exception. And you can run the same call at compile time. This chapter explains these conventions once,
 so the module chapters need not repeat them. Most of its examples use `nxx::roots`, shortened to `rt` by
 `namespace rt = nxx::roots;`; the same rules hold for `nxx::deriv`, shortened to `dv`, and for `nxx::quadrature`,
 shortened to `qd`, whose examples come at the end of [Results](#results).
@@ -207,7 +207,8 @@ Read the members by name, not with a structured binding: a later version may add
 `nxx::roots` and `nxx::quadrature` both have a `Criteria` and an `error`, and they differ: `nxx::roots::Criteria` asks
 for full precision by default, `nxx::quadrature::Criteria` for about half the digits ([Set
 tolerances](quadrature/tolerances.md)). Under `using namespace` for both modules, an unqualified `Criteria` or `error`
-is ambiguous and does not compile. Qualify the names, or use the namespace aliases of this site.
+is ambiguous and does not compile. Qualify the names, or use namespace aliases, as this manual does
+(`rt`, `dv`, `qd`).
 ```
 
 ## Compile time
@@ -225,7 +226,7 @@ Two things limit this. First, `fn` must be `constexpr` itself. Arithmetic and co
 functions of `<cmath>` mostly are not: C++23 makes a few `constexpr`, such as `std::abs` and `std::floor`, but not
 `std::sin`, `std::exp` or `std::sqrt` (GCC accepts some of them as an extension, which other compilers reject). Second,
 the type must be a *literal type*, usable in constant expressions: the built-in types are, while the
-Boost.Multiprecision types on this site, `cpp_bin_float_50` and `cpp_dec_float_50`, are not.
+Boost.Multiprecision types in this manual, `cpp_bin_float_50` and `cpp_dec_float_50`, are not.
 
 A constant gives exactly what the same call gives at run time, as long as the compiler does not fuse a multiplication
 and an addition into one instruction (a fused multiply-add) at run time. One more exception: an overflow is not
@@ -233,7 +234,7 @@ allowed in a constant expression, so `nxx::quadrature` refuses, with `non_finite
 type's largest number in a constant that it would accept at run time. Compilers for x86-64 and WebAssembly do not by
 default, but GCC and Clang do as soon as you target hardware that has the instruction (`-march=native`, `-mfma`);
 `-ffp-contract=off` turns that off. Fused arithmetic also changes the last digits of results, and the counts of
-evaluations, that this site quotes.
+evaluations, that this manual quotes.
 
 ```{note}
 A compiler limits the work in one constant expression. If it reports that a solve exceeds the limit, raise it:

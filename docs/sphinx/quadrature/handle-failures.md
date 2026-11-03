@@ -1,7 +1,7 @@
 # Handle failures
 
 An integration can end without an integral: the input was invalid, the function returned something that is not a
-number, or the method ran out of work before its estimate met your request. This page shows how to read a failure,
+number, or the method ran out of work before its estimate met your request. This section shows how to read a failure,
 when its best estimate is worth keeping, how to tell a divergent integral, how to recover, and how to watch a method's
 steps. The examples write `qd` for `nxx::quadrature`.
 
@@ -157,5 +157,5 @@ observer changes nothing in the run. An exception thrown by `fn` or by an observ
 unchanged ([Working with Numerixx](../basics.md#results)), so throwing from an observer can stop a run that takes too
 long.
 
-The output on this page is the same on every toolchain, as long as the compiler does not fuse multiplications and
-additions ([Working with Numerixx](../basics.md#compile-time)).
+All the output quoted in this section is the same on every toolchain, as long as the compiler does not fuse
+multiplications and additions ([Working with Numerixx](../basics.md#compile-time)).

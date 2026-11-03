@@ -1,7 +1,7 @@
 # Choose a method
 
 The default, the central difference `Central<2>`, costs two evaluations of `fn` and gives about 10 or 11 correct digits
-of a `double` on a function that varies on the scale $\max(|x|, 1)$. That is often enough. This page is for the cases
+of a `double` on a function that varies on the scale $\max(|x|, 1)$. That is often enough. This section is for the cases
 where it is not: when you need more digits, an error estimate, a function defined on one side of $x$ only, or the fewest
 evaluations of an expensive `fn`.
 

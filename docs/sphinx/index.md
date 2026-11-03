@@ -21,16 +21,16 @@ time as well as at run time.
 The modules share one header, `numerixx/math.hpp`, with the definition of a real type and a few helpers ([nxx::real and
 nxx::math](core.md)).
 
-## How this site is organised
+## How this manual is organised
 
 Start with [Getting started](getting-started.md), which adds Numerixx to a project and runs a first program, and
 [Working with Numerixx](basics.md), which explains what every module has in common: real types, results and errors, and
 compile-time use. Then go to the chapter of the module you need. Each chapter opens with an overview of its problem and
-its methods, and holds a tutorial that solves one problem step by step, a guide of pages that each solve one task, and
+its methods, and holds a tutorial that solves one problem step by step, a guide whose sections each solve one task, and
 the reference generated from the headers.
 
-Every piece of code on this site comes from a program that is built and run as a test, and that program checks the
-results and the output the page quotes from it.
+Every piece of code in this manual comes from a program that is built and run as a test, and that program checks the
+results and the output this manual quotes from it.
 
 ```{toctree}
 :caption: Start here

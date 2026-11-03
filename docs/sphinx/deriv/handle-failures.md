@@ -1,7 +1,7 @@
 # Handle failures
 
 A derivative can fail outright, when `fn` returns NaN where a method needs a value, or a step is unusable. It can also
-return a number that is not accurate enough, and for Ridders' methods the error estimate is how you tell. This page
+return a number that is not accurate enough, and for Ridders' methods the error estimate is how you tell. This section
 shows how to recognise each case, and what to try next.
 
 The examples write `dv` for `nxx::deriv`.
@@ -10,7 +10,7 @@ The examples write `dv` for `nxx::deriv`.
 
 A failed call returns a `std::expected` holding an {cpp:enum}`nxx::deriv::error` instead of an
 {cpp:struct}`nxx::deriv::Estimate`. Nothing is thrown. [Working with Numerixx](../basics.md#results) explains how to
-test the result; this page is about what the errors mean. Today there is one,
+test the result; this section is about what the errors mean. Today there is one,
 {cpp:enumerator}`nxx::deriv::error::non_finite`: no finite estimate exists. Its causes:
 
 - `fn` returned NaN or an infinity where the method needed a value. A stencil fails as soon as one of its points gives

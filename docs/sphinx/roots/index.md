@@ -96,8 +96,8 @@ digits, write $f$ so that it does not cancel near the root.
 ## Where to go next
 
 The [tutorial](tutorial.md) solves Kepler's equation step by step. [Choose a method](choose-a-method.md) says when a
-method other than Brent's does better, and the other guide pages each solve one task. The [reference](reference.md)
-documents every name.
+method other than Brent's does better, and the other sections of the guide each solve one task. The
+[reference](reference.md) documents every name.
 
 ```{toctree}
 :maxdepth: 1

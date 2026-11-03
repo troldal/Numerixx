@@ -1,7 +1,7 @@
 # Choose a method
 
 `nxx::roots` has eleven methods, and Brent's method is the one to start with: it needs only a bracket and the values of
-`fn`, it is fast on smooth functions, and its worst case is bounded. This page is for the cases where another method
+`fn`, it is fast on smooth functions, and its worst case is bounded. This section is for the cases where another method
 does better. Which one depends on three things: what you start from (a bracket or a guess), whether you can compute the
 derivative, and how much one evaluation of `fn` costs.
 

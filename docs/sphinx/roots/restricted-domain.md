@@ -2,7 +2,7 @@
 
 Many functions are defined only on part of the line: a logarithm for $x > 0$, a square root for $x \ge 0$, a physical
 model only where its quantities make sense. Outside that *domain*, a method that evaluates `fn` gets either NaN or a
-number that means nothing. This page shows how to keep a solve inside the domain, and what each method does when it
+number that means nothing. This section shows how to keep a solve inside the domain, and what each method does when it
 steps outside.
 
 Numerixx reads a value of `fn` that is not finite, NaN or infinite, as a sign that the point lies outside the domain.

@@ -75,7 +75,7 @@ two sequences meet within a handful of steps, to within a few rounding errors:
 
 The loop stops when $a$ and $b$ agree to a few units in the last place rather than when they are equal, since rounding
 can leave them alternating between two neighbouring numbers forever. Its error is below $2 \times 10^{-15}$ relative
-for every $k'$ on this page. Compare:
+for every $k'$ in this tutorial. Compare:
 
 ```{literalinclude} ../examples/quadrature_pendulum.cpp
 :start-after: // <check>
@@ -156,7 +156,7 @@ The function counts its evaluations through a reference, so that the caller can 
 Every value agrees with the arithmetic-geometric mean to within a few units in the last place, at a few hundred
 evaluations. The default method on this form would also succeed, but at four to eleven times the cost: it handles the
 singularity by cutting panels, while `TanhSinh` was built for it. [Singularities, kinks and steps](rough-integrands.md)
-says more about such integrands. These values and counts, like every output this site quotes, are the same on every
+says more about such integrands. These values and counts, like every output this manual quotes, are the same on every
 platform whose compiler does not fuse a multiplication and an addition into one instruction ([Working with
 Numerixx](../basics.md#compile-time)).
 

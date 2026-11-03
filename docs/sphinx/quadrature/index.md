@@ -128,8 +128,8 @@ for oscillating integrands on an infinite interval, such as $\sin x / x$ on $[0,
 ## Where to go next
 
 The [tutorial](tutorial.md) computes the period of a pendulum, step by step. [Choose a method](choose-a-method.md) says
-which method suits which integrand, and the other guide pages each solve one task. [Costs](costs.md) compares the
-methods on a few functions, and the [reference](reference.md) documents every name.
+which method suits which integrand, and the other sections of the guide each solve one task. [Costs](costs.md) compares
+the methods on a few functions, and the [reference](reference.md) documents every name.
 
 ```{toctree}
 :maxdepth: 1

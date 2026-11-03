@@ -4,7 +4,7 @@ A `double` holds about 16 significant digits, which suits most problems. Sometim
 save memory or time where 7 digits are enough, or a multiprecision type when 16 digits are not, say to check a `double`
 computation against a more precise one. Every method works in any *real type*, a type that behaves like a floating-point
 number. [Working with Numerixx](../basics.md#real-types) explains what a real type is and the rules for using one; this
-page covers what is particular to solving.
+section covers what is particular to solving.
 
 ## The type comes from the start
 

@@ -4,7 +4,7 @@ A stencil evaluates `fn` at points a step $h$ apart. Too large a step, and the f
 the formula itself, dominates; too small, and rounding does ([Numerical derivatives](index.md#the-idea-and-its-catch)
 shows the trade-off). The default step balances the two under one assumption: that `fn` varies on the scale
 $\max(|x|, 1)$. Near $x = 0$ that scale is 1; for a large $|x|$ it is $|x|$. For the central difference and a first
-derivative the default is $\varepsilon^{1/3} \approx 6 \times 10^{-6}$ times that scale. This page is about the
+derivative the default is $\varepsilon^{1/3} \approx 6 \times 10^{-6}$ times that scale. This section is about the
 functions that break the assumption, and what to do then. The examples write `dv` for `nxx::deriv`.
 
 ## When the default step is too large
@@ -27,8 +27,8 @@ With the default step:
 ```
 
 The step, $6 \times 10^{-6}$, is about a sixteenth of the peak's width, so the truncation error is large: the result
-keeps only three or four digits (the output is at the end of the page). The default step is $\varepsilon^{1/3}$ times
-the assumed scale; for this function, use $\varepsilon^{1/3}$ times its own scale, $a$.
+keeps only three or four digits (the output follows the last example, in [Or let Ridders' method find the
+step](#or-let-ridders-method-find-the-step)). The default step is $\varepsilon^{1/3}$ times the assumed scale; for this function, use $\varepsilon^{1/3}$ times its own scale, $a$.
 {cpp:func}`nxx::math::root_epsilon` gives $\varepsilon^{1/3}$:
 
 ```{literalinclude} ../examples/deriv_step.cpp

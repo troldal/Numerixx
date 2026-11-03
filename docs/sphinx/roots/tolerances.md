@@ -12,7 +12,7 @@ two terms is larger decides. Every result keeps its side of this: its `abs_error
 it returns.
 
 The defaults ask for all but the last digit or so of the type, whatever the size of the root, so you rarely need to
-change them. This page is about the cases where you do: a root near zero, and a root you need only to a few digits.
+change them. This section is about the cases where you do: a root near zero, and a root you need only to a few digits.
 
 You pass tolerances as a {cpp:struct}`nxx::roots::Criteria`, usually as a braced list after the start:
 `solve<Brent>(fn, bracket, {.abs_tol = 1e-12})`. The list converts to the type of the bracket, so the same `double`

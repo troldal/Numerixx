@@ -2,12 +2,12 @@
 
 A solve can fail: the *bracket*, the interval at whose ends `fn` should have opposite signs, may hold no sign change;
 Newton's method may wander off; `fn` may return NaN. A solve can also succeed and still not give you what you wanted,
-when the sign change it found is a pole. This page shows how to tell what went wrong and what to try next, and how to
+when the sign change it found is a pole. This section shows how to tell what went wrong and what to try next, and how to
 check a result for a pole.
 
 A failed solve returns a `std::expected` that holds an {cpp:enum}`nxx::roots::error` instead of a
 {cpp:struct}`nxx::roots::Root`. Nothing is thrown. [Working with Numerixx](../basics.md#results) explains how to test a
-`std::expected` and chain steps on it; this page is about what the errors of `nxx::roots` mean.
+`std::expected` and chain steps on it; this section is about what the errors of `nxx::roots` mean.
 
 ## What each error means
 

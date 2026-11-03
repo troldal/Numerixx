@@ -2,8 +2,8 @@
 
 Many functions are defined only on part of the line: a square root or a logarithm for $x > 0$, a correlation between the
 ends of its range, a physical model above some limit. The part where a function is defined is its *domain*. A central
-method evaluates `fn` on both sides of $x$, so at the edge of the domain one of its points falls outside it. This page
-shows what happens there, and the methods that look only one way. The examples write `dv` for `nxx::deriv`.
+method evaluates `fn` on both sides of $x$, so at the edge of the domain one of its points falls outside it. This
+section shows what happens there, and the methods that look only one way. The examples write `dv` for `nxx::deriv`.
 
 ## Return NaN outside the domain
 
