@@ -516,8 +516,9 @@ Built in three steps (`PHASE3B_API.md` Q2): exp, the tables in pieces, the metho
   and Waite's c1, ln 2 cut so that k c1 is exact for every k the domain needs; k by a greedy comparison against powers
   of 2 (T has no conversion to an integer), 2^k as two factors; the Taylor series of expm1 by Horner's scheme. One
   guard: x <= x_min gives 0. The error, derived: at most 1.48 ulp (the final rounding of 1 + p 0.5, Horner 0.73, the
-  rounding of r 0.25). No NaN test, no overflow guard, no subnormal results (Phase 4 widens it). Its constants
-  (`detail::ExpConstants`, from `detail::exp_constants<T>()`) are passed in, so that a caller forms them once.
+  rounding of r 0.25). No NaN test, no overflow guard, no subnormal results (Phase 4 keeps it so: its table needs
+  only this domain). Its constants (`detail::ExpConstants`, from `detail::exp_constants<T>()`) are passed in, so that
+  a caller forms them once.
 - **x_min from min(), not min_exponent** (an implementation note to `PHASE3_API.md` B): x_min = -m ln 2, moved 4 eps
   inward, m the largest integer with 2^-m >= min(), found by a greedy descent over m's bits that forms 2^-(m + 2^i)
   from the downward factors and takes the bit where it is at least min() (a product that underflows lies below it;
@@ -637,6 +638,98 @@ edge template) compiles on all five.
 Compile time (Debug, this machine, the best of three): a translation unit with one `integrate<TanhSinh>` in double
 takes 0.32 s longer than with the default method on GCC 16 (1.20 against 0.89 s) and 0.23 s on Clang 22 (0.97 against
 0.74 s): the double table's pieces.
+
+### The exp-sinh table (Phase 4 step 1, `PHASE4_API.md` B)
+
+One table for exp-sinh on a half line and sinh-sinh on the line (Q5), internal; step 2 builds the maps on it.
+
+- **The nodes** (`detail::exp_sinh_piece<T, L, P>`): c = 3/2, formed as T(3) / T(2), exact in every radix (Q2); per
+  t >= 0 at the tanh-sinh table's levels and positions, sinh t and cosh t by `sinh_cosh`, u = c sinh t, q = exp(-u)
+  on exp's domain as it is (not widened), f = c cosh t. The side toward the finite end keeps a node while q >= min()
+  (exp gives 0 below x_min, which ends it); the side toward infinity while f <= (max / 2) q, decided before E = 1/q is
+  formed, so that 1/q cannot overflow and E and f E stay at most about max / 2 in every T. The sides end at different
+  t, the one toward infinity first or with the other: a piece records both counts (`inward`, `outward`).
+- **Four columns:** q, f, E and the line's node x = sinh u, by sinh's series (`sinh_cosh` at u) where u < 1/2, the
+  168 nodes with t <= 167/512 (t = 0 among them, x = 0), else (E - q) / 2. A full fourth column rather than the
+  series for those 168 nodes beside (E - q) / 2 formed at use: one load per node of the line, no branch at use, for
+  8 bytes a slot in double (32 KB a piece in all). The weights are formed at use: f E, f q and (f E + f q) / 2.
+  t = 0 is one node: q = E = 1, f = 3/2, x = 0, exact in every type.
+- **Pieces:** as the tanh-sinh table's, with its capacity bound (t_max <= asinh(2L / 3) <= ln n, n = (1 -
+  min_exponent) bits per digit, holds for both tables: double 3,585 slots for 3,508 nodes); each piece its own
+  `inline constexpr` initializer for float, double and long double (`detail::exp_sinh_table`), through
+  `with_generated` for other T, in std::vector columns as the tanh-sinh table's (four arrays of 1,024
+  `cpp_bin_float_50` values take about 160 KB, past Emscripten's stack of 64 KB).
+- **A level at once, generalised:** `detail::with_level<T, View>` and `detail::with_pieces` assemble any view of a
+  level from its pieces: the view names its pieces (`View::with_piece<L, P>`) and adds each (`View::add`, false where
+  the piece is not full, which ends the level). `TanhSinhLevel` and `ExpSinhLevel` are the two views;
+  `with_tanh_sinh_level` and `with_exp_sinh_level` forward to it. `ExpSinhLevel` takes a piece's nodes toward
+  infinity only while every earlier piece's were full, so that the side ends at its first refused node in t. The
+  tanh-sinh path is unchanged: its double table equals `tanh-sinh-prototype/tab_double.txt` bit for bit, and 1/x to
+  the cap in a constant expression takes 871,680 steps on Clang (871,858 before). No walker (`each`) yet for the new
+  view: step 2's sweeps decide what they need. A pointer to member in the view's accessors (one helper for the four
+  columns) crashed cl 19.51 in constant evaluation (C1001); each accessor indexes its own column.
+- **The latent fixes of Phase 3b:** `exp_constants` forms an upward factor 2^(2^(i-1)) only where it fits
+  (up[i - 1] <= max / up[i - 1]), else leaves it 0, which exp never takes (asserted: its arguments, up to about 22,
+  need k < 2^5); in every tested type all factors fit, so nothing changed (the test's type with max() = 2^100 and
+  double's min() stops at 2^64, its exp equal to double's). The capacity bound's bits per radix-10 digit were already
+  rounded up: `significand_bits<T>() / digits` is ceil(log2 radix), 4 in radix 10, so n ln 2 >= (1 - min_exponent)
+  ln 10 held (the numerics review's truncation was not in the code); the comment now says so and a static_assert
+  checks it. exp's assert costs the tanh-sinh pieces about 1 % of their steps (below).
+
+### Evidence (Phase 4 step 1)
+
+The nodes per level and side are the script's (mpmath; no node within 1e-4 of either side's end, relative) and equal
+the prototype's (`es.py`, its default `one_q` at c = 3/2) in double, binary128 and 168 bits. With t > 0:
+
+| | toward infinity | toward the finite end | t_max (2^-9) |
+|---|---|---|---|
+| float | 2,413 | 2,435 | 4.713, 4.756 |
+| double | 3,503 | 3,507 | 6.842, 6.850 |
+| long double (80-bit, binary128) | 4,927 | 4,928 | 9.623, 9.625 |
+| `cpp_bin_float_50` | 10,961 | 10,961 | 21.41 |
+| `cpp_dec_float_50` | 9,801 | 9,801 | 19.14 |
+
+Accuracy against mpmath (80 digits) on the sampled nodes (`quadrature: exp_sinh: the table against mpmath`, 275 in
+double, 298 in `cpp_bin_float_50`), within the bound of the test's comment, derived as Phase 3's: sinh t and cosh t
+within (N + 1/2) / 2 below t = 1/2 (N = 8 in double, 18 in `cpp_bin_float_50`) and 1/2 + (3/2 e + 2/e) / (e -+ 1/e)
+above; u = c s with absolute error a = u (ds + 1/2), which moves q, E and x by a times d ln/du (1, 1, coth u), the
+same shift of the node in t for each value and its weight; q 3/2 + a, E 2 + a, f dc + 1/2, x (N + 1/2) / 2 + a coth u
+below u = 1/2 and 1/2 + ((2 + a) E + (3/2 + a) q) / (E - q) above, f q dc + 5/2 + a, f E dc + 3 + a, the line's
+weight 1/2 + ((dc + 3 + a) E + (dc + 5/2 + a) q) / (E + q). Largest error, and of error to bound:
+
+| | q, E, x, weights: largest (t) | below t = 1/2 | error / bound (t) |
+|---|---|---|---|
+| double | 517 eps (6.53) | x 1.82, weights 1.91, q 0.81, E 0.98, f 1.65 eps | 0.401 (6.53) |
+| `cpp_bin_float_50` | 9.6e8 eps (21.38) | x 2.66, weights 2.89, q 1.82, E 1.69, f 2.45 eps | 0.462 (10.5) |
+
+The compile-time tables of float, double and long double equal the run-time pieces of their boxed twins bit for bit
+(`compile-time and run-time tables`), and a boxed double's level 4 generated in a constant expression equals the
+double table's (static_assert). The double table built by cl and clang-cl equals GCC's (`dump.cpp es`), dumped for
+the prototype as `tanh-sinh-prototype/es_double.txt`.
+
+The largest piece's share of each toolchain's default constexpr budget (as Phase 3b's table, the same bisection); in
+brackets the tanh-sinh table's largest piece, re-measured with exp's new assert (Phase 3b's figures above, before it):
+
+| | float | double | long double |
+|---|---|---|---|
+| GCC 16 | 7.8 % (7.5) | 9.7 % (9.3) | 14.0 % (13.7; 80-bit, level 9 piece 1) |
+| Clang 22 | 22.4 % (21.1) | 27.0 % (25.5; 283,044 steps, level 9 piece 0) | 38.1 % (37.1; 80-bit, piece 1) |
+| clang-cl | 19.2 % (18.1) | 23.3 % (22.0) | as double |
+| cl 19.51 | 17.8 % (16.9) | 24.4 % (23.4) | as double |
+| em++ 6.0.13 | 22.4 % (21.1) | 27.0 % (25.5) | 40.8 % (39.8; binary128, piece 1) |
+
+About 276 Clang steps a node in double, 261 for tanh-sinh. A class wrapping double (no table) on Clang: level 4 in
+one constant expression 84,691 steps (tanh-sinh 78,037), level 8 922,380, 88.0 % of the default (tanh-sinh 824,099):
+about 1,050 steps a node against 980, so step 2's constant evaluation of such a type ends earlier than tanh-sinh's.
+
+Compile time (Debug, -O0 -g, this machine, the best of three): a translation unit reading every level of both double
+tables at run time takes 0.52 s more than with the tanh-sinh table alone on GCC 16 (1.65 against 1.13 s; 0.67 with
+neither) and 0.37 s on Clang 22 (1.25 against 0.88 s; 0.52): every piece is instantiated where a level is read
+(the spike's separate tables at c = 1 cost 1.1 and 0.9 s).
+
+Run-time generation in `cpp_bin_float_50` (GCC 16, every piece of every level generated directly, the best of
+three): 15.7 us a node at -O2 (tanh-sinh 15.6), 79 us at -O0 -g (78); the whole table, 10,962 nodes, 0.17 s and
+0.87 s, once per program (cached).
 
 ### The references of the tanh-sinh tests
 
@@ -789,6 +882,136 @@ if __name__ == '__main__':
     main()
 ```
 
+### The references of the exp-sinh tests
+
+`tests/quadrature_exp_sinh_reference.hpp`, run as `python -I es_references.py > quadrature_exp_sinh_reference.hpp`:
+
+```python
+# References for the exp-sinh table's tests (tests/quadrature_exp_sinh_reference.hpp), from mpmath at 80 digits,
+# printed to 60: at sampled nodes t > 0 of the double and cpp_bin_float_50 tables, with u = c sinh t and c = 3/2,
+# q = e^-u, E = e^u, f = c cosh t, the line's node sinh u, and the weights f q, f E and f cosh u; and the nodes per
+# level of each side of every type's table.
+# A value is written as a mantissa in [1, radix) and an exponent of the radix, as in ts_references.py.
+# Usage: python -I es_references.py > quadrature_exp_sinh_reference.hpp
+import mpmath as mp
+
+mp.mp.dps = 80
+LN2 = mp.log(2)
+C = mp.mpf(3) / 2
+
+
+def ln_half_max(radix, digits, exponent):
+    # ln(max / 2), max = (1 - radix^-digits) radix^exponent.
+    return mp.log((1 - mp.mpf(radix) ** -digits) * mp.mpf(radix) ** exponent / 2)
+
+
+# (name, digits, m, ln(max / 2)) of each type: m as in ts_references.py, the largest integer with 2^-m >= min(), so
+# that the side toward the finite end keeps the nodes with u < m ln 2 (q >= min()); the side toward infinity keeps
+# those with f <= (max / 2) q, that is ln f + u <= ln(max / 2). max is (1 - 2^-digits) 2^max_exponent for the built-in
+# types (x87 and binary128 share max_exponent 16384; their max differ in the 19th digit, no node lies that close),
+# (1 - 2^-168) 2^2147483312 for cpp_bin_float_50 and 10^67108864 for cpp_dec_float_50 (std::numeric_limits).
+TYPES = [('float', 24, 126, ln_half_max(2, 24, 128)), ('double', 53, 1022, ln_half_max(2, 53, 1024)),
+         ('long_double', 64, 16382, ln_half_max(2, 64, 16384)),
+         ('bin50', 168, 2147483312, ln_half_max(2, 168, 2147483312)),
+         ('dec50', 50, int(mp.floor(67108864 * mp.log(10, 2))), mp.log(mp.mpf(10) ** 67108864 / 2))]
+
+
+def scaled(v, radix=2):
+    # v = m radix^e, 1 <= m < radix, m to 60 digits.
+    e = int(mp.floor(mp.log(v, radix)))
+    m = v / mp.mpf(radix) ** e
+    if m >= radix:
+        m /= radix
+        e += 1
+    if m < 1:
+        m *= radix
+        e -= 1
+    return mp.nstr(m, 60, min_fixed=-1, max_fixed=-1, strip_zeros=False), e
+
+
+def node_t(level, i):
+    return mp.mpf(i) if level == 0 else mp.mpf(2 * i + 1) / mp.mpf(2) ** level
+
+
+def counts(m, half_max):
+    # The nodes per level of each side (t = 0 included), and the smallest relative distance of a node from either
+    # side's boundary.
+    lmin = m * LN2
+    inward, outward, gap = [], [], mp.inf
+    for level in range(10):
+        n_in, n_out = 0, 0
+        while True:
+            t = node_t(level, n_in)
+            u = C * mp.sinh(t)
+            gap = min(gap, abs(u - lmin) / lmin)
+            if not u < lmin:
+                break
+            far = mp.log(C * mp.cosh(t)) + u
+            gap = min(gap, abs(far - half_max) / half_max)
+            if far <= half_max and n_out == n_in:
+                n_out += 1
+            n_in += 1
+        inward.append(n_in)
+        outward.append(n_out)
+    return inward, outward, gap
+
+
+def table_sample(m, half_max, full_levels, stride_from):
+    inward, outward, _ = counts(m, half_max)
+    out = []
+    for level in range(10):
+        n = inward[level]
+        chosen = set(range(n)) if level < full_levels else set(range(0, n, 2 ** (level - stride_from)))
+        chosen.update({n - 1, outward[level] - 1})
+        for i in range(n):  # around the switches to exp at t = 1/2 and to E - q at u = 1/2 (t = 0.327)
+            t = node_t(level, i)
+            if level >= 4 and (abs(t - mp.mpf(1) / 2) <= mp.mpf(1) / 32 or abs(C * mp.sinh(t) - mp.mpf(1) / 2)
+                               <= mp.mpf(1) / 32):
+                chosen.add(i)
+        chosen.discard(0 if level == 0 else -1)  # t = 0 is exact: the tests check it alone
+        for i in sorted(chosen):
+            t = node_t(level, i)
+            u = C * mp.sinh(t)
+            f = C * mp.cosh(t)
+            q, e = mp.exp(-u), mp.exp(u)
+            values = [q, e, f, mp.sinh(u), f * q, f * e, f * mp.cosh(u)]
+            out.append((level, i, i < outward[level], [scaled(v) for v in values]))
+    return out
+
+
+def main():
+    print('// Generated by the script in docs/quadrature/design.md ("The references of the exp-sinh tests") from '
+          'mpmath at 80')
+    print('// digits, printed to 60: a value is mantissa radix^exponent, 1 <= mantissa < radix.')
+    print('\n#pragma once\n\nnamespace exp_sinh_reference {\n')
+    print('    // A value: mantissa radix^exponent.\n    struct Value\n    {\n        char const *mantissa;\n'
+          '        long long exponent;\n    };\n')
+    print('    // Node i of a level, t > 0, u = (3/2) sinh t: q = e^-u, E = e^u, f = (3/2) cosh t, x = sinh u, and\n'
+          '    // the weights f q, f E and f cosh u; E, x and the last two only where the node is on the side\n'
+          '    // toward infinity (outward).\n'
+          '    struct Node\n    {\n        int level;\n        int i;\n        bool outward;\n        Value q;\n'
+          '        Value e;\n        Value f;\n        Value x;\n        Value w_end;\n        Value w_infinity;\n'
+          '        Value w_line;\n    };\n')
+    for name, digits, m, half_max in TYPES:
+        inward, outward, gap = counts(m, half_max)
+        print(f'    // {name}, t > 0: {sum(inward) - 1} nodes toward the end, {sum(outward) - 1} toward infinity; the'
+              f' nearest\n    // to a side\'s end lies {mp.nstr(gap, 3)} from it, relative')
+        print(f'    inline constexpr int inward_{name}[] = {{ ' + ', '.join(str(v) for v in inward) + ' };')
+        print(f'    inline constexpr int outward_{name}[] = {{ ' + ', '.join(str(v) for v in outward) + ' };\n')
+    for name, full, stride in (('double', 4, 3), ('bin50', 3, 1)):
+        _, _, m, half_max = next(x for x in TYPES if x[0] == name)
+        print(f'    inline constexpr Node table_{name}[] = {{')
+        for level, i, outward, values in table_sample(m, half_max, full, stride):
+            fields = ',\n          '.join(f'{{ "{vm}", {ve} }}' for vm, ve in values)
+            print(f'        {{ {level}, {i}, {"true" if outward else "false"}, ' + fields + ' },')
+        print('    };\n')
+    print('} // namespace exp_sinh_reference')
+
+
+if __name__ == '__main__':
+    main()
+```
+
 ## Tests
 
 - References from closed forms at 70 digits (mpmath at 80), never Numerixx; Boost's and mpmath's nodes and weights
@@ -831,3 +1054,10 @@ if __name__ == '__main__':
   TanhSinh joins the edge template (`test_quadrature_kronrod.cpp`) with its statuses of `PHASE3_API.md` F and an
   allowance from its table's bound, and the protocol's tests (`test_quadrature_protocol.cpp`): the concept, named and
   as a value, reversed ends exactly negated, observed equal to unobserved, in constant evaluation too.
+- The exp-sinh table (`tests/test_quadrature_exp_sinh.cpp`, `quadrature: exp_sinh: *`): the sampled nodes of the
+  double and `cpp_bin_float_50` tables (q, E, f, x and the three weights formed as at use) within the derived bound,
+  t = 0 exact in every type; the nodes per level and side in float, double, long double and the 50-digit types (with
+  and without expression templates) within the capacity bound; the compile-time tables equal to the run-time pieces
+  of a boxed twin; static_asserts on the double table's levels and sides' ends, on a boxed double's level 4 in a
+  constant expression, on the radix-10 ceiling, and on exp_constants' factors in a type whose exponents reach further
+  below 0 than above.

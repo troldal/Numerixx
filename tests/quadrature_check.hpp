@@ -1,6 +1,7 @@
 // What the nxx::quadrature tests share: the types, the references, the error measurement, an evaluation counter and a
-// domain check, a real type without a default constructor, and the running error analysis of the Legendre recurrence
-// with the error model of a computed Gauss node and weight (Phase 1's, which the Kronrod rule's builds on).
+// domain check, a real type without a default constructor, a built-in type boxed in a class (no compile-time tables),
+// and the running error analysis of the Legendre recurrence with the error model of a computed Gauss node and weight
+// (Phase 1's, which the Kronrod rule's builds on).
 //
 // References are closed forms at 70 digits (mpmath at 80), never Numerixx. Every tolerance comes from an error
 // estimate stated where it is used: for GaussLegendre the truncation bound and the per-node rounding bound of
@@ -61,6 +62,25 @@ namespace quadrature_check {
     template<typename T>
     double error_of(T const &value, char const *ref)
     { return error_of(value, bin100(ref)); }
+
+    // |v / radix^e - m| for a reference value m radix^e, 1 <= m < radix, measured in bin100: in units of eps it is the
+    // error in ulps of the reference's binade. A radix-2 value is split exactly by frexp first, since
+    // cpp_bin_float_50's smallest values lie below cpp_bin_float_100's range.
+    template<typename T>
+    double scaled_error(T const &v, char const *mantissa, long long exponent)
+    {
+        bin100 const m(mantissa);
+        using std::frexp, std::ldexp;
+        if constexpr (std::numeric_limits<T>::radix == 2) {
+            int e = 0;
+            T const f = frexp(v, &e); // v = f 2^e, 1/2 <= f < 1; std::frexp or Boost's, found by lookup
+            return static_cast<double>(bin100(abs(bin100(ldexp(wide(f), static_cast<int>(e - exponent))) - m)));
+        }
+        else {
+            bin100 const scale = pow(bin100(10), static_cast<int>(exponent));
+            return static_cast<double>(bin100(abs(bin100(wide(v) / scale) - m)));
+        }
+    }
 
     // T's epsilon in double (cpp_bin_float_50's, 2^-167, is a double too).
     template<typename T>
@@ -277,7 +297,30 @@ namespace quadrature_check {
         friend constexpr auto operator<=>(Wrapped x, Wrapped y) { return x.v <=> y.v; }
     };
 
+    // A built-in floating type B inside a class: a type without a compile-time table, so its pieces of the tanh-sinh
+    // and exp-sinh tables are generated (cached at run time, temporaries in constant evaluation) with B's arithmetic,
+    // and must equal B's compile-time tables bit for bit.
+    template<typename B>
+    struct Boxed
+    {
+        B v;
+        constexpr Boxed(int i) : v(static_cast<B>(i)) {}
+        constexpr Boxed(B x) : v(x) {}
+        friend constexpr Boxed operator+(Boxed x, Boxed y) { return Boxed(x.v + y.v); }
+        friend constexpr Boxed operator-(Boxed x, Boxed y) { return Boxed(x.v - y.v); }
+        friend constexpr Boxed operator*(Boxed x, Boxed y) { return Boxed(x.v * y.v); }
+        friend constexpr Boxed operator/(Boxed x, Boxed y) { return Boxed(x.v / y.v); }
+        friend constexpr Boxed operator-(Boxed x) { return Boxed(-x.v); }
+        friend constexpr bool operator==(Boxed, Boxed) = default;
+        friend constexpr auto operator<=>(Boxed x, Boxed y) { return x.v <=> y.v; }
+    };
+
 } // namespace quadrature_check
+
+template<typename B>
+struct std::numeric_limits<quadrature_check::Boxed<B>> : std::numeric_limits<B>
+{
+};
 
 template<>
 struct std::numeric_limits<quadrature_check::Wrapped> : std::numeric_limits<double>

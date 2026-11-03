@@ -252,7 +252,10 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
     `PHASE3B_API.md`, "The independent review")
 - Phase 4: `TanhSinh` on half lines and the line (exp-sinh, sinh-sinh), infinite ends opt-in per method.
   - [x] API approved: `docs/quadrature/PHASE4_API.md` (2026-11-03, Q1 to Q8 as recommended, draft 3)
-  - [ ] Step 1, the table (internal), with Phase 3b's latent fix to `exp_constants`
+  - [x] Step 1, the table (internal), with Phase 3b's latent fix to `exp_constants`: against mpmath within the
+    derived bound (largest ratio 0.40 double, 0.46 `cpp_bin_float_50`), the counts per level and side the
+    prototype's, compile-time and run-time tables bit-identical; all five presets locally and the docs build
+    (2026-11-03)
   - [ ] Step 2, the infinite ends: the opt-in, `TanhSinh`'s maps and sides; tests in every type; docs build clean
   - [ ] CI passes on all five toolchains
   - [ ] The independent review (Codex) and its adopted findings

@@ -1852,7 +1852,7 @@ namespace nxx::quadrature {
             /** @brief 2^i. */
             std::array<T, bits> powers;
 
-            /** @brief The factors of 2^k for k > 0: 2 for bit 0, and 2^(2^(i-1)) for bit i, applied twice. */
+            /** @brief The factors of 2^k for k > 0: 2 for bit 0, 2^(2^(i-1)) for bit i applied twice, 0 past max(). */
             std::array<T, bits> up;
 
             /** @brief Their inverses, for k < 0. */
@@ -1903,8 +1903,13 @@ namespace nxx::quadrature {
             down[0] = T(T(1) / T(2));
             up[1] = up[0];
             down[1] = down[0];
+            // An upward factor only where it fits (up[i - 1] <= max / up[i - 1]), else 0: in a type whose exponents
+            // reach further below 0 than above, reach outruns the largest power of 2 (the Phase 4 spike's type with
+            // max_exponent 100 formed 2^128). exp() never takes such a factor: its arguments, up to about 22, need
+            // k < 2^5.
+            T const largest = T((limits::max)());
             for (std::size_t i = 2; i < bits; ++i) {
-                up[i] = T(up[i - 1] * up[i - 1]);
+                up[i] = up[i - 1] > T(0) && up[i - 1] <= T(largest / up[i - 1]) ? T(up[i - 1] * up[i - 1]) : T(0);
                 down[i] = T(down[i - 1] * down[i - 1]);
             }
 
@@ -1970,6 +1975,7 @@ namespace nxx::quadrature {
                     if (i > 0) scale_2 = T(scale_2 * factors[i]);
                 }
             }
+            assert(scale_1 > T(0)); // no upward factor left 0 by exp_constants() was taken
             T const signed_k = negative ? T(-k) : k;
             T const r = T(T(x - T(signed_k * constants.c1)) - T(signed_k * constants.c2));
             T p = T(0);
@@ -2024,7 +2030,7 @@ namespace nxx::quadrature {
             return Hyperbolic<T>{ T(T(e - inverse) / T(2)), T(T(e + inverse) / T(2)) };
         }
 
-        /** @brief The levels of the tanh-sinh rule: h = 1 down to 2^-9 (PHASE3_API.md Q2). */
+        /** @brief The levels of the tanh-sinh rule and of the exp-sinh table: h = 1 down to 2^-9 (PHASE3_API.md Q2). */
         inline constexpr int tanh_sinh_levels = 10;
 
         /** @brief The nodes of a piece at most: the unit of the tables, one initializer each (the constexpr budget). */
@@ -2032,8 +2038,10 @@ namespace nxx::quadrature {
 
         /**
          * @brief Ten times an upper bound on the tables' t_max, from T's limits in integers: a node is kept while
-         * 2 sinh t < L, L = -ln min() <= n ln 2, n = (1 - min_exponent) bits per digit, so t_max <= asinh(L / 2) <=
-         * ln(L + 1) <= ln n < 0.7 bit_width(n).
+         * 2 sinh t < L in the tanh-sinh table and while (3/2) sinh t < L in the exp-sinh table (both of its sides keep
+         * q >= min()), L = -ln min() <= n ln 2, n = (1 - min_exponent) times the bits of a digit rounded up (4 in
+         * radix 10, so that n ln 2 >= (1 - min_exponent) ln 10), so t_max <= asinh(2L / 3) <= ln(4L / 3 + 1) <= ln n
+         * (n >= 14) < 0.7 bit_width(n).
          * @return 10 times the bound.
          */
         template<real T>
@@ -2082,40 +2090,44 @@ namespace nxx::quadrature {
         }
 
         /**
+         * @brief The storage of a column of a piece of N nodes: std::array for float, double and long double, whose
+         * pieces are compile-time tables; std::vector for every other T, whose pieces are built at run time: a column
+         * of 1,024 cpp_bin_float_50 values takes about 40 KB, and a piece holds two (tanh-sinh) or four (exp-sinh),
+         * past Emscripten's default stack of 64 KB.
+         * @tparam T The real type.
+         * @tparam N The capacity.
+         */
+        template<real T, std::size_t N>
+        using Column = std::conditional_t<tabled<T>, std::array<T, N>, std::vector<T>>;
+
+        /**
+         * @brief N nodes of value 0 in either storage (T need not be default constructible).
+         * @return The column.
+         */
+        template<real T, std::size_t N>
+        constexpr Column<T, N> column()
+        {
+            if constexpr (tabled<T>) return detail::zeros<T, N>();
+            else return std::vector<T>(N, T(0));
+        }
+
+        /**
          * @brief The nodes of a piece of a level of the tanh-sinh rule, t ascending: each node's complement 1 - x and
          * weight dx/dt (without the step h).
-         *
-         * In std::arrays for float, double and long double, whose pieces are compile-time tables; in std::vectors for
-         * every other T, whose pieces are built at run time: a piece of 1,024 cpp_bin_float_50 nodes, about 80 KB,
-         * would not fit in Emscripten's default stack of 64 KB.
-         *
          * @tparam T The real type.
          * @tparam N The capacity.
          */
         template<real T, std::size_t N>
         struct Nodes
         {
-            /** @brief The storage of a column. */
-            using Column = std::conditional_t<tabled<T>, std::array<T, N>, std::vector<T>>;
-
             /** @brief 1 - x = 2q / (1 + q), q = exp(-2 sinh t), formed directly, never as 1 - x. */
-            Column comp;
+            Column<T, N> comp;
 
             /** @brief dx/dt = cosh t 4q / (1 + q)^2. */
-            Column w;
+            Column<T, N> w;
 
             /** @brief The nodes held: N, or fewer where the table ends. */
             std::size_t size;
-
-            /**
-             * @brief N nodes of value 0 in either storage (T need not be default constructible).
-             * @return The column.
-             */
-            static constexpr Column column()
-            {
-                if constexpr (tabled<T>) return detail::zeros<T, N>();
-                else return std::vector<T>(N, T(0));
-            }
         };
 
         /**
@@ -2135,7 +2147,7 @@ namespace nxx::quadrature {
         {
             constexpr std::size_t capacity = detail::piece_capacity<T>(L, P);
             return detail::with_generated<&detail::exp_constants<T>>([](ExpConstants<T> const &constants) {
-                Nodes<T, capacity> nodes{ Nodes<T, capacity>::column(), Nodes<T, capacity>::column(), 0 };
+                Nodes<T, capacity> nodes{ detail::column<T, capacity>(), detail::column<T, capacity>(), 0 };
                 T h = T(1);
                 for (int i = 0; i < L; ++i) h = T(h / T(2));
                 for (std::size_t index = 0; index < capacity; ++index) {
@@ -2199,6 +2211,30 @@ namespace nxx::quadrature {
             int size;
 
             /**
+             * @brief @p use applied to piece P of level L, for with_level().
+             * @param use A callable taking the piece.
+             * @return What use returns.
+             */
+            template<int L, int P, typename U>
+            static constexpr decltype(auto) with_piece(U &&use)
+            { return detail::with_tanh_sinh_piece<T, L, P>(use); }
+
+            /**
+             * @brief Adds the nodes of piece @p p, for with_level().
+             * @param p The piece, after those added.
+             * @param nodes Its nodes.
+             * @return Whether the piece is full, so that the level may go on.
+             */
+            template<std::size_t N>
+            constexpr bool add(std::size_t p, Nodes<T, N> const &nodes)
+            {
+                comp[p] = std::span<T const>(nodes.comp.data(), nodes.size);
+                w[p] = std::span<T const>(nodes.w.data(), nodes.size);
+                size += static_cast<int>(nodes.size);
+                return nodes.size == N;
+            }
+
+            /**
              * @brief The complement 1 - x of node @p i.
              * @param i The node, 0 <= i < size.
              * @return Its complement.
@@ -2241,46 +2277,299 @@ namespace nxx::quadrature {
         };
 
         /**
-         * @brief @p use applied to level L once pieces P onward are added to @p level: each piece in turn, until one
-         * that is not full ends the level.
-         * @param level The view, holding pieces 0 to P - 1.
-         * @param use A callable taking the view.
+         * @brief The nodes of a piece of a level of the exp-sinh table, t ascending (PHASE4_API.md B), for both maps
+         * with c = 3/2 and u = c sinh t: on [a, inf) the nodes a + E toward infinity and a + q toward a, on the line
+         * +-x. The weights are formed at use: f E, f q, and (f E + f q) / 2 on the line.
+         *
+         * The nodes toward infinity are a prefix of those toward the finite end: their columns hold the first
+         * `outward` entries, the others the first `inward`.
+         *
+         * @tparam T The real type.
+         * @tparam N The capacity.
+         */
+        template<real T, std::size_t N>
+        struct ExpSinhNodes
+        {
+            /** @brief q = exp(-u), the distance toward the finite end. */
+            Column<T, N> q;
+
+            /** @brief f = c cosh t, the factor of every weight. */
+            Column<T, N> f;
+
+            /** @brief E = 1 / q, the distance toward infinity. */
+            Column<T, N> e;
+
+            /** @brief The line's node x = sinh u: by its series where u < 1/2, where E - q cancels, else (E - q) / 2. */
+            Column<T, N> x;
+
+            /** @brief The nodes toward the finite end: N, or fewer where the table ends. */
+            std::size_t inward;
+
+            /** @brief The nodes toward infinity and on the line, at most inward. */
+            std::size_t outward;
+        };
+
+        /**
+         * @brief A piece of a level of the exp-sinh table, from exp() on its domain alone (PHASE4_API.md B): c = 3/2,
+         * exact in every radix, so no pi.
+         *
+         * Levels and positions as the tanh-sinh table's. The side toward the finite end ends at the first node whose
+         * q = exp(-u) is 0, below x_min: q >= min() for the nodes kept. The side toward infinity ends at the first
+         * node with f > (max / 2) q, decided before E = 1/q is formed, so that 1/q cannot overflow and E and f E stay
+         * at most about max / 2 in every T.
+         *
+         * @tparam T The real type.
+         * @tparam L The level, 0 to 9.
+         * @tparam P The piece.
+         * @return The piece.
+         */
+        template<real T, int L, int P>
+        constexpr ExpSinhNodes<T, detail::piece_capacity<T>(L, P)> exp_sinh_piece()
+        {
+            constexpr std::size_t capacity = detail::piece_capacity<T>(L, P);
+            return detail::with_generated<&detail::exp_constants<T>>([](ExpConstants<T> const &constants) {
+                ExpSinhNodes<T, capacity> nodes{ detail::column<T, capacity>(), detail::column<T, capacity>(),
+                    detail::column<T, capacity>(), detail::column<T, capacity>(), 0, 0 };
+                T const c = T(T(3) / T(2));
+                T const half = T(T(1) / T(2));
+                T const smallest = T((std::numeric_limits<T>::min)());
+                T const half_max = T(T((std::numeric_limits<T>::max)()) / T(2));
+                T h = T(1);
+                for (int i = 0; i < L; ++i) h = T(h / T(2));
+                bool outward = true;
+                for (std::size_t index = 0; index < capacity; ++index) {
+                    int const i = P * piece_size + static_cast<int>(index);
+                    T const t = L == 0 ? T(i) : T(T(2 * i + 1) * h);
+                    Hyperbolic<T> const hyperbolic = detail::sinh_cosh(t, constants);
+                    T const u = T(c * hyperbolic.s);
+                    T const q = detail::exp(T(-u), constants);
+                    if (q < smallest) break;
+                    T const f = T(c * hyperbolic.c);
+                    nodes.q[index] = q;
+                    nodes.f[index] = f;
+                    nodes.inward = index + 1;
+                    outward = outward && f <= T(half_max * q);
+                    if (!outward) continue;
+                    T const e = T(T(1) / q);
+                    nodes.e[index] = e;
+                    nodes.x[index] = u < half ? detail::sinh_cosh(u, constants).s : T(T(e - q) / T(2));
+                    nodes.outward = index + 1;
+                }
+                return nodes;
+            });
+        }
+
+        /**
+         * @brief A piece of the exp-sinh table for float, double and long double, computed at compile time once per
+         * program, each piece its own initializer, as tanh_sinh_table.
+         * @tparam T float, double or long double.
+         * @tparam L The level.
+         * @tparam P The piece.
+         */
+        template<typename T, int L, int P>
+        inline constexpr ExpSinhNodes<T, piece_capacity<T>(L, P)> exp_sinh_table = detail::exp_sinh_piece<T, L, P>();
+
+        /**
+         * @brief @p use applied to a piece of the exp-sinh table in T, as with_tanh_sinh_piece().
+         * @param use A callable taking the piece.
          * @return What use returns.
          */
         template<real T, int L, int P, typename U>
-        constexpr decltype(auto) with_pieces(TanhSinhLevel<T> &level, U &use)
+        constexpr decltype(auto) with_exp_sinh_piece(U &&use)
+        {
+            if constexpr (tabled<T>) return use(detail::exp_sinh_table<T, L, P>);
+            else return detail::with_generated<&detail::exp_sinh_piece<T, L, P>>(use);
+        }
+
+        /**
+         * @brief The nodes of one level of the exp-sinh table across its pieces, t ascending, positions as
+         * TanhSinhLevel's: q and f for the nodes toward the finite end, E and x for the first `outward` of them. A
+         * view, valid only inside with_exp_sinh_level()'s callback.
+         * @tparam T The real type.
+         */
+        template<real T>
+        struct ExpSinhLevel
+        {
+            /** @brief The most pieces of any level: the finest level's. */
+            static constexpr std::size_t most =
+                static_cast<std::size_t>(detail::level_pieces<T>(tanh_sinh_levels - 1));
+
+            /** @brief The columns of a piece, each of its nodes held on its side. */
+            struct Piece
+            {
+                /** @brief q, toward the finite end. */
+                std::span<T const> q;
+
+                /** @brief f, toward the finite end. */
+                std::span<T const> f;
+
+                /** @brief E, toward infinity. */
+                std::span<T const> e;
+
+                /** @brief x, toward infinity. */
+                std::span<T const> x;
+            };
+
+            /** @brief The pieces. */
+            std::array<Piece, most> pieces;
+
+            /** @brief The nodes of the level toward the finite end. */
+            int inward;
+
+            /** @brief The nodes of the level toward infinity and on the line, at most inward. */
+            int outward;
+
+            /**
+             * @brief @p use applied to piece P of level L, for with_level().
+             * @param use A callable taking the piece.
+             * @return What use returns.
+             */
+            template<int L, int P, typename U>
+            static constexpr decltype(auto) with_piece(U &&use)
+            { return detail::with_exp_sinh_piece<T, L, P>(use); }
+
+            /**
+             * @brief Adds the nodes of piece @p p, for with_level(). The side toward infinity of a piece is taken
+             * only while every earlier piece's was full, so that the side ends at its first refused node in t.
+             * @param p The piece, after those added.
+             * @param nodes Its nodes.
+             * @return Whether the piece is full toward the finite end, so that the level may go on.
+             */
+            template<std::size_t N>
+            constexpr bool add(std::size_t p, ExpSinhNodes<T, N> const &nodes)
+            {
+                std::size_t const held = static_cast<std::size_t>(outward) == p * piece_size ? nodes.outward : 0;
+                pieces[p] = Piece{ std::span<T const>(nodes.q.data(), nodes.inward),
+                    std::span<T const>(nodes.f.data(), nodes.inward), std::span<T const>(nodes.e.data(), held),
+                    std::span<T const>(nodes.x.data(), held) };
+                inward += static_cast<int>(nodes.inward);
+                outward += static_cast<int>(held);
+                return nodes.inward == N;
+            }
+
+            /**
+             * @brief The piece of node @p i.
+             * @param i The node, at least 0.
+             * @return Its piece.
+             */
+            constexpr Piece const &piece_of(int i) const
+            { return pieces[static_cast<std::size_t>(i / piece_size)]; }
+
+            /**
+             * @brief The index of node @p i in its piece.
+             * @param i The node, at least 0.
+             * @return Its index.
+             */
+            static constexpr std::size_t index_of(int i)
+            { return static_cast<std::size_t>(i % piece_size); }
+
+            /**
+             * @brief q = exp(-u) of node @p i.
+             * @param i The node, 0 <= i < inward.
+             * @return Its q.
+             */
+            constexpr T const &q(int i) const
+            {
+                assert(0 <= i && i < inward);
+                return piece_of(i).q[index_of(i)];
+            }
+
+            /**
+             * @brief f = c cosh t of node @p i.
+             * @param i The node, 0 <= i < inward.
+             * @return Its f.
+             */
+            constexpr T const &f(int i) const
+            {
+                assert(0 <= i && i < inward);
+                return piece_of(i).f[index_of(i)];
+            }
+
+            /**
+             * @brief E = 1/q of node @p i.
+             * @param i The node, 0 <= i < outward.
+             * @return Its E.
+             */
+            constexpr T const &e(int i) const
+            {
+                assert(0 <= i && i < outward);
+                return piece_of(i).e[index_of(i)];
+            }
+
+            /**
+             * @brief The line's node x = sinh u of node @p i.
+             * @param i The node, 0 <= i < outward.
+             * @return Its x.
+             */
+            constexpr T const &x(int i) const
+            {
+                assert(0 <= i && i < outward);
+                return piece_of(i).x[index_of(i)];
+            }
+        };
+
+        /**
+         * @brief @p use applied to level L of a table once pieces P onward are added to @p level: each piece in turn,
+         * until one that is not full ends the level.
+         * @tparam T The real type.
+         * @tparam L The level.
+         * @tparam P The next piece.
+         * @param level The view (TanhSinhLevel<T> or ExpSinhLevel<T>), holding pieces 0 to P - 1.
+         * @param use A callable taking the view.
+         * @return What use returns.
+         */
+        template<real T, int L, int P, typename View, typename U>
+        constexpr decltype(auto) with_pieces(View &level, U &use)
         {
             if constexpr (P == detail::level_pieces<T>(L)) return use(std::as_const(level));
             else {
-                constexpr std::size_t capacity = detail::piece_capacity<T>(L, P);
-                return detail::with_tanh_sinh_piece<T, L, P>([&](Nodes<T, capacity> const &nodes) -> decltype(auto) {
-                    level.comp[P] = std::span<T const>(nodes.comp.data(), nodes.size);
-                    level.w[P] = std::span<T const>(nodes.w.data(), nodes.size);
-                    level.size += static_cast<int>(nodes.size);
-                    if (nodes.size < capacity) return use(std::as_const(level));
+                return View::template with_piece<L, P>([&](auto const &nodes) -> decltype(auto) {
+                    if (!level.add(P, nodes)) return use(std::as_const(level));
                     return detail::with_pieces<T, L, P + 1>(level, use);
                 });
             }
         }
 
         /**
-         * @brief @p use applied to a level of the tanh-sinh table in T, every piece of it at once: the compile-time
-         * tables for float, double and long double, with_generated() for every other T (in constant evaluation, each
-         * piece generated as a temporary for the call).
+         * @brief @p use applied to a level of a table in T, every piece of it at once: the compile-time tables for
+         * float, double and long double, with_generated() for every other T (in constant evaluation, each piece
+         * generated as a temporary for the call).
+         * @tparam T The real type.
+         * @tparam View The view of a level: TanhSinhLevel<T> or ExpSinhLevel<T>.
+         * @param level The level, 0 to 9.
+         * @param use A callable taking a View const &.
+         * @return What use returns.
+         */
+        template<real T, typename View, int L = 0, typename U>
+        constexpr decltype(auto) with_level(int level, U &&use)
+        {
+            assert(0 <= level && level < tanh_sinh_levels);
+            if constexpr (L + 1 < tanh_sinh_levels) {
+                if (level != L) return detail::with_level<T, View, L + 1>(level, use);
+            }
+            View nodes{};
+            return detail::with_pieces<T, L, 0>(nodes, use);
+        }
+
+        /**
+         * @brief @p use applied to a level of the tanh-sinh table in T, as with_level().
          * @param level The level, 0 to 9.
          * @param use A callable taking a TanhSinhLevel<T> const &.
          * @return What use returns.
          */
-        template<real T, int L = 0, typename U>
+        template<real T, typename U>
         constexpr decltype(auto) with_tanh_sinh_level(int level, U &&use)
-        {
-            assert(0 <= level && level < tanh_sinh_levels);
-            if constexpr (L + 1 < tanh_sinh_levels) {
-                if (level != L) return detail::with_tanh_sinh_level<T, L + 1>(level, use);
-            }
-            TanhSinhLevel<T> nodes{ {}, {}, 0 };
-            return detail::with_pieces<T, L, 0>(nodes, use);
-        }
+        { return detail::with_level<T, TanhSinhLevel<T>>(level, use); }
+
+        /**
+         * @brief @p use applied to a level of the exp-sinh table in T, as with_level().
+         * @param level The level, 0 to 9.
+         * @param use A callable taking an ExpSinhLevel<T> const &.
+         * @return What use returns.
+         */
+        template<real T, typename U>
+        constexpr decltype(auto) with_exp_sinh_level(int level, U &&use)
+        { return detail::with_level<T, ExpSinhLevel<T>>(level, use); }
 
         /** @brief The finest level: positions are kept as t 2^9, an integer. */
         inline constexpr int finest_level = tanh_sinh_levels - 1;
