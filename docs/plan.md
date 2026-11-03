@@ -442,6 +442,20 @@ Complex numbers (2026-10-25; `docs/deriv/DERIV_TECHNIQUES.md` 2.5 and 2.7):
   complex type (a concept for real and multiprecision types, with `abs` and `isfinite`) is the foundation the items
   above would reuse.
 
+### Build and tests
+
+- Clang 23 (23.1.4, WSL, 2026-11-03) fails `test_quadrature_tanh_sinh.cpp`: `ts_reciprocal_result`, 1/x on [0, 1] run
+  to the cap in constant evaluation, exceeds the default constexpr step limit ("hit maximum step limit" in
+  `nodes.each`, `quadrature.hpp`), where CI's Clang 22 passes. Before CI moves to Clang 23: the test's budget or the
+  library's step count.
+- With Clang, a class-type real (the tests' `Wrapped` and `Capped`) makes TanhSinh build its levels in constant
+  evaluation during code generation: 31 s and 68 s of a test file's compile, where `double` costs under a second
+  (`-ftime-trace`, 2026-11-03). A user with a type of their own pays it in every file that integrates with it. A
+  question for `include/`, with the user's approval.
+- CI runs clang-cl only on pull requests, pushes to master and manual runs (2026-11-03): ccache cannot keep its
+  dependency files (`CMakeLists.txt`), so it is the one slow job. Run it on `dev` by hand
+  (`gh workflow run ci.yml --ref dev`) when a change could differ there.
+
 ## History
 
 - 2026-10-20: the first rewrite was abandoned; master went back to the 1.x code (`v1.1.0-legacy`) and Numerixx 2

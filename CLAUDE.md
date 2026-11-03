@@ -86,7 +86,8 @@ Presets: `clang-cl`, `cl`, `gcc`, `clang`, `emscripten`; each builds Debug into 
   library is header-only, every step changes the public API: propose its API before writing it, as
   `docs/<module>/PHASE<n>_API.md`, reviewed by `numerics-reviewer`, `simplicity-critic` and `usage-sketcher` before it
   goes to the user. Before pushing, build and test on all five toolchains; after pushing, check CI
-  (`gh run list --workflow ci.yml --branch dev`).
+  (`gh run list --workflow ci.yml --branch dev`). CI runs clang-cl only on pull requests, `master` and manual runs
+  (`gh workflow run ci.yml --ref dev`), so build it locally before a push.
 - **Independent review at the end of each phase.** After the phase's implementation is committed and CI passes, run a
   second-opinion review by another model with the OpenAI Codex CLI, read-only, on the phase's commit:
   `codex exec -s read-only --ephemeral --color never -o <scratchpad>/codex_review.md "<prompt>"` from the project

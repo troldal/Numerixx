@@ -70,8 +70,11 @@ jobs:
     runs-on: windows-2025-vs2026
     strategy:
       fail-fast: false
+      # clang-cl only on pull requests, pushes to master and manual runs: it is the one job ccache cannot speed up
+      # (CMakeLists.txt) and takes 6 to 8 minutes, where the others take 1 or 2; on dev, clang and cl cover its
+      # compiler and its standard library.
       matrix:
-        compiler: [cl, clang-cl]
+        compiler: ${{ fromJSON((github.event_name != 'push' || github.ref == 'refs/heads/master') && '["cl", "clang-cl"]' || '["cl"]') }}
     env:
       CPM_SOURCE_CACHE: 'C:\cpm' # short on purpose: long paths lose files silently (MAX_PATH)
       CCACHE_DIR: 'C:\ccache'
