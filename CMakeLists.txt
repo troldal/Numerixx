@@ -9,9 +9,13 @@ target_compile_features(numerixx INTERFACE cxx_std_23)
 # The tests, demos and examples compile through ccache where it is found: a file whose source, headers and flags are
 # unchanged is taken from the cache instead of compiled again, locally and in CI. Top level only; a project that adds
 # Numerixx keeps its own choice. MSVC's objects are cacheable only with their debug information inside them (/Z7),
-# not in a .pdb shared by the target (/Zi, CMake's default).
+# not in a .pdb shared by the target (/Zi, CMake's default). Not clang-cl: CMake asks it for a dependency file with
+# -clang:-MD -clang:-MF, which ccache 4.14 refuses and 4.9 does not restore on a hit, so that Ninja would lose the
+# object's headers and not rebuild it when one changes.
 option(NUMERIXX_CCACHE "Compile the tests, demos and examples through ccache where it is found" ${PROJECT_IS_TOP_LEVEL})
-if (NUMERIXX_CCACHE)
+if (NUMERIXX_CCACHE AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    message(STATUS "ccache: not with clang-cl, whose dependency files it does not keep")
+elseif (NUMERIXX_CCACHE)
     find_program(NUMERIXX_CCACHE_PROGRAM ccache)
     if (NUMERIXX_CCACHE_PROGRAM)
         set(CMAKE_CXX_COMPILER_LAUNCHER ${NUMERIXX_CCACHE_PROGRAM})

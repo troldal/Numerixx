@@ -83,12 +83,15 @@ jobs:
         with:
           path: 'C:\cpm'
           key: cpm-windows-${{ hashFiles('tests/CMakeLists.txt') }}
-      - uses: actions/cache@v4
+      # ccache only for cl: CMakeLists.txt leaves clang-cl out (its dependency files).
+      - if: matrix.compiler == 'cl'
+        uses: actions/cache@v4
         with:
           path: 'C:\ccache'
           key: ccache-${{ matrix.compiler }}-${{ github.sha }}
           restore-keys: ccache-${{ matrix.compiler }}-
       - name: Install ccache
+        if: matrix.compiler == 'cl'
         shell: pwsh
         run: |
           $zip = "$env:RUNNER_TEMP\ccache.zip"
@@ -98,7 +101,10 @@ jobs:
           "$env:RUNNER_TEMP\ccache-$env:CCACHE_VERSION-windows-x86_64" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
       - run: cmake --preset ${{ matrix.compiler }}
-      - run: ccache --zero-stats; cmake --build --preset ${{ matrix.compiler }}; if ($?) { ccache --show-stats }
+      - if: matrix.compiler == 'cl'
+        run: ccache --zero-stats; cmake --build --preset cl; if ($?) { ccache --show-stats }
+      - if: matrix.compiler == 'clang-cl'
+        run: cmake --build --preset clang-cl
       - run: ctest --preset ${{ matrix.compiler }}
 
   # The user manual (docs/sphinx): Doxygen's XML, then Sphinx through uv, the site and the PDF's LaTeX source,
