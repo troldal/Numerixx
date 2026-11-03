@@ -1,13 +1,14 @@
 # Numerixx
 
 Numerixx is a header-only C++23 library of numerical algorithms: finding the root of an equation, computing a derivative
-from a function's values, and, planned for later versions, integrals, minima, interpolation and fitting. It is a
+or an integral from a function's values, and, planned for later versions, minima, interpolation and fitting. It is a
 collection of small libraries, one per task, that you can use on their own or together, in the spirit of the standard
 library's algorithms.
 
 Every algorithm works in any real type: `float`, `double`, `long double`, or a type of your own such as a
 Boost.Multiprecision number with 50 digits. Every algorithm returns its result in a `std::expected`, with the reason
-when there is none: Numerixx itself never throws. And they run at compile time as well as at run time.
+when there is none: Numerixx itself throws nothing but `std::bad_alloc`, when memory runs out. And they run at compile
+time as well as at run time.
 
 ## What it does
 
@@ -15,6 +16,7 @@ when there is none: Numerixx itself never throws. And they run at compile time a
 |---|---|---|
 | Solve an equation $f(x) = 0$ in one variable: from an interval, from a guess, or with a search for an interval | [Roots of functions](roots/index.md), `nxx::roots` | `numerixx/roots.hpp` |
 | Compute a derivative of order 1 to 4 from a function's values, by finite differences or by Ridders' method, which also estimates its error | [Numerical derivatives](deriv/index.md), `nxx::deriv` | `numerixx/deriv.hpp` |
+| Compute the integral of a function of one variable over a finite or infinite interval, with an estimate of its error | [Integrals of functions](quadrature/index.md), `nxx::quadrature` | `numerixx/quadrature.hpp` |
 
 The modules share one header, `numerixx/math.hpp`, with the definition of a real type and a few helpers ([nxx::real and
 nxx::math](core.md)).
@@ -45,5 +47,5 @@ core
 
 roots/index
 deriv/index
-quadrature/reference
+quadrature/index
 ```

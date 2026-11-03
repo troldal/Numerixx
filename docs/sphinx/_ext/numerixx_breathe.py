@@ -51,11 +51,28 @@ sphinxrenderer.SphinxRenderer.create_template_prefix = _template_prefix_with_cla
 _compounddef = sphinxrenderer.SphinxRenderer.node_handlers[_parser.Node_compounddefType]
 
 
+def _template_head(compounddef):
+    # Doxygen 1.18 writes a default template argument into the initializer's head without its "=" ("typename F
+    # T (*)(T const &)"), while <templateparamlist> keeps it apart as <defval>; the head is rebuilt from the list.
+    params = []
+    for param in compounddef.findall("templateparamlist/param"):
+        text = "".join(param.find("type").itertext())
+        if param.find("declname") is not None:
+            text += " " + "".join(param.find("declname").itertext())
+        if param.find("defval") is not None:
+            text += " = " + "".join(param.find("defval").itertext())
+        params.append(text)
+    return f"template<{', '.join(params)}>"
+
+
 def _compounddef_with_definition(self, node):
     result = _compounddef(self, node)
     if node.kind == _parser.DoxCompoundKind.concept and node.initializer is not None:
-        initializer = ET.parse(xml_dir / f"{node.id}.xml").getroot().find("compounddef/initializer")
-        text = "".join(initializer.itertext())
+        compounddef = ET.parse(xml_dir / f"{node.id}.xml").getroot().find("compounddef")
+        text = "".join(compounddef.find("initializer").itertext())
+        head, newline, rest = text.partition("\n")
+        if head.startswith("template<") and newline:
+            text = _template_head(compounddef) + newline + rest
         result.insert(0, nodes.literal_block(text, text, language="cpp"))
         emitted["concepts"][node.id] += 1
     return result

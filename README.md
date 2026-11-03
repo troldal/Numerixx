@@ -1,16 +1,17 @@
 # Numerixx
 
 A header-only C++23 library of numerical methods, in the spirit of GSL: small algorithms that combine, work with any
-real type (including Boost.Multiprecision) and run in constant expressions. Numerixx itself never throws or catches:
-failures are returned as `std::expected`, and an exception thrown by your callback or your number type passes through
-unchanged.
+real type (including Boost.Multiprecision) and run in constant expressions. Numerixx itself throws nothing but
+`std::bad_alloc` and catches nothing: failures are returned as `std::expected`, and an exception thrown by your callback
+or your number type passes through unchanged.
 
 Numerixx 2 is in development on the `dev` branch and currently provides numerical derivatives: central and one-sided
 finite differences of orders up to 10, and Ridders' extrapolation with an error estimate, central or one-sided, for
 the first to the fourth derivative; and roots of a function of one variable, in a bracket by bisection, Brent's method
 or a safeguarded Newton or Halley, or from a guess by Newton, Halley or the secant method, each with a bound on its
-error; and integrals of a function of one variable, by adaptive Gauss-Kronrod (the default), Romberg's method or a
-fixed Gauss-Legendre rule, with an error estimate. Numerixx 1.x is at the tag `v1.1.0-legacy`.
+error; and integrals of a function of one variable, by adaptive Gauss-Kronrod (the default), the tanh-sinh rule (also
+on infinite intervals) or Romberg's method, each with an error estimate, or by a fixed Gauss-Legendre rule. Numerixx
+1.x is at the tag `v1.1.0-legacy`.
 
 ```cpp
 #include <numerixx/deriv.hpp>

@@ -3,19 +3,19 @@
 Each module of Numerixx solves its own kind of problem, but they all work the same way. You pass a function, written as
 a lambda or any other callable and called `fn` throughout this documentation, together with the numbers that start the
 computation. The type of those numbers sets the type of the whole computation. You get back a result or the reason there
-is none, never an exception. And you can run the same call at compile time. This page explains these conventions once,
+is none, not an exception. And you can run the same call at compile time. This page explains these conventions once,
 so the module chapters need not repeat them. Most of its examples use `nxx::roots`, shortened to `rt` by
-`namespace rt = nxx::roots;`; the same rules hold for `nxx::deriv`, shortened to `dv`, whose examples come at the end of
-[Results](#results).
+`namespace rt = nxx::roots;`; the same rules hold for `nxx::deriv`, shortened to `dv`, and for `nxx::quadrature`,
+shortened to `qd`, whose examples come at the end of [Results](#results).
 
 ## Real types
 
 Numerixx works in any *real type*: a type that behaves like a floating-point number. The built-in ones are `float`,
 `double` and `long double`; others come from libraries such as Boost.Multiprecision, whose numbers can carry 50 digits
 or more. You choose the type by what you pass. A computation runs in the type of its starting numbers, the ends of a
-bracket or the point of a derivative, and `fn` takes a number of that type and returns one. Write the starting numbers
-in the type you want: `Bracket{1.0f, 2.0f}` is a `float` bracket, while `Bracket{1.0, 2.0}` is a `double` one. (A
-*bracket* is an interval at whose ends `fn` has opposite signs, in which a root is sought.)
+bracket, the point of a derivative or the ends of an integral, and `fn` takes a number of that type and returns one.
+Write the starting numbers in the type you want: `Bracket{1.0f, 2.0f}` is a `float` bracket, while `Bracket{1.0, 2.0}`
+is a `double` one. (A *bracket* is an interval at whose ends `fn` has opposite signs, in which a root is sought.)
 
 `long double` differs between platforms. With MSVC and clang-cl it is the same as `double`; with GCC and Clang on x86-64
 it is the x87's extended precision, with a 64-bit significand; with Emscripten it is quadruple precision, with 113 bits.
@@ -103,11 +103,16 @@ The program includes both modules' headers:
 ```
 
 After the test, read the result with `->` or `*`. An error formats as its name, so you can print or log it directly, as
-the second line shows. Each module has its own error enumeration, listed in its reference.
+the second line shows. Each module has its own error enumeration, listed in its reference. In `nxx::quadrature` the
+error side of a method with an error estimate is a {cpp:struct}`nxx::quadrature::Failure`, which holds the error as its
+`reason` and, where the method ran out of work, its best estimate; it formats as the reason's name.
 
-Numerixx itself never throws, and never catches. Exceptions can still reach you from outside the library. An exception
-thrown by `fn`, or by the operations of a real type of your own, passes through unchanged. And `value()`, the standard
-library's checked access, throws `std::bad_expected_access` when there is no result, which is why you test first.
+Numerixx itself never throws, with one exception: it allocates memory in a few places, and if the allocation fails,
+`std::bad_alloc` reaches you. In this version that is `nxx::quadrature`'s adaptive Gauss-Kronrod method, which keeps
+its panels on the heap, and its `TanhSinh` in a type without compile-time tables, which builds its nodes at run time.
+Numerixx never catches. Exceptions can also reach you from outside the library. An exception thrown by `fn`, or by the
+operations of a real type of your own, passes through unchanged. And `value()`, the standard library's checked access,
+throws `std::bad_expected_access` when there is no result, which is why you test first.
 
 ```{note}
 More errors may be added in a later version, and a cause may move from one error to another. Test for success rather
@@ -160,6 +165,11 @@ module's description of it.
   with `*`. An `Estimate` converts to its value, so it can be used where a number is expected. That has a trap: for a
   result `d`, `if (*d)` compiles, and tests whether the derivative is 0. Test `d` itself.
 
+- **An integral** ({cpp:struct}`nxx::quadrature::Integral`): `abs_error` is an *estimate* of the error, always present,
+  not a guarantee: no method that samples `fn` at finitely many points can bound its error. A failure, a
+  {cpp:struct}`nxx::quadrature::Failure`, may still carry the best estimate the method reached, in its `best`.
+  [Integrals of functions](quadrature/index.md#what-you-get-back) explains both.
+
 Here are both kinds of derivative of $1/x$ at 2, which is $-1/4$:
 
 ```{literalinclude} examples/basics_results.cpp
@@ -174,7 +184,31 @@ Here are both kinds of derivative of $1/x$ at 2, which is $-1/4$:
 :end-before: )";
 ```
 
+and an integral of $4 / (1 + x^2)$ over $[0, 1]$, which is $\pi$, beside one of $1/x$, which is infinite:
+
+```{literalinclude} examples/basics_results.cpp
+:start-after: // <integral>
+:end-before: // </integral>
+:dedent:
+```
+
+```{literalinclude} examples/basics_results.cpp
+:language: text
+:start-after: integral_output = R"(
+:end-before: )";
+```
+
+The failure's `best` is a finite number, 31.5, for an integral that does not exist: a best is only as good as the
+integral behind it ([Handle failures](quadrature/handle-failures.md)).
+
 Read the members by name, not with a structured binding: a later version may add members.
+
+```{note}
+`nxx::roots` and `nxx::quadrature` both have a `Criteria` and an `error`, and they differ: `nxx::roots::Criteria` asks
+for full precision by default, `nxx::quadrature::Criteria` for about half the digits ([Set
+tolerances](quadrature/tolerances.md)). Under `using namespace` for both modules, an unqualified `Criteria` or `error`
+is ambiguous and does not compile. Qualify the names, or use the namespace aliases of this site.
+```
 
 ## Compile time
 

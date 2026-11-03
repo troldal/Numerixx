@@ -870,7 +870,9 @@ double unless noted, with where each was measured:
   - Values below min(): 1e-300 x^-1.5 on [1, inf) is an honest not_converged (error 2.8e-3), 1e-250 x^-1.01 likewise.
   - Slow decay: x^-1.01 on [1, inf) is an honest not_converged in double (best 99.91, error 0.09); ok in binary128 and
     `cpp_bin_float_50`.
-  - Oscillation: sin x / x on [0, inf) has a best below its error.
+  - Oscillation: sin x / x on [0, inf) had a best below its error in the prototype (`PHASE4_API.md` F, carried into
+    the header's comment until Phase 5a); the C++ returns not_converged without a best (Phase 5b, reproduced
+    2026-11-03, with and without a guard at 0). No test asserted the prototype's outcome.
   - A singular end other than 0: (x - 1)^-0.5 e^-x on [1, inf) is ok at 1e-6 and an honest not_converged at the
     default; with u = x - 1 written in fn, ok in 111.
   - A large number for infinity: e^-x on [0, 1e10] is ok, on [0, 1e300] an honest not_converged.

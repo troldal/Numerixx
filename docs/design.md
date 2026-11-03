@@ -10,7 +10,9 @@ decisions are in `docs/<module>/design.md` (`docs/deriv/design.md`).
 - One header per module (`deriv.hpp`, `roots.hpp`), plus `math.hpp` for what the modules share. A shared core grows
   only when a second module needs something.
 - Numerixx never throws and never catches: an exception thrown by fn or by T's operations passes through unchanged.
-  Catching would break builds without exceptions, such as Emscripten's default.
+  Catching would break builds without exceptions, such as Emscripten's default. The one exception is std::bad_alloc
+  from an allocation: `nxx::quadrature`'s GaussKronrod (its panels and heap) and TanhSinh in a type without a
+  compile-time table (its nodes); the user's decision (2026-11-03) is to document it rather than to change the code.
 - fn is constrained by `nxx::detail::callable<F, T>` in `math.hpp` (invocable with a `T const` lvalue, its result
   admitted by `nxx::detail::value_of<R, T>`), shared by the modules since `nxx::roots` was the second to need it;
   spelled with `nxx::` in the modules, whose own `detail` namespaces would otherwise hide it.

@@ -1,11 +1,13 @@
 // The program of docs/sphinx/basics.md, its section on results: testing a std::expected before reading it, printing its
-// error, composing steps with and_then, transform, or_else and value_or, and reading a derivative's Estimate. The page
+// error, composing steps with and_then, transform, or_else and value_or, and reading a derivative's Estimate and an
+// integral's Integral and Failure, and the names nxx::roots and nxx::quadrature share. The page
 // shows the parts between the markers and the output in the raw string; main returns non-zero unless the program prints
 // that output and what the page says holds, against closed forms.
 
 // clang-format off
 // <includes>
 #include <numerixx/deriv.hpp>
+#include <numerixx/quadrature.hpp>
 #include <numerixx/roots.hpp>
 
 #include <limits>
@@ -23,6 +25,11 @@
 
 // A derivative's Estimate converts to its value, so `if (*d)` compiles and tests the value against 0.
 static_assert(std::is_convertible_v<nxx::deriv::Estimate<double>, double>);
+
+// The page's note: nxx::roots and nxx::quadrature each have a Criteria and an error, distinct types, so under
+// using-directives for both an unqualified use is ambiguous (a hard error, which no requires-expression can test).
+static_assert(!std::is_same_v<nxx::roots::Criteria<double>, nxx::quadrature::Criteria<double>>);
+static_assert(!std::is_same_v<nxx::roots::error, nxx::quadrature::error>);
 
 int main(int, char **argv)
 {
@@ -64,6 +71,14 @@ int main(int, char **argv)
     auto const c = dv::derivative([](double t) { return 1.0 / t; }, 2.0); // Central<2>: no estimate
     if (c && !c->abs_error) std::println("f'(2) = {:.12f}, no estimate", c->value);
     // </estimate>
+
+    // <integral>
+    namespace qd = nxx::quadrature;
+    auto const i = qd::integrate([](double t) { return 4.0 / (1.0 + t * t); }, 0.0, 1.0); // pi
+    if (i) std::println("integral {:.15f}, abs_error {:.1e}", i->value, i->abs_error);
+    auto const g = qd::integrate([](double t) { return 1.0 / t; }, 0.0, 1.0); // infinite
+    if (!g && g.error().best) std::println("no integral: {}, best {:.1f}", g.error(), g.error().best->value);
+    // </integral>
     // clang-format on
 
     constexpr std::string_view test_output = R"(
@@ -78,8 +93,13 @@ s = 1.414214
 f'(2) = -0.250000000000, abs_error 2.8e-14
 f'(2) = -0.250000000009, no estimate
 )";
+    constexpr std::string_view integral_output = R"(
+integral 3.141592653589793, abs_error 3.5e-14
+no integral: not_converged, best 31.5
+)";
     std::string const expected = std::string(docs::quoted(test_output)) + std::string(docs::quoted(compose_output))
-                                 + std::string(docs::quoted(estimate_output));
+                                 + std::string(docs::quoted(estimate_output))
+                                 + std::string(docs::quoted(integral_output));
     if (!(docs::printed() == expected)) return 1;
 
     // x and s are sqrt(2) within abs_error + c (tests/roots_check.hpp's bound for x^2 - 2: c = 8e-17 for x * x
@@ -95,5 +115,8 @@ f'(2) = -0.250000000009, no estimate
     // Ridders' estimate covers its error from -1/4; the central difference is within its model's 1e-10.
     if (!d || !d->abs_error || !(std::abs(d->value + 0.25) <= *d->abs_error)) return 5;
     if (!c || c->abs_error || !(std::abs(c->value + 0.25) < 1e-10 * 0.25)) return 6;
+    // The integral's estimate covers its error from pi; the divergent integral's best is a finite number.
+    if (!i || !(std::abs(i->value - 3.141592653589793) <= i->abs_error)) return 7;
+    if (g || g.error().reason != qd::error::not_converged || !g.error().best) return 8;
     return 0;
 }

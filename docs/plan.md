@@ -341,12 +341,29 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
     `design.md`, "TanhSinh's measured limits"; three comment defects fixed (the heap's tie-break described backwards,
     `exp_sinh_start`'s comment above `inverse_epsilon`, `KronrodState`'s undocumented constants); the header's
     examples run as written in `tests/test_quadrature_examples.cpp`, and `Midpoint{.panels = 1000}` in the protocol
-    tests. All five presets locally, both Doxygen builds clean (2026-11-03)
-  - [ ] 5b: the chapter's pages and programs, and the `index.md` and `basics.md` changes
+    tests. All five presets locally, both Doxygen builds clean (2026-11-03); CI (cdca6e1: run 41655023180)
+  - [ ] 5b: the chapter's pages and programs, and the `index.md` and `basics.md` changes. Done as planned, with
+    `std::bad_alloc` stated in `basics.md`, the site's `index.md`, the README and `docs/design.md`; the prototypes
+    behind `costs.md` kept in `docs/quadrature/costs-prototype/` (`costs.py` prints every count it reproduces); the
+    concepts' definitions rendered with their default argument (Doxygen 1.18 drops the "=" in a concept's initializer;
+    the extension rebuilds the template head from the parameter list). All five presets locally and the docs build
+    (2026-11-03)
   - [ ] 5b reviews, as in Milestone 3 Phase 5: `docs-reviewer`, `numerics-reviewer`, `docs-reader` (tasks: the
     probability that a standard normal variable exceeds 3; an integrand with a kink at a known interior point; a time
     from an integral, solved for its upper limit with `nxx::roots`; an integral in `cpp_bin_float_50` to 40 digits; a
-    fixed rule of one's own), then Codex on the commit; the adopted findings recorded in this entry
+    fixed rule of one's own), then Codex on the commit; the adopted findings recorded in this entry. The reviews (all
+    findings reproduced or derived, all adopted): the tutorial's accuracy loss near 180 degrees is the coarse doubles
+    near pi/2 (the sliver fl(pi/2) misses, about 6e-17 / k', and the rounding of the points there), not the rounding of
+    cos, which the first draft blamed; the default steps around an isolated non-finite value anywhere, not only near an
+    end; a divergent integral can succeed at a loose request (1/x at rel_tol 0.2: ok, 9.33 after 150 evaluations), and
+    the default's best on 1/x is the same at every request, so the pages teach the real signs (no best from TanhSinh, a
+    result growing as the singular end moves); x^51 e^-x fails on inf * 0 past 1.1e6, not on x^51 overflowing first;
+    sin x / x on [0, inf) gives no best in the C++ (the prototype's best below its error, recorded in `design.md`, was
+    never asserted); TanhSinh's prototype reads the header's nodes, which `costs.md` now says; the floor, the slivers'
+    2e-8, the AGM's error budget, cpp_bin_float_50's epsilon (2^-167) and the Simpson bound corrected; the reader's
+    gaps closed (the mesh's panel boundaries and a kink at a tight request, the Boost header, a `Criteria` variable,
+    `qd` at file scope); "the default method" throughout, since C++ has one. The tutorial stays one page at about
+    1,450 words with its directives, above the 1,000 of the voice rules: one continuous problem
 
 ## Deferred
 

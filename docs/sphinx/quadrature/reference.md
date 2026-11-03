@@ -1,22 +1,10 @@
 # nxx::quadrature
 
-Integrals of a real function of one variable over a finite interval, from `numerixx/quadrature.hpp`: adaptive
-Gauss-Kronrod (G7-K15), the default method; the tanh-sinh rule (`TanhSinh`), for endpoint singularities and high
-precision; Romberg's method; and the fixed Gauss-Legendre rule. `TanhSinh` alone also takes an infinite end, by
-exp-sinh on a half line and sinh-sinh on the line; every other method returns `non_finite` for one. The module's
-chapter, with its overview, tutorial and guides, comes when the module is complete; until then this page is its
-reference.
-
-A method is a type: a `fixed_rule`, an `iterative_method` or an `estimating_method`, and a type of one's own that is
-one works as the library's do. An iterative method computes and reports a `Step` after each step, and `integrate`
-decides when the criteria are met; `observer(o)` passes each `Step` to `o`. The concepts' comments state the contract
-a method of one's own must meet.
-
-`Criteria` here and `nxx::roots::Criteria` differ in their defaults. Here `rel_tol` is the square root of epsilon
-(1.5e-8 in `double`), because no error estimate from samples certifies the last digits; in `nxx::roots` the defaults ask
-for full precision. Gauss-Kronrod and TanhSinh accept a result at twice the rounding floor, Romberg at the floor. Under
-`using namespace` for both modules the two names collide, as `error` does: the call does not compile. Qualify them, or
-use a namespace alias such as `namespace qd = nxx::quadrature;`.
+Integrals of a real function of one variable, from `numerixx/quadrature.hpp`. The [overview](index.md) introduces
+the methods and when to use each; [Set tolerances](tolerances.md) explains the default request, which here asks for
+half the type's digits, unlike `nxx::roots`; [Working with Numerixx](../basics.md#what-a-result-holds) says how to read
+a result, and why `Criteria` and `error` must be qualified when both modules are in use. A method of your own is
+checked against the concepts below ([A method of your own](method-of-your-own.md)).
 
 ```{doxygenconcept} nxx::quadrature::fixed_rule
 ```
