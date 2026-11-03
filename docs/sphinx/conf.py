@@ -53,7 +53,36 @@ latex_documents = [("manual", "numerixx.tex", "Numerixx", "Kenneth Troldal Balsl
 latex_elements = {
     "papersize": "a4paper",
     "extraclassoptions": "openany,oneside",
-    "sphinxsetup": "hmargin=2cm, vmargin=2.5cm",
+    # The logo's typeface family: IBM Plex Serif for text and Plex Sans for Sphinx's sans headings (CTAN's plex). Code
+    # keeps Sphinx's txtt: Plex Mono is 14% wider, and the examples' 115 columns fit the text width only in txtt.
+    # At 95%, since Plex's x-height is larger than Times': its text looks no larger and sets less wide.
+    "fontpkg": r"\usepackage[scale=0.95]{plex-serif}\usepackage[scale=0.95]{plex-sans}"
+               r"\renewcommand{\ttdefault}{txtt}",
+    # A C++ name in the text may break after "::", never between its two colons: Sphinx breaks inline code only after
+    # . , ; ? ! /, and in Plex's wider text a line or a table cell with nxx::deriv::BackwardRidders ran into the margin.
+    # The colon joins Sphinx's list, which makes it active in inline code and turns it off where it must (URLs), and
+    # its active meaning offers a break only after the second colon of a pair, at a penalty that makes it a last resort.
+    # Table cells are set ragged right: a justified narrow column spread a line such as "or nxx::deriv::" across its
+    # width. Sphinx wraps every cell in varwidth, a minipage that restores justified text and then calls this hook.
+    "preamble": r"""
+\makeatletter
+\newif\ifnxx@colonpair
+\def\nxx@colon{\futurelet\nxx@next\nxx@colon@}
+\def\nxx@colon@{\char`\:\ifx\nxx@next\nxx@colon\global\nxx@colonpairtrue
+  \else\ifnxx@colonpair\global\nxx@colonpairfalse\penalty5000\relax\fi\fi}
+\g@addto@macro\sphinxbreaksafteractivelist{\do\:}
+\g@addto@macro\sphinxbreaksviaactive{\lccode`\~=`\:\lowercase{\let~}\nxx@colon\lccode`\~=`\~}
+\def\@@vwid@minipagerestore{\raggedright}
+\makeatother
+""",
+    # Lumina's colours: headings and links in a darker emerald than its accent #10b981, which is too light for text on
+    # paper (2.5:1 on white, this one 5.5:1); notes framed in the accent on its pale green, with a deeper green title
+    # bar; code on the site's grey.
+    "sphinxsetup": "hmargin=2cm, vmargin=2.5cm, TitleColor={HTML}{047857}, InnerLinkColor={HTML}{047857}, "
+                   "OuterLinkColor={HTML}{047857}, pre_background-TeXcolor={HTML}{F4F5F4}, "
+                   "pre_border-TeXcolor={HTML}{E4E4E7}, div.note_border-TeXcolor={HTML}{10B981}, "
+                   "div.note_background-TeXcolor={HTML}{EAF6EF}, div.note_title-background-TeXcolor={HTML}{D4EFE1}, "
+                   "div.note_title-foreground-TeXcolor={HTML}{047857}",
     "fvset": r"\fvset{fontsize=\footnotesize}",
     # The default chapter style (fncychap's Bjarne) sets titles in capitals, which would misspell nxx::real.
     "fncychap": "",
