@@ -1,0 +1,2 @@
+# PDFs are binary even when, like the logo's, they are plain ASCII: a line-ending conversion breaks their byte offsets.
+*.pdf binary

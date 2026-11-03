@@ -61,6 +61,8 @@ latex_elements = {
     "printindex": r"\footnotesize\raggedright\printindex",
 }
 latex_show_pagerefs = True
+# The title page's logo, as PDF since pdflatex includes no SVG (make_logo.py writes it beside the site's SVGs).
+latex_logo = "_static/numerixx-logo.pdf"
 # Formulas in $...$ and $$...$$, rendered by MathJax from its CDN (a site read offline shows the TeX); anchors on
 # headings down to level 3, so that links such as basics.md#results resolve.
 myst_enable_extensions = ["dollarmath"]

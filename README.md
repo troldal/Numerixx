@@ -80,8 +80,8 @@ the project root.
 ## Logo
 
 The logo, its mark alone and the favicon are in `docs/sphinx/_static/` (`numerixx-logo-{light,dark}.svg`,
-`numerixx-mark-{light,dark}.svg`, `favicon.svg`), drawn from outlines of IBM Plex Mono (SIL Open Font License). Where
-only text will do:
+`numerixx-mark-{light,dark}.svg`, `favicon.svg`, and `numerixx-logo.pdf` for print), drawn from outlines of IBM Plex
+Mono (SIL Open Font License) by `uv run docs/sphinx/make_logo.py`. Where only text will do:
 
 ```text
  _ __  __  ____  __ _  _
