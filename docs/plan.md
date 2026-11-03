@@ -202,8 +202,8 @@ ticked when the docs build with no warning locally and in CI, and the examples' 
 - Phase 7: plots in the manual, drawn by matplotlib at build time from data a tested program checks; the first, in
   the quadrature guide, where the default and `TanhSinh` evaluate 1/sqrt x. Plan approved: `docs/sphinx/PHASE7_PLAN.md`
   (2026-11-03).
-  - [ ] The figure, its program and its script; built and read on the site and in the PDF; the program passing on the
-    five toolchains, locally and in CI; `docs-reviewer`
+  - [x] The figure, its program and its script; built and read on the site and in the PDF; the program passing on the
+    five toolchains, locally and in CI; `docs-reviewer` (20fe902: run 41716617342)
 
 Open decisions: hosting (GitHub Pages from CI, or Read the Docs) and versioning (one site per release, or `dev` only),
 with `linkcheck` and the install section of getting-started;

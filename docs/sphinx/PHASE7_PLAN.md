@@ -1,7 +1,7 @@
 # Milestone 3, Phase 7: plots in the manual
 
-Status: approved (2026-11-03), at the user's request: one illustrative plot in the quadrature chapter, on the site and
-in the PDF, drawn by matplotlib.
+Status: done (2026-11-03, 20fe902, CI run 41716617342), at the user's request: one illustrative plot in the quadrature
+chapter, on the site and in the PDF, drawn by matplotlib.
 
 ## The plot
 
@@ -54,8 +54,8 @@ adopted: reproducible SVG and PDF files (matplotlib writes the build's date into
 
 ## Success criteria
 
-- [ ] The program passes on all five toolchains (CI, and locally)
-- [ ] `numerixx_docs` builds with no warning, locally and in CI; the plot shows on the site (SVG) and in the PDF
+- [x] The program passes on all five toolchains (CI, and locally)
+- [x] `numerixx_docs` builds with no warning, locally and in CI; the plot shows on the site (SVG) and in the PDF
   (vector), read in both
-- [ ] The page's text about the plot is asserted by the program
-- [ ] `docs-reviewer` on the page, the program and the script
+- [x] The page's text about the plot is asserted by the program
+- [x] `docs-reviewer` on the page, the program and the script

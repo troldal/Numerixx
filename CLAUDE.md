@@ -42,6 +42,7 @@ A module may use another module's public API, never its `detail`.
   (`uv run docs/sphinx/make_logo.py`); a page shows code only from `docs/sphinx/examples/`, programs built and
   run as tests (`numerixx_docs_example_<name>`, a glob in `tests/CMakeLists.txt`), each checking its page's claims and
   comparing the output the page quotes, held in a raw string, with what it printed (`examples/printed.hpp`);
+  figures drawn by matplotlib from `plots/*.py`, with data an example program checks (`docs/CLAUDE.md` says how);
   `docs-reviewer` reviews the pages
 - `docs/deriv-book/` the book on `nxx::deriv` (LaTeX): its own `CLAUDE.md` holds its rules, roles and process; its
   examples build as tests (`NUMERIXX_BUILD_BOOK`), its PDF is the target `numerixx_book`
