@@ -32,6 +32,7 @@ add_executable(numerixx_tests test_math.cpp test_deriv.cpp test_stencils.cpp tes
         test_roots_examples.cpp test_quadrature_gauss.cpp
         test_quadrature_romberg.cpp test_quadrature_kronrod.cpp test_quadrature_protocol.cpp
         test_quadrature_tanh_sinh.cpp test_quadrature_exp_sinh.cpp test_quadrature_infinite.cpp
+        test_quadrature_infinite_capped.cpp
         test_quadrature_examples.cpp)
 target_link_libraries(numerixx_tests PRIVATE numerixx::numerixx doctest::doctest_with_main boost_multiprecision)
 if (MSVC)
