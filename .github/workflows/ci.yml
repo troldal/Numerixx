@@ -13,40 +13,57 @@ concurrency:
 permissions:
   contents: read
 
+# ccache (CMakeLists.txt) keeps each job's objects between runs: a run restores the newest cache of its job and saves
+# its own, so a commit that leaves a file, its headers and its flags as they were does not compile it again.
+env:
+  CCACHE_MAXSIZE: 1G
+
 jobs:
   gcc:
     runs-on: ubuntu-latest
     container: gcc:16
     env:
       CPM_SOURCE_CACHE: /__w/.cpm
+      CCACHE_DIR: /__w/.ccache
     steps:
-      - run: apt-get update && apt-get install -y cmake ninja-build
+      - run: apt-get update && apt-get install -y cmake ninja-build ccache
       - uses: actions/checkout@v5
       - uses: actions/cache@v4
         with:
           path: /__w/.cpm
           key: cpm-gcc-${{ hashFiles('tests/CMakeLists.txt') }}
+      - uses: actions/cache@v4
+        with:
+          path: /__w/.ccache
+          key: ccache-gcc-${{ github.sha }}
+          restore-keys: ccache-gcc-
       - run: cmake --preset gcc
-      - run: cmake --build --preset gcc
+      - run: ccache --zero-stats && cmake --build --preset gcc && ccache --show-stats
       - run: ctest --preset gcc
 
   clang:
     runs-on: ubuntu-26.04
     env:
       CPM_SOURCE_CACHE: ${{ github.workspace }}/.cpm
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
     steps:
       - uses: actions/checkout@v5
       - uses: actions/cache@v4
         with:
           path: .cpm
           key: cpm-clang-${{ hashFiles('tests/CMakeLists.txt') }}
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-clang-${{ github.sha }}
+          restore-keys: ccache-clang-
       - run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang-22 libc++-22-dev libc++abi-22-dev
+          sudo apt-get install -y ninja-build ccache clang-22 libc++-22-dev libc++abi-22-dev
       - run: >
           cmake --preset clang -DCMAKE_CXX_COMPILER=clang++-22
           -DCMAKE_CXX_FLAGS=-stdlib=libc++ -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++
-      - run: cmake --build --preset clang
+      - run: ccache --zero-stats && cmake --build --preset clang && ccache --show-stats
       - run: ctest --preset clang
 
   windows:
@@ -57,15 +74,31 @@ jobs:
         compiler: [cl, clang-cl]
     env:
       CPM_SOURCE_CACHE: 'C:\cpm' # short on purpose: long paths lose files silently (MAX_PATH)
+      CCACHE_DIR: 'C:\ccache'
+      CCACHE_VERSION: '4.14.2'
+      CCACHE_SHA256: 6993ce645e53192cec592ee23186200b574ac4c59097ecde8d9cfd681b47ae84
     steps:
       - uses: actions/checkout@v5
       - uses: actions/cache@v4
         with:
           path: 'C:\cpm'
           key: cpm-windows-${{ hashFiles('tests/CMakeLists.txt') }}
+      - uses: actions/cache@v4
+        with:
+          path: 'C:\ccache'
+          key: ccache-${{ matrix.compiler }}-${{ github.sha }}
+          restore-keys: ccache-${{ matrix.compiler }}-
+      - name: Install ccache
+        shell: pwsh
+        run: |
+          $zip = "$env:RUNNER_TEMP\ccache.zip"
+          Invoke-WebRequest -OutFile $zip -Uri "https://github.com/ccache/ccache/releases/download/v$env:CCACHE_VERSION/ccache-$env:CCACHE_VERSION-windows-x86_64.zip"
+          if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne $env:CCACHE_SHA256) { throw "ccache: checksum mismatch" }
+          Expand-Archive $zip -DestinationPath $env:RUNNER_TEMP
+          "$env:RUNNER_TEMP\ccache-$env:CCACHE_VERSION-windows-x86_64" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
       - run: cmake --preset ${{ matrix.compiler }}
-      - run: cmake --build --preset ${{ matrix.compiler }}
+      - run: ccache --zero-stats; cmake --build --preset ${{ matrix.compiler }}; if ($?) { ccache --show-stats }
       - run: ctest --preset ${{ matrix.compiler }}
 
   # The user manual (docs/sphinx): Doxygen's XML, then Sphinx through uv, the site and the PDF's LaTeX source,
@@ -95,6 +128,7 @@ jobs:
     runs-on: ubuntu-26.04
     env:
       CPM_SOURCE_CACHE: ${{ github.workspace }}/.cpm
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
       EMSDK_VERSION: '6.0.10'
     steps:
       - uses: actions/checkout@v5
@@ -106,7 +140,12 @@ jobs:
         with:
           path: .cpm
           key: cpm-emscripten-${{ hashFiles('tests/CMakeLists.txt') }}
-      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-emscripten-${{ github.sha }}
+          restore-keys: ccache-emscripten-
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build ccache
       - run: |
           [ -d ~/emsdk ] || git clone --depth 1 https://github.com/emscripten-core/emsdk.git ~/emsdk
           ~/emsdk/emsdk install "$EMSDK_VERSION"
@@ -114,5 +153,7 @@ jobs:
       - run: |
           source ~/emsdk/emsdk_env.sh
           cmake --preset emscripten
+          ccache --zero-stats
           cmake --build --preset emscripten
+          ccache --show-stats
           ctest --preset emscripten

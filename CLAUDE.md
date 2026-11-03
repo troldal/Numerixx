@@ -51,7 +51,9 @@ A module may use another module's public API, never its `detail`.
 Run from the project root, with `CPM_SOURCE_CACHE=C:/cpm` in the environment (a long path loses files to MAX_PATH).
 Presets: `clang-cl`, `cl`, `gcc`, `clang`, `emscripten`; each builds Debug into `build/<preset>`.
 - Configure: `cmake --preset <preset>`
-- Build: `cmake --build --preset <preset>`
+- Build: `cmake --build --preset <preset>`. Every preset compiles through ccache where CMake finds it
+  (`NUMERIXX_CCACHE`, on at top level; MSVC's debug information then goes into the objects, `/Z7`), locally and in
+  CI, where each job keeps its cache between runs; a clean rebuild of unchanged files takes seconds.
 - Run affected tests: `build/<preset>/tests/numerixx_tests --test-case="roots:*"` (the module's prefixes, above)
 - Full suite: `ctest --preset <preset>`
 - Docs: `cmake --build --preset <preset> --target numerixx_docs` writes the Sphinx site to
