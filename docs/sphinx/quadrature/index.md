@@ -19,7 +19,25 @@ $$\int_a^b f(x)\,dx \approx \sum_{i=1}^{N} w_i\, f(x_i)$$
 
 The trapezoidal rule, with equally spaced nodes, is the simplest. A *Gauss rule* chooses its nodes and weights so that
 the sum is exact for every polynomial of degree up to $2N - 1$, which makes it very accurate for a smooth $f$ with few
-points. A rule alone does not tell you how accurate its sum is. To estimate that, compute two sums of different accuracy
+points.
+
+```{eval-rst}
+.. plot:: plots/quadrature_weighted_sum.py
+   :alt: The curve 4 / (1 + x^2), falling from 4 at x = 0 to 2 at x = 1, with the area under it shaded, and five bars
+         side by side across 0 to 1, of widths 0.118, 0.239, 0.284, 0.239 and 0.118, each as high as the curve at
+         its node, which is a dot on the bar's top edge, within its width. The bars' total area differs from the area
+         under the curve by 1.4e-8.
+   :caption: A weighted sum: a Gauss rule of five points on :math:`4 / (1 + x^2)` over :math:`[0, 1]`, each term
+             :math:`w_i f(x_i)` drawn as a bar of width :math:`w_i` and height :math:`f(x_i)`.
+```
+
+In the figure, each term of the sum is the area of a bar. Side by side, the five bars fill the interval, since the
+weights add up to its length, and each bar contains its node: the sum is a Riemann sum with bars of uneven width.
+Where a bar rises above the curve, the sum counts area the integral does not have; where the curve rises above a bar,
+the sum misses some. The two nearly cancel, and the bars' total area, from five evaluations of $f$, is within
+$1.4 \times 10^{-8}$ of the integral, $\pi$.
+
+Here the integral is known; in general it is not, and a rule alone does not tell you how accurate its sum is. To estimate that, compute two sums of different accuracy
 and take their difference: the *Gauss-Kronrod* pair does it with 15 nodes, 7 of which give a Gauss rule of their own, so
 the second sum costs nothing extra.
 
@@ -43,8 +61,8 @@ and the narrowest, four of width $1/80$, cover $[0.275, 0.325]$ around the peak.
 $10^{-12}$, it cuts 16 times, and eight panels of width $1/160$ cover the same stretch. Far from the peak, $[0, 0.1]$
 and $[0.5, 1]$ keep their first panels whatever the request.
 
-On a smooth integrand the first ten panels can be enough. This program integrates $4 / (1 + x^2)$ over $[0, 1]$,
-which is $\pi$. The examples write `qd` for `nxx::quadrature`:
+On a smooth integrand the first ten panels can be enough. This program integrates the same $4 / (1 + x^2)$ over
+$[0, 1]$. The examples write `qd` for `nxx::quadrature`:
 
 ```{literalinclude} ../examples/quadrature_overview.cpp
 :start-after: // <first>

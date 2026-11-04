@@ -70,10 +70,22 @@ error"; the figure's paragraph split from the program's; "a relative error of $1
 `rel_tol = 1e-12` in the label, from the table; shorter sentences; one return code per claim, and "each cut a panel that
 ends at 0.3" asserted; the default request as `Criteria<double>{}.rel_tol`.
 
+**Figure 0.** The weights come from the rule applied to an indicator of each node, which the reviewer showed to be
+exact: on $[0, 1]$ every point is $c$ or $c \pm d$, bit-identical between calls, and a single nonzero term is summed
+without rounding. The rule's error, $-1.37 \times 10^{-8}$, from numpy and from the closed-form nodes in 50 digits.
+`docs-reviewer`: nothing major, all eleven findings adopted: the error asserted to two digits, in
+$[-1.4, -1.35] \times 10^{-8}$; the figure 2.6 inches high, so that it fits on the chapter's first page of the PDF rather than leaving 40% of it
+blank; the shaded area at alpha 0.4, visible on the dark site; the paragraph no longer repeats the caption, says why a
+bar containing its node matters (a Riemann sum with uneven bars), says what the sum gains and misses, and bridges to the
+error estimate ("Here the integral is known; in general it is not"); the alt text's dot "on the bar's top edge"; the
+theorem named (Chebyshev-Markov-Stieltjes, Szego 3.41.1); the legend in the text's order, $f(x)$ throughout; the
+program's names `integrand` and `Rule`.
+
 ## Success criteria
 
-- [x] Figure 1, where the default method cuts (five toolchains and WSL GCC locally; `docs-reviewer`)
-- [ ] Figure 0, a weighted sum
+- [x] Figure 1, where the default method cuts (five toolchains and WSL GCC locally; `docs-reviewer`; df9851c: run
+  41722681387)
+- [x] Figure 0, a weighted sum (five toolchains and WSL GCC locally; `docs-reviewer`)
 - [ ] Figure 2, the tanh-sinh map; the Phase 7 figure deleted
 - [ ] Figure 3, the rounding floor
 - [ ] Figure 4, evaluations against digits
