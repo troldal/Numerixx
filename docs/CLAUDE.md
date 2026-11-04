@@ -6,9 +6,10 @@ The root `CLAUDE.md` describes the documentation's layout and its build targets;
 ## Plots in the manual
 
 A figure is drawn by matplotlib when the manual is built, on the site as SVG and in the PDF as vector graphics, from
-data a tested program checked. The first is in `quadrature/choose-a-method.md` ("Measure the cost on your own
-function"), with `examples/quadrature_sampling.cpp` and `plots/quadrature_sampling.py`; `PHASE7_PLAN.md` records why it
-is built this way. The manual's rule holds for figures too: every number comes from a program built and run as a test.
+data a tested program checked. A model to follow is the figure of the default method's panels in `quadrature/index.md`,
+with `examples/quadrature_panels.cpp` and `plots/quadrature_panels.py` (`PHASE8_PLAN.md`); `PHASE7_PLAN.md` records why
+figures are built this way. The manual's rule holds for figures too: every number comes from a program built and run as
+a test.
 
 ### 1. The data: an example program
 
@@ -19,12 +20,12 @@ with the table it holds in a raw string, as the programs compare the output thei
 ```cpp
 if (!docs::capture(argv[0])) return 100;
 // ... compute, then print the table: a header line, then one row per point
-std::println("decade,default,tanh_sinh");
-constexpr std::string_view sampling_table = R"(
-decade,default,tanh_sinh
+std::println("request,left,right");
+constexpr std::string_view panels_table = R"(
+request,left,right
 ...
 )";
-if (!(docs::printed() == docs::quoted(sampling_table))) return 1;
+if (!(docs::printed() == docs::quoted(panels_table))) return 1;
 ```
 
 - No file I/O beyond `printed.hpp`: the examples also run under node (Emscripten), where a file of the source tree

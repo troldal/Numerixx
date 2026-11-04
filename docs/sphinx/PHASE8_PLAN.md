@@ -74,19 +74,34 @@ ends at 0.3" asserted; the default request as `Criteria<double>{}.rel_tol`.
 exact: on $[0, 1]$ every point is $c$ or $c \pm d$, bit-identical between calls, and a single nonzero term is summed
 without rounding. The rule's error, $-1.37 \times 10^{-8}$, from numpy and from the closed-form nodes in 50 digits.
 `docs-reviewer`: nothing major, all eleven findings adopted: the error asserted to two digits, in
-$[-1.4, -1.35] \times 10^{-8}$; the figure 2.6 inches high, so that it fits on the chapter's first page of the PDF rather than leaving 40% of it
-blank; the shaded area at alpha 0.4, visible on the dark site; the paragraph no longer repeats the caption, says why a
-bar containing its node matters (a Riemann sum with uneven bars), says what the sum gains and misses, and bridges to the
-error estimate ("Here the integral is known; in general it is not"); the alt text's dot "on the bar's top edge"; the
-theorem named (Chebyshev-Markov-Stieltjes, Szego 3.41.1); the legend in the text's order, $f(x)$ throughout; the
-program's names `integrand` and `Rule`.
+$[-1.4, -1.35] \times 10^{-8}$; the figure 2.6 inches high, so that it fits on the chapter's first page of the PDF
+rather than leaving 40% of it blank; the shaded area at alpha 0.4, visible on the dark site; the paragraph no longer
+repeats the caption, says why a bar containing its node matters (a Riemann sum with uneven bars), says what the sum
+gains and misses, and bridges to the error estimate ("Here the integral is known; in general it is not"); the alt text's
+dot "on the bar's top edge"; the theorem named (Chebyshev-Markov-Stieltjes, Szego 3.41.1); the legend in the text's
+order, $f(x)$ throughout; the program's names `integrand` and `Rule`.
+
+**Figure 2.** `exp_of` from `+ - * /` keeps libm out of the table, which agrees with mpmath to the printed digits; the
+map's error stays below $10^{-12}$ of $x$ (largest $8.8 \times 10^{-13}$). The Phase 7 figure deleted;
+`choose-a-method.md` is back to its text before 20fe902, and `docs/CLAUDE.md` names figure 1 as the model.
+`docs-reviewer`: nothing major (a mutated map, $c = 1 + 10^{-9}$, fails the check); twelve of thirteen findings
+adopted: the caption names the right panel "the integrand in $t$, $f(x(t))\,dx/dt$", not "$1/\sqrt x$ written in $t$",
+which this section's usage would read without $dx/dt$; that term defined at first use; "too close to 0 to see here"
+for what the linear left panel cannot show; the asymmetry explained and asserted (the singular side falls more slowly);
+"halves its step in $t$ everywhere at once, reusing every earlier point, until two successive sums agree", told apart
+from the default's cutting; the map check strict near 0 (relative $10^{-12}$ only, $t$ from $-4$) and its comment
+corrected; the alt text's "vertical x axis", "steps of 1/2", "a maximum of about 0.87 near $t = -0.75$"; titles
+replaced by axis labels; lines at alpha 0.8 and unclipped dots; the paragraph's opening. Not adopted: the 15% gap at the
+foot of the PDF page before the figure, which no reasonable height closes.
 
 ## Success criteria
 
 - [x] Figure 1, where the default method cuts (five toolchains and WSL GCC locally; `docs-reviewer`; df9851c: run
   41722681387)
-- [x] Figure 0, a weighted sum (five toolchains and WSL GCC locally; `docs-reviewer`)
-- [ ] Figure 2, the tanh-sinh map; the Phase 7 figure deleted
+- [x] Figure 0, a weighted sum (five toolchains and WSL GCC locally; `docs-reviewer`; ea4c091: run
+  41809057575)
+- [x] Figure 2, the tanh-sinh map; the Phase 7 figure deleted (five toolchains and WSL GCC locally;
+  `docs-reviewer`)
 - [ ] Figure 3, the rounding floor
 - [ ] Figure 4, evaluations against digits
 - [ ] Figure 5, where the infinite-interval maps look

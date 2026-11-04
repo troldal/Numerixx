@@ -30,6 +30,27 @@ and needs no cutting. On $1/\sqrt{x}$ over $[0, 1]$, whose integral is 2:
 Both meet the default request, a relative error of $1.5 \times 10^{-8}$, but `TanhSinh` gives every digit at a tenth
 of the cost. On $\log x$ over $[0, 1]$ the pattern repeats: about 110 evaluations by `TanhSinh` against about 600.
 
+```{eval-rst}
+.. plot:: plots/quadrature_tanh_sinh_map.py
+   :alt: Left: x against t from -4 to 4, an S-shaped curve from 0 to 1. Dots at steps of 1/2 in t, each carried
+         across to the vertical x axis by a line, crowd towards x = 0 and x = 1. Right: on a logarithmic scale, the
+         integrand in t rises from below 1e-10 at t = -4 to a maximum of about 0.87 near t = -0.75, and falls to about
+         1e-22 at t = 4.
+   :caption: The substitution :math:`x = (1 + \tanh(\sinh t)) / 2` that ``TanhSinh`` makes on :math:`[0, 1]` (left),
+             and the integrand in :math:`t`, :math:`f(x(t))\,dx/dt` for :math:`f(x) = 1/\sqrt{x}` (right, on a
+             logarithmic scale). The dots are equal steps of :math:`1/2` in :math:`t`.
+```
+
+The figure shows why `TanhSinh` is so much cheaper here. It substitutes $x = (1 + \tanh(\sinh t)) / 2$, which maps
+the whole line of $t$ onto $(0, 1)$, and adds up the integrand in $t$, $f(x(t))\,dx/dt$, at equal steps: the
+trapezoidal rule. On the left, equal steps in $t$ land ever closer to the ends. The point at $t = -3$ is already
+$x \approx 2 \times 10^{-9}$, too close to 0 to see here, and each further step multiplies the distance to 0 by a
+factor that itself shrinks. On the right is that integrand. Where $1/\sqrt x$ grows without bound, $dx/dt$ falls
+faster, so the product stays finite and is below $10^{-10}$ at both $t = -4$ and $t = 4$. On the singular side it
+falls more slowly, since $1/\sqrt x$ takes back half of the decay of $dx/dt$, but still faster than exponentially.
+The trapezoidal rule converges very fast on a smooth function that dies off like this. So `TanhSinh` halves its step
+in $t$ everywhere at once, reusing every earlier point, until two successive sums agree as closely as you asked.
+
 The default method has a limit. For a singularity stronger than about $(x - a)^{-0.65}$ its estimate falls short
 of its error, by a factor that further cutting does not change. On $x^{-3/4}$ over $[0, 1]$, whose integral is 4, it
 reports success with an error above both its `abs_error` and the request; `TanhSinh` is accurate to within its

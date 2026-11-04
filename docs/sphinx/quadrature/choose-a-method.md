@@ -46,23 +46,6 @@ about the same ([Costs](costs.md)). Output quoted in this manual assumes that th
 multiplication and an addition into one instruction ([Working with Numerixx](../basics.md#compile-time)); with fused
 arithmetic the last digits and the counts can differ.
 
-```{eval-rst}
-.. plot:: plots/quadrature_sampling.py
-   :alt: Evaluations per decade of x on logarithmic axes. The default's evaluations sit at about 100 per decade from
-         1e-13 to 0.1, 135 in the top decade, and stop near 1e-16; TanhSinh's fall from 73 in the top decade to one or
-         two per decade, reaching below 1e-40.
-   :caption: Where the default and ``TanhSinh`` evaluate :math:`1/\sqrt{x}` on :math:`[0, 1]`, counted per decade of
-             :math:`x`.
-```
-
-The figure shows where the two methods evaluate `fn`: the number of evaluations in each decade
-of $x$, an interval $[10^d, 10^{d+1})$, with both axes logarithmic. The default spends 135 evaluations in $[0.1, 1)$,
-whose nine panels it never cuts, and about 100 in every decade from $10^{-13}$ to $0.1$: a decade takes about 3.3 cuts
-of 30 evaluations, since $2^{3.3}$ is about 10. It makes 40 cuts and evaluates nothing below $10^{-16}$. `TanhSinh`
-spends 73 of its 131 evaluations in $[0.1, 1)$, one or two in every decade from $10^{-20}$ to $10^{-6}$, and the last 12
-across the decades below, the smallest under $10^{-175}$: it pays one or two evaluations for each decade it reaches
-toward 0, where the default pays about 100.
-
 `integrate<TanhSinh>` also has a cost at compile time: its node tables are built in every translation unit that uses it,
 which makes those files noticeably slower to compile. If several files integrate with it, put the calls in one of them.
 
