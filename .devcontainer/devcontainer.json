@@ -1,0 +1,36 @@
+{
+  "name": "Numerixx",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "username": "vscode",
+      "installZsh": false,
+      "installOhMyZsh": false
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "remoteUser": "vscode",
+  "containerEnv": {
+    "CPM_SOURCE_CACHE": "/home/vscode/.cache/cpm"
+  },
+  // Claude Code's native installer puts the binary in ~/.local/bin, which a non-login shell may not have on PATH.
+  "remoteEnv": {
+    "PATH": "${containerEnv:PATH}:/home/vscode/.local/bin"
+  },
+  "postCreateCommand": {
+    "claude": "curl -fsSL https://claude.ai/install.sh | bash",
+    // The checkout may belong to another user than vscode, and git then refuses to work in it.
+    "git": "git config --global --add safe.directory ${containerWorkspaceFolder}"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "ms-vscode.cmake-tools",
+        "ms-vscode.cpptools"
+      ]
+    }
+  }
+}
