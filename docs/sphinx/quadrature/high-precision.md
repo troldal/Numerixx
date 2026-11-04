@@ -42,6 +42,23 @@ digits slowly as the panels shrink, so full precision in a 50-digit type is cost
 `TanhSinh` gains digits much faster as it halves its step, and meets the same request with 325 evaluations, about a
 sixteenth. For many digits, choose `TanhSinh`.
 
+```{eval-rst}
+.. plot:: plots/quadrature_digits.py
+   :alt: Evaluations, on a logarithmic scale, against the digits requested, from 4 to 48. The default stays at 150
+         up to 22 digits, then climbs steadily to 18,990 at 48. TanhSinh stays at 172 up to 28 digits, then steps
+         once to 325, where it stays up to 48.
+   :caption: Evaluations of the default method and ``TanhSinh`` for :math:`1/(1 + x^2)` over :math:`[0, 1]` in
+             ``cpp_bin_float_50``, at requests of 4 to 48 digits.
+```
+
+The figure shows where the advice begins to matter. Up to 22 digits the default needs only its first 150
+evaluations, fewer than `TanhSinh`'s 172. From there its cost climbs, and from about 30 digits it doubles with about
+every four more digits, up to 18,990 at 48: halving every panel doubles the evaluations and shrinks the 7-point rule's
+error by a fixed factor, $2^{14}$, about four digits. `TanhSinh`'s cost rises one *level*, a halving of its step, at
+a time. Its first levels, which it always takes, cost 172 evaluations and serve up to 28 digits; the next, 153
+evaluations more, serves every request up to 48. At the default request, about 25 digits, the default needs 420
+evaluations and `TanhSinh` 172; beyond that, `TanhSinh` pulls away.
+
 ## Write `fn` in the type
 
 `fn` takes a `bin50` and returns one, and every number in it must carry the type's 50 digits:

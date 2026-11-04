@@ -36,8 +36,8 @@ same on every toolchain.
    request (690 evaluations from $10^{-13}$ on), and the actual error, from an independent value of
    $100(\arctan 70 + \arctan 30)$, two to six orders of magnitude below the estimate. The page's table stays.
 4. **Evaluations against digits** (`high-precision.md`, "Ask for the digits you want"): `quadrature_digits`.
-   $1/(1 + x^2)$ on $[0, 1]$ in `cpp_bin_float_50`, requests of 5 to 48 digits: the default at 150 evaluations up to
-   20 digits, then 390 to 18,990; `TanhSinh` at 172 up to 25 and 325 up to 48. The text gains that below about 20
+   $1/(1 + x^2)$ on $[0, 1]$ in `cpp_bin_float_50`, requests of 4 to 48 digits: the default at 150 evaluations up to
+   22 digits, then 210 to 18,990; `TanhSinh` at 172 up to 28 and 325 up to 48. The text gains that below about 22
    digits the default costs no more.
 5. **Where the infinite-interval maps look** (`infinite-intervals.md`, "Where the maps look"): `quadrature_line`.
    `TanhSinh`'s 133 points on the whole line (from $1/(1 + x^2)$), with the peaks at $x_0 = 10$ and $x_0 = 40$
@@ -108,6 +108,15 @@ paragraph no longer repeats the caption; one return code per claim and the comme
 comment updated; the plan's "two to three orders" corrected to two to six; "below 1e-15" in the alt text and "tighter to
 the right" in the caption.
 
+**Figure 4.** The counts come from Boost's software arithmetic, so they are the same everywhere; each result is checked
+against $\pi/4$ to 60 digits. `TanhSinh`'s 172 evaluations are the levels it always takes (`min_level`), and 325 the
+next level. `docs-reviewer`: nothing major, all nine findings adopted: the doubling "with about every four more digits"
+said from about 30 digits, the range `main` asserts (from 23 to 30 a bisection's 30 new evaluations for a panel of 15
+make it about three); the default request's counts, 420 and 172, given and asserted by running it; "level" defined on
+the page, and that `TanhSinh` always takes its first levels; the plan's numbers corrected to the table; the axis from
+100, so that the plateaus at 150 and 172 can be read; "halving every panel doubles the evaluations" said; the wording
+of two sentences; `d` named in the axis label; the program's comment.
+
 ## Success criteria
 
 - [x] Figure 1, where the default method cuts (five toolchains and WSL GCC locally; `docs-reviewer`; df9851c: run
@@ -116,7 +125,7 @@ the right" in the caption.
   41809057575)
 - [x] Figure 2, the tanh-sinh map; the Phase 7 figure deleted (five toolchains and WSL GCC locally;
   `docs-reviewer`; 35e19c9: run 41813985572, by hand)
-- [x] Figure 3, the rounding floor (five toolchains and WSL GCC locally; `docs-reviewer`)
-- [ ] Figure 4, evaluations against digits
+- [x] Figure 3, the rounding floor (five toolchains and WSL GCC locally; `docs-reviewer`; 378c748: run 41815277331)
+- [x] Figure 4, evaluations against digits (five toolchains and WSL GCC locally; `docs-reviewer`)
 - [ ] Figure 5, where the infinite-interval maps look
 - [ ] CI passes; the independent review and its adopted findings
