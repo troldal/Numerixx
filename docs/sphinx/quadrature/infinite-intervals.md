@@ -69,8 +69,26 @@ The split gives $3\pi/4$ to the last digit or two.
 Both maps are centred: the line's at 0, a half line's at its finite end, and both at a scale of about 1. They place
 most of their points within a few units of the centre and spread the rest ever more thinly outwards. An integrand
 whose mass lies far from the centre is seen only by a few widely spaced points. A peak at $x_0 = 10$ on the line still
-works, at about 2,000 evaluations; at $x_0 = 40$ it no longer does. Split at the peak, or substitute $u = x - x_0$ and
-write the integrand in $u$:
+works, at about 2,000 evaluations; at $x_0 = 40$ it no longer does.
+
+```{eval-rst}
+.. plot:: plots/quadrature_line.py
+   :alt: Vertical lines at the points TanhSinh places on the line in its first five levels, dense around 0 and ever
+         sparser outwards, and the peak 1 / (1 + (x - x0)^2) at x0 = 0, 10 and 40. The peak at 0 is covered by many
+         lines, the peak at 10 by one, and the peak at 40 falls between two lines about 11 apart.
+   :caption: The points ``TanhSinh`` places on :math:`(-\infty, \infty)` in its first five levels, which every run
+             takes, and the peak :math:`1 / (1 + (x - x_0)^2)` at three centres.
+```
+
+The figure shows where the runs start. Each *level* of `TanhSinh` halves the spacing of its points, and every run
+takes the first five: here the 133 points of the run on $1 / (1 + x^2)$, 61 of them within the figure's range, where
+the map puts them in the same places whatever the integrand. Within the half-width of the peak at 0, where it is at
+least half its height, there are 17, and the run on it ends there. At 10 there is one, the points about 2 apart; four
+more levels bring them 0.13 apart, with 15 within the half-width, and the run succeeds after 2,069 evaluations. At 40
+there is none: the two nearest are about 11 apart, five times the peak's width. The tenth and last level still leaves
+them 0.36 apart, with 5 within the half-width, and the run ends `not_converged` after 4,119 evaluations.
+
+Split at the peak, or substitute $u = x - x_0$ and write the integrand in $u$:
 
 ```{literalinclude} ../examples/quadrature_infinite_intervals.cpp
 :start-after: // <far_peak>

@@ -117,6 +117,17 @@ the page, and that `TanhSinh` always takes its first levels; the plan's numbers 
 100, so that the plateaus at 150 and 172 can be read; "halving every panel doubles the evaluations" said; the wording
 of two sentences; `d` named in the axis label; the program's comment.
 
+**Figure 5.** The points are those of the first five levels, which every run takes (`min_level`); within the figure's
+range they are the same for every integrand, which the program checks for the peaks at 10 and 40. `docs-reviewer`: one
+major finding, adopted: the draft's "the figure shows why" implied the method never sees the peak at 40, but that run
+refines to the tenth and last level, where the points are 0.36 apart with 5 within the half-width, and ends
+`not_converged` for want of levels; the text now says where the runs start and how many levels each needs, every
+number asserted through an observer (the peak at 10: 2,069 evaluations, 0.13 apart, 15 within; at 40: 4,119, 0.36,
+5). Also adopted: "in the same places" limited to the figure's range (how far out a run goes depends on fn); "about
+11"; "level" defined on the page; the lines at full opacity (3:1 or more on both surfaces); the axis padded so that the
+outermost lines are not clipped; the peaks drawn within 5 of their centres; the remedy in a paragraph of its own. Not
+adopted: "from about $x_0 = 22$ it no longer does", since the boundary is ragged (21.5 fails, 23 succeeds).
+
 ## Success criteria
 
 - [x] Figure 1, where the default method cuts (five toolchains and WSL GCC locally; `docs-reviewer`; df9851c: run
@@ -126,6 +137,7 @@ of two sentences; `d` named in the axis label; the program's comment.
 - [x] Figure 2, the tanh-sinh map; the Phase 7 figure deleted (five toolchains and WSL GCC locally;
   `docs-reviewer`; 35e19c9: run 41813985572, by hand)
 - [x] Figure 3, the rounding floor (five toolchains and WSL GCC locally; `docs-reviewer`; 378c748: run 41815277331)
-- [x] Figure 4, evaluations against digits (five toolchains and WSL GCC locally; `docs-reviewer`)
-- [ ] Figure 5, where the infinite-interval maps look
+- [x] Figure 4, evaluations against digits (five toolchains and WSL GCC locally; `docs-reviewer`; 6bc3d63: run
+  41817219050, by hand)
+- [x] Figure 5, where the infinite-interval maps look (five toolchains and WSL GCC locally; `docs-reviewer`)
 - [ ] CI passes; the independent review and its adopted findings
