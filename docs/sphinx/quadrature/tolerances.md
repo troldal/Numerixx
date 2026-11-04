@@ -58,6 +58,27 @@ request below the floor can be met, so the methods accept an estimate at it (the
 twice it) instead of running until they give up; a request of 0 gives the same result as $10^{-14}$. In a `double`
 the floor is about $10^{-14}$ relative for a function of one sign.
 
+```{eval-rst}
+.. plot:: plots/quadrature_floor.py
+   :alt: On logarithmic axes, with tighter requests to the right: the request falls as a diagonal from 1e-2 to 1e-16.
+         The estimate stays below it down to 1e-12, then stays at 2.1e-14, just under twice the rounding floor of
+         1.1e-14. The actual error falls from 4.5e-6 to below 1e-15 by 1e-7 and stays there, and is 0 at 1e-9.
+   :caption: The default method on :math:`1 / ((x - 0.3)^2 + 10^{-4})` over :math:`[0, 1]` at requests from
+             :math:`10^{-2}` to :math:`10^{-16}`, tighter to the right: its estimate and its actual error, divided by
+             the integral, against the request and the rounding floor.
+```
+
+Down to $10^{-12}$ the estimate stays under the request, as a success requires while the request is above the floor,
+and each tighter request costs more evaluations: 150 at $10^{-2}$, 630 at $10^{-12}$. Two more bisections then took
+the estimate from $4.3 \times 10^{-13}$ to $2.1 \times 10^{-14}$, just under twice the floor, so from $10^{-13}$ on
+the run no longer changes: 690 evaluations and the same estimate. At $10^{-13}$ that still meets the request. From
+$10^{-14}$ on it lies above it, and the method accepts it because it is within twice the floor, where the default
+method stops when no request can be met. The actual error is at least a hundred times smaller than the estimate at
+every request here. From $10^{-7}$ on it is within four units in the last place of the integral, and at $10^{-9}$ it
+is 0, the `double` nearest the integral. The floor limits what an estimate can certify, not what the value holds. And
+an estimate is not a bound: on the noisy function of [A function noisier than the
+type](#a-function-noisier-than-the-type), `TanhSinh` reports an `abs_error` smaller than its error.
+
 ## An integral near zero: `abs_tol`
 
 A relative tolerance asks for digits of the value, and an integral that is 0, or close to it, has none to give. This

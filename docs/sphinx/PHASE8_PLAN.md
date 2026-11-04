@@ -34,7 +34,7 @@ same on every toolchain.
 3. **The rounding floor** (`tolerances.md`, "More digits"): `quadrature_floor`. The same peak at requests from
    $10^{-2}$ to $10^{-16}$: the relative estimate below the request until the floor, then at the floor whatever the
    request (690 evaluations from $10^{-13}$ on), and the actual error, from an independent value of
-   $100(\arctan 70 + \arctan 30)$, two to three orders of magnitude below the estimate. The page's table stays.
+   $100(\arctan 70 + \arctan 30)$, two to six orders of magnitude below the estimate. The page's table stays.
 4. **Evaluations against digits** (`high-precision.md`, "Ask for the digits you want"): `quadrature_digits`.
    $1/(1 + x^2)$ on $[0, 1]$ in `cpp_bin_float_50`, requests of 5 to 48 digits: the default at 150 evaluations up to
    20 digits, then 390 to 18,990; `TanhSinh` at 172 up to 25 and 325 up to 48. The text gains that below about 20
@@ -92,7 +92,21 @@ for what the linear left panel cannot show; the asymmetry explained and asserted
 from the default's cutting; the map check strict near 0 (relative $10^{-12}$ only, $t$ from $-4$) and its comment
 corrected; the alt text's "vertical x axis", "steps of 1/2", "a maximum of about 0.87 near $t = -0.75$"; titles
 replaced by axis labels; lines at alpha 0.8 and unclipped dots; the paragraph's opening. Not adopted: the 15% gap at the
-foot of the PDF page before the figure, which no reasonable height closes.
+foot of the PDF page before the figure, which no reasonable height closes. CI did not start for 35e19c9, whose first
+push GitHub rejected (`fatal error in commit_refs_rules`); run by hand.
+
+**Figure 3.** At $10^{-13}$ the estimate still meets the request: that run is the floor's only because two bisections
+took the estimate from $4.3 \times 10^{-13}$ to $2.1 \times 10^{-14}$; from $10^{-14}$ on it is above the request. The
+actual error is 0 at $10^{-9}$ and within four ulps from $10^{-7}$. `docs-reviewer`: one major finding, adopted: the
+draft said the method accepts the floor-level estimate "because no estimate can go lower", but the estimate can fall to
+the floor itself; the default accepts anything within twice it (`attainable = 2 F`), as the section said already. The
+eleven others adopted: a success meets the request "while the request is above the floor"; the orange line broken at
+the zero error, not drawn over it; the floor's legend entry relative, $50\,\varepsilon$; the evaluation counts given
+as counts, not read off the figure; "at every request here" and a closing clause that an estimate is not a bound
+(`TanhSinh` on the noisy function of the same section); why $10^{-13}$ already gives the floor run, asserted; the
+paragraph no longer repeats the caption; one return code per claim and the comment corrected; the sibling program's
+comment updated; the plan's "two to three orders" corrected to two to six; "below 1e-15" in the alt text and "tighter to
+the right" in the caption.
 
 ## Success criteria
 
@@ -101,8 +115,8 @@ foot of the PDF page before the figure, which no reasonable height closes.
 - [x] Figure 0, a weighted sum (five toolchains and WSL GCC locally; `docs-reviewer`; ea4c091: run
   41809057575)
 - [x] Figure 2, the tanh-sinh map; the Phase 7 figure deleted (five toolchains and WSL GCC locally;
-  `docs-reviewer`)
-- [ ] Figure 3, the rounding floor
+  `docs-reviewer`; 35e19c9: run 41813985572, by hand)
+- [x] Figure 3, the rounding floor (five toolchains and WSL GCC locally; `docs-reviewer`)
 - [ ] Figure 4, evaluations against digits
 - [ ] Figure 5, where the infinite-interval maps look
 - [ ] CI passes; the independent review and its adopted findings

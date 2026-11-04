@@ -133,8 +133,8 @@ abs_error 2.1e-13, error 2.3e-12
     if (!(std::abs(fifteen->value - exact) / exact < 1e-15)) return 11;
     // The variable holds the same request as the braced list.
     if (!(result && result == at(1e-12))) return 13;
-    // "A request of 0 gives the same result as 1e-14": both below the floor. (1e-13 happens to give it too, since the
-    // estimate fell from 1.3e-10 to 6.6e-12 in one step; the page does not claim that.)
+    // "A request of 0 gives the same result as 1e-14": both below the floor. (1e-13 gives it too, since the estimate
+    // fell from 1.3e-10 to 6.6e-12 in two bisections; quadrature_floor.cpp asserts that for the section's figure.)
     auto const floor14 = at(1e-14);
     if (!(floor14 == at(0.0))) return 4;
     double const floor = 50.0 * eps * exact;
