@@ -41,7 +41,7 @@ same on every toolchain.
    digits the default costs no more.
 5. **Where the infinite-interval maps look** (`infinite-intervals.md`, "Where the maps look"): `quadrature_line`.
    `TanhSinh`'s 133 points on the whole line (from $1/(1 + x^2)$), with the peaks at $x_0 = 10$ and $x_0 = 40$
-   marked: about 2 apart near 10, about 11 near 40, wider than the peak.
+   marked: about 2.4 apart near 10, about 11 near 40, wider than the peak.
 
 The Phase 7 figure (`quadrature_sampling`, in "Measure the cost on your own function") is deleted with figure 2, which
 explains the same thing through its cause; its counts stay in the text and in Costs. `docs/CLAUDE.md` then names
@@ -128,6 +128,19 @@ number asserted through an observer (the peak at 10: 2,069 evaluations, 0.13 apa
 outermost lines are not clipped; the peaks drawn within 5 of their centres; the remedy in a paragraph of its own. Not
 adopted: "from about $x_0 = 22$ it no longer does", since the boundary is ragged (21.5 fails, 23 succeeds).
 
+**The independent review** (Claude Fable in place of Codex, which the Codespace lacks, on df9851c to a6c2085,
+2026-11-05): no defect. The seven programs pass under GCC 16; the reference values re-derived at 80 digits (the
+arctan sum, pi/4, GaussLegendre<5>'s error from its closed-form nodes and weights), the separation theorem, the stop
+test against the floor, and the maps' points agree. Two wording findings, both reproduced from the tables and
+adopted: `tolerances.md` said each tighter request costs more evaluations, but the counts plateau (270 at $10^{-5}$
+and $10^{-6}$, 330 at $10^{-7}$ and $10^{-8}$), and the program asserts only that they never fall: "a tighter request
+never costs fewer evaluations"; `infinite-intervals.md` and item 5 above said the points near 10 are about 2 apart,
+but they are 9.81335 and 12.1714: "about 2.4". Recorded, no change: under FMA contraction (GCC `-mfma
+-ffp-contract=fast`) figure 3's table differs in two entries (2.12e-14 for 2.13e-14, 7.35e-16 for 5.51e-16 at
+$10^{-12}$) while every assertion holds, as the program and the page caution; the five toolchains do not contract.
+Not adopted: checking the results of figures 1 and 5 against their closed forms, which the pages' other programs
+already do. Not checked by the review: the docs build and the other four toolchains, not installed in the Codespace.
+
 ## Success criteria
 
 - [x] Figure 1, where the default method cuts (five toolchains and WSL GCC locally; `docs-reviewer`; df9851c: run
@@ -139,5 +152,7 @@ adopted: "from about $x_0 = 22$ it no longer does", since the boundary is ragged
 - [x] Figure 3, the rounding floor (five toolchains and WSL GCC locally; `docs-reviewer`; 378c748: run 41815277331)
 - [x] Figure 4, evaluations against digits (five toolchains and WSL GCC locally; `docs-reviewer`; 6bc3d63: run
   41817219050, by hand)
-- [x] Figure 5, where the infinite-interval maps look (five toolchains and WSL GCC locally; `docs-reviewer`)
-- [ ] CI passes; the independent review and its adopted findings
+- [x] Figure 5, where the infinite-interval maps look (five toolchains and WSL GCC locally; `docs-reviewer`; a6c2085:
+  run 41819573354)
+- [x] CI passes; the independent review and its adopted findings (Fable in place of Codex: no defect, two wording
+  findings adopted)

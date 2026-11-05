@@ -83,7 +83,7 @@ works, at about 2,000 evaluations; at $x_0 = 40$ it no longer does.
 The figure shows where the runs start. Each *level* of `TanhSinh` halves the spacing of its points, and every run
 takes the first five: here the 133 points of the run on $1 / (1 + x^2)$, 61 of them within the figure's range, where
 the map puts them in the same places whatever the integrand. Within the half-width of the peak at 0, where it is at
-least half its height, there are 17, and the run on it ends there. At 10 there is one, the points about 2 apart; four
+least half its height, there are 17, and the run on it ends there. At 10 there is one, the points about 2.4 apart; four
 more levels bring them 0.13 apart, with 15 within the half-width, and the run succeeds after 2,069 evaluations. At 40
 there is none: the two nearest are about 11 apart, five times the peak's width. The tenth and last level still leaves
 them 0.36 apart, with 5 within the half-width, and the run ends `not_converged` after 4,119 evaluations.

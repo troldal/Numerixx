@@ -69,7 +69,7 @@ the floor is about $10^{-14}$ relative for a function of one sign.
 ```
 
 Down to $10^{-12}$ the estimate stays under the request, as a success requires while the request is above the floor,
-and each tighter request costs more evaluations: 150 at $10^{-2}$, 630 at $10^{-12}$. Two more bisections then took
+and a tighter request never costs fewer evaluations: 150 at $10^{-2}$, 630 at $10^{-12}$. Two more bisections then took
 the estimate from $4.3 \times 10^{-13}$ to $2.1 \times 10^{-14}$, just under twice the floor, so from $10^{-13}$ on
 the run no longer changes: 690 evaluations and the same estimate. At $10^{-13}$ that still meets the request. From
 $10^{-14}$ on it lies above it, and the method accepts it because it is within twice the floor, where the default
