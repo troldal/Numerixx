@@ -33,23 +33,19 @@ RUN curl -fsSL -o /tmp/doxygen.tar.gz \
     && rm /tmp/doxygen.tar.gz
 COPY --from=ghcr.io/astral-sh/uv:0.13.5 /uv /uvx /usr/local/bin/
 
-# OpenAI's Codex CLI, for the independent review at the end of a phase (CLAUDE.md), with the bubblewrap from the same
-# release, in which it sandboxes the commands it runs (`-s read-only`); devcontainer.json lets bubblewrap make its
-# namespaces.
+# OpenAI's Codex CLI, for the independent review at the end of a phase (CLAUDE.md): the release's package, not its
+# bare binary, since the interactive codex refuses to start without the package around it ("no complete local
+# package"). The package brings the bubblewrap in which Codex sandboxes the commands it runs (`-s read-only`);
+# devcontainer.json lets bubblewrap make its namespaces.
 ARG CODEX_VERSION=0.161.0
-ARG CODEX_SHA256=b1efb95097660d7f2e5a3887618a23f2ea1b0d548078bf92b0f7a5d229a0cef2
-ARG BWRAP_SHA256=68f3b912c9d5f113343f6e054b5bb2be3cbbc09d21fcbc67ea6e997ed4b1cbfd
-RUN cd /tmp \
-    && release="https://github.com/openai/codex/releases/download/rust-v${CODEX_VERSION}" \
-    && curl -fsSLO "$release/codex-x86_64-unknown-linux-musl.tar.gz" \
-    && curl -fsSLO "$release/bwrap-x86_64-unknown-linux-musl.tar.gz" \
-    && echo "$CODEX_SHA256  codex-x86_64-unknown-linux-musl.tar.gz" | sha256sum -c - \
-    && echo "$BWRAP_SHA256  bwrap-x86_64-unknown-linux-musl.tar.gz" | sha256sum -c - \
-    && tar xzf codex-x86_64-unknown-linux-musl.tar.gz \
-    && tar xzf bwrap-x86_64-unknown-linux-musl.tar.gz \
-    && install codex-x86_64-unknown-linux-musl /usr/local/bin/codex \
-    && install bwrap-x86_64-unknown-linux-musl /usr/local/bin/bwrap \
-    && rm /tmp/codex-x86_64-unknown-linux-musl* /tmp/bwrap-x86_64-unknown-linux-musl*
+ARG CODEX_PACKAGE_SHA256=04d8ab9dbcb9df0edf3c67dca5072a374babfdf762a9bc4ae649ae140b8e2cf0
+RUN curl -fsSL -o /tmp/codex.tar.gz \
+        "https://github.com/openai/codex/releases/download/rust-v${CODEX_VERSION}/codex-package-x86_64-unknown-linux-musl.tar.gz" \
+    && echo "$CODEX_PACKAGE_SHA256  /tmp/codex.tar.gz" | sha256sum -c - \
+    && mkdir /opt/codex-${CODEX_VERSION} \
+    && tar xzf /tmp/codex.tar.gz -C /opt/codex-${CODEX_VERSION} \
+    && ln -s /opt/codex-${CODEX_VERSION}/bin/codex /usr/local/bin/codex \
+    && rm /tmp/codex.tar.gz
 
 # The PDF manual (numerixx_docs_pdf): a minimal TeX Live with only what the manual's LaTeX loads, from TeX Live 2025's
 # frozen archive, so the image does not change with the live repository. tlmgr checks each package's checksum against
