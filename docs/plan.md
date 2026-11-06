@@ -121,6 +121,20 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
   - [x] CI passes on all five toolchains (840e04b)
   - [x] The independent review (Codex; Kimi K3.1 Pro incomplete): three findings, all reproduced and fixed
     (`docs/roots/PHASE6_API.md`)
+- Phase 7: the method protocol, so that a method, the library's or a user's, is a type with `start` and `advance`
+  (`docs/open-closed/ANALYSIS.md` section 10, step 2; the model is quadrature's Phase 3a). `solve` owns the loop,
+  checks each step's bracket and sign change, applies `Criteria`'s stop test, forms `abs_error`, and ends every method
+  (each bracket strictly inside the last); the observer moves to `math.hpp`; a latent bound above 2 tol in types
+  without subnormals is fixed. The spike: `docs/open-closed/roots-spike/`.
+  - [x] API approved: `docs/roots/PHASE7_API.md` (2026-11-06, Q1 to Q19 as recommended, draft 2; the one-call concepts
+    deferred)
+  - [ ] Step 0: `nxx::observer` in `math.hpp`, quadrature's using-declarations, `iterative_method`'s state by
+    reference; quadrature's tests unchanged
+  - [ ] Step 1: on a bracket: the public types, the concepts, the loop, the fix, the nine bracketing methods stepped,
+    the new forms; `tests/test_roots_protocol.cpp`
+  - [ ] Step 2: from a guess: the four open methods stepped, the cap in the loop; the documentation and the guide page
+  - [ ] CI passes on all five toolchains
+  - [ ] The independent review (Codex) and its adopted findings
 
 ## Milestone 3: user documentation (Doxygen, Breathe, Sphinx)
 
