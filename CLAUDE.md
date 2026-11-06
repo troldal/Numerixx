@@ -77,9 +77,12 @@ Presets: `clang-cl`, `cl`, `gcc`, `clang`, `emscripten`; each builds Debug into 
 - WSL (openSUSE Tumbleweed) has GCC 16 and Clang 23. Build there from a copy of the tracked and new files (a tar of
   `git ls-files` and `git ls-files --others --exclude-standard`), not from `/mnt/c`: `build/<preset>` would clash
   with the Windows builds, and the untracked CLion build folders are gigabytes.
-- In a GitHub Codespace (`.devcontainer/`, the image of CI's gcc job): Linux with GCC 16, CMake, Ninja, ccache, `gh`
-  and Claude Code, with `CPM_SOURCE_CACHE` set. Only the `gcc` preset builds there; the other toolchains, uv and
-  Doxygen are not installed, so the five-toolchain check before a push still runs locally.
+- In a GitHub Codespace (`.devcontainer/`, the image of CI's gcc job): Linux with GCC 16, Clang 22 with libc++ (its
+  default there, so `cmake --preset clang` needs no flags), CMake, Ninja, ccache, `gh`, Claude Code, the Codex CLI
+  (its sandbox works there: the container runs without Docker's seccomp filter), Doxygen 1.18, uv and a minimal TeX
+  Live 2025 for `numerixx_docs_pdf` (not the book), with `CPM_SOURCE_CACHE` set. The `gcc` and
+  `clang` presets and the docs targets build there; `cl`, `clang-cl` and `emscripten` do not, so the five-toolchain
+  check before a push still runs locally.
 - Primary toolchain: clang-cl + MSVC STL, x64. Also must build with MSVC `cl`, GCC and Clang (MinGW and WSL), and
   Emscripten.
 

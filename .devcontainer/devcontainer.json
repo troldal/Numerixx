@@ -12,6 +12,9 @@
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
   "remoteUser": "vscode",
+  // Docker's default seccomp profile forbids the user namespaces bubblewrap needs for Codex's sandbox; without them,
+  // `codex exec -s read-only` cannot run a command.
+  "securityOpt": ["seccomp=unconfined"],
   "containerEnv": {
     "CPM_SOURCE_CACHE": "/home/vscode/.cache/cpm"
   },
