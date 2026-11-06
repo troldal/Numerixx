@@ -282,6 +282,39 @@ namespace {
         { return T(0); }
     };
 
+    // advance or settle taking the state by value or by const reference: they would step or settle a copy, and the
+    // loop would go on for ever (docs/roots/PHASE7_API.md, Q17).
+    template<bool AdvanceByValue, bool SettleByConstReference>
+    struct CopiedState
+    {
+        struct State
+        {
+            qd::Step<double> step;
+        };
+
+        template<typename F>
+        constexpr std::expected<State, qd::Failure<double>> start(F &, double const &, double const &) const
+        { return State{}; }
+
+        template<typename F>
+        requires AdvanceByValue
+        constexpr std::expected<void, qd::Failure<double>> advance(F &, State) const
+        { return {}; }
+
+        template<typename F>
+        requires(!AdvanceByValue)
+        constexpr std::expected<void, qd::Failure<double>> advance(F &, State &) const
+        { return {}; }
+
+        constexpr std::expected<void, qd::Failure<double>> settle(State const &) const
+        requires SettleByConstReference
+        { return {}; }
+
+        constexpr std::expected<void, qd::Failure<double>> settle(State &) const
+        requires(!SettleByConstReference)
+        { return {}; }
+    };
+
     struct NoSettle
     {
         struct State
@@ -402,6 +435,13 @@ static_assert(!qd::iterative_method<qd::GaussLegendre<7>, double> && !qd::estima
 static_assert(!qd::fixed_rule<WrongReturn, double> && !integrable<WrongReturn>);
 static_assert(!qd::fixed_rule<NotConst, double> && !integrable<NotConst>);
 static_assert(!qd::iterative_method<NoSettle, double> && !integrable<NoSettle>);
+// The state by non-const reference in advance and settle; the same type with both so is a method.
+static_assert(qd::iterative_method<CopiedState<false, false>, double>);
+static_assert(!qd::iterative_method<CopiedState<true, false>, double> && !integrable<CopiedState<true, false>>);
+static_assert(!qd::iterative_method<CopiedState<false, true>, double> && !integrable<CopiedState<false, true>>);
+// The observer is nxx::observer, shared with the other modules (numerixx/math.hpp).
+static_assert(std::same_as<decltype(qd::observer(quiet)), decltype(nxx::observer(quiet))>);
+static_assert(std::same_as<qd::Observer<int>, nxx::Observer<int>>);
 static_assert(!integrable<int> && !integrable<qd::GaussLegendre<0>> && !integrable<qd::GaussLegendre<65>>);
 // A braced list is never deduced as a method: with M named, a braced list after the ends is criteria, which a fixed rule
 // does not take. (With M named, a braced list in the method's place is the method: integrate<M>({...}, fn, a, b).)

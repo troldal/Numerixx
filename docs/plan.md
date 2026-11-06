@@ -128,8 +128,8 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
   without subnormals is fixed. The spike: `docs/open-closed/roots-spike/`.
   - [x] API approved: `docs/roots/PHASE7_API.md` (2026-11-06, Q1 to Q19 as recommended, draft 2; the one-call concepts
     deferred)
-  - [ ] Step 0: `nxx::observer` in `math.hpp`, quadrature's using-declarations, `iterative_method`'s state by
-    reference; quadrature's tests unchanged
+  - [x] Step 0: `nxx::observer` in `math.hpp`, quadrature's using-declarations, `iterative_method`'s state by
+    reference; quadrature's tests unchanged, with `static_assert`s added for the clause and the shared observer
   - [ ] Step 1: on a bracket: the public types, the concepts, the loop, the fix, the nine bracketing methods stepped,
     the new forms; `tests/test_roots_protocol.cpp`
   - [ ] Step 2: from a guess: the four open methods stepped, the cap in the loop; the documentation and the guide page

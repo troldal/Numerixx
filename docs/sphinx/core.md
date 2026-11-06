@@ -1,6 +1,6 @@
-# nxx::real and nxx::math
+# nxx::real, nxx::math and nxx::observer
 
-The concept of a real type and the helpers the modules share, from `numerixx/math.hpp`.
+The concept of a real type, the helpers and the observer the modules share, from `numerixx/math.hpp`.
 
 ```{doxygenconcept} nxx::real
 ```
@@ -8,4 +8,11 @@ The concept of a real type and the helpers the modules share, from `numerixx/mat
 ```{doxygennamespace} nxx::math
 :members:
 :undoc-members:
+```
+
+```{doxygenstruct} nxx::Observer
+:members:
+```
+
+```{doxygenfunction} nxx::observer
 ```

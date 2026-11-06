@@ -1,16 +1,19 @@
 /**
  * @file
- * @brief The real-number concept and the constexpr helpers shared by the Numerixx algorithms.
+ * @brief The real-number concept, the constexpr helpers and the observer shared by the Numerixx algorithms.
  *
  * The helpers use only comparisons and + - * /, so they work in constant expressions, give the same result on every
- * compiler, and accept user-defined types such as boost::multiprecision::cpp_bin_float_50.
+ * compiler, and accept user-defined types such as boost::multiprecision::cpp_bin_float_50. observer() marks a callable
+ * that watches a stepped method's progress, in every module that has stepped methods.
  */
 
 #pragma once
 
 #include <concepts>
+#include <functional>
 #include <limits>
 #include <type_traits>
+#include <utility>
 
 /** @brief Numerixx: numerical algorithms for built-in and user-defined real types. */
 namespace nxx {
@@ -177,4 +180,60 @@ namespace nxx {
         }
 
     } // namespace math
+
+    /** @cond INTERNAL */
+    namespace detail {
+
+        /**
+         * @brief How an Observer stores its callable: an lvalue by reference, so that a recorder the caller owns sees
+         * every step; an rvalue by value, so that a temporary lambda lives as long as the Observer.
+         * @tparam O The callable's type as given to observer().
+         */
+        template<typename O>
+        using kept = std::conditional_t<std::is_lvalue_reference_v<O>,
+            std::reference_wrapper<std::remove_reference_t<O>>, std::remove_cvref_t<O>>;
+
+    } // namespace detail
+    /** @endcond */
+
+    /**
+     * @brief Marks a callable as the observer of a stepped method, so that the entry point (nxx::quadrature's
+     * integrate()) tells it from fn by its type and never by trying to call an argument: made by observer(), passed
+     * before fn.
+     * @tparam O The callable's type as given to observer(): an lvalue reference, kept by reference, or a value.
+     */
+    template<typename O>
+    struct Observer
+    {
+        /** @brief The callable: a std::reference_wrapper for an lvalue, the callable itself for an rvalue. */
+        detail::kept<O> callable;
+    };
+
+    /**
+     * @brief Makes @p o the observer of a stepped method, to watch it converge, record its steps or find out why it
+     * failed: `o(step)` is called with the module's Step<T> after the method's start and after each step.
+     *
+     * The same function in every module (nxx::quadrature::observer names it). What a step holds, and when it is
+     * reported, is the module's: see nxx::quadrature::Step. The observed run computes exactly what the unobserved run
+     * computes. o must be callable as `o(step)` and return void (a static_assert says so where it is not); it is called
+     * as a non-const callable, so a mutable lambda can count; an lvalue is kept by reference, so a recorder keeps what
+     * it records; its exceptions pass through, which is also the way out of a method that never ends. Count the
+     * evaluations in fn, and the steps in o.
+     *
+     * @code
+     * namespace qd = nxx::quadrature;
+     * auto const print = [](qd::Step<double> const &s) {
+     *     if (s.current) std::println("{:.15f} +- {:.3g}", s.current->value, s.current->abs_error);
+     * };
+     * auto const r = qd::integrate<qd::Romberg>(qd::observer(print), fn, 0.0, 1.0, {.rel_tol = 1e-12});
+     * @endcode
+     *
+     * @tparam O The callable's type.
+     * @param o A callable taking the module's Step<T> const &, returning void.
+     * @return The observer, for the entry point.
+     */
+    template<typename O>
+    constexpr Observer<O> observer(O &&o)
+    { return Observer<O>{ detail::kept<O>(std::forward<O>(o)) }; }
+
 } // namespace nxx

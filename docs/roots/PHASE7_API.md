@@ -455,6 +455,15 @@ it changes `quadrature.hpp` and is checked on its own by quadrature's tests:
 2. **From a guess:** the four open methods stepped with the hand-over in their state; the cap in the loop; the forms
    from a guess; the documentation, including the guide page.
 
+Step 0 as built (2026-11-06): `nxx::detail::kept`, `nxx::Observer` and `nxx::observer` in `math.hpp`, documented
+there for every module (the manual's core page shows them); `nxx::quadrature` re-exports them by using-declarations,
+each with a brief for its module, so `qd::observer` and `qd::Observer` keep their names and are the same entities
+(asserted in `tests/test_quadrature_protocol.cpp`). Doxygen lists a using-declaration of a function as a member of the
+namespace and asks for its `@param` and `@return`, so the declaration carries them. The briefs say "shared with the
+other modules" rather than naming `numerixx/math.hpp`, which Doxygen would link to a file page the manual does not
+have. `iterative_method` rejects a method whose `advance` or `settle` takes the state by value or by const reference
+(Q17), asserted with `CopiedState`.
+
 Each step is built and tested on the five toolchains, locally and in CI, with the docs build clean, before the next.
 
 ## Decisions for the user

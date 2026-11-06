@@ -4312,14 +4312,8 @@ namespace nxx::quadrature {
         concept expected_state = requires { typename R::value_type; }
                                  && std::same_as<R, std::expected<typename R::value_type, Failure<T>>>;
 
-        /**
-         * @brief How an Observer stores its callable: an lvalue by reference, so that a recorder the caller owns sees
-         * every step; an rvalue by value, so that a temporary lambda lives as long as the Observer.
-         * @tparam O The callable's type as given to observer().
-         */
-        template<typename O>
-        using kept = std::conditional_t<std::is_lvalue_reference_v<O>,
-            std::reference_wrapper<std::remove_reference_t<O>>, std::remove_cvref_t<O>>;
+        /** @brief How an Observer stores its callable: nxx::detail::kept, shared with the other modules. */
+        using nxx::detail::kept;
 
         /**
          * @brief The type an iterative method's start returns for an fn of type F, from which state_t takes the state:
@@ -4472,6 +4466,9 @@ namespace nxx::quadrature {
      * - `m.settle(s)` refines `s.step` before integrate() decides on it (Gauss-Kronrod forms its sums afresh); a method
      *   with nothing to refine returns `{}`.
      *
+     * Both take the state by non-const reference: one taken by value or by const reference fails the concept, since
+     * advance would then step a copy and the loop never end.
+     *
      * integrate() runs the loop: it checks each step (a current result as integrate() checks results, an attainable
      * error finite and not negative; else non_finite), tests `ready` and
      * `abs_error <= max(abs_tol, rel_tol |value|, attainable)`, settles before any decision, and advances while the
@@ -4503,46 +4500,29 @@ namespace nxx::quadrature {
         { m.advance(fn, s) } -> std::same_as<std::expected<void, Failure<T>>>;
         { m.settle(s) } -> std::same_as<std::expected<void, Failure<T>>>;
         { std::as_const(s).step } -> std::same_as<Step<T> const &>;
+        // The state by non-const reference: advance or settle taking it by value or by const reference would work on
+        // a copy, and the loop would go on for ever or skip the refinement (docs/roots/PHASE7_API.md, Q17).
+        requires !requires { m.advance(fn, std::move(s)); };
+        requires !requires { m.settle(std::move(s)); };
     };
 
     /**
-     * @brief Marks a callable as the observer of an integration, so that integrate() tells it from fn by its type and
-     * never by trying to call an argument: made by observer(), passed to integrate() before fn.
-     * @tparam O The callable's type as given to observer(): an lvalue reference, kept by reference, or a value.
+     * @brief The observer's marker, nxx::Observer, shared with the other modules: integrate() tells an observer from
+     * fn by this type.
      */
-    template<typename O>
-    struct Observer
-    {
-        /** @brief The callable: a std::reference_wrapper for an lvalue, the callable itself for an rvalue. */
-        detail::kept<O> callable;
-    };
+    using nxx::Observer;
 
     /**
-     * @brief Makes @p o the observer of an integration by an iterative method, to watch it converge, record its steps
-     * or find out why it failed: `o(step)` is called with the Step<T> after the method's start and after each step.
+     * @brief nxx::observer, shared with the other modules: makes a callable the observer of an integration by an
+     * iterative method, `o(step)` called with the Step<T> after the method's start and after each step.
      *
-     * The step is for the ends in order (a < b), so for b < a it has the opposite sign to the result; nothing is
-     * reported after settle, whose values the result shows. The observed run computes exactly what the unobserved run
-     * computes. o must be callable as `o(Step<T> const &)` and return void (a static_assert says so where it is not);
-     * it is called as a non-const callable, so a mutable lambda can count; an lvalue is kept by reference, so a
-     * recorder keeps what it records; its exceptions pass through, which is also the way out of a method that never
-     * ends. Count the evaluations in fn, and the steps in o.
+     * In integrate(), the step is for the ends in order (a < b), so for b < a it has the opposite sign to the result;
+     * nothing is reported after settle, whose values the result shows. See nxx::observer for the rest.
      *
-     * @code
-     * namespace qd = nxx::quadrature;
-     * auto const print = [](qd::Step<double> const &s) {
-     *     if (s.current) std::println("{:.15f} +- {:.3g}", s.current->value, s.current->abs_error);
-     * };
-     * auto const r = qd::integrate<qd::Romberg>(qd::observer(print), fn, 0.0, 1.0, {.rel_tol = 1e-12});
-     * @endcode
-     *
-     * @tparam O The callable's type.
      * @param o A callable taking Step<T> const &, returning void.
      * @return The observer, for integrate().
      */
-    template<typename O>
-    constexpr Observer<O> observer(O &&o)
-    { return Observer<O>{ detail::kept<O>(std::forward<O>(o)) }; }
+    using nxx::observer;
 
     /** @cond INTERNAL */
     namespace detail {

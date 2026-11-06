@@ -24,8 +24,8 @@ time as well as at run time.
 | Compute a derivative of order 1 to 4 from a function's values, by finite differences or by Ridders' method, which also estimates its error | [Numerical derivatives](deriv/index.md), `nxx::deriv` | `numerixx/deriv.hpp` |
 | Compute the integral of a function of one variable over a finite or infinite interval, with an estimate of its error | [Integrals of functions](quadrature/index.md), `nxx::quadrature` | `numerixx/quadrature.hpp` |
 
-The modules share one header, `numerixx/math.hpp`, with the definition of a real type and a few helpers ([nxx::real and
-nxx::math](core.md)).
+The modules share one header, `numerixx/math.hpp`, with the definition of a real type, a few helpers and the observer
+that watches a stepped method ([nxx::real, nxx::math and nxx::observer](core.md)).
 
 ## How this manual is organised
 
