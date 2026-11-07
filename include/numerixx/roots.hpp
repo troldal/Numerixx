@@ -16,6 +16,11 @@
  * exactly T (the value, f', f''), or from separate callables passed after fn, which may return a std::expected:
  * nxx::deriv::derivative_of(fn) gives a numerical derivative as such a callable.
  *
+ * On a bracket a method computes and solve() decides: the method reports its bracket and its point after each step
+ * (a Step), and solve() checks the report, applies the stop test and forms the bound. So a method of one's own, a
+ * type that is a bracketing_method, gets the same checks and the same guarantee as the library's: `solve<M>(fn,
+ * bracket)`, or `solve(m, fn, bracket)` for a method with parameters. `observer(o)` before fn reports each step to o.
+ *
  * search(fn, x0) finds a bracket from a guess, by an outward search, for a bracketing method to finish:
  * `search(fn, x0).and_then([&](Bracket<double> b) { return solve<Brent>(fn, b); })`.
  *
@@ -72,12 +77,20 @@ namespace nxx::roots {
         no_sign_change,
 
         /**
-         * An open method found no root from its guess: no sign change between its iterates within its iteration cap,
-         * or no usable step (f' = 0, not finite or a failed std::expected, Secant's two values equal, a step that would
+         * A method found no root. From a guess: no sign change between its iterates within its iteration cap, or no
+         * usable step (f' = 0, not finite or a failed std::expected, Secant's two values equal, a step that would
          * overflow). With a numerical derivative also where its stencil leaves fn's domain at an iterate, or where |f'|
-         * is as small as the derivative's own error (a multiple root): see Newton with separate derivatives.
+         * is as small as the derivative's own error (a multiple root): see Newton with separate derivatives. On a
+         * bracket: a method that could place no point strictly inside it, which the library's methods do not reach.
          */
-        not_converged
+        not_converged,
+
+        /**
+         * A method of one's own broke the contract of bracketing_method: a step with its point outside its points,
+         * outside the caller's bracket, without a sign change, or not strictly inside the previous step. The
+         * library's methods never return it.
+         */
+        invalid_step
     };
 
     /**
@@ -160,167 +173,152 @@ namespace nxx::roots {
     };
 
     /**
-     * @brief Bisection: halves the bracket at every step, one bit per evaluation of fn, guaranteed.
+     * @brief The caller's tolerances after validation, as solve() passes them to a method: tol(x) = absolute +
+     * relative |x|, so that a method can scale its own steps to the request.
      *
-     * About log2(width / (2 tol)) evaluations, 52 for [1, 2] in double, whatever fn is.
+     * solve() accepts a bracket at most 2 tol(x) wide around the method's point x. A method uses at(x) for its minimum
+     * step and its placement (Brent steps at least tol(b); Toms748 keeps its points 0.7 tol inside the ends), so that
+     * it never proposes points the request cannot tell apart. solve() builds it from Criteria: absolute in
+     * [denorm_min, max / 4], relative in [2 eps, 1].
+     *
+     * @tparam T The real type.
      */
-    struct Bisection
+    template<real T>
+    struct Tolerance
     {
+        /** @brief The absolute tolerance, in [denorm_min, max / 4]. */
+        T absolute;
+
+        /** @brief The relative tolerance, in [2 eps, 1]. */
+        T relative;
+
+        /**
+         * @brief tol(x), saturated at max.
+         * @param x The point.
+         * @return absolute + relative |x|, or max if that would overflow.
+         */
+        constexpr T at(T const &x) const
+        {
+            // scaled is at most |x|, since relative <= 1. Above max / 2 it saturates: max - absolute would round,
+            // and could admit a sum that overflows; below it the sum is at most 3/4 max, since absolute <= max / 4.
+            // Parenthesised, so that a max macro, as defined by <windows.h>, cannot expand.
+            T const max = T((std::numeric_limits<T>::max)());
+            T const scaled = T(relative * math::abs(x));
+            if (scaled > T(max / T(2))) return max;
+            return T(absolute + scaled);
+        }
+
+        /** @brief Compares both members. */
+        friend constexpr bool operator==(Tolerance const &, Tolerance const &) = default;
     };
 
     /**
-     * @brief Brent's method: inverse quadratic and linear interpolation, safeguarded by bisection (Brent 1973).
+     * @brief A bracket as solve() hands it to a bracketing method, so that the method starts from a checked interval:
+     * lower < upper, both finite, fn's values there finite, nonzero and of opposite signs.
      *
-     * Superlinear on a smooth fn with a simple root, typically 8 to 12 evaluations in double, and never much slower
-     * than Bisection: at most (k + 1)^2 - 2 evaluations, k being Bisection's count. Slower on a multiple root
-     * ((x - 1)^3: 156 evaluations, against Bisection's 54).
+     * solve() has already validated the caller's bracket, put it in order, and evaluated fn at its ends and, for a
+     * bracket around 0, at 0 (zero first), so the bracket may be half the caller's. A method that needs fn's
+     * derivatives (values_of<M> > 1) receives them too: at_lower[0] is fn's value, at_lower[1] f', at_lower[2] f''.
+     * The derivatives are not checked.
+     *
+     * @tparam T The real type.
+     * @tparam K The number of values at each end: values_of<M>.
      */
-    struct Brent
+    template<real T, std::size_t K = 1>
+    struct Start
     {
+        /** @brief The lower end. */
+        T lower;
+
+        /** @brief fn's values at the lower end. */
+        std::array<T, K> at_lower;
+
+        /** @brief The upper end. */
+        T upper;
+
+        /** @brief fn's values at the upper end; the value of the other sign. */
+        std::array<T, K> at_upper;
+
+        /** @brief Compares every member. */
+        friend constexpr bool operator==(Start const &, Start const &) = default;
     };
 
     /**
-     * @brief Alefeld, Potra and Shi's Algorithm 748 (1995, Algorithm 4.2): inverse cubic interpolation with quadratic
-     * and secant fallbacks, a double-length secant step, and a bisection whenever an iteration has not halved the
-     * bracket. A bracket only; no derivative form.
+     * @brief What a stepped method reports after its start and after each step, so that solve() can check it and
+     * decide: the two points it holds, fn's values there, and its point.
      *
-     * Costs about what Brent costs on smooth fn (the paper reports 4% fewer evaluations; on 27 of its test cases at
-     * full precision Brent took 309, Toms748 325), with a better worst case: at most about 4 evaluations per halving
-     * of the bracket, where Brent's bound is quadratic in the number of halvings. Like every bracketing method it
-     * returns a point and a bound, not the final bracket (Boost.Math's toms748_solve returns the bracket).
-     */
-    struct Toms748
-    {
-    };
-
-    /**
-     * @brief Regula falsi with Anderson and Bjorck's rescaling (1973): the secant through the latest point and the
-     * retained end, whose value is scaled down by 1 - f(c) / f(b) (or 1/2) whenever the same end is retained again. A
-     * bracket only.
+     * On a bracket: lower < upper with fn's values nonzero and of opposite signs, inside the caller's bracket and
+     * strictly inside the previous step's; or point an end at which fn is exactly 0. solve() returns point once the
+     * bracket is at most 2 tol(point) wide or point is within tol(point) of both ends, with abs_error the larger
+     * distance from point to an end, and point with abs_error tol(point) where fn is exactly 0 there. A method that
+     * cannot go on returns error::not_converged from advance.
      *
-     * Guarded by a bisection after three steps that have not halved the bracket, so at most about 4 evaluations per
-     * halving (the published method took 65 million evaluations on x^20 - 1 over [0, 5]; guarded, 30). Far cheaper than
-     * Brent where fn is strongly curved near one end of the bracket (ln(x / 1e-12) on [1e-20, 1]: 18 evaluations against
-     * 45) and on a walk to a sign change at 0; dearer on high powers and very wide brackets.
+     * @tparam T The real type.
      */
-    struct AndersonBjorck
+    template<real T>
+    struct Step
     {
-    };
+        /** @brief The lower point. */
+        T lower;
 
-    /**
-     * @brief Ridders' method (1979): the midpoint, then the zero of an exponential fit through the three values. A
-     * bracket. Not nxx::deriv::Ridders, the derivative method of the same author.
-     *
-     * Each iteration halves the bracket at a cost of 2 evaluations (so at most twice Bisection's count) and converges
-     * quadratically per iteration on a simple root. A teaching example; of the interpolating methods the cheapest on
-     * roots of odd multiplicity ((x - 1)^3: 86 evaluations against Brent's 156, though Bisection takes 54), dearer than
-     * Brent otherwise (416 against 309 on 27 of Alefeld, Potra and Shi's test cases). The fit's zero is formed without
-     * the cancellation of the textbook formula, which loses roots near an end of the bracket.
-     */
-    struct Ridders
-    {
-    };
+        /** @brief fn's value at lower: its true value, not one the method has scaled. */
+        T f_lower;
 
-    /**
-     * @brief False position: the zero of the secant through the bracket's ends, guarded. A bracket.
-     *
-     * A teaching example. As published, one end of the bracket stalls while the other converges: x^20 - 1 over [0, 5]
-     * took over 200,000 evaluations. Guarded here, as AndersonBjorck, by a bisection after three steps that have not
-     * halved the bracket (45 evaluations there), so the stall shows only in its counts: 645 on 27 of Alefeld, Potra and
-     * Shi's test cases, against Illinois' 382 and AndersonBjorck's 327.
-     */
-    struct RegulaFalsi
-    {
-    };
+        /** @brief The upper point. */
+        T upper;
 
-    /**
-     * @brief The Illinois method (Dowell and Jarratt 1971): false position with the retained end's value halved
-     * whenever that end is retained again, the simplest cure for its stall; guarded, as AndersonBjorck. A bracket.
-     */
-    struct Illinois
-    {
-    };
+        /** @brief fn's value at upper. */
+        T f_upper;
 
-    /**
-     * @brief Newton's method: the step -f / f'. Needs fn and f'.
-     *
-     * On a bracket it is Brent's method with Newton's step in place of the interpolation, safeguarded the same way:
-     * x^2 - 2 on [1, 2] in 8 evaluations. From a guess it iterates until a sign change appears between two iterates,
-     * then continues on that bracket; every result is then a verified sign change, at about one evaluation more than
-     * the textbook stop (7 from 1 for x^2 - 2). From a guess it returns a root, the first sign change its iterates
-     * cross, not necessarily the one nearest the guess, and error::not_converged where it finds none (a cycle, a
-     * divergence, f' = 0). Its iteration cap is 4 times the bits of T (212 in double): beyond it lie a multiple root
-     * at 0 with the default abs_tol (x^3 from 1 shrinks by 2/3 per step until x^3 underflows), a guess very far from
-     * the root, and roots of multiplicity above about 5; a bracket, or abs_tol, solves them.
-     */
-    struct Newton
-    {
-    };
+        /** @brief The method's estimate: lower, upper, or a point between them (Bisection's midpoint). */
+        T point;
 
-    /**
-     * @brief Halley's method: the step -t / (1 - t f'' / (2 f')) with t = f / f'. Needs fn, f' and f''.
-     *
-     * Cubic near a simple root: x^2 - 2 from 1 in 5 evaluations. Where its correction cannot be formed or would point
-     * against Newton's step (far from a root), it takes Newton's step, as Boost.Math's Halley does. On a bracket and
-     * from a guess as Newton.
-     */
-    struct Halley
-    {
-    };
-
-    /**
-     * @brief The secant method: the step through the latest two iterates. Needs fn only; from a guess.
-     *
-     * Its second point is x0 (1 + eps^(1/4)) (eps^(1/4) itself at x0 = 0). At the first sign change it continues as
-     * Brent's method on that bracket, so its results are verified sign changes, as Newton's are: x^2 - 2 from 1 in 9
-     * evaluations. Superlinear (order 1.62) on a simple root.
-     */
-    struct Secant
-    {
-    };
-
-    /**
-     * @brief Steffensen's method: Newton's with the slope (f(z) - f(x)) / f(x) at z = x + f(x). Needs fn only; from a
-     * guess, 2 evaluations per iteration, at the first sign change continuing as Brent's method, as Secant.
-     *
-     * A teaching example: quadratic without a derivative, at the price of scale dependence. f(x) is added to x, so fn's
-     * scale sets the cost and even which root is found: 1000 (x^2 - 2) from 1 returns -sqrt 2 after 27 evaluations,
-     * where x^2 - 2 returns sqrt 2 after 10 (z = 1 - 1000 brackets the other root). From a far guess it is slow (x^2 - 2
-     * from 10: 39 evaluations, Secant 13). Prefer Secant.
-     */
-    struct Steffensen
-    {
+        /** @brief Compares every member. */
+        friend constexpr bool operator==(Step const &, Step const &) = default;
     };
 
     /** @cond INTERNAL */
     namespace detail {
 
         /**
-         * @brief The methods solve() accepts on a bracket.
+         * @brief M::values where M declares it as a static integral constant of at least 1, else 1: the value of
+         * values_of, in a function so that the documentation's C++ parser reads values_of's initializer.
          * @tparam M The method.
+         * @return The number of values.
          */
+        // Only a static integral constant counts: a method with a data member that happens to be called values (a
+        // table of coefficients) needs one value (numerics review of Phase 7's draft 1, finding 7). At least 1: fn's
+        // value is always read, so values = 0 would index an empty array (review of step 1, finding 4).
         template<typename M>
-        concept bracketing = std::same_as<M, Bisection> || std::same_as<M, Brent> || std::same_as<M, Toms748>
-                             || std::same_as<M, AndersonBjorck> || std::same_as<M, Ridders>
-                             || std::same_as<M, RegulaFalsi> || std::same_as<M, Illinois> || std::same_as<M, Newton>
-                             || std::same_as<M, Halley>;
+        consteval std::size_t declared_values()
+        {
+            if constexpr (requires {
+                              requires std::integral<std::remove_cvref_t<decltype(M::values)>>;
+                              typename std::integral_constant<std::size_t, M::values>;
+                              requires M::values >= 1;
+                          })
+                return std::size_t{ M::values };
+            else
+                return std::size_t{ 1 };
+        }
 
-        /**
-         * @brief The methods solve() accepts from a guess.
-         * @tparam M The method.
-         */
-        template<typename M>
-        concept open = std::same_as<M, Newton> || std::same_as<M, Halley> || std::same_as<M, Secant>
-                       || std::same_as<M, Steffensen>;
+    } // namespace detail
+    /** @endcond */
 
-        /**
-         * @brief The number of values a method needs from fn at a point: the value, and the derivatives it uses.
-         * @tparam M The method.
-         */
-        template<typename M>
-        inline constexpr std::size_t values_needed = std::same_as<M, Newton>   ? 2
-                                                     : std::same_as<M, Halley> ? 3
-                                                                               : 1;
+    /**
+     * @brief How many values a method needs from fn at a point: M::values where M declares it as a static integral
+     * constant of at least 1 (Newton 2, Halley 3), else 1, fn's value alone.
+     *
+     * solve() evaluates that many at the bracket's ends for the method's Start, and requires fn to give them; a method
+     * with `values = 2` gets the form of solve() with the derivative as a separate callable.
+     *
+     * @tparam M The method.
+     */
+    template<typename M>
+    inline constexpr std::size_t values_of = detail::declared_values<M>();
+
+    /** @cond INTERNAL */
+    namespace detail {
 
         /**
          * @brief Whether R is a std::pair, std::tuple or std::array: the tuple-likes fn may return.
@@ -476,34 +474,6 @@ namespace nxx::roots {
         }
 
         /**
-         * @brief The validated and clamped tolerances, with tol(x) = absolute + relative |x|.
-         * @tparam T The real type.
-         */
-        template<real T>
-        struct Tolerance
-        {
-            /** @brief The absolute tolerance, in [denorm_min, max / 4]. */
-            T absolute;
-
-            /** @brief The relative tolerance, in [2 eps, 1]. */
-            T relative;
-
-            /**
-             * @brief tol(x), saturated at max.
-             * @param x The point.
-             * @return absolute + relative |x|, or max if that would overflow.
-             */
-            constexpr T at(T const &x) const
-            {
-                // scaled is at most |x|, since relative <= 1. Above max / 2 it saturates: max - absolute would round,
-                // and could admit a sum that overflows; below it the sum is at most 3/4 max, since absolute <= max / 4.
-                T const scaled = T(relative * math::abs(x));
-                if (scaled > T(detail::largest<T>() / T(2))) return detail::largest<T>();
-                return T(absolute + scaled);
-            }
-        };
-
-        /**
          * @brief Twice @p t, saturated at max.
          * @param t A tolerance, non-negative.
          * @return 2 t, or max if that would overflow.
@@ -648,7 +618,17 @@ namespace nxx::roots {
         constexpr T midpoint(T const &a, T const &b)
         {
             if ((a < T(0)) != (b < T(0))) return T(T(a + b) / T(2));
-            return T(a + T(T(b - a) / T(2)));
+            T const m = T(a + T(T(b - a) / T(2)));
+            if ((a < m && m < b) || (b < m && m < a)) return m;
+            // Ends of one sign with no point formed between them: adjacent (then none exists), or, in a type without
+            // subnormals, closer than 2 min, where (b - a) / 2 flushes to 0 (numerics review of Phase 7's draft 1,
+            // finding 1). Then both are tiny and their sum fits; the guard keeps the sum from overflowing near max,
+            // which constant evaluation would reject.
+            T const quarter = T(detail::largest<T>() / T(4));
+            if (!(math::abs(a) <= quarter && math::abs(b) <= quarter)) return m;
+            T const sum = T(T(a + b) / T(2));
+            if ((a < sum && sum < b) || (b < sum && sum < a)) return sum;
+            return m;
         }
 
         /**
@@ -813,27 +793,19 @@ namespace nxx::roots {
         };
 
         /**
-         * @brief A validated bracket, in order, with fn's values at its ends; or a root found during validation.
+         * @brief A validated bracket for the method, or a root found during validation, so that solve() runs the
+         * method only where validation left a sign change.
          * @tparam T The real type.
          * @tparam K The number of values at each end.
          */
         template<real T, std::size_t K>
-        struct Start
+        struct Prepared
         {
             /** @brief The root, if validation found one (fn exactly 0 at an end or at 0). */
             std::optional<Root<T>> root;
 
-            /** @brief The lower end. */
-            T lower;
-
-            /** @brief fn's values at the lower end; the value finite and nonzero. */
-            std::array<T, K> at_lower;
-
-            /** @brief The upper end. */
-            T upper;
-
-            /** @brief fn's values at the upper end; the value finite, nonzero and of the other sign. */
-            std::array<T, K> at_upper;
+            /** @brief The bracket, in order, with fn's values at its ends; meaningful only without a root. */
+            Start<T, K> start;
         };
 
         /**
@@ -848,10 +820,10 @@ namespace nxx::roots {
          * @param fn The function.
          * @param bracket The caller's bracket.
          * @param tolerance The tolerances.
-         * @return The start, or error::non_finite or error::no_sign_change.
+         * @return The start or the root found, or error::non_finite or error::no_sign_change.
          */
         template<std::size_t K, real T, typename F>
-        constexpr std::expected<Start<T, K>, error>
+        constexpr std::expected<Prepared<T, K>, error>
             prepare(F &fn, Bracket<T> const &bracket, Tolerance<T> const &tolerance)
         {
             if (!math::isfinite(bracket.lower) || !math::isfinite(bracket.upper))
@@ -865,16 +837,14 @@ namespace nxx::roots {
             std::array<T, K> at_lower = detail::evaluate<K>(fn, lower);
             std::array<T, K> at_upper = detail::evaluate<K>(fn, upper);
             if (!math::isfinite(at_lower[0]) || !math::isfinite(at_upper[0])) return std::unexpected(error::non_finite);
-            if (at_lower[0] == T(0))
-                return Start<T, K>{ Root<T>{ lower, tolerance.at(lower) }, lower, at_lower, upper, at_upper };
-            if (at_upper[0] == T(0))
-                return Start<T, K>{ Root<T>{ upper, tolerance.at(upper) }, lower, at_lower, upper, at_upper };
+            Start<T, K> const ends{ lower, at_lower, upper, at_upper };
+            if (at_lower[0] == T(0)) return Prepared<T, K>{ Root<T>{ lower, tolerance.at(lower) }, ends };
+            if (at_upper[0] == T(0)) return Prepared<T, K>{ Root<T>{ upper, tolerance.at(upper) }, ends };
             if (detail::same_sign(at_lower[0], at_upper[0])) return std::unexpected(error::no_sign_change);
             if (lower < T(0) && T(0) < upper) {
                 T const zero = T(0);
                 std::array<T, K> const at_zero = detail::evaluate<K>(fn, zero);
-                if (at_zero[0] == T(0))
-                    return Start<T, K>{ Root<T>{ zero, tolerance.at(zero) }, lower, at_lower, upper, at_upper };
+                if (at_zero[0] == T(0)) return Prepared<T, K>{ Root<T>{ zero, tolerance.at(zero) }, ends };
                 if (math::isfinite(at_zero[0])) {
                     if (detail::same_sign(at_zero[0], at_lower[0])) {
                         lower = zero;
@@ -885,40 +855,7 @@ namespace nxx::roots {
                     }
                 }
             }
-            return Start<T, K>{ std::nullopt, lower, at_lower, upper, at_upper };
-        }
-
-        /**
-         * @brief Bisection on a validated bracket.
-         * @param fn The function.
-         * @param s The start: a bracket in order with a sign change and no root found.
-         * @param tolerance The tolerances.
-         * @return The root, or error::non_finite if fn is not finite at a midpoint.
-         */
-        template<std::size_t K, real T, typename F>
-        constexpr std::expected<Root<T>, error> bisection(F &fn, Start<T, K> const &s, Tolerance<T> const &tolerance)
-        {
-            T a = s.lower;
-            T fa = s.at_lower[0];
-            T b = s.upper;
-            while (true) {
-                T const m = detail::midpoint(a, b);
-                // The larger of the distances to the ends is a true bound even where half the width rounds, as among
-                // the subnormals or with ends far apart. A midpoint not strictly inside means T's resolution.
-                T const left = detail::distance_bound(m, a);
-                T const right = detail::distance_bound(b, m);
-                T const half = right < left ? left : right;
-                if (!(a < m && m < b) || half <= tolerance.at(m)) return Root<T>{ m, half };
-                T const fm = detail::evaluate<K>(fn, m)[0];
-                if (!math::isfinite(fm)) return std::unexpected(error::non_finite);
-                if (fm == T(0)) return Root<T>{ m, tolerance.at(m) };
-                if (detail::same_sign(fm, fa)) {
-                    a = m;
-                    fa = fm;
-                } else {
-                    b = m;
-                }
-            }
+            return Prepared<T, K>{ std::nullopt, Start<T, K>{ lower, at_lower, upper, at_upper } };
         }
 
         /**
@@ -962,146 +899,6 @@ namespace nxx::roots {
         }
 
         /**
-         * @brief The derivative step of method M from the values at a point (Newton's or Halley's).
-         * @tparam M The method, Newton or Halley.
-         * @param v The values at the point.
-         * @return The step, or nothing where it cannot be formed.
-         */
-        template<typename M, real T, std::size_t K>
-        constexpr std::optional<T> derivative_step(std::array<T, K> const &v)
-        {
-            if constexpr (std::same_as<M, Halley>)
-                return detail::halley_step(v);
-            else
-                return detail::newton_step(v);
-        }
-
-        /**
-         * @brief Brent's procedure zero (Brent 1973, ch. 4, section 6) on a validated bracket, with the step chosen by
-         * the method: Brent's interpolation, or Newton's or Halley's step from b, the end with the smaller |f|.
-         *
-         * Implemented from the book, with three changes: the tolerance is the caller's tol(b) rather than
-         * 2 macheps |b| + t; the stop test is distance_bound(c, b) <= 2 tol(b) rather than |c - b| / 2 <= tol(b),
-         * since the bound is exact there while the half may round in radix 10; and a step is a bisection step whenever
-         * |c - b|, |b - a| or |e| exceeds max / 16, so that no product of the interpolation overflows (3 m q reaches 12
-         * |c - b|, 2 p 4 (|c - b| + |b - a|)). The quotients cannot overflow: in the interpolation |fb| < |fa| <= |fc|.
-         * A derivative step is accepted by Brent's test written for a step s: towards c, |s| < 3 |m| / 2 - tol / 2,
-         * and |s| < |e| / 2; one that cannot be formed is a bisection step. The bookkeeping, and so the termination
-         * argument, is Brent's for every method.
-         *
-         * @tparam M The method: Brent, Newton or Halley.
-         * @param fn The function.
-         * @param s The start: a bracket in order with a sign change and no root found.
-         * @param tolerance The tolerances.
-         * @return The root, or error::non_finite if fn is not finite at a point.
-         */
-        template<typename M, std::size_t K, real T, typename F>
-        constexpr std::expected<Root<T>, error> brent(F &fn, Start<T, K> const &s, Tolerance<T> const &tolerance)
-        {
-            T const big = T(detail::largest<T>() / T(16));
-
-            T a = s.lower;
-            std::array<T, K> va = s.at_lower;
-            T b = s.upper;
-            std::array<T, K> vb = s.at_upper;
-            T c = a;
-            std::array<T, K> vc = va;
-            T d = detail::bounded_difference(b, a, big);
-            T e = d;
-            while (true) {
-                // [b, c] is the bracket, with fn(b) and fn(c) of opposite signs; a is the previous b.
-                if (detail::same_sign(vb[0], vc[0])) {
-                    c = a;
-                    vc = va;
-                    d = detail::bounded_difference(b, a, big);
-                    e = d;
-                }
-                if (math::abs(vc[0]) < math::abs(vb[0])) {
-                    a = b;
-                    b = c;
-                    c = a;
-                    va = vb;
-                    vb = vc;
-                    vc = va;
-                }
-                T const fa = va[0];
-                T const fb = vb[0];
-                T const fc = vc[0];
-                T const tol = tolerance.at(b);
-                T const width = detail::distance_bound(c, b);
-                if (width <= detail::twice(tol)) return Root<T>{ b, width };
-
-                bool const wide = width > big || detail::distance_bound(b, a) > big || math::abs(e) > big;
-                // Half the bracket, towards c: exact Brent below big, the overflow-free midpoint above it.
-                T const m = wide ? T(detail::midpoint(b, c) - b) : T(T(c - b) / T(2));
-                if (wide || math::abs(e) < tol || math::abs(fa) <= math::abs(fb)) {
-                    d = m;
-                    e = m;
-                } else if constexpr (std::same_as<M, Brent>) {
-                    T const ratio = T(fb / fa);
-                    T p = T(0);
-                    T q = T(0);
-                    if (a == c) {
-                        // Linear interpolation (the secant).
-                        p = T(T(2) * m * ratio);
-                        q = T(T(1) - ratio);
-                    } else {
-                        // Inverse quadratic interpolation.
-                        T const qa = T(fa / fc);
-                        T const r = T(fb / fc);
-                        p = T(ratio * T(T(T(2) * m * qa * T(qa - r)) - T(T(b - a) * T(r - T(1)))));
-                        q = T(T(qa - T(1)) * T(r - T(1)) * T(ratio - T(1)));
-                    }
-                    if (p > T(0))
-                        q = T(-q);
-                    else
-                        p = T(-p);
-                    T const before_last = e; // Brent's s := e
-                    e = d;
-                    // Accept the interpolated point only if it falls well inside the bracket and the steps shrink. A
-                    // NaN or q = 0 fails both tests, and falls back on bisection.
-                    if (T(T(2) * p) < T(T(T(3) * m * q) - math::abs(T(tol * q)))
-                        && p < math::abs(T(before_last * q / T(2)))) {
-                        d = T(p / q);
-                    } else {
-                        d = m;
-                        e = m;
-                    }
-                } else {
-                    std::optional<T> const step = detail::derivative_step<M>(vb);
-                    T const before_last = e;
-                    e = d;
-                    // Brent's acceptance for a step: towards c, well inside the bracket (so that b + step cannot round
-                    // onto c), and shorter than half the step before last.
-                    T const inside = T(T(T(3) * math::abs(m)) / T(2) - T(tol / T(2)));
-                    if (step && (*step > T(0)) == (m > T(0)) && math::abs(*step) < inside
-                        && math::abs(*step) < T(math::abs(before_last) / T(2))) {
-                        d = *step;
-                    } else {
-                        d = m;
-                        e = m;
-                    }
-                }
-                T next = b;
-                if (math::abs(d) > tol)
-                    next = T(b + d);
-                else if (m > T(0))
-                    next = T(b + tol);
-                else
-                    next = T(b - tol);
-                // A point not strictly inside the bracket means it is already at the tolerance's resolution: no step
-                // can make progress, and evaluating there again would repeat the iteration forever.
-                if (!((b < next && next < c) || (c < next && next < b))) return Root<T>{ b, width };
-                a = b;
-                va = vb;
-                b = next;
-                vb = detail::evaluate<K>(fn, b);
-                if (!math::isfinite(vb[0])) return std::unexpected(error::non_finite);
-                if (vb[0] == T(0)) return Root<T>{ b, tolerance.at(b) };
-            }
-        }
-
-        /**
          * @brief x - y, where it cannot overflow (sum_fits).
          * @param x A finite value.
          * @param y A finite value.
@@ -1125,26 +922,6 @@ namespace nxx::roots {
         {
             if (!x || !y || !detail::sum_fits(*x, *y)) return std::nullopt;
             return T(*x + *y);
-        }
-
-        /**
-         * @brief The result where the bracket [a, b] meets the stop test: the end with the smaller |f|, with the bound
-         * on the bracket's width.
-         * @param a The lower end.
-         * @param fa fn there.
-         * @param b The upper end.
-         * @param fb fn there.
-         * @param tolerance The tolerances.
-         * @return The root, or nothing to go on.
-         */
-        template<real T>
-        constexpr std::optional<Root<T>>
-            stop_at(T const &a, T const &fa, T const &b, T const &fb, Tolerance<T> const &tolerance)
-        {
-            T const u = math::abs(fa) < math::abs(fb) ? a : b;
-            T const width = detail::distance_bound(a, b);
-            if (width <= detail::twice(tolerance.at(u))) return Root<T>{ u, width };
-            return std::nullopt;
         }
 
         /**
@@ -1178,26 +955,6 @@ namespace nxx::roots {
 
             /** @brief fn at e. */
             T fe;
-        };
-
-        /**
-         * @brief One step of enclose(): the root where the search ends, the new state, and the point evaluated.
-         * @tparam T The real type.
-         */
-        template<real T>
-        struct Enclosed
-        {
-            /** @brief The root, where the step found fn exactly 0 or the bracket met the stop test. */
-            std::optional<Root<T>> root;
-
-            /** @brief The state after the step. */
-            Enclosure<T> next;
-
-            /** @brief The point evaluated. */
-            T c;
-
-            /** @brief fn at c. */
-            T fc;
         };
 
         /**
@@ -1246,51 +1003,6 @@ namespace nxx::roots {
                 c = T(s.b - margin);
             if (s.a < c && c < s.b) return c;
             return middle;
-        }
-
-        /**
-         * @brief One step of Toms748 and AndersonBjorck, the paper's bracket subroutine: the point (the midpoint while
-         * the bracket is wide, else the proposed point placed as place() says), e := d where asked, evaluate fn, keep
-         * the half with the sign change and record the dropped end as d, and stop on an exact zero or the stop test.
-         * @param fn The function.
-         * @param s The state.
-         * @param proposed The method's point, computed only where the bracket is not wide; or nothing.
-         * @param shift Whether e takes d's value before d changes.
-         * @param tolerance The tolerances.
-         * @return The step, or error::non_finite if fn is not finite at the point.
-         */
-        template<real T, typename F>
-        constexpr std::expected<Enclosed<T>, error> enclose(F &fn,
-            Enclosure<T> const &s,
-            std::optional<T> const &proposed,
-            bool shift,
-            Tolerance<T> const &tolerance)
-        {
-            T const c = detail::wide(s) ? detail::midpoint(s.a, s.b) : detail::place(s, proposed, tolerance);
-            // Unreachable: a midpoint not strictly inside means adjacent ends, which met the stop test before.
-            assert(s.a < c && c < s.b);
-            if (!(s.a < c && c < s.b))
-                return Enclosed<T>{ Root<T>{ c, detail::distance_bound(s.a, s.b) }, s, c, s.fa };
-            Enclosure<T> next = s;
-            if (shift) {
-                next.e = s.d;
-                next.fe = s.fd;
-            }
-            T const fc = detail::evaluate<1>(fn, c)[0];
-            if (!math::isfinite(fc)) return std::unexpected(error::non_finite);
-            if (fc == T(0)) return Enclosed<T>{ Root<T>{ c, tolerance.at(c) }, next, c, fc };
-            if (detail::same_sign(s.fa, fc)) {
-                next.d = s.a;
-                next.fd = s.fa;
-                next.a = c;
-                next.fa = fc;
-            } else {
-                next.d = s.b;
-                next.fd = s.fb;
-                next.b = c;
-                next.fb = fc;
-            }
-            return Enclosed<T>{ detail::stop_at(next.a, next.fa, next.b, next.fb, tolerance), next, c, fc };
         }
 
         /**
@@ -1430,155 +1142,6 @@ namespace nxx::roots {
         }
 
         /**
-         * @brief A step of Toms748 with its point, computed only where the bracket is not wide.
-         *
-         * A function rather than a lambda capturing fn: MSVC rejects a lambda's capture of a function reference in
-         * constant evaluation (as at Joined).
-         *
-         * @param fn The function.
-         * @param s The state.
-         * @param point The method's point from the state, or nothing.
-         * @param shift Whether e takes d's value.
-         * @param tolerance The tolerances.
-         * @return The step, or error::non_finite.
-         */
-        template<real T, typename F, typename P>
-        constexpr std::expected<Enclosed<T>, error>
-            advance(F &fn, Enclosure<T> const &s, P const &point, bool shift, Tolerance<T> const &tolerance)
-        {
-            std::optional<T> const proposed = detail::wide(s) ? std::optional<T>() : std::optional<T>(point(s));
-            return detail::enclose(fn, s, proposed, shift, tolerance);
-        }
-
-        /**
-         * @brief Alefeld, Potra and Shi's Algorithm 4.2 (1995, pp. 334-335) on a validated bracket, each point taken
-         * through enclose(): a secant step; then per iteration two interpolation steps (inverse cubic, or
-         * Newton-Quadratic with 2 and then 3 Newton steps), a double-length secant step, and a bisection step where the
-         * iteration has not brought the bracket below half its width at its start. At most 4 evaluations per iteration,
-         * each iteration at least halving the bracket.
-         * @param fn The function.
-         * @param start The start: a bracket in order with a sign change and no root found.
-         * @param tolerance The tolerances.
-         * @return The root, or error::non_finite if fn is not finite at a point.
-         */
-        template<real T, typename F>
-        constexpr std::expected<Root<T>, error> toms748(F &fn, Start<T, 1> const &start, Tolerance<T> const &tolerance)
-        {
-            T const lower = start.lower;
-            T const upper = start.upper;
-            T const f_lower = start.at_lower[0];
-            T const f_upper = start.at_upper[0];
-            if (std::optional<Root<T>> const r = detail::stop_at(lower, f_lower, upper, f_upper, tolerance)) return *r;
-            // d and e are read only once steps have set them (the first iteration uses Newton-Quadratic, without e).
-            Enclosure<T> s{ lower, f_lower, upper, f_upper, upper, f_upper, upper, f_upper };
-            std::expected<Enclosed<T>, error> r = detail::advance(
-                fn, s, [](Enclosure<T> const &e) { return detail::secant_point(e.a, e.fa, e.b, e.fb); }, false,
-                tolerance); // 4.2.1-4.2.2
-            for (bool first = true;; first = false) {
-                if (!r) return std::unexpected(r.error());
-                if (r->root) return *r->root;
-                s = r->next;
-                T const a0 = s.a;
-                T const b0 = s.b;
-                // 4.2.3-4.2.4: e := d before the bracket.
-                r = detail::advance(
-                    fn, s, [first](Enclosure<T> const &e) { return detail::interpolate(e, 2, first); }, true, tolerance);
-                if (!r) return std::unexpected(r.error());
-                if (r->root) return *r->root;
-                // 4.2.5-4.2.6.
-                r = detail::advance(
-                    fn, r->next, [](Enclosure<T> const &e) { return detail::interpolate(e, 3, false); }, false,
-                    tolerance);
-                if (!r) return std::unexpected(r.error());
-                if (r->root) return *r->root;
-                // 4.2.7-4.2.10, e := d-bar (4.1.9).
-                r = detail::advance(
-                    fn, r->next, [](Enclosure<T> const &e) { return detail::double_secant(e); }, true, tolerance);
-                if (!r) return std::unexpected(r.error());
-                if (r->root) return *r->root;
-                // 4.2.11: a bisection where the iteration has not halved the bracket, e := d-hat.
-                if (detail::distance_bound(r->next.a, r->next.b) < T(detail::distance_bound(a0, b0) / T(2))) continue;
-                r = detail::advance(
-                    fn, r->next, [](Enclosure<T> const &e) { return std::optional<T>(detail::midpoint(e.a, e.b)); },
-                    true, tolerance);
-            }
-        }
-
-        /**
-         * @brief False position on a validated bracket, the retained end's value scaled by M's factor, guarded by a
-         * bisection after three consecutive steps that have not brought the bracket below half its width at the last
-         * halving (a guard bisection counts as one); each point taken through enclose().
-         *
-         * b is the latest point and a the retained end, whose value is replaced by g_a. The point is the secant's
-         * zero through (a, g_a) and (b, f_b). Where f_c has f_b's sign, a is retained and g_a scaled by M's factor:
-         * AndersonBjorck's m = 1 - f_c / f_b, or 1/2 where m is not positive (formed only where |f_c| < |f_b|, so
-         * nothing overflows; Anderson and Bjorck 1973); Illinois' 1/2; RegulaFalsi's 1. Otherwise b becomes the
-         * retained end with its true value. c becomes b. Nothing depends on the factor being below 1: g_a keeps its
-         * sign, so the step's ratio stays in (0, 1).
-         *
-         * @tparam M AndersonBjorck, Illinois or RegulaFalsi.
-         * @param fn The function.
-         * @param start The start: a bracket in order with a sign change and no root found.
-         * @param tolerance The tolerances.
-         * @return The root, or error::non_finite if fn is not finite at a point.
-         */
-        template<typename M, real T, typename F>
-        constexpr std::expected<Root<T>, error>
-            false_position(F &fn, Start<T, 1> const &start, Tolerance<T> const &tolerance)
-        {
-            T retained = start.lower;
-            T f_retained = start.at_lower[0];
-            T scaled = f_retained;
-            T latest = start.upper;
-            T f_latest = start.at_upper[0];
-            if (std::optional<Root<T>> const r = detail::stop_at(retained, f_retained, latest, f_latest, tolerance))
-                return *r;
-            T reference = detail::distance_bound(retained, latest);
-            int unhalved = 0;
-            while (true) {
-                bool const ordered = retained < latest;
-                Enclosure<T> const s{ ordered ? retained : latest, ordered ? f_retained : f_latest,
-                    ordered ? latest : retained, ordered ? f_latest : f_retained, retained, f_retained, retained,
-                    f_retained };
-                bool const bisect = unhalved >= 3;
-                std::optional<T> proposed;
-                if (!detail::wide(s)) {
-                    if (bisect) {
-                        proposed = detail::midpoint(s.a, s.b);
-                    } else if (std::optional<T> const spread = detail::difference(f_latest, scaled)) {
-                        // f_latest and scaled have opposite signs, so 0 < r < 1.
-                        if (std::optional<T> const r = detail::quotient(f_latest, *spread))
-                            proposed = T(latest - T(*r * T(latest - retained)));
-                    }
-                }
-                std::expected<Enclosed<T>, error> const step = detail::enclose(fn, s, proposed, false, tolerance);
-                if (!step) return std::unexpected(step.error());
-                if (step->root) return *step->root;
-                if (!detail::same_sign(step->fc, f_latest)) {
-                    retained = latest;
-                    f_retained = f_latest;
-                    scaled = f_latest;
-                } else if constexpr (std::same_as<M, AndersonBjorck>) {
-                    T const m = math::abs(step->fc) < math::abs(f_latest) ? T(T(1) - T(step->fc / f_latest))
-                                                                          : T(T(1) / T(2));
-                    scaled = T(scaled * m);
-                } else if constexpr (std::same_as<M, Illinois>) {
-                    scaled = T(scaled * T(T(1) / T(2)));
-                } // RegulaFalsi: the factor 1
-                latest = step->c;
-                f_latest = step->fc;
-                T const width = detail::distance_bound(retained < latest ? retained : latest,
-                    retained < latest ? latest : retained);
-                if (bisect || width <= T(reference / T(2))) {
-                    reference = width;
-                    unhalved = 0;
-                } else {
-                    ++unhalved;
-                }
-            }
-        }
-
-        /**
          * @brief The square root of x >= 0, faithful (within one ulp), from + - * /, the same at compile time and run time.
          *
          * x is scaled into [1/radix^2, 1] by even powers of the radix, squared up so that the scaling takes a number of
@@ -1671,41 +1234,1284 @@ namespace nxx::roots {
         }
 
         /**
-         * @brief Ridders' method on a validated bracket: per iteration enclose() at the midpoint, then at Ridders' point
-         * from the state that step leaves. Each iteration halves the bracket, at most 2 evaluations.
+         * @brief The step of a bracket [a, b] in order whose point is the end with the smaller |f| (b on a tie): the
+         * report of Toms748, AndersonBjorck, RegulaFalsi, Illinois and Ridders.
+         * @param a The lower end.
+         * @param fa fn there.
+         * @param b The upper end.
+         * @param fb fn there.
+         * @return The step.
+         */
+        template<real T>
+        constexpr Step<T> bracket_step(T const &a, T const &fa, T const &b, T const &fb)
+        { return Step<T>{ a, fa, b, fb, math::abs(fa) < math::abs(fb) ? a : b }; }
+
+
+        // ---- Bisection --------------------------------------------------------------------------------------------
+
+        /**
+         * @brief Bisection's state: the bracket and fn's values at its ends.
+         * @tparam T The real type.
+         */
+        template<real T>
+        struct BisectionState
+        {
+            /** @brief The lower end. */
+            T a;
+            /** @brief fn at a. */
+            T fa;
+            /** @brief The upper end. */
+            T b;
+            /** @brief fn at b. */
+            T fb;
+            /** @brief The report: the bracket, its midpoint the point. */
+            Step<T> step;
+        };
+
+        /**
+         * @brief Bisection's report on [a, b]: the midpoint as its point.
+         * @param a The lower end.
+         * @param fa fn there.
+         * @param b The upper end.
+         * @param fb fn there.
+         * @return The step.
+         */
+        template<real T>
+        constexpr Step<T> bisection_step(T const &a, T const &fa, T const &b, T const &fb)
+        {
+            return Step<T>{ a, fa, b, fb, detail::midpoint(a, b) };
+        }
+
+        // ---- Brent's procedure zero, with Brent's, Newton's or Halley's step ---------------------------------------
+
+        /** @brief The step inside Brent's safeguard: his interpolation, or Newton's or Halley's derivative step. */
+        enum class Safeguard { interpolation, newton, halley };
+
+        /**
+         * @brief The derivative step of the safeguard G from the values at a point.
+         * @tparam G Safeguard::newton or Safeguard::halley.
+         * @param v The values at the point.
+         * @return The step, or nothing where it cannot be formed.
+         */
+        template<Safeguard G, real T, std::size_t K>
+        constexpr std::optional<T> derivative_step(std::array<T, K> const &v)
+        {
+            if constexpr (G == Safeguard::halley)
+                return detail::halley_step(v);
+            else
+                return detail::newton_step(v);
+        }
+
+        /**
+         * @brief The state of Brent's procedure zero (Brent 1973, ch. 4, section 6): [b, c] the bracket with |fn(b)| <=
+         * |fn(c)|, a the previous b, d the last step and e the one before.
+         * @tparam T The real type.
+         * @tparam K The number of values at each point.
+         */
+        template<real T, std::size_t K>
+        struct SafeguardedState
+        {
+            /** @brief The previous b. */
+            T a;
+            /** @brief fn's values at a. */
+            std::array<T, K> va;
+            /** @brief The best point. */
+            T b;
+            /** @brief fn's values at b. */
+            std::array<T, K> vb;
+            /** @brief The other end of the bracket. */
+            T c;
+            /** @brief fn's values at c. */
+            std::array<T, K> vc;
+            /** @brief The last step. */
+            T d;
+            /** @brief The step before it. */
+            T e;
+            /** @brief The report: the bracket [b, c] in order, b the point. */
+            Step<T> step;
+        };
+
+        /**
+         * @brief The top of Brent's loop, then the report: c reset to a where fn(b) and fn(c) have one sign, b and c
+         * swapped where |fn(c)| < |fn(b)|.
+         * @param s The state, its b just evaluated (fn nonzero there).
+         */
+        template<real T, std::size_t K>
+        constexpr void normalize(SafeguardedState<T, K> &s)
+        {
+            T const big = T(detail::largest<T>() / T(16));
+            if (detail::same_sign(s.vb[0], s.vc[0])) {
+                s.c = s.a;
+                s.vc = s.va;
+                s.d = detail::bounded_difference(s.b, s.a, big);
+                s.e = s.d;
+            }
+            if (math::abs(s.vc[0]) < math::abs(s.vb[0])) {
+                s.a = s.b;
+                s.b = s.c;
+                s.c = s.a;
+                s.va = s.vb;
+                s.vb = s.vc;
+                s.vc = s.va;
+            }
+            s.step = s.b < s.c ? Step<T>{ s.b, s.vb[0], s.c, s.vc[0], s.b }
+                               : Step<T>{ s.c, s.vc[0], s.b, s.vb[0], s.b };
+        }
+
+        /**
+         * @brief Brent's state on a validated bracket.
+         * @param s The bracket.
+         * @return The state, reported.
+         */
+        template<real T, std::size_t K>
+        constexpr SafeguardedState<T, K> safeguarded_start(Start<T, K> const &s)
+        {
+            T const big = T(detail::largest<T>() / T(16));
+            T const d = detail::bounded_difference(s.upper, s.lower, big);
+            SafeguardedState<T, K> state{ s.lower, s.at_lower, s.upper, s.at_upper, s.lower, s.at_lower, d, d,
+                Step<T>{ s.lower, s.at_lower[0], s.upper, s.at_upper[0], s.upper } };
+            detail::normalize(state);
+            return state;
+        }
+
+        /**
+         * @brief One iteration of Brent's procedure zero from the step's choice to the next point's evaluation, with
+         * the step chosen by G (detail::brent of Phase 1 to 6, its stop test moved to solve()).
+         *
+         * Implemented from the book, with three changes: the tolerance is the caller's tol(b) rather than
+         * 2 macheps |b| + t; the stop test (in solve()) is distance_bound(c, b) <= 2 tol(b) rather than |c - b| / 2 <=
+         * tol(b); and a step is a bisection step whenever |c - b|, |b - a| or |e| exceeds max / 16, so that no product
+         * of the interpolation overflows. A derivative step is accepted by Brent's test written for a step s: towards c,
+         * |s| < 3 |m| / 2 - tol / 2, and |s| < |e| / 2; one that cannot be formed is a bisection step.
+         *
+         * @tparam G The step.
          * @param fn The function.
-         * @param start The start: a bracket in order with a sign change and no root found.
+         * @param s The state, normalized and not yet meeting the stop test.
          * @param tolerance The tolerances.
-         * @return The root, or error::non_finite if fn is not finite at a point.
+         * @return Nothing, or error::non_finite if fn is not finite at the new point.
+         */
+        template<Safeguard G, std::size_t K, real T, typename F>
+        constexpr std::expected<void, error>
+            safeguarded_advance(F &fn, SafeguardedState<T, K> &s, Tolerance<T> const &tolerance)
+        {
+            T const big = T(detail::largest<T>() / T(16));
+            T const fa = s.va[0];
+            T const fb = s.vb[0];
+            T const fc = s.vc[0];
+            T const tol = tolerance.at(s.b);
+            T const width = detail::distance_bound(s.c, s.b);
+            bool const wide = width > big || detail::distance_bound(s.b, s.a) > big || math::abs(s.e) > big;
+            // Half the bracket, towards c: exact Brent below big, the overflow-free midpoint above it.
+            T const m = wide ? T(detail::midpoint(s.b, s.c) - s.b) : T(T(s.c - s.b) / T(2));
+            if (wide || math::abs(s.e) < tol || math::abs(fa) <= math::abs(fb)) {
+                s.d = m;
+                s.e = m;
+            } else if constexpr (G == Safeguard::interpolation) {
+                T const ratio = T(fb / fa);
+                T p = T(0);
+                T q = T(0);
+                if (s.a == s.c) {
+                    // Linear interpolation (the secant).
+                    p = T(T(2) * m * ratio);
+                    q = T(T(1) - ratio);
+                } else {
+                    // Inverse quadratic interpolation.
+                    T const qa = T(fa / fc);
+                    T const r = T(fb / fc);
+                    p = T(ratio * T(T(T(2) * m * qa * T(qa - r)) - T(T(s.b - s.a) * T(r - T(1)))));
+                    q = T(T(qa - T(1)) * T(r - T(1)) * T(ratio - T(1)));
+                }
+                if (p > T(0))
+                    q = T(-q);
+                else
+                    p = T(-p);
+                T const before_last = s.e; // Brent's s := e
+                s.e = s.d;
+                // Accept the interpolated point only if it falls well inside the bracket and the steps shrink. A NaN
+                // or q = 0 fails both tests, and falls back on bisection.
+                if (T(T(2) * p) < T(T(T(3) * m * q) - math::abs(T(tol * q))) && p < math::abs(T(before_last * q / T(2)))) {
+                    s.d = T(p / q);
+                } else {
+                    s.d = m;
+                    s.e = m;
+                }
+            } else {
+                std::optional<T> const step = detail::derivative_step<G>(s.vb);
+                T const before_last = s.e;
+                s.e = s.d;
+                // Brent's acceptance for a step: towards c, well inside the bracket (so that b + step cannot round
+                // onto c), and shorter than half the step before last.
+                T const inside = T(T(T(3) * math::abs(m)) / T(2) - T(tol / T(2)));
+                if (step && (*step > T(0)) == (m > T(0)) && math::abs(*step) < inside
+                    && math::abs(*step) < T(math::abs(before_last) / T(2))) {
+                    s.d = *step;
+                } else {
+                    s.d = m;
+                    s.e = m;
+                }
+            }
+            T next = s.b;
+            if (math::abs(s.d) > tol)
+                next = T(s.b + s.d);
+            else if (s.b < s.c) // towards c; m > 0 says the same wherever m is not 0, and m flushes to 0 in a type
+                                // without subnormals where c - b is below 2 min (numerics review of draft 1, finding 1)
+                next = T(s.b + tol);
+            else
+                next = T(s.b - tol);
+            // A point not strictly inside the bracket: no step can make progress. Not reached by the library's
+            // arithmetic where the stop test failed (PHASE7_API.md B); not_converged rather than a root outside the bound.
+            if (!((s.b < next && next < s.c) || (s.c < next && next < s.b))) return std::unexpected(error::not_converged);
+            s.a = s.b;
+            s.va = s.vb;
+            s.b = next;
+            s.vb = detail::evaluate<K>(fn, s.b);
+            if (!math::isfinite(s.vb[0])) return std::unexpected(error::non_finite);
+            if (s.vb[0] == T(0)) {
+                s.step = s.b < s.c ? Step<T>{ s.b, s.vb[0], s.c, s.vc[0], s.b }
+                                   : Step<T>{ s.c, s.vc[0], s.b, s.vb[0], s.b };
+                return {};
+            }
+            detail::normalize(s);
+            return {};
+        }
+
+        // ---- The bracket subroutine of Toms748, AndersonBjorck and Ridders -----------------------------------------
+
+        /**
+         * @brief One step of the paper's bracket subroutine, without its stop test (solve()'s): the new state, the
+         * point evaluated, and whether fn is exactly 0 there or no point was strictly inside.
+         * @tparam T The real type.
+         */
+        template<real T>
+        struct Narrowed
+        {
+            /** @brief The state after the step. */
+            Enclosure<T> next;
+            /** @brief The point evaluated. */
+            T c;
+            /** @brief fn at c. */
+            T fc;
+            /** @brief fn is exactly 0 at c. */
+            bool zero;
+            /** @brief No point strictly inside (not reached: the stop test meets such a bracket first). */
+            bool stuck;
+        };
+
+        /**
+         * @brief One step of Toms748, AndersonBjorck, the false-position methods and Ridders, the paper's bracket
+         * subroutine: the point (the midpoint while the bracket is wide, else the proposed point placed as place()
+         * says), e := d where asked, evaluate fn, keep the half with the sign change and record the dropped end as d.
+         * @param fn The function.
+         * @param s The state.
+         * @param proposed The method's point, computed only where the bracket is not wide; or nothing.
+         * @param shift Whether e takes d's value before d changes.
+         * @param tolerance The tolerances.
+         * @return The step, or error::non_finite if fn is not finite at the point.
          */
         template<real T, typename F>
-        constexpr std::expected<Root<T>, error> ridders(F &fn, Start<T, 1> const &start, Tolerance<T> const &tolerance)
+        constexpr std::expected<Narrowed<T>, error> narrow(F &fn,
+            Enclosure<T> const &s,
+            std::optional<T> const &proposed,
+            bool shift,
+            Tolerance<T> const &tolerance)
         {
-            T const lower = start.lower;
-            T const upper = start.upper;
-            T const f_lower = start.at_lower[0];
-            T const f_upper = start.at_upper[0];
-            if (std::optional<Root<T>> const r = detail::stop_at(lower, f_lower, upper, f_upper, tolerance)) return *r;
-            Enclosure<T> s{ lower, f_lower, upper, f_upper, upper, f_upper, upper, f_upper };
+            T const c = detail::wide(s) ? detail::midpoint(s.a, s.b) : detail::place(s, proposed, tolerance);
+            // Not reached: a midpoint not strictly inside means adjacent ends, which met the stop test before (midpoint()
+            // falls back on (a + b) / 2 where a + (b - a) / 2 flushes, numerics review of draft 1, finding 1).
+            assert(s.a < c && c < s.b);
+            if (!(s.a < c && c < s.b)) return Narrowed<T>{ s, c, s.fa, false, true };
+            Enclosure<T> next = s;
+            if (shift) {
+                next.e = s.d;
+                next.fe = s.fd;
+            }
+            T const fc = detail::evaluate<1>(fn, c)[0];
+            if (!math::isfinite(fc)) return std::unexpected(error::non_finite);
+            if (fc == T(0)) return Narrowed<T>{ next, c, fc, true, false };
+            if (detail::same_sign(s.fa, fc)) {
+                next.d = s.a;
+                next.fd = s.fa;
+                next.a = c;
+                next.fa = fc;
+            } else {
+                next.d = s.b;
+                next.fd = s.fb;
+                next.b = c;
+                next.fb = fc;
+            }
+            return Narrowed<T>{ next, c, fc, false, false };
+        }
+
+        /**
+         * @brief The report after a step of narrow() that found a point inside: the new bracket, or [a, c] with c the
+         * point where fn is 0 there.
+         * @param before The state before the step.
+         * @param r The step.
+         * @return The step.
+         */
+        template<real T>
+        constexpr Step<T> narrowed_step(Enclosure<T> const &before, Narrowed<T> const &r)
+        {
+            if (r.zero) return Step<T>{ before.a, before.fa, r.c, r.fc, r.c };
+            return detail::bracket_step(r.next.a, r.next.fa, r.next.b, r.next.fb);
+        }
+
+        /**
+         * @brief Toms748's state: the bracket subroutine's state, where Algorithm 4.2 stands (stage 0 the first
+         * secant step; 1 and 2 the interpolation steps; 3 the double-length secant step; 4 the bisection step), and
+         * the bracket at the start of the iteration.
+         * @tparam T The real type.
+         */
+        template<real T>
+        struct Toms748State
+        {
+            /** @brief The bracket and the dropped ends. */
+            Enclosure<T> s;
+            /** @brief The lower end at the start of the iteration. */
+            T a0;
+            /** @brief The upper end at the start of the iteration. */
+            T b0;
+            /** @brief The next step of the algorithm. */
+            int stage;
+            /** @brief The first iteration, which uses Newton-Quadratic without e. */
+            bool first;
+            /** @brief The report. */
+            Step<T> step;
+        };
+
+        /**
+         * @brief One step of Alefeld, Potra and Shi's Algorithm 4.2 (1995, pp. 334-335): one evaluation, through
+         * narrow(). Stage 0: a secant step (4.2.1-4.2.2); per iteration, two interpolation steps (inverse cubic, or
+         * Newton-Quadratic with 2 and then 3 Newton steps; 4.2.3-4.2.6), a double-length secant step (4.2.7-4.2.10)
+         * and a bisection step where the iteration has not brought the bracket below half its width at its start
+         * (4.2.11).
+         * @param fn The function.
+         * @param st The state.
+         * @param tolerance The tolerances.
+         * @return Nothing, or error::non_finite.
+         */
+        template<real T, typename F>
+        constexpr std::expected<void, error> toms748_advance(F &fn, Toms748State<T> &st, Tolerance<T> const &tolerance)
+        {
+            Enclosure<T> const before = st.s;
+            bool const w = detail::wide(before);
+            std::optional<T> proposed;
+            bool shift = false;
+            switch (st.stage) {
+            case 0:
+                if (!w) proposed = detail::secant_point(before.a, before.fa, before.b, before.fb);
+                break;
+            case 1: // e := d before the bracket
+                if (!w) proposed = detail::interpolate(before, 2, st.first);
+                shift = true;
+                break;
+            case 2:
+                if (!w) proposed = detail::interpolate(before, 3, false);
+                break;
+            case 3: // e := d-bar (4.1.9)
+                if (!w) proposed = detail::double_secant(before);
+                shift = true;
+                break;
+            default: // e := d-hat
+                if (!w) proposed = detail::midpoint(before.a, before.b);
+                shift = true;
+                break;
+            }
+            std::expected<Narrowed<T>, error> const r = detail::narrow(fn, before, proposed, shift, tolerance);
+            if (!r) return std::unexpected(r.error());
+            if (r->stuck) return std::unexpected(error::not_converged);
+            st.step = detail::narrowed_step(before, *r);
+            if (r->zero) return {};
+            st.s = r->next;
+            switch (st.stage) {
+            case 0:
+                st.stage = 1;
+                st.a0 = st.s.a;
+                st.b0 = st.s.b;
+                break;
+            case 1:
+                st.stage = 2;
+                break;
+            case 2:
+                st.stage = 3;
+                break;
+            case 3:
+                if (detail::distance_bound(st.s.a, st.s.b) < T(detail::distance_bound(st.a0, st.b0) / T(2))) {
+                    st.first = false;
+                    st.a0 = st.s.a;
+                    st.b0 = st.s.b;
+                    st.stage = 1;
+                } else {
+                    st.stage = 4;
+                }
+                break;
+            default:
+                st.first = false;
+                st.a0 = st.s.a;
+                st.b0 = st.s.b;
+                st.stage = 1;
+                break;
+            }
+            return {};
+        }
+
+        // ---- False position --------------------------------------------------------------------------------------
+
+        /** @brief The factor by which false position scales the retained end's value when it is retained again. */
+        enum class Scaling { none, illinois, anderson_bjorck };
+
+        /**
+         * @brief False position's state: b the latest point, a the retained end, whose value is replaced by g_a.
+         * @tparam T The real type.
+         */
+        template<real T>
+        struct FalsePositionState
+        {
+            /** @brief The retained end. */
+            T retained;
+            /** @brief fn there. */
+            T f_retained;
+            /** @brief Its scaled value, g_a. */
+            T scaled;
+            /** @brief The latest point. */
+            T latest;
+            /** @brief fn there. */
+            T f_latest;
+            /** @brief The bracket's width at the last halving. */
+            T reference;
+            /** @brief Steps since then. */
+            int unhalved;
+            /** @brief The report. */
+            Step<T> step;
+        };
+
+        /**
+         * @brief One step of false position, the retained end's value scaled by S's factor, guarded by a bisection
+         * after three consecutive steps that have not brought the bracket below half its width at the last halving (a
+         * guard bisection counts as one); the point taken through narrow().
+         *
+         * The point is the secant's zero through (a, g_a) and (b, f_b). Where f_c has f_b's sign, a is retained and g_a
+         * scaled: AndersonBjorck's m = 1 - f_c / f_b, or 1/2 where m is not positive (formed only where |f_c| < |f_b|;
+         * Anderson and Bjorck 1973); Illinois' 1/2; RegulaFalsi's 1. Otherwise b becomes the retained end with its true
+         * value. c becomes b.
+         *
+         * @tparam S The scaling.
+         * @param fn The function.
+         * @param st The state.
+         * @param tolerance The tolerances.
+         * @return Nothing, or error::non_finite.
+         */
+        template<Scaling S, real T, typename F>
+        constexpr std::expected<void, error>
+            false_position_advance(F &fn, FalsePositionState<T> &st, Tolerance<T> const &tolerance)
+        {
+            bool const ordered = st.retained < st.latest;
+            Enclosure<T> const s{ ordered ? st.retained : st.latest, ordered ? st.f_retained : st.f_latest,
+                ordered ? st.latest : st.retained, ordered ? st.f_latest : st.f_retained, st.retained, st.f_retained,
+                st.retained, st.f_retained };
+            bool const bisect = st.unhalved >= 3;
+            std::optional<T> proposed;
+            if (!detail::wide(s)) {
+                if (bisect) {
+                    proposed = detail::midpoint(s.a, s.b);
+                } else if (std::optional<T> const spread = detail::difference(st.f_latest, st.scaled)) {
+                    // f_latest and scaled have opposite signs, so 0 < r < 1.
+                    if (std::optional<T> const r = detail::quotient(st.f_latest, *spread))
+                        proposed = T(st.latest - T(*r * T(st.latest - st.retained)));
+                }
+            }
+            std::expected<Narrowed<T>, error> const r = detail::narrow(fn, s, proposed, false, tolerance);
+            if (!r) return std::unexpected(r.error());
+            if (r->stuck) return std::unexpected(error::not_converged);
+            st.step = detail::narrowed_step(s, *r);
+            if (r->zero) return {};
+            if (!detail::same_sign(r->fc, st.f_latest)) {
+                st.retained = st.latest;
+                st.f_retained = st.f_latest;
+                st.scaled = st.f_latest;
+            } else if constexpr (S == Scaling::anderson_bjorck) {
+                T const m = math::abs(r->fc) < math::abs(st.f_latest) ? T(T(1) - T(r->fc / st.f_latest))
+                                                                        : T(T(1) / T(2));
+                st.scaled = T(st.scaled * m);
+            } else if constexpr (S == Scaling::illinois) {
+                st.scaled = T(st.scaled * T(T(1) / T(2)));
+            } // RegulaFalsi: the factor 1
+            st.latest = r->c;
+            st.f_latest = r->fc;
+            T const width = detail::distance_bound(st.retained < st.latest ? st.retained : st.latest,
+                st.retained < st.latest ? st.latest : st.retained);
+            if (bisect || width <= T(st.reference / T(2))) {
+                st.reference = width;
+                st.unhalved = 0;
+            } else {
+                ++st.unhalved;
+            }
+            return {};
+        }
+
+        // ---- Ridders ---------------------------------------------------------------------------------------------
+
+        /**
+         * @brief Ridders' state: the bracket subroutine's state, and the midpoint just evaluated where the fit's point
+         * comes next.
+         * @tparam T The real type.
+         */
+        template<real T>
+        struct RiddersState
+        {
+            /** @brief The bracket. */
+            Enclosure<T> s;
+            /** @brief The midpoint evaluated by the last step (stage 1). */
+            T m;
+            /** @brief fn there. */
+            T fm;
+            /** @brief 0: the midpoint next; 1: the fit's point next. */
+            int stage;
+            /** @brief The report. */
+            Step<T> step;
+        };
+
+        /**
+         * @brief One step of Ridders' method: alternately narrow() at the midpoint, and at Ridders' point from the
+         * state that step left. Each pair halves the bracket.
+         * @param fn The function.
+         * @param st The state.
+         * @param tolerance The tolerances.
+         * @return Nothing, or error::non_finite.
+         */
+        template<real T, typename F>
+        constexpr std::expected<void, error> ridders_advance(F &fn, RiddersState<T> &st, Tolerance<T> const &tolerance)
+        {
+            Enclosure<T> const before = st.s;
+            std::optional<T> proposed;
+            if (st.stage == 1 && !detail::wide(before)) proposed = detail::ridders_point(before, st.m, st.fm);
+            std::expected<Narrowed<T>, error> const r = detail::narrow(fn, before, proposed, false, tolerance);
+            if (!r) return std::unexpected(r.error());
+            if (r->stuck) return std::unexpected(error::not_converged);
+            st.step = detail::narrowed_step(before, *r);
+            if (r->zero) return {};
+            st.s = r->next;
+            if (st.stage == 0) {
+                st.m = r->c;
+                st.fm = r->fc;
+                st.stage = 1;
+            } else {
+                st.stage = 0;
+            }
+            return {};
+        }
+
+    } // namespace detail
+    /** @endcond */
+
+    /**
+     * @brief Bisection: halves the bracket at every step, one bit per evaluation of fn, guaranteed.
+     *
+     * About log2(width / (2 tol)) evaluations, 52 for [1, 2] in double, whatever fn is. Its point is the midpoint of
+     * the bracket.
+     */
+    struct Bisection
+    {
+        /**
+         * @brief The state on a validated bracket, reporting it with its midpoint.
+         * @tparam T The real type.
+         * @tparam F fn's type.
+         * @param s The bracket.
+         * @return The state.
+         */
+        template<real T, typename F>
+        constexpr std::expected<detail::BisectionState<T>, error> start(F &, Start<T> const &s, Tolerance<T> const &) const
+        {
+            T const fa = s.at_lower[0];
+            T const fb = s.at_upper[0];
+            return detail::BisectionState<T>{ s.lower, fa, s.upper, fb,
+                detail::bisection_step(s.lower, fa, s.upper, fb) };
+        }
+
+        /**
+         * @brief One halving: fn at the midpoint, and the half with the sign change kept.
+         * @tparam T The real type.
+         * @tparam F fn's type.
+         * @param fn The function.
+         * @param s The state.
+         * @return Nothing, or error::non_finite where fn is not finite at the midpoint.
+         */
+        template<real T, typename F>
+        constexpr std::expected<void, error> advance(F &fn, detail::BisectionState<T> &s, Tolerance<T> const &) const
+        {
+            T const m = s.step.point;
+            // Not reached where the stop test failed: the midpoint is then strictly inside (PHASE7_API.md B).
+            if (!(s.a < m && m < s.b)) return std::unexpected(error::not_converged);
+            T const fm = detail::evaluate<1>(fn, m)[0];
+            if (!math::isfinite(fm)) return std::unexpected(error::non_finite);
+            if (fm == T(0)) {
+                s.step = Step<T>{ s.a, s.fa, m, fm, m };
+                return {};
+            }
+            if (detail::same_sign(fm, s.fa)) {
+                s.a = m;
+                s.fa = fm;
+            } else {
+                s.b = m;
+                s.fb = fm;
+            }
+            s.step = detail::bisection_step(s.a, s.fa, s.b, s.fb);
+            return {};
+        }
+    };
+
+    /**
+     * @brief Brent's method: inverse quadratic and linear interpolation, safeguarded by bisection (Brent 1973).
+     *
+     * Superlinear on a smooth fn with a simple root, typically 8 to 12 evaluations in double, and never much slower
+     * than Bisection: at most (k + 1)^2 - 2 evaluations, k being Bisection's count. Slower on a multiple root
+     * ((x - 1)^3: 156 evaluations, against Bisection's 54). Its point is b, the end with the smaller |f|.
+     */
+    struct Brent
+    {
+        /**
+         * @brief The state on a validated bracket: Brent's a, b, c, d and e.
+         * @tparam T The real type.
+         * @tparam F fn's type.
+         * @param s The bracket.
+         * @return The state.
+         */
+        template<real T, typename F>
+        constexpr std::expected<detail::SafeguardedState<T, 1>, error>
+            start(F &, Start<T> const &s, Tolerance<T> const &) const
+        { return detail::safeguarded_start(s); }
+
+        /**
+         * @brief One iteration of Brent's procedure zero: an interpolated or bisection point, at least tol(b) from b,
+         * evaluated.
+         * @tparam T The real type.
+         * @tparam F fn's type.
+         * @param fn The function.
+         * @param s The state.
+         * @param t The tolerances.
+         * @return Nothing, error::non_finite where fn is not finite at the point, or error::not_converged where no
+         *         point lies strictly inside (not reached in the arithmetic solve() assumes).
+         */
+        template<real T, typename F>
+        constexpr std::expected<void, error>
+            advance(F &fn, detail::SafeguardedState<T, 1> &s, Tolerance<T> const &t) const
+        { return detail::safeguarded_advance<detail::Safeguard::interpolation>(fn, s, t); }
+    };
+
+    /**
+     * @brief Alefeld, Potra and Shi's Algorithm 748 (1995, Algorithm 4.2): inverse cubic interpolation with quadratic
+     * and secant fallbacks, a double-length secant step, and a bisection whenever an iteration has not halved the
+     * bracket. A bracket only; no derivative form.
+     *
+     * Costs about what Brent costs on smooth fn (the paper reports 4% fewer evaluations; on 27 of its test cases at
+     * full precision Brent took 309, Toms748 325), with a better worst case: at most about 4 evaluations per halving
+     * of the bracket, where Brent's bound is quadratic in the number of halvings. Like every bracketing method it
+     * returns a point and a bound, not the final bracket (Boost.Math's toms748_solve returns the bracket). Its point is
+     * the end with the smaller |f|; each step is one evaluation, so an iteration of the algorithm is up to four steps.
+     */
+    struct Toms748
+    {
+        /**
+         * @brief The state on a validated bracket, before the algorithm's first secant step.
+         * @tparam T The real type.
+         * @tparam F fn's type.
+         * @param s The bracket.
+         * @return The state.
+         */
+        template<real T, typename F>
+        constexpr std::expected<detail::Toms748State<T>, error> start(F &, Start<T> const &s, Tolerance<T> const &) const
+        {
+            T const fa = s.at_lower[0];
+            T const fb = s.at_upper[0];
+            // d and e are read only once steps have set them (the first iteration uses Newton-Quadratic, without e).
+            return detail::Toms748State<T>{ detail::Enclosure<T>{ s.lower, fa, s.upper, fb, s.upper, fb, s.upper, fb },
+                s.lower, s.upper, 0, true, detail::bracket_step(s.lower, fa, s.upper, fb) };
+        }
+
+        /**
+         * @brief One evaluation: the algorithm's next secant, interpolation, double-length secant or bisection point.
+         * @tparam T The real type.
+         * @tparam F fn's type.
+         * @param fn The function.
+         * @param s The state.
+         * @param t The tolerances.
+         * @return Nothing, error::non_finite where fn is not finite at the point, or error::not_converged where no
+         *         point lies strictly inside (not reached in the arithmetic solve() assumes).
+         */
+        template<real T, typename F>
+        constexpr std::expected<void, error> advance(F &fn, detail::Toms748State<T> &s, Tolerance<T> const &t) const
+        { return detail::toms748_advance(fn, s, t); }
+    };
+
+    /** @cond INTERNAL */
+    namespace detail {
+
+        /**
+         * @brief False position with a scaling of the retained end's value, so that AndersonBjorck, Illinois and
+         * RegulaFalsi share one implementation and differ only in the factor.
+         * @tparam S The scaling.
+         */
+        template<Scaling S>
+        struct FalsePositionMethod
+        {
+            /**
+             * @brief The state on a validated bracket: the lower end retained, the upper the latest point.
+             * @tparam T The real type.
+             * @tparam F fn's type.
+             * @param s The bracket.
+             * @return The state.
+             */
+            template<real T, typename F>
+            constexpr std::expected<FalsePositionState<T>, error> start(F &, Start<T> const &s, Tolerance<T> const &) const
+            {
+                T const fa = s.at_lower[0];
+                T const fb = s.at_upper[0];
+                return FalsePositionState<T>{ s.lower, fa, fa, s.upper, fb, detail::distance_bound(s.lower, s.upper), 0,
+                    detail::bracket_step(s.lower, fa, s.upper, fb) };
+            }
+
+            /**
+             * @brief One evaluation: the secant's zero through the latest point and the retained end's scaled value,
+             * or a guard bisection.
+             * @tparam T The real type.
+             * @tparam F fn's type.
+             * @param fn The function.
+             * @param s The state.
+             * @param t The tolerances.
+             * @return Nothing, error::non_finite where fn is not finite at the point, or error::not_converged where no
+             *         point lies strictly inside (not reached in the arithmetic solve() assumes).
+             */
+            template<real T, typename F>
+            constexpr std::expected<void, error> advance(F &fn, FalsePositionState<T> &s, Tolerance<T> const &t) const
+            { return detail::false_position_advance<S>(fn, s, t); }
+        };
+
+        /**
+         * @brief A method with a derivative step (Newton's or Halley's) inside Brent's safeguard on a bracket, so that
+         * Newton and Halley share Brent's bookkeeping and differ only in the step.
+         * @tparam G The step.
+         * @tparam K The values it needs: the value and K - 1 derivatives.
+         */
+        template<Safeguard G, std::size_t K>
+        struct DerivativeMethod
+        {
+            /** @brief fn's values the method needs: the value and K - 1 derivatives (values_of). */
+            static constexpr std::size_t values = K;
+
+            /**
+             * @brief The state on a validated bracket: Brent's a, b, c, d and e, with K values at each point.
+             * @tparam T The real type.
+             * @tparam F fn's type.
+             * @param s The bracket.
+             * @return The state.
+             */
+            template<real T, typename F>
+            constexpr std::expected<SafeguardedState<T, K>, error>
+                start(F &, Start<T, K> const &s, Tolerance<T> const &) const
+            { return detail::safeguarded_start(s); }
+
+            /**
+             * @brief One iteration of Brent's procedure with the derivative step from b, where Brent's test accepts
+             * it, else a bisection step.
+             * @tparam T The real type.
+             * @tparam F fn's type.
+             * @param fn The function.
+             * @param s The state.
+             * @param t The tolerances.
+             * @return Nothing, error::non_finite where fn is not finite at the point, or error::not_converged where no
+             *         point lies strictly inside (not reached in the arithmetic solve() assumes).
+             */
+            template<real T, typename F>
+            constexpr std::expected<void, error> advance(F &fn, SafeguardedState<T, K> &s, Tolerance<T> const &t) const
+            { return detail::safeguarded_advance<G>(fn, s, t); }
+        };
+
+    } // namespace detail
+    /** @endcond */
+
+    /**
+     * @brief Regula falsi with Anderson and Bjorck's rescaling (1973): the secant through the latest point and the
+     * retained end, whose value is scaled down by 1 - f(c) / f(b) (or 1/2) whenever the same end is retained again. A
+     * bracket only.
+     *
+     * Guarded by a bisection after three steps that have not halved the bracket, so at most about 4 evaluations per
+     * halving (the published method took 65 million evaluations on x^20 - 1 over [0, 5]; guarded, 30). Far cheaper than
+     * Brent where fn is strongly curved near one end of the bracket (ln(x / 1e-12) on [1e-20, 1]: 18 evaluations against
+     * 45) and on a walk to a sign change at 0; dearer on high powers and very wide brackets. Its point is the end with
+     * the smaller |f|; each step is one evaluation.
+     */
+    struct AndersonBjorck : detail::FalsePositionMethod<detail::Scaling::anderson_bjorck>
+    {
+    };
+
+    /**
+     * @brief Ridders' method (1979): the midpoint, then the zero of an exponential fit through the three values. A
+     * bracket. Not nxx::deriv::Ridders, the derivative method of the same author.
+     *
+     * Each iteration halves the bracket at a cost of 2 evaluations (so at most twice Bisection's count) and converges
+     * quadratically per iteration on a simple root. A teaching example; of the interpolating methods the cheapest on
+     * roots of odd multiplicity ((x - 1)^3: 86 evaluations against Brent's 156, though Bisection takes 54), dearer than
+     * Brent otherwise (416 against 309 on 27 of Alefeld, Potra and Shi's test cases). The fit's zero is formed without
+     * the cancellation of the textbook formula, which loses roots near an end of the bracket. Its point is the end with
+     * the smaller |f|; each step is one evaluation, the midpoint or the fit's zero.
+     */
+    struct Ridders
+    {
+        /**
+         * @brief The state on a validated bracket, the midpoint next.
+         * @tparam T The real type.
+         * @tparam F fn's type.
+         * @param s The bracket.
+         * @return The state.
+         */
+        template<real T, typename F>
+        constexpr std::expected<detail::RiddersState<T>, error> start(F &, Start<T> const &s, Tolerance<T> const &) const
+        {
+            T const fa = s.at_lower[0];
+            T const fb = s.at_upper[0];
+            return detail::RiddersState<T>{ detail::Enclosure<T>{ s.lower, fa, s.upper, fb, s.upper, fb, s.upper, fb },
+                s.lower, fa, 0, detail::bracket_step(s.lower, fa, s.upper, fb) };
+        }
+
+        /**
+         * @brief One evaluation: the midpoint, or the zero of the fit through the bracket's ends and the midpoint.
+         * @tparam T The real type.
+         * @tparam F fn's type.
+         * @param fn The function.
+         * @param s The state.
+         * @param t The tolerances.
+         * @return Nothing, error::non_finite where fn is not finite at the point, or error::not_converged where no
+         *         point lies strictly inside (not reached in the arithmetic solve() assumes).
+         */
+        template<real T, typename F>
+        constexpr std::expected<void, error> advance(F &fn, detail::RiddersState<T> &s, Tolerance<T> const &t) const
+        { return detail::ridders_advance(fn, s, t); }
+    };
+
+    /**
+     * @brief False position: the zero of the secant through the bracket's ends, guarded. A bracket.
+     *
+     * A teaching example. As published, one end of the bracket stalls while the other converges: x^20 - 1 over [0, 5]
+     * took over 200,000 evaluations. Guarded here, as AndersonBjorck, by a bisection after three steps that have not
+     * halved the bracket (45 evaluations there), so the stall shows only in its counts: 645 on 27 of Alefeld, Potra and
+     * Shi's test cases, against Illinois' 382 and AndersonBjorck's 327.
+     */
+    struct RegulaFalsi : detail::FalsePositionMethod<detail::Scaling::none>
+    {
+    };
+
+    /**
+     * @brief The Illinois method (Dowell and Jarratt 1971): false position with the retained end's value halved
+     * whenever that end is retained again, the simplest cure for its stall; guarded, as AndersonBjorck. A bracket.
+     */
+    struct Illinois : detail::FalsePositionMethod<detail::Scaling::illinois>
+    {
+    };
+
+    /**
+     * @brief Newton's method: the step -f / f'. Needs fn and f' (values = 2).
+     *
+     * On a bracket it is Brent's method with Newton's step in place of the interpolation, safeguarded the same way:
+     * x^2 - 2 on [1, 2] in 8 evaluations. From a guess it iterates until a sign change appears between two iterates,
+     * then continues on that bracket; every result is then a verified sign change, at about one evaluation more than
+     * the textbook stop (7 from 1 for x^2 - 2). From a guess it returns a root, the first sign change its iterates
+     * cross, not necessarily the one nearest the guess, and error::not_converged where it finds none (a cycle, a
+     * divergence, f' = 0). Its iteration cap is 4 times the bits of T (212 in double): beyond it lie a multiple root
+     * at 0 with the default abs_tol (x^3 from 1 shrinks by 2/3 per step until x^3 underflows), a guess very far from
+     * the root, and roots of multiplicity above about 5; a bracket, or abs_tol, solves them.
+     */
+    struct Newton : detail::DerivativeMethod<detail::Safeguard::newton, 2>
+    {
+    };
+
+    /**
+     * @brief Halley's method: the step -t / (1 - t f'' / (2 f')) with t = f / f'. Needs fn, f' and f'' (values = 3).
+     *
+     * Cubic near a simple root: x^2 - 2 from 1 in 5 evaluations. Where its correction cannot be formed or would point
+     * against Newton's step (far from a root), it takes Newton's step, as Boost.Math's Halley does. On a bracket and
+     * from a guess as Newton.
+     */
+    struct Halley : detail::DerivativeMethod<detail::Safeguard::halley, 3>
+    {
+    };
+
+    /**
+     * @brief The secant method: the step through the latest two iterates. Needs fn only; from a guess.
+     *
+     * Its second point is x0 (1 + eps^(1/4)) (eps^(1/4) itself at x0 = 0). At the first sign change it continues as
+     * Brent's method on that bracket, so its results are verified sign changes, as Newton's are: x^2 - 2 from 1 in 9
+     * evaluations. Superlinear (order 1.62) on a simple root.
+     */
+    struct Secant
+    {
+    };
+
+    /**
+     * @brief Steffensen's method: Newton's with the slope (f(z) - f(x)) / f(x) at z = x + f(x). Needs fn only; from a
+     * guess, 2 evaluations per iteration, at the first sign change continuing as Brent's method, as Secant.
+     *
+     * A teaching example: quadratic without a derivative, at the price of scale dependence. f(x) is added to x, so fn's
+     * scale sets the cost and even which root is found: 1000 (x^2 - 2) from 1 returns -sqrt 2 after 27 evaluations,
+     * where x^2 - 2 returns sqrt 2 after 10 (z = 1 - 1000 brackets the other root). From a far guess it is slow (x^2 - 2
+     * from 10: 39 evaluations, Secant 13). Prefer Secant.
+     */
+    struct Steffensen
+    {
+    };
+
+    /** @cond INTERNAL */
+    namespace detail {
+
+        /**
+         * @brief The type of fn the concepts assume by default, so that a method can be checked without a particular
+         * fn: a plain function of T returning the values a method needs (T, or a std::array of K values of T).
+         * @tparam T The real type.
+         * @tparam K The number of values.
+         */
+        template<typename T, std::size_t K>
+        using archetype = std::conditional_t<K == 1, T (*)(T const &), std::array<T, K> (*)(T const &)>;
+
+        /**
+         * @brief What a method's start returns for fn of type F from a start X, from which the state alias takes the
+         * state.
+         * @tparam M The method.
+         * @tparam T The real type.
+         * @tparam F fn's type.
+         * @tparam X The start: a Start.
+         */
+        template<typename M, typename T, typename F, typename X>
+        using start_result = decltype(std::declval<M const &>().start(
+            std::declval<F &>(), std::declval<X const &>(), std::declval<Tolerance<T> const &>()));
+
+        /**
+         * @brief Whether R is std::expected<S, error> for a state S that is not a reference.
+         * @tparam R The type.
+         */
+        template<typename R>
+        inline constexpr bool is_state_result = false;
+
+        /**
+         * @brief It is, for a state that is not a reference.
+         * @tparam S The state.
+         */
+        template<typename S>
+        inline constexpr bool is_state_result<std::expected<S, error>> = !std::is_reference_v<S>;
+
+        /**
+         * @brief A start's result: std::expected<S, error>, so that the concepts can require that shape without
+         * naming the method's state type.
+         * @tparam R The type.
+         */
+        template<typename R>
+        concept state_result = is_state_result<R>;
+
+    } // namespace detail
+    /** @endcond */
+
+    /**
+     * @brief The state type of a bracketing method M for fn of type F, for a method of one's own that holds a
+     * library method's state in its own: what `m.start(fn, start, tolerance)` returns inside its std::expected.
+     * @tparam M The method.
+     * @tparam T The real type.
+     * @tparam F fn's type, reference removed; by default a plain function of T returning values_of<M> values.
+     */
+    template<typename M, typename T, typename F = detail::archetype<T, values_of<M>>>
+    using bracketing_state_t = typename detail::start_result<M, T, F, Start<T, values_of<M>>>::value_type;
+
+    /**
+     * @brief What a type must provide to work with solve() on a bracket, one step at a time: the method computes and
+     * reports, solve() checks each report and decides when to stop.
+     *
+     * The nine bracketing methods of the library are bracketing methods; a user's type can be another, given as a
+     * type, `solve<M>(fn, bracket)`, or as a value, `solve(m, fn, bracket)`. Two const members, each returning a
+     * std::expected with error:
+     * - `m.start(fn, start, tolerance)` returns a state S of the method's own type, whose member `step` is the Step<T>
+     *   after the start; `start` is a Start<T, values_of<M>>;
+     * - `m.advance(fn, s, tolerance)` takes one more step (usually one evaluation of fn) and updates `s.step`.
+     *
+     * advance takes the state by non-const reference: one taken by value or by const reference fails the concept,
+     * since the loop would then step a copy and never end.
+     *
+     * solve() runs the loop: after the start and after each advance it checks the step (all five numbers finite, else
+     * error::non_finite; lower <= point <= upper, inside the caller's bracket, fn's values nonzero and of opposite
+     * signs at lower < upper or exactly 0 at the point, and strictly inside the previous step's bracket, else
+     * error::invalid_step), then returns point where fn is 0 there (abs_error tol(point)) or where the bracket is at
+     * most 2 tol(point) wide or point is within tol(point) of both ends (abs_error the larger distance to an end).
+     * Since every bracket lies strictly inside the last, every method ends.
+     *
+     * The contract, which solve() relies on:
+     * - **Given:** the validated Tolerance; fn as an lvalue, valid for the call only (keep no reference, pointer or
+     *   copy of it in the state); a Start with lower < upper, finite, fn's value finite, nonzero and of opposite
+     *   signs at the ends, values_of<M> values at each, the derivatives unchecked. advance is called only on a step
+     *   that does not meet the request; nothing is called after an error.
+     * - **Required:** fn evaluated only inside the start's bracket, as the library does: with std::invoke and an
+     *   argument of type T, its result converted to T at once; a value of fn that is not finite returned as
+     *   error::non_finite; start and every advance leave `step` describing the state as above, with f_lower and
+     *   f_upper fn's true values at lower and upper (not a scaled value, such as Pegasus's), which solve() cannot
+     *   check and which make the result a verified sign change; error::not_converged from advance where the method
+     *   cannot go on. Exceptions, fn's and the method's own, pass through.
+     * - **For convergence, not checked:** keep each new point about tol(point) inside the ends. A method that moves
+     *   only one end otherwise stalls at the stop test, the other end never moving.
+     * - **Arithmetic:** IEEE round-to-nearest with subnormals, or a type that flushes below min() as
+     *   Boost.Multiprecision's do; flush-to-zero modes (-ffast-math) are outside the derivations.
+     *
+     * Check a method where it is defined: `static_assert(nxx::roots::bracketing_method<MyMethod, double>)`; a failure
+     * there names the cause (a member that is not const, a return type, the state's `step`), which solve()'s
+     * diagnostic does not.
+     *
+     * @tparam M The method.
+     * @tparam T The real type.
+     * @tparam F fn's type, reference removed; by default a plain function of T returning values_of<M> values.
+     */
+    template<typename M, typename T, typename F = detail::archetype<T, values_of<M>>>
+    concept bracketing_method =
+        requires(M const &m, F &fn, Start<T, values_of<M>> const &s, Tolerance<T> const &t) {
+            { m.start(fn, s, t) } -> detail::state_result;
+        } && requires(M const &m, F &fn, bracketing_state_t<M, T, F> &st, Tolerance<T> const &t) {
+            { m.advance(fn, st, t) } -> std::same_as<std::expected<void, error>>;
+            { std::as_const(st).step } -> std::same_as<Step<T> const &>;
+            // advance updates the state: one taken by value or by const reference would loop for ever on a copy
+            // (PHASE7_API.md, Q17).
+            requires !requires { m.advance(fn, std::move(st), t); };
+        };
+
+    /**
+     * @brief The observer's marker, nxx::Observer, shared with the other modules: solve() tells an observer from fn
+     * by this type.
+     */
+    using nxx::Observer;
+
+    /**
+     * @brief nxx::observer, shared with the other modules: makes a callable the observer of a solve by a stepped
+     * method, `o(step)` called with the Step<T> after the method's start and after each step.
+     *
+     * An observed run computes exactly what an unobserved one does. See nxx::observer for the rest.
+     *
+     * @param o A callable taking Step<T> const &, returning void.
+     * @return The observer, for solve().
+     */
+    using nxx::observer;
+
+    /** @cond INTERNAL */
+    namespace detail {
+
+        /**
+         * @brief Whether O is an Observer, so that the forms of solve() that take a method value do not take an
+         * observer for one.
+         * @tparam O The type.
+         */
+        template<typename O>
+        inline constexpr bool is_observer = false;
+
+        /**
+         * @brief It is.
+         * @tparam O The callable's type.
+         */
+        template<typename O>
+        inline constexpr bool is_observer<Observer<O>> = true;
+
+        /**
+         * @brief The method solve() runs when it is given an observer: M wrapped so that each step is reported,
+         * itself a stepped method with M's state, so that the observed run is the same computation and solve() needs
+         * no second loop.
+         * @tparam M The method.
+         * @tparam O The observer's callable, as given to observer().
+         */
+        template<typename M, typename O>
+        struct Observed
+        {
+            /**
+             * @brief The method, held for the call to solve() that observes it, so that a method that cannot be
+             * copied can be observed.
+             */
+            M const &method;
+
+            /** @brief The observer, called as a non-const callable: a mutable lambda can count its calls. */
+            mutable nxx::detail::kept<O> observer;
+
+            /** @brief The method's values, forwarded, so that solve() evaluates what M needs. */
+            static constexpr std::size_t values = values_of<M>;
+
+            // Self = M makes each declaration dependent, so that an observer on a method without these members fails
+            // the concept softly instead of where the class is instantiated.
+
+            /**
+             * @brief The method's start on a bracket, then a report of its first step.
+             * @tparam T The real type.
+             * @tparam K The number of values at each end.
+             * @tparam F fn's type.
+             * @tparam Self The method, as a dependent type.
+             * @param fn The function.
+             * @param s The bracket.
+             * @param t The tolerances.
+             * @return The method's state, or its error.
+             */
+            template<real T, std::size_t K, typename F, typename Self = M>
+            requires bracketing_method<Self, T, F>
+            constexpr auto start(F &fn, Start<T, K> const &s, Tolerance<T> const &t) const
+                -> decltype(std::declval<Self const &>().start(fn, s, t))
+            {
+                auto started = method.start(fn, s, t);
+                if (started) report(started->step);
+                return started;
+            }
+
+            /**
+             * @brief The method's step, then a report of it.
+             * @tparam F fn's type.
+             * @tparam S The method's state.
+             * @tparam T The real type.
+             * @tparam Self The method, as a dependent type.
+             * @param fn The function.
+             * @param s The state.
+             * @param t The tolerances.
+             * @return Nothing, or the method's error.
+             */
+            template<typename F, typename S, real T, typename Self = M>
+            constexpr auto advance(F &fn, S &s, Tolerance<T> const &t) const
+                -> decltype(std::declval<Self const &>().advance(fn, s, t))
+            {
+                auto const r = method.advance(fn, s, t);
+                if (r) report(s.step);
+                return r;
+            }
+
+            /**
+             * @brief Calls the observer with a step, with one readable diagnostic where the observer cannot take it.
+             * @tparam T The real type.
+             * @param step The step.
+             */
+            template<real T>
+            constexpr void report(Step<T> const &step) const
+            {
+                // Each requirement is checked only where the one before it holds, so a wrong observer gives one
+                // diagnostic, not a cascade.
+                constexpr bool callable = std::invocable<nxx::detail::kept<O> &, Step<T> const &>;
+                static_assert(callable, "nxx::roots::observer(o): o must be callable as o(Step<T> const &)");
+                if constexpr (callable) {
+                    constexpr bool returns_void =
+                        std::is_void_v<std::invoke_result_t<nxx::detail::kept<O> &, Step<T> const &>>;
+                    static_assert(returns_void,
+                        "nxx::roots::observer(o): o must return void (a result is reserved for stopping the run)");
+                    if constexpr (returns_void) std::invoke(observer, step);
+                }
+            }
+        };
+
+        /**
+         * @brief The method m observed by o, for the forms of solve() that take an observer.
+         * @param m The method, held by reference: it must outlive the result (a temporary does, for the full
+         * expression that solves with it).
+         * @param o The observer.
+         * @return The observed method.
+         */
+        template<typename M, typename O>
+        constexpr Observed<M, O> observed(M const &m, Observer<O> &&o)
+        { return Observed<M, O>{ m, std::move(o.callable) }; }
+
+        /**
+         * @brief A bracket inside which every step must lie: the caller's after validation, or an open method's at its
+         * hand-over.
+         * @tparam T The real type.
+         */
+        template<real T>
+        struct Within
+        {
+            /** @brief The lower end. */
+            T lower;
+
+            /** @brief The upper end. */
+            T upper;
+        };
+
+        /**
+         * @brief The loop for a bracketing method: check each step, return a root once it meets the request, else
+         * advance (bracketing_method states the checks).
+         *
+         * The stop test is Criteria's rule, the bracket at most 2 tol(point) wide, or point within tol(point) of both
+         * ends. For a method whose point is an end the two are one test; Bisection's midpoint can meet the second
+         * where the unit distance_bound adds to a width that rounds fails the first (numerics review of Phase 7's
+         * draft 1, finding 2). Each bracket strictly inside the last: finitely many such brackets of T's numbers
+         * exist, so every method ends (the same review, finding 3).
+         *
+         * @param m The method.
+         * @param fn The function.
+         * @param state The method's state, started.
+         * @param tolerance The tolerances.
+         * @param within The bracket inside which every step must lie.
+         * @return The root, or an error.
+         */
+        template<typename M, real T, typename F, typename S>
+        constexpr std::expected<Root<T>, error>
+            run(M const &m, F &fn, S &state, Tolerance<T> const &tolerance, Within<T> const &within)
+        {
+            std::optional<Within<T>> previous; // the last step's bracket
             while (true) {
-                // The midpoint: enclose's point where none is proposed.
-                std::expected<Enclosed<T>, error> const half = detail::enclose(fn, s, std::optional<T>(), false, tolerance);
-                if (!half) return std::unexpected(half.error());
-                if (half->root) return *half->root;
-                std::optional<T> const proposed =
-                    detail::wide(half->next) ? std::optional<T>() : detail::ridders_point(half->next, half->c, half->fc);
-                std::expected<Enclosed<T>, error> const fit =
-                    detail::enclose(fn, half->next, proposed, false, tolerance);
-                if (!fit) return std::unexpected(fit.error());
-                if (fit->root) return *fit->root;
-                s = fit->next;
+                Step<T> const &s = std::as_const(state).step;
+                if (!math::isfinite(s.lower) || !math::isfinite(s.upper) || !math::isfinite(s.point)
+                    || !math::isfinite(s.f_lower) || !math::isfinite(s.f_upper))
+                    return std::unexpected(error::non_finite);
+                if (!(s.lower <= s.point && s.point <= s.upper)) return std::unexpected(error::invalid_step);
+                if (s.lower < within.lower || within.upper < s.upper) return std::unexpected(error::invalid_step);
+                if ((s.point == s.lower && s.f_lower == T(0)) || (s.point == s.upper && s.f_upper == T(0)))
+                    return Root<T>{ s.point, tolerance.at(s.point) };
+                bool const bracketed =
+                    s.f_lower != T(0) && s.f_upper != T(0) && !detail::same_sign(s.f_lower, s.f_upper);
+                if (!bracketed || !(s.lower < s.upper)) return std::unexpected(error::invalid_step);
+                if (previous
+                    && (s.lower < previous->lower || previous->upper < s.upper
+                        || (s.lower == previous->lower && s.upper == previous->upper)))
+                    return std::unexpected(error::invalid_step);
+                previous = Within<T>{ s.lower, s.upper };
+                T const tol = tolerance.at(s.point);
+                T const below = detail::distance_bound(s.point, s.lower);
+                T const above = detail::distance_bound(s.upper, s.point);
+                T const larger = below < above ? above : below;
+                if (detail::distance_bound(s.lower, s.upper) <= detail::twice(tol) || larger <= tol)
+                    return Root<T>{ s.point, larger };
+                std::expected<void, error> const r = m.advance(fn, state, tolerance);
+                if (!r) return std::unexpected(r.error());
             }
         }
 
         /**
-         * @brief The bracket loop of method M on two consecutive iterates of an open method, whose values have
-         * opposite signs: the hand-over. No zero first: they are adjacent iterates, not the caller's bracket.
-         * @tparam M The bracketing method: Brent (for Secant), Newton or Halley.
+         * @brief solve() on a bracket: the tolerances and the bracket validated, zero first, then the method's start
+         * and the loop.
+         * @param m The method.
+         * @param fn The function.
+         * @param bracket The caller's bracket.
+         * @param criteria The caller's criteria.
+         * @return The root, or an error.
+         */
+        template<typename M, real T, typename F>
+        constexpr std::expected<Root<T>, error>
+            on_bracket(M const &m, F &fn, Bracket<T> const &bracket, Criteria<T> const &criteria)
+        {
+            constexpr std::size_t K = values_of<M>;
+            // Qualified, so that argument-dependent lookup cannot pick a function from the namespace of T or F.
+            std::expected<Tolerance<T>, error> const tolerance = detail::checked_tolerance(criteria);
+            if (!tolerance) return std::unexpected(tolerance.error());
+            std::expected<Prepared<T, K>, error> const prepared = detail::prepare<K>(fn, bracket, *tolerance);
+            if (!prepared) return std::unexpected(prepared.error());
+            if (prepared->root) return *prepared->root;
+            Start<T, K> const &start = prepared->start;
+            auto state = m.start(fn, start, *tolerance);
+            if (!state) return std::unexpected(state.error());
+            return detail::run(m, fn, *state, *tolerance, Within<T>{ start.lower, start.upper });
+        }
+
+        /**
+         * @brief The methods solve() accepts from a guess.
+         * @tparam M The method.
+         */
+        template<typename M>
+        concept open = std::same_as<M, Newton> || std::same_as<M, Halley> || std::same_as<M, Secant>
+                       || std::same_as<M, Steffensen>;
+
+        /**
+         * @brief The bracketing method M on two consecutive iterates of an open method, whose values have opposite
+         * signs: the hand-over. No zero first: they are adjacent iterates, not the caller's bracket.
+         * @tparam M The bracketing method: Brent (for Secant and Steffensen), Newton or Halley.
          * @param fn The function.
          * @param x One iterate.
          * @param vx fn's values there.
@@ -1722,9 +2528,19 @@ namespace nxx::roots {
             std::array<T, K> const &vy,
             Tolerance<T> const &tolerance)
         {
-            if (x < y) return detail::brent<M>(fn, Start<T, K>{ std::nullopt, x, vx, y, vy }, tolerance);
-            return detail::brent<M>(fn, Start<T, K>{ std::nullopt, y, vy, x, vx }, tolerance);
+            Start<T, K> const start = x < y ? Start<T, K>{ x, vx, y, vy } : Start<T, K>{ y, vy, x, vx };
+            M const m{};
+            auto state = m.start(fn, start, tolerance);
+            if (!state) return std::unexpected(state.error());
+            return detail::run(m, fn, *state, tolerance, Within<T>{ start.lower, start.upper });
         }
+
+        /**
+         * @brief The derivative step of Newton or Halley, from the method's type.
+         * @tparam M Newton or Halley.
+         */
+        template<typename M>
+        inline constexpr Safeguard derivative_safeguard = std::same_as<M, Halley> ? Safeguard::halley : Safeguard::newton;
 
         /**
          * @brief Newton or Halley from a guess: the method's step, at least tol(x) long, until fn's values at two
@@ -1742,14 +2558,14 @@ namespace nxx::roots {
         template<typename M, real T, typename F>
         constexpr std::expected<Root<T>, error> open_derivative(F &fn, T const &guess, Tolerance<T> const &tolerance)
         {
-            constexpr std::size_t K = values_needed<M>;
+            constexpr std::size_t K = values_of<M>;
             if (!math::isfinite(guess)) return std::unexpected(error::non_finite);
             T x = guess;
             std::array<T, K> vx = detail::evaluate<K>(fn, x);
             if (!math::isfinite(vx[0])) return std::unexpected(error::non_finite);
             if (vx[0] == T(0)) return Root<T>{ x, tolerance.at(x) };
             for (int i = 0; i < detail::iteration_cap<T>(); ++i) {
-                std::optional<T> const step = detail::derivative_step<M>(vx);
+                std::optional<T> const step = detail::derivative_step<detail::derivative_safeguard<M>>(vx);
                 if (!step) return std::unexpected(error::not_converged);
                 T const tol = tolerance.at(x);
                 bool const upward = !detail::same_sign(vx[0], vx[1]); // Newton's direction, -f / f'
@@ -1903,7 +2719,8 @@ namespace nxx::roots {
 
     /**
      * @brief A root of @p fn in @p bracket by the method @p M: a bracketing method (Bisection, Brent, Toms748,
-     * AndersonBjorck, Ridders, RegulaFalsi or Illinois), or Newton or Halley safeguarded by the bracket.
+     * AndersonBjorck, Ridders, RegulaFalsi or Illinois), Newton or Halley safeguarded by the bracket, or a
+     * bracketing_method of one's own.
      *
      * The bracket's ends may come in either order; fn must have opposite signs at them, or be 0 at one. When the
      * bracket contains 0 in its interior, fn is also evaluated at 0 first: a root at 0 is then found at once, and the
@@ -1935,7 +2752,8 @@ namespace nxx::roots {
      * @endcode
      *
      * @tparam M The method: `Bisection`, `Brent`, `Toms748`, `AndersonBjorck`, `Ridders`, `RegulaFalsi`, `Illinois`,
-     *           `Newton` or `Halley`.
+     *           `Newton`, `Halley`, or a default-constructible bracketing_method (a method with parameters is given
+     *           as a value).
      * @tparam T The real type, deduced from @p bracket.
      * @tparam F A callable taking T const & and returning T (for a class type T, T itself or a built-in arithmetic
      *           type, not an expression template; for a built-in T, anything convertible to T), or (for Newton and
@@ -1947,33 +2765,95 @@ namespace nxx::roots {
      * @param criteria When to stop; it converts to T, so `{.rel_tol = 1e-10}` works for any T.
      * @return The root and a bound on its distance to a sign change of fn; error::non_finite if an end, a tolerance or
      *         a value of fn is not finite or a tolerance is negative; error::no_sign_change if fn has the same sign at
-     *         both ends.
+     *         both ends; error::not_converged if the method cannot go on (not reached by the library's methods);
+     *         error::invalid_step if a method of one's own broke the contract of bracketing_method. Any other error a
+     *         method of one's own returns passes through.
      */
     // criteria is a non-deduced context (type_identity_t), so T comes from the bracket alone and a braced list of
     // doubles converts to a multiprecision T.
     template<typename M, real T, typename F>
-    requires detail::bracketing<M> && detail::gives<F, T, detail::values_needed<M>>
+    requires std::default_initializable<M> && bracketing_method<M, T, std::remove_reference_t<F>>
+             && detail::gives<F, T, values_of<M>>
     [[nodiscard]] constexpr std::expected<Root<T>, error>
         solve(F &&fn, Bracket<T> const &bracket, Criteria<std::type_identity_t<T>> const &criteria = {})
-    {
-        constexpr std::size_t K = detail::values_needed<M>;
-        // Qualified, so that argument-dependent lookup cannot pick a function from the namespace of T or F.
-        std::expected<detail::Tolerance<T>, error> const tolerance = detail::checked_tolerance(criteria);
-        if (!tolerance) return std::unexpected(tolerance.error());
-        std::expected<detail::Start<T, K>, error> const start = detail::prepare<K>(fn, bracket, *tolerance);
-        if (!start) return std::unexpected(start.error());
-        if (start->root) return *start->root;
-        if constexpr (std::same_as<M, Bisection>)
-            return detail::bisection(fn, *start, *tolerance);
-        else if constexpr (std::same_as<M, Toms748>)
-            return detail::toms748(fn, *start, *tolerance);
-        else if constexpr (std::same_as<M, AndersonBjorck> || std::same_as<M, Illinois> || std::same_as<M, RegulaFalsi>)
-            return detail::false_position<M>(fn, *start, *tolerance);
-        else if constexpr (std::same_as<M, Ridders>)
-            return detail::ridders(fn, *start, *tolerance);
-        else
-            return detail::brent<M>(fn, *start, *tolerance);
-    }
+    { return detail::on_bracket(M{}, fn, bracket, criteria); }
+
+    /**
+     * @brief A root of @p fn in @p bracket by the method @p m, given as a value: for a method of one's own with
+     * parameters, as solve<M>(fn, bracket) otherwise.
+     *
+     * @code
+     * namespace rt = nxx::roots;
+     * auto const r = rt::solve(rt::Toms748{}, fn, rt::Bracket{1.0, 2.0}, {.rel_tol = 1e-12});
+     * @endcode
+     *
+     * @tparam M The method: a bracketing_method.
+     * @tparam T The real type, deduced from @p bracket.
+     * @tparam F As for solve<M>(fn, bracket).
+     * @param m The method.
+     * @param fn The function.
+     * @param bracket An interval in which fn changes sign.
+     * @param criteria When to stop.
+     * @return As for solve<M>(fn, bracket).
+     */
+    template<typename M, real T, typename F>
+    requires(!detail::is_observer<M>) && bracketing_method<M, T, std::remove_reference_t<F>>
+            && detail::gives<F, T, values_of<M>>
+    [[nodiscard]] constexpr std::expected<Root<T>, error>
+        solve(M const &m, F &&fn, Bracket<T> const &bracket, Criteria<std::type_identity_t<T>> const &criteria = {})
+    { return detail::on_bracket(m, fn, bracket, criteria); }
+
+    /**
+     * @brief As solve<M>(fn, bracket), each step reported to an observer: `o(step)` with the Step<T> after the
+     * method's start and after each step, the ends in order.
+     *
+     * The observed run computes exactly what an unobserved one does. An lvalue observer is kept by reference, an
+     * rvalue by value; it is called as a non-const callable, must return void, and its exceptions pass through.
+     *
+     * @code
+     * namespace rt = nxx::roots;
+     * auto const print = [](rt::Step<double> const &s) { std::println("[{}, {}] {}", s.lower, s.upper, s.point); };
+     * auto const r = rt::solve<rt::Brent>(rt::observer(print), fn, rt::Bracket{1.0, 2.0});
+     * @endcode
+     *
+     * @tparam M The method, as for solve<M>(fn, bracket).
+     * @tparam O The observer's callable.
+     * @tparam T The real type, deduced from @p bracket.
+     * @tparam F As for solve<M>(fn, bracket).
+     * @param o The observer, made by observer().
+     * @param fn The function.
+     * @param bracket An interval in which fn changes sign.
+     * @param criteria When to stop.
+     * @return As for solve<M>(fn, bracket).
+     */
+    template<typename M, typename O, real T, typename F>
+    requires std::default_initializable<M> && bracketing_method<M, T, std::remove_reference_t<F>>
+             && detail::gives<F, T, values_of<M>>
+    [[nodiscard]] constexpr std::expected<Root<T>, error>
+        solve(Observer<O> o, F &&fn, Bracket<T> const &bracket, Criteria<std::type_identity_t<T>> const &criteria = {})
+    { return detail::on_bracket(detail::observed(M{}, std::move(o)), fn, bracket, criteria); }
+
+    /**
+     * @brief As solve(m, fn, bracket), each step reported to an observer, as for solve<M>(observer(o), fn, bracket).
+     * @tparam M The method: a bracketing_method.
+     * @tparam O The observer's callable.
+     * @tparam T The real type, deduced from @p bracket.
+     * @tparam F As for solve<M>(fn, bracket).
+     * @param m The method.
+     * @param o The observer, made by observer().
+     * @param fn The function.
+     * @param bracket An interval in which fn changes sign.
+     * @param criteria When to stop.
+     * @return As for solve<M>(fn, bracket).
+     */
+    template<typename M, typename O, real T, typename F>
+    requires bracketing_method<M, T, std::remove_reference_t<F>> && detail::gives<F, T, values_of<M>>
+    [[nodiscard]] constexpr std::expected<Root<T>, error> solve(M const &m,
+        Observer<O> o,
+        F &&fn,
+        Bracket<T> const &bracket,
+        Criteria<std::type_identity_t<T>> const &criteria = {})
+    { return detail::on_bracket(detail::observed(m, std::move(o)), fn, bracket, criteria); }
 
     /**
      * @brief A root of @p fn from @p guess by the open method @p M: Newton, Halley, Secant or Steffensen.
@@ -2008,11 +2888,11 @@ namespace nxx::roots {
      *         root.
      */
     template<typename M, real T, typename F>
-    requires detail::open<M> && detail::gives<F, T, detail::values_needed<M>>
+    requires detail::open<M> && detail::gives<F, T, values_of<M>>
     [[nodiscard]] constexpr std::expected<Root<T>, error>
         solve(F &&fn, T const &guess, Criteria<std::type_identity_t<T>> const &criteria = {})
     {
-        std::expected<detail::Tolerance<T>, error> const tolerance = detail::checked_tolerance(criteria);
+        std::expected<Tolerance<T>, error> const tolerance = detail::checked_tolerance(criteria);
         if (!tolerance) return std::unexpected(tolerance.error());
         if constexpr (std::same_as<M, Secant>)
             return detail::open_secant(fn, guess, *tolerance);
@@ -2024,7 +2904,8 @@ namespace nxx::roots {
 
     /**
      * @brief Newton on @p bracket with the derivative as a separate callable: the same as Newton on a fn returning
-     * (f, f'), with each callable evaluated once per point.
+     * (f, f'), with each callable evaluated once per point. Also for a method of one's own that declares
+     * `values = 2`.
      *
      * The derivative may return a value, as fn does, or a std::expected whose value converts to T (its error is never
      * read), such as the callable nxx::deriv::derivative_of(fn) or a lambda around nxx::deriv::derivative(fn, x, h)
@@ -2042,6 +2923,9 @@ namespace nxx::roots {
      * the iterates can: where |f'| is as small as the derivative's own error, at a multiple root or a stationary point,
      * Newton can stall into error::not_converged ((x - 1)^3 from 2) or jump far. A bracket always converges.
      *
+     * The separate-derivative forms take the method by name only: with a method value or an observer, fn is one
+     * callable returning the values, as in the last example.
+     *
      * @code
      * namespace rt = nxx::roots;
      * auto const r = rt::solve<rt::Newton>(fn, nxx::deriv::derivative_of(fn), rt::Bracket{0.0, 1.0});
@@ -2055,9 +2939,9 @@ namespace nxx::roots {
      * @endcode
      *
      * A misuse fails one of the constraints, named in the compiler's message: detail::value_valued (fn returns a
-     * value, not a tuple or a std::expected), detail::derivative_valued (the derivatives), detail::bracketing and
+     * value, not a tuple or a std::expected), detail::derivative_valued (the derivatives), bracketing_method and
      * detail::open (the method and the start).
-     * @tparam M Newton.
+     * @tparam M Newton, or a default-constructible bracketing_method with `values = 2`.
      * @tparam T The real type, deduced from @p bracket.
      * @tparam F A callable taking T const & and returning T (for a class type T, T itself or a built-in arithmetic
      *           type, not an expression template; for a built-in T, anything convertible to T).
@@ -2069,7 +2953,9 @@ namespace nxx::roots {
      * @return As for a bracket.
      */
     template<typename M, real T, typename F, typename D>
-    requires std::same_as<M, Newton> && detail::value_valued<F, T> && detail::derivative_valued<D, T>
+    requires(values_of<M> == 2) && detail::value_valued<F, T> && detail::derivative_valued<D, T>
+            && std::default_initializable<M>
+            && bracketing_method<M, T, detail::Joined<T, std::remove_reference_t<F>, std::remove_reference_t<D>> const>
     [[nodiscard]] constexpr std::expected<Root<T>, error>
         solve(F &&fn, D &&dfn, Bracket<T> const &bracket, Criteria<std::type_identity_t<T>> const &criteria = {})
     {
@@ -2092,7 +2978,7 @@ namespace nxx::roots {
      * @return As from a guess.
      */
     template<typename M, real T, typename F, typename D>
-    requires std::same_as<M, Newton> && detail::value_valued<F, T> && detail::derivative_valued<D, T>
+    requires(values_of<M> == 2) && detail::open<M> && detail::value_valued<F, T> && detail::derivative_valued<D, T>
     [[nodiscard]] constexpr std::expected<Root<T>, error>
         solve(F &&fn, D &&dfn, T const &guess, Criteria<std::type_identity_t<T>> const &criteria = {})
     {
@@ -2102,8 +2988,9 @@ namespace nxx::roots {
     }
 
     /**
-     * @brief Halley on @p bracket with the first and second derivatives as separate callables.
-     * @tparam M Halley.
+     * @brief Halley on @p bracket with the first and second derivatives as separate callables. Also for a method of
+     * one's own that declares `values = 3`.
+     * @tparam M Halley, or a default-constructible bracketing_method with `values = 3`.
      * @tparam T The real type, deduced from @p bracket.
      * @tparam F A callable taking T const & and returning T (for a class type T, T itself or a built-in arithmetic
      *           type, not an expression template; for a built-in T, anything convertible to T).
@@ -2117,8 +3004,10 @@ namespace nxx::roots {
      * @return As for a bracket.
      */
     template<typename M, real T, typename F, typename D, typename D2>
-    requires std::same_as<M, Halley> && detail::value_valued<F, T> && detail::derivative_valued<D, T>
-             && detail::derivative_valued<D2, T>
+    requires(values_of<M> == 3) && detail::value_valued<F, T> && detail::derivative_valued<D, T>
+            && detail::derivative_valued<D2, T> && std::default_initializable<M>
+            && bracketing_method<M, T,
+                detail::Joined<T, std::remove_reference_t<F>, std::remove_reference_t<D>, std::remove_reference_t<D2>> const>
     [[nodiscard]] constexpr std::expected<Root<T>, error> solve(F &&fn,
         D &&dfn,
         D2 &&d2fn,
@@ -2146,8 +3035,8 @@ namespace nxx::roots {
      * @return As from a guess.
      */
     template<typename M, real T, typename F, typename D, typename D2>
-    requires std::same_as<M, Halley> && detail::value_valued<F, T> && detail::derivative_valued<D, T>
-             && detail::derivative_valued<D2, T>
+    requires(values_of<M> == 3) && detail::open<M> && detail::value_valued<F, T> && detail::derivative_valued<D, T>
+            && detail::derivative_valued<D2, T>
     [[nodiscard]] constexpr std::expected<Root<T>, error>
         solve(F &&fn, D &&dfn, D2 &&d2fn, T const &guess, Criteria<std::type_identity_t<T>> const &criteria = {})
     {
@@ -2343,6 +3232,9 @@ namespace std {
                 break;
             case nxx::roots::error::not_converged:
                 name = "not_converged";
+                break;
+            case nxx::roots::error::invalid_step:
+                name = "invalid_step";
                 break;
             }
             return formatter<string_view>::format(name, ctx);

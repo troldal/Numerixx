@@ -240,11 +240,11 @@ TEST_CASE("roots: Toms748 and AndersonBjorck, edges")
     // The placement's two fallbacks.
     // 1. 2 delta rounds away at an end of much larger magnitude than u: u = 0.3, tol(0.3) = 1.3e-16, and
     //    fl(2.5 - 2 delta) = 2.5; the point becomes the midpoint.
-    rt::detail::Tolerance<double> const defaults{ dmin, 2.0 * deps };
+    rt::Tolerance<double> const defaults{ dmin, 2.0 * deps };
     rt::detail::Enclosure<double> const far{ 0.3, -1e-20, 2.5, 1.0, 2.5, 1.0, 2.5, 1.0 };
     CHECK(rt::detail::place(far, std::optional<double>(2.5 - 1e-16), defaults) == rt::detail::midpoint(0.3, 2.5));
     // 2. delta flushes to 0 where denorm_min() is min(), as in cpp_bin_float_50: at u = 0 delta is min, at least.
-    rt::detail::Tolerance<bin50> const big_defaults{ bin50(std::numeric_limits<bin50>::denorm_min()),
+    rt::Tolerance<bin50> const big_defaults{ bin50(std::numeric_limits<bin50>::denorm_min()),
         bin50(2 * std::numeric_limits<bin50>::epsilon()) };
     bin50 const smallest = std::numeric_limits<bin50>::denorm_min();
     rt::detail::Enclosure<bin50> const near0{ bin50(0), bin50(-smallest), bin50(0.5), bin50(1), bin50(0.5), bin50(1),

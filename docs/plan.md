@@ -130,8 +130,9 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
     deferred)
   - [x] Step 0: `nxx::observer` in `math.hpp`, quadrature's using-declarations, `iterative_method`'s state by
     reference; quadrature's tests unchanged, with `static_assert`s added for the clause and the shared observer
-  - [ ] Step 1: on a bracket: the public types, the concepts, the loop, the fix, the nine bracketing methods stepped,
-    the new forms; `tests/test_roots_protocol.cpp`
+  - [x] Step 1: on a bracket: the public types, the concepts, the loop, the fix, the nine bracketing methods stepped,
+    the new forms; `tests/test_roots_protocol.cpp` (five toolchains locally, docs clean, `numerics-reviewer`'s seven
+    findings adopted)
   - [ ] Step 2: from a guess: the four open methods stepped, the cap in the loop; the documentation and the guide page
   - [ ] CI passes on all five toolchains
   - [ ] The independent review (Codex) and its adopted findings

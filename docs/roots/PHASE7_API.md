@@ -464,6 +464,43 @@ other modules" rather than naming `numerixx/math.hpp`, which Doxygen would link 
 have. `iterative_method` rejects a method whose `advance` or `settle` takes the state by value or by const reference
 (Q17), asserted with `CopiedState`.
 
+Step 1 as built (2026-11-07): the public types, `bracketing_state_t`, `bracketing_method` with the contract of D in its
+comment, `invalid_step`, the nine bracketing methods stepped (the spike's states and steps), F's fix, and the forms on
+a bracket: named, as a value, both observed, and the separate-derivative forms keyed on `values_of` (from a guess on
+`detail::open`, until step 2). Where it differs from the spike:
+- `detail::run` takes the bracket every step must lie in, not an optional one, and has no cap: on a bracket every step
+  must be bracketed. The guess path keeps its loops; its hand-over starts the bracketing method (Brent, Newton or
+  Halley) on the two iterates and runs it through `run` inside them, so that only one bracket loop exists. Step 2
+  adds the optional bracket and the cap with the stepped open methods.
+- `values_of`'s test is in `detail::declared_values`: Sphinx's C++ parser cannot read a lambda initializer.
+- The reference page names the concept (`doxygenconcept`), as quadrature's does.
+- The evidence: the existing suite unchanged but for `detail::Tolerance` (now `rt::Tolerance`); the battery
+  (`dump.cpp`) against the header at 2dd3228, 10,923 of 10,930 results identical and the 7 of Spike; the numerics
+  review's cases (`numerics_findings.cpp`) as in Spike, in a Debug build. `tests/test_roots_protocol.cpp` holds
+  this step's tests of the list above (the cap's, the open methods' and the guess's are step 2's).
+- F's `midpoint` is also `search()`'s: in a type without subnormals, a side whose last finite point and the domain's
+  edge lie less than 2 min apart now goes on probing, within `probe_limit`, where it stopped before. Bit for bit
+  wherever today's code made progress, as F says.
+
+The review of step 1 (`numerics-reviewer`, on the uncommitted diff), each finding reproduced before it was acted on:
+1. Bisection's counts on x^2 - 2 over [0, 10] were checked against today's (`<=`), though they follow by hand: the
+   ends are exact until the stop, 26 in float, 55 in double, 66 in x87's long double. *Adopted: asserted exactly,
+   with the derivation (also for a 53-bit long double); binary128 stops where midpoints round, and e^x - 2 stays a
+   labelled baseline.*
+2. Two conditioning terms overstated fn's error near sqrt 2 (eps / 2.83, not 4 eps / 2.8). *Adopted: corrected;
+   cpp_bin_float_50's term from 10 eps to 2 eps.*
+3. `solve`'s `@return` on a bracket did not name `not_converged` or a method's own errors. *Adopted.*
+4. `values = 0` made `values_of` 0, and `prepare` read an empty array. *Adopted: `values_of` counts a `values` of
+   at least 1, else 1; tested with 0 and -2.*
+5. Most scripted and Bisection cases were `static_assert`s only. *Adopted: each in a table checked in constant
+   evaluation and again at run time.*
+6. Four test comments did not match their code. *Adopted.*
+7. The midpoint fix reaches `search()`. *Adopted: recorded above.*
+
+Found correct: every stepped method's arithmetic and order of evaluations against the loops of Phases 1 to 6, the
+loop's checks and stop test, the hand-over, F, `Observed`, the concept's clause and comment, the overload set, the
+rules for user types, and the tests' references.
+
 Each step is built and tested on the five toolchains, locally and in CI, with the docs build clean, before the next.
 
 ## Decisions for the user

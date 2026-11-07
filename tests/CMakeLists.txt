@@ -29,7 +29,7 @@ target_compile_definitions(boost_multiprecision INTERFACE BOOST_MP_STANDALONE)
 add_executable(numerixx_tests test_math.cpp test_deriv.cpp test_stencils.cpp test_callables.cpp test_ridders.cpp
         test_orders.cpp test_onesided.cpp test_deriv_of.cpp test_roots_bracketing.cpp test_roots_open.cpp
         test_roots_numerical.cpp test_roots_toms_anderson.cpp test_roots_search.cpp test_roots_classic.cpp
-        test_roots_examples.cpp test_quadrature_gauss.cpp
+        test_roots_examples.cpp test_roots_protocol.cpp test_quadrature_gauss.cpp
         test_quadrature_romberg.cpp test_quadrature_kronrod.cpp test_quadrature_protocol.cpp
         test_quadrature_tanh_sinh.cpp test_quadrature_exp_sinh.cpp test_quadrature_infinite.cpp
         test_quadrature_infinite_capped.cpp
