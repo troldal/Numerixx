@@ -189,6 +189,7 @@ loop:
         lower < upper, and strictly inside the last bracketed step, if the last step was one   (else invalid_step)
         larger = max(distance_bound(point, lower), distance_bound(upper, point))
         if distance_bound(lower, upper) <= 2 tol(point) or larger <= tol(point):   return {point, larger}
+                                     (as built: abs_error min(distance_bound(lower, upper), larger); Codex finding 1)
     not bracketed:
         on a bracket:                                    invalid_step (the sign change was lost)
         from a guess: the step counts against the cap;   at the cap (4 times the bits of T): not_converged
@@ -556,6 +557,16 @@ the fixes to `include/` approved by the user (2026-11-07):
 Found correct: validation and zero first, the loop's checks, nesting and the cap, termination for any method whose
 calls end, the eleven methods against the loops of Phases 1 to 6, Bisection's stop test, F, the concepts, `values_of`,
 the overloads, the observer, and the guide's numbers and their checks.
+
+A further review, by DeepSeek V4.1 Flash through Cline (plan mode, on 6aeb8a0, asked for what the reviews above
+missed): no code defect (among its checks, `distance_bound` against an exact 100-digit difference on 120,000 random
+pairs, never below it). Three wording findings, each confirmed in the sources and adopted:
+1. Codex finding 1's fix left four texts saying `abs_error` is the larger distance (the `Step` and
+   `bracketing_method` comments, `design.md`, B): now the smaller of the bound on the width and that distance, B with
+   a note.
+2. "Strictly inside the last" read as strict at both ends, which the guide's own Pegasus output contradicts: now
+   "nested in the last, neither end outside it and not both ends the same", B's own definition.
+3. `handle-failures.md` gave `not_converged` to the open methods only: a method of one's own is named too.
 
 Each step is built and tested on the five toolchains, locally and in CI, with the docs build clean, before the next.
 

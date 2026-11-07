@@ -18,11 +18,11 @@ Each error points to a next step:
   another guess, or check that `fn` changes sign at all: a root where `fn` touches zero without crossing it, as $x^2$
   does at 0, never does.
 - {cpp:enumerator}`nxx::roots::error::not_converged`: an *open method*, one that starts from a guess rather than a
-  bracket, found no root. Its steps cycled or diverged; or it had no usable step, because the derivative was 0, a
-  numerical derivative failed near the edge of `fn`'s domain ([Solve on a restricted
-  domain](restricted-domain.md#a-numerical-derivative-near-the-edge)), or the secant method met two equal values; or it
-  ran out of steps, as on a multiple root at 0 with the default tolerances ([Set
-  tolerances](tolerances.md#a-root-near-zero-set-abs_tol)). Give it a bracket instead.
+  bracket, found no root (or a [method of your own](method-of-your-own.md) could not go on). Its steps cycled or
+  diverged; or it had no usable step, because the derivative was 0, a numerical derivative failed near the edge of
+  `fn`'s domain ([Solve on a restricted domain](restricted-domain.md#a-numerical-derivative-near-the-edge)), or the
+  secant method met two equal values; or it ran out of steps, as on a multiple root at 0 with the default tolerances
+  ([Set tolerances](tolerances.md#a-root-near-zero-set-abs_tol)). Give it a bracket instead.
 - {cpp:enumerator}`nxx::roots::error::non_finite`: a value was not finite. Most often `fn` was evaluated outside its
   domain ([Solve on a restricted domain](restricted-domain.md)); it can also be a start or a tolerance that is not
   finite, or a tolerance that is negative.

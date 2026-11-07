@@ -81,12 +81,13 @@ given as a value.
 
 After the start and after every step, `solve` checks the report. A number that is not finite ends the solve with
 {cpp:enumerator}`nxx::roots::error::non_finite`. The point must lie between the two ends, the ends inside the bracket
-`start` received, and either $f$ must change sign between them or be exactly 0 at the point; each bracket must lie
-strictly inside the last. A report that breaks one of these ends the solve with
-{cpp:enumerator}`nxx::roots::error::invalid_step`, which says the method, not the function, is at fault. Because each
-bracket lies strictly inside the last, every method ends. Your method's own errors pass through: return `non_finite`
-where `fn` is not finite, and {cpp:enumerator}`nxx::roots::error::not_converged` where the method cannot place a point.
-The reference entry of {cpp:concept}`nxx::roots::bracketing_method` states the contract in full.
+`start` received, and either $f$ must change sign between them or be exactly 0 at the point; each bracket must be nested
+in the last, with neither end outside it and not both ends the same: Pegasus keeps one end and moves the other. A report
+that breaks one of these ends the solve with {cpp:enumerator}`nxx::roots::error::invalid_step`, which says the method,
+not the function, is at fault. Because each bracket is nested in the last, every method ends. Your method's own errors
+pass through: return `non_finite` where `fn` is not finite, and {cpp:enumerator}`nxx::roots::error::not_converged` where
+the method cannot place a point. The reference entry of {cpp:concept}`nxx::roots::bracketing_method` states the contract
+in full.
 
 ## An open method
 

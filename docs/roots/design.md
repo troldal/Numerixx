@@ -204,11 +204,12 @@ the phases in `docs/plan.md`, and each phase's specification and evidence in `PH
   reference; the concepts reject one taken by value or by const reference, which would loop on a copy (Q17).
 - **The loop (`detail::run`)** checks each step: all five numbers finite (`non_finite`); lower <= point <= upper, inside
   the caller's bracket on a bracket (`invalid_step`); fn exactly 0 at the point returns it with tol(point); a bracketed
-  step (fn nonzero, of opposite signs at lower < upper) must lie strictly inside the last bracketed step
-  (`invalid_step`), and returns the point once the bracket is at most 2 tol(point) wide or the point within tol(point)
-  of both ends, `abs_error` the larger distance to an end (Q3). On a bracket every step must be bracketed; from a
-  guess a step without a sign change counts against the cap, 4 times the bits of T, and may follow a bracketed one
-  (Q19).
+  step (fn nonzero, of opposite signs at lower < upper) must be nested in the last bracketed step, neither end outside
+  it and not both the same (`invalid_step`), and returns the point once the bracket is at most 2 tol(point) wide or the
+  point within tol(point) of both ends (Q3), `abs_error` the smaller of the bound on the width and the larger distance
+  to an end (the independent review, finding 1: a point next to an end may round its far distance above 2 tol). On a
+  bracket every step must be bracketed; from a guess a step without a sign change counts against the cap, 4 times the
+  bits of T, and may follow a bracketed one (Q19).
 - **Every method ends:** strictly nested brackets of T's finite set of numbers are finitely many (Q18), and the cap
   bounds the rest. A method that cannot go on returns `not_converged` from `advance`; no step without progress
   returns a root.

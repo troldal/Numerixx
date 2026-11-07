@@ -88,7 +88,7 @@ namespace nxx::roots {
 
         /**
          * A method of one's own broke the contract of bracketing_method: a step with its point outside its points,
-         * outside the caller's bracket, without a sign change, or not strictly inside the previous step. The
+         * outside the caller's bracket, without a sign change, or not nested in the previous step. The
          * library's methods never return it.
          */
         invalid_step
@@ -250,9 +250,10 @@ namespace nxx::roots {
      * decide: the two points it holds, fn's values there, and its point.
      *
      * On a bracket: lower < upper with fn's values nonzero and of opposite signs, inside the caller's bracket and
-     * strictly inside the previous step's; or point an end at which fn is exactly 0. solve() returns point once the
-     * bracket is at most 2 tol(point) wide or point is within tol(point) of both ends, with abs_error the larger
-     * distance from point to an end, and point with abs_error tol(point) where fn is exactly 0 there. From a guess,
+     * nested in the previous step's (neither end outside it, and not both ends the same); or point an end at which fn
+     * is exactly 0. solve() returns point once the bracket is at most 2 tol(point) wide or point is within tol(point)
+     * of both ends, with abs_error the smaller of the bound on the width and the larger distance from point to an
+     * end, and point with abs_error tol(point) where fn is exactly 0 there. From a guess,
      * before a sign change: the last two iterates in order (one point after a start that evaluates only the guess;
      * Secant's start holds its first two points), point the latest; such a step
      * counts against the iteration cap. A method that cannot go on returns error::not_converged from advance.
@@ -2633,10 +2634,11 @@ namespace nxx::roots {
      *
      * solve() runs the loop: after the start and after each advance it checks the step (all five numbers finite, else
      * error::non_finite; lower <= point <= upper, inside the caller's bracket, fn's values nonzero and of opposite
-     * signs at lower < upper or exactly 0 at the point, and strictly inside the previous step's bracket, else
-     * error::invalid_step), then returns point where fn is 0 there (abs_error tol(point)) or where the bracket is at
-     * most 2 tol(point) wide or point is within tol(point) of both ends (abs_error the larger distance to an end).
-     * Since every bracket lies strictly inside the last, every method ends.
+     * signs at lower < upper or exactly 0 at the point, and nested in the previous step's bracket: neither end
+     * outside it, and not both ends the same, else error::invalid_step), then returns point where fn is 0 there
+     * (abs_error tol(point)) or where the bracket is at most 2 tol(point) wide or point is within tol(point) of both
+     * ends (abs_error the smaller of the bound on the width and the larger distance to an end, so at most 2
+     * tol(point)). Since every bracket is nested in the last, every method ends.
      *
      * The contract, which solve() relies on:
      * - **Given:** the validated Tolerance; fn as an lvalue, valid for the call only (keep no reference, pointer or
@@ -2696,7 +2698,7 @@ namespace nxx::roots {
      * (one point after a start that evaluates only the guess; Secant's holds its first two), and point the latest.
      * solve() checks each step as for bracketing_method, without a
      * caller's bracket: a step whose values have opposite signs at lower < upper is bracketed and is tested as on a
-     * bracket, and a bracketed step after a bracketed one must lie strictly inside it; fn exactly 0 at the point ends
+     * bracket, and a bracketed step after a bracketed one must be nested in it; fn exactly 0 at the point ends
      * the solve. A step without a sign change counts against the iteration cap, 4 times the bits of T (212 in double):
      * at the cap solve() returns error::not_converged. So every open method ends, and every success is a bracketed
      * step that met the request, a verified sign change.
@@ -2902,7 +2904,8 @@ namespace nxx::roots {
          * The stop test is Criteria's rule, the bracket at most 2 tol(point) wide, or point within tol(point) of both
          * ends. For a method whose point is an end the two are one test; Bisection's midpoint can meet the second
          * where the unit distance_bound adds to a width that rounds fails the first (numerics review of Phase 7's
-         * draft 1, finding 2). Each bracketed step after a bracketed step strictly inside it: finitely many such
+         * draft 1, finding 2). Each bracketed step after a bracketed step nested in it (neither end outside, not
+         * both the same): finitely many such
          * brackets of T's numbers exist (the same review, finding 3); from a guess the steps without a sign change
          * count against the cap. So every method ends.
          *
