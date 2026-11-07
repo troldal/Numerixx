@@ -135,8 +135,10 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
     findings adopted)
   - [x] Step 2: from a guess: the four open methods stepped, the cap in the loop; the documentation and the guide page
     (five toolchains locally, docs clean, the battery as step 1, `numerics-reviewer` and `docs-reviewer` adopted)
-  - [ ] CI passes on all five toolchains
-  - [ ] The independent review (Codex) and its adopted findings
+  - [x] CI passes on all five toolchains (ee83261: runs 42406900995 and 42407112691, clang-cl included)
+  - [ ] The independent review (Codex) and its adopted findings: three, all reproduced and adopted (the bound at a
+    point next to an end, the guide's Pegasus near max, `Tolerance::at`'s comment); ticked once their commit's CI
+    passes
 
 ## Milestone 3: user documentation (Doxygen, Breathe, Sphinx)
 

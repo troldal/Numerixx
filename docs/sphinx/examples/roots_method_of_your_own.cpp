@@ -68,15 +68,19 @@ struct Pegasus
     {
         T const lo = s.step.lower;
         T const hi = s.step.upper;
-        // The secant through (x1, f1) and (x0, g0), the quotient first: f1 and g0 have opposite signs,
-        // so q lies in (0, 1) and nothing overflows
-        T const q = T(s.f1 / T(s.f1 - s.g0));
-        T x = T(s.x1 - T(q * T(s.x1 - s.x0)));
+        // The secant through (x1, f1) and (x0, g0), from halves, so that no difference overflows: f1 and g0
+        // have opposite signs, so q lies in [0, 1]; d is half the step, and x = x1 - 2d lies between the ends,
+        // formed in two subtractions where 2d itself would overflow (a bracket wider than max)
+        T const half1 = T(s.f1 / T(2));
+        T const q = T(half1 / T(half1 - T(s.g0 / T(2))));
+        T const d = T(q * T(T(s.x1 / T(2)) - T(s.x0 / T(2))));
+        T const quarter = T(T((std::numeric_limits<T>::max)()) / T(4));
+        T x = nxx::math::abs(d) <= quarter ? T(s.x1 - T(d + d)) : T(T(s.x1 - d) - d);
         T const margin = T(T(inside) * tol.at(s.step.point));
         if (x < T(lo + margin)) x = T(lo + margin);
         else if (T(hi - margin) < x) x = T(hi - margin);
-        // The midpoint, without overflow, where the bracket is too narrow for the margin or x is not inside
-        if (T(T(hi - lo) / T(4)) <= margin || !(lo < x && x < hi)) x = T(T(lo / T(2)) + T(hi / T(2)));
+        // The midpoint where the bracket is too narrow for the margin or x is not inside; halves again
+        if (T(T(hi / T(4)) - T(lo / T(4))) <= margin || !(lo < x && x < hi)) x = T(T(lo / T(2)) + T(hi / T(2)));
         if (!(lo < x && x < hi)) return std::unexpected(rt::error::not_converged);
         T const fx = T(std::invoke(fn, x));
         if (!nxx::math::isfinite(fx)) return std::unexpected(rt::error::non_finite);
@@ -88,8 +92,8 @@ struct Pegasus
             s.x0 = s.x1;
             s.f0 = s.f1;
             s.g0 = s.f1;
-        } else {
-            s.g0 = T(s.g0 * T(s.f1 / T(s.f1 + fx)));
+        } else { // f1 and fx have one sign: halved, their sum cannot overflow
+            s.g0 = T(s.g0 * T(half1 / T(half1 + T(fx / T(2)))));
         }
         s.x1 = x;
         s.f1 = fx;
@@ -100,6 +104,21 @@ struct Pegasus
 static_assert(rt::bracketing_method<Pegasus, double>); // checked where it is defined
 // </pegasus>
 // clang-format on
+
+// "Nothing overflows": in constant evaluation an overflow is not a constant, so these compile only if none occurs.
+// Values near max (the independent review's case: 1.6e308 (2x - 3) on [1, 2], root 1.5, where f1 - g0 overflowed
+// before the halves), and a bracket wider than max (x - 1.5 on [-1e308, 1e308], where x1 - x0 would).
+namespace {
+
+    constexpr bool brackets_root(std::expected<rt::Root<double>, rt::error> const &r, double root)
+    { return r.has_value() && nxx::math::abs(r->value - root) <= r->abs_error; }
+
+    static_assert(brackets_root(
+        rt::solve<Pegasus>([](double x) { return 1.6e308 * (2.0 * x - 3.0); }, rt::Bracket{ 1.0, 2.0 }), 1.5));
+    static_assert(
+        brackets_root(rt::solve<Pegasus>([](double x) { return x - 1.5; }, rt::Bracket{ -1e308, 1e308 }), 1.5));
+
+} // namespace
 
 // clang-format off
 // <chebyshev>

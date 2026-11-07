@@ -43,9 +43,10 @@ these headers:
 :end-before: // </includes>
 ```
 
-`advance` shows four habits a correct step needs. It forms the secant point with the quotient first, a number in
-(0, 1), so that no product overflows. It tests signs with `(fx < 0) != (f1 < 0)`, not with `fx * f1 < 0`, which
-underflows to 0 where both values are tiny. Its fallback midpoint is `lo / 2 + hi / 2`, which cannot overflow. And its
+`advance` shows four habits a correct step needs. It subtracts and adds halves, of the values of $f$ and of the
+ends, so that nothing overflows where they lie near the largest `double`, and it forms the quotient first, a number
+in $[0, 1]$, so that the step stays inside the bracket. It tests signs with `(fx < 0) != (f1 < 0)`, not with
+`fx * f1 < 0`, which underflows to 0 where both values are tiny. Its fallback midpoint is `lo / 2 + hi / 2`. And its
 report holds the true values of $f$, never the scaled `g0`: `solve` cannot check them, and they make the result a
 verified sign change.
 

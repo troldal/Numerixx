@@ -538,6 +538,25 @@ The reviews of step 2, each finding reproduced before it was acted on:
   Halley do not continue as Brent; tol(x) defined; observed against unobserved asserted; the page trimmed; editorial
   fixes. The replacement of the trisection was judged acceptable for the page's job.
 
+The independent review (Codex, read-only, on cdf3214, c73dbe0 and ee83261, after CI passed), each finding reproduced;
+the fixes to `include/` approved by the user (2026-11-07):
+1. **A point next to an end could return `abs_error` above 2 tol.** A method's report [0, 1] with point 1e-20, at
+   abs_tol 0.5, met the width test (1 <= 2 tol = 1), but the point's far distance, 1 - 1e-20 rounded to 1, was raised
+   a unit: `abs_error` 1.0000000000000002, against `Root`'s bound. B's derivation covered only a point at an end or
+   at the midpoint. *Adopted: `abs_error` is the smaller of the width's bound and the larger distance, both bounds on
+   the distance to the sign change; the battery's 10,930 results unchanged; the case is in the loop's table.*
+2. **The guide's Pegasus overflowed on finite values:** on 1.6e308 (2x - 3) over [1, 2], `f1 - g0` overflowed, and
+   the method then moved by tol per step (a million steps left the bracket about 1 wide). *Adopted: halves of fn's
+   values and of the ends, and the step x1 - (d + d), bit for bit the textbook point where nothing overflows, with
+   two subtractions where 2d would; the page's output unchanged; two `static_assert`s in its program solve the case
+   and x - 1.5 on [-1e308, 1e308] in constant evaluation, which rejects an overflow.*
+3. **`Tolerance::at`'s comment** said max only where the sum would overflow; it saturates wherever relative |x|
+   exceeds max / 2. *Adopted: the comment.*
+
+Found correct: validation and zero first, the loop's checks, nesting and the cap, termination for any method whose
+calls end, the eleven methods against the loops of Phases 1 to 6, Bisection's stop test, F, the concepts, `values_of`,
+the overloads, the observer, and the guide's numbers and their checks.
+
 Each step is built and tested on the five toolchains, locally and in CI, with the docs build clean, before the next.
 
 ## Decisions for the user

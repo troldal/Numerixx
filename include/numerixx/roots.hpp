@@ -196,7 +196,8 @@ namespace nxx::roots {
         /**
          * @brief tol(x), saturated at max.
          * @param x The point.
-         * @return absolute + relative |x|, or max if that would overflow.
+         * @return absolute + relative |x|, or max where relative |x| exceeds max / 2, before the sum could
+         *         overflow (independent review of Phase 7, finding 3).
          */
         constexpr T at(T const &x) const
         {
@@ -2941,8 +2942,12 @@ namespace nxx::roots {
                     T const below = detail::distance_bound(s.point, s.lower);
                     T const above = detail::distance_bound(s.upper, s.point);
                     T const larger = below < above ? above : below;
-                    if (detail::distance_bound(s.lower, s.upper) <= detail::twice(tol) || larger <= tol)
-                        return Root<T>{ s.point, larger };
+                    T const width = detail::distance_bound(s.lower, s.upper);
+                    // Both bound the distance from the point to the sign change; the smaller keeps Root's bound,
+                    // 2 tol, where the width test passed but a point next to an end rounds its far distance up
+                    // (independent review of Phase 7, finding 1).
+                    if (width <= detail::twice(tol) || larger <= tol)
+                        return Root<T>{ s.point, width < larger ? width : larger };
                 } else {
                     // On a bracket the sign change must be kept; from a guess a step without one counts against the
                     // cap, so that a method that finds and loses sign changes still ends (simplicity review of

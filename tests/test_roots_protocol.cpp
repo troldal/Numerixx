@@ -71,7 +71,7 @@ namespace {
 
     // Each case of the loop (PHASE7_API.md B), true where the loop does what the comment says; checked in constant
     // evaluation and again at run time.
-    constexpr std::array<bool, 20> loop_cases()
+    constexpr std::array<bool, 21> loop_cases()
     {
         using rt::error;
         using rt::Step;
@@ -83,6 +83,11 @@ namespace {
             // An interior point: the larger of its two distances to the ends.
             on_unit(Script<1>{ { Step<double>{ 0.4995, -0.0005, 0.5005, 0.0005, 0.5 } } })->abs_error
                 == std::max(rt::detail::distance_bound(0.5, 0.4995), rt::detail::distance_bound(0.5005, 0.5)),
+            // A point next to an end of a bracket that meets the width test: its distance to the far end rounds
+            // to 1 and is raised a unit, above 2 tol = 1; abs_error is the width's bound, 1 (independent review of
+            // Phase 7, finding 1).
+            rt::solve(Script<1>{ { Step<double>{ 0.0, -0.5, 1.0, 0.5, 1e-20 } } }, half_off, unit, { .abs_tol = 0.5 })
+                == rt::Root<double>{ 1e-20, 1.0 },
             // A point that is an end where fn is exactly 0: that point, abs_error tol(point).
             on_unit(Script<2>{ { s0, Step<double>{ 0.25, -0.25, 0.5, 0.0, 0.5 } } })
                 == rt::Root<double>{ 0.5, 1e-3 + 2.0 * deps * 0.5 },
