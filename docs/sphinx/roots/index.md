@@ -118,6 +118,7 @@ restricted-domain
 derivatives
 other-types
 handle-failures
+method-of-your-own
 ```
 
 ## Reference

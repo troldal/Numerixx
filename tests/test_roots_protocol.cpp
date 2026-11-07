@@ -1,6 +1,6 @@
-// The method protocol of nxx::roots on a bracket (Phase 7, step 1, docs/roots/PHASE7_API.md): the loop's checks with
-// a scripted method, observing, the methods as values, Bisection's stop test, the fix for types without subnormals,
-// methods of one's own and the concepts.
+// The method protocol of nxx::roots (Phase 7, docs/roots/PHASE7_API.md): the loop's checks with a scripted method, on
+// a bracket and from a guess with its cap, observing, the methods as values, Bisection's stop test, the fix for types
+// without subnormals, methods of one's own and the concepts.
 //
 // References are closed forms; the scripted cases are derived by hand from the loop's rules (PHASE7_API.md B).
 
@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <format>
 #include <limits>
+#include <optional>
 #include <vector>
 
 using namespace roots_check;
@@ -40,6 +41,10 @@ namespace {
 
         template<typename F>
         constexpr std::expected<State, rt::error> start(F &, rt::Start<double> const &, rt::Tolerance<double> const &) const
+        { return State{ steps, 1, fail_at, steps[0] }; }
+
+        template<typename F>
+        constexpr std::expected<State, rt::error> start(F &, double const &, rt::Tolerance<double> const &) const
         { return State{ steps, 1, fail_at, steps[0] }; }
 
         template<typename F>
@@ -117,6 +122,62 @@ namespace {
 
     static_assert(std::ranges::all_of(loop_cases(), [](bool b) { return b; }));
 
+    // From a guess, with the same fn and tolerances: no caller's bracket; steps without a sign change count against
+    // the cap.
+    template<std::size_t N>
+    constexpr std::expected<rt::Root<double>, rt::error> from(Script<N> const &m)
+    { return rt::solve(m, half_off, 0.25, { .abs_tol = 1e-3 }); }
+
+    constexpr rt::Step<double> g0{ 0.25, -0.25, 0.25, -0.25, 0.25 }; // the start: one iterate
+    constexpr rt::Step<double> g1{ 0.25, -0.25, 0.3, -0.2, 0.3 };    // two iterates of one sign
+
+    // k steps without a sign change (the start the first), then s2: the cap is 4 times the bits of double, 212.
+    template<std::size_t K>
+    constexpr Script<K + 1> unbracketed_then_s2()
+    {
+        Script<K + 1> m{};
+        for (std::size_t i = 0; i < K; ++i) m.steps[i] = g0;
+        m.steps[K] = s2;
+        return m;
+    }
+
+    constexpr int double_cap = 4 * std::numeric_limits<double>::digits;
+    static_assert(double_cap == 212 && rt::detail::iteration_cap<double>() == double_cap);
+
+    constexpr std::array<bool, 14> guess_cases()
+    {
+        using rt::error;
+        using rt::Step;
+        return {
+            // Unbracketed steps, then a bracketed one that meets the request.
+            from(Script<3>{ { g0, g1, s2 } })->value == 0.5005,
+            // A sign change found, lost and found again: allowed (Q19), and the bracket found again need not lie
+            // inside the one lost, here the same bracket s1 twice (review of step 2, finding 1).
+            from(Script<5>{ { g0, g1, s1, g1, s2 } })->value == 0.5005,
+            from(Script<6>{ { g0, g1, s1, g1, s1, s2 } })->value == 0.5005,
+            // A bracketed step after a bracketed one must nest, as on a bracket (Q18).
+            from(Script<4>{ { g0, s1, s1, s2 } }).error() == error::invalid_step,
+            from(Script<3>{ { g0, s1, Step<double>{ 0.2, -0.3, 0.6, 0.1, 0.6 } } }).error() == error::invalid_step,
+            // Opposite signs at a single point (lower == upper): invalid_step.
+            from(Script<2>{ { g0, Step<double>{ 0.5, -0.25, 0.5, 0.25, 0.5 } } }).error() == error::invalid_step,
+            // fn exactly 0 at the point: that point, abs_error tol(point); no caller's bracket to stay inside.
+            from(Script<2>{ { g0, Step<double>{ 0.25, -0.25, 5.0, 0.0, 5.0 } } })
+                == rt::Root<double>{ 5.0, 1e-3 + 2.0 * deps * 5.0 },
+            // The point outside its points is invalid here too; an infinity is non_finite.
+            from(Script<2>{ { g0, Step<double>{ 0.25, -0.25, 0.3, -0.2, 0.4 } } }).error() == error::invalid_step,
+            from(Script<2>{ { g0, Step<double>{ 0.25, -0.25, dinf, -0.2, 0.3 } } }).error() == error::non_finite,
+            // The cap: cap - 1 and cap steps without a sign change, then a bracketed one, succeed; cap + 1 do not.
+            from(unbracketed_then_s2<double_cap - 1>())->value == 0.5005,
+            from(unbracketed_then_s2<double_cap>())->value == 0.5005,
+            from(unbracketed_then_s2<double_cap + 1>()).error() == error::not_converged,
+            // The guess is checked by solve(), before the method starts (Q7).
+            rt::solve(Script<1>{ { g0 } }, half_off, dinf).error() == error::non_finite,
+            rt::solve(Script<1>{ { g0 } }, half_off, dnan).error() == error::non_finite,
+        };
+    }
+
+    static_assert(std::ranges::all_of(guess_cases(), [](bool b) { return b; }));
+
     // ---- Observing changes nothing, for every method on a bracket, named and as a value -----------------------------
 
     // Lambdas, not functions: MSVC warns that const on a function type (F const & with F a function) is ignored.
@@ -151,6 +212,51 @@ namespace {
     static_assert(same_everywhere<rt::Illinois>(g));
     static_assert(same_everywhere<rt::Newton>(g1d));
     static_assert(same_everywhere<rt::Halley>(g2d));
+
+    // From a guess: the named, value and both observed forms agree.
+    template<typename M, typename F>
+    constexpr bool same_everywhere_from(F const &fn, double guess)
+    {
+        int reports = 0;
+        auto count = [&reports](rt::Step<double> const &) { ++reports; };
+        auto const named = rt::solve<M>(fn, guess);
+        auto const value = rt::solve(M{}, fn, guess);
+        auto const observed = rt::solve<M>(rt::observer(count), fn, guess);
+        int const once = reports;
+        auto const observed_value = rt::solve(M{}, rt::observer(count), fn, guess);
+        return named.has_value() && named == value && named == observed && named == observed_value && once > 0
+               && reports == 2 * once;
+    }
+
+    static_assert(same_everywhere_from<rt::Newton>(g1d, 1.0));
+    static_assert(same_everywhere_from<rt::Halley>(g2d, 1.0));
+    static_assert(same_everywhere_from<rt::Secant>(g, 1.0));
+    static_assert(same_everywhere_from<rt::Steffensen>(g, 1.0));
+
+    // The maximum counts from the cap: each step without a sign change costs Newton and Halley one evaluation,
+    // Secant one after its two at the start, Steffensen two; at the cap's check no advance follows. So 1 + cap, 2 +
+    // cap and 1 + 2 cap evaluations, here on functions that never change sign and never stop a step: Newton's and
+    // Halley's constant values (step -1), the secant on 1/(1 + x^2) and Steffensen on 1 + x^2.
+    template<typename M, typename F>
+    constexpr int evaluations_to_cap(F const &fn, double guess)
+    {
+        int evaluations = 0;
+        auto counted = [&evaluations, &fn](double const &x) {
+            ++evaluations;
+            return fn(x);
+        };
+        auto const r = rt::solve<M>(counted, guess);
+        return !r && r.error() == rt::error::not_converged ? evaluations : -1;
+    }
+
+    constexpr auto flat2 = [](double) { return std::array<double, 2>{ 1.0, 1.0 }; };
+    constexpr auto flat3 = [](double) { return std::array<double, 3>{ 1.0, 1.0, 0.0 }; };
+    constexpr auto bump = [](double x) { return 1.0 / (1.0 + x * x); };
+    constexpr auto bowl = [](double x) { return 1.0 + x * x; };
+    static_assert(evaluations_to_cap<rt::Newton>(flat2, 0.0) == 1 + double_cap);
+    static_assert(evaluations_to_cap<rt::Halley>(flat3, 0.0) == 1 + double_cap);
+    static_assert(evaluations_to_cap<rt::Secant>(bump, 1.0) == 2 + double_cap);
+    static_assert(evaluations_to_cap<rt::Steffensen>(bowl, 1.0) == 1 + 2 * double_cap);
 
     // A report after the start and one after each advance, each advance one evaluation where fn is never exactly 0:
     // reports = evaluations - 2 + 1 (the two ends are evaluated by solve()).
@@ -370,6 +476,70 @@ namespace {
         }
     };
 
+    // An open method of one's own (values = 2): Newton's step, at least tol(x) long, until two iterates show a sign
+    // change; then Brent's procedure on them, its state held in the method's and reached through Brent's public
+    // members only.
+    struct NewtonThenBrent
+    {
+        static constexpr int values = 2;
+
+        struct State
+        {
+            double x;
+            std::array<double, 2> vx;
+            std::optional<rt::bracketing_state_t<rt::Brent, double>> finish;
+            rt::Step<double> step;
+        };
+
+        template<typename F>
+        static constexpr std::array<double, 2> values_at(F &fn, double x)
+        {
+            auto const r = std::invoke(fn, x);
+            return { std::get<0>(r), std::get<1>(r) };
+        }
+
+        template<typename F>
+        constexpr std::expected<State, rt::error> start(F &fn, double const &guess, rt::Tolerance<double> const &) const
+        {
+            std::array<double, 2> const v = values_at(fn, guess);
+            if (!nxx::math::isfinite(v[0])) return std::unexpected(rt::error::non_finite);
+            return State{ guess, v, std::nullopt, rt::Step<double>{ guess, v[0], guess, v[0], guess } };
+        }
+
+        template<typename F>
+        constexpr std::expected<void, rt::error> advance(F &fn, State &s, rt::Tolerance<double> const &t) const
+        {
+            if (s.finish) {
+                std::expected<void, rt::error> const r = rt::Brent{}.advance(fn, *s.finish, t);
+                s.step = s.finish->step;
+                return r;
+            }
+            if (s.vx[1] == 0.0 || !nxx::math::isfinite(s.vx[1])) return std::unexpected(rt::error::not_converged);
+            double step = -s.vx[0] / s.vx[1];
+            double const tol = t.at(s.x);
+            if (nxx::math::abs(step) < tol) step = step < 0.0 ? -tol : tol;
+            double const next = s.x + step;
+            std::array<double, 2> const vn = values_at(fn, next);
+            if (!nxx::math::isfinite(vn[0])) return std::unexpected(rt::error::non_finite);
+            bool const low = s.x < next;
+            if (vn[0] != 0.0 && (vn[0] < 0.0) != (s.vx[0] < 0.0)) {
+                rt::Start<double> const ends = low ? rt::Start<double>{ s.x, { s.vx[0] }, next, { vn[0] } }
+                                                   : rt::Start<double>{ next, { vn[0] }, s.x, { s.vx[0] } };
+                auto started = rt::Brent{}.start(fn, ends, t);
+                if (!started) return std::unexpected(started.error());
+                s.finish = *started;
+                s.step = s.finish->step;
+                return {};
+            }
+            s.step = low ? rt::Step<double>{ s.x, s.vx[0], next, vn[0], next }
+                         : rt::Step<double>{ next, vn[0], s.x, s.vx[0], next };
+            s.x = next;
+            s.vx = vn;
+            return {};
+        }
+    };
+
+    static_assert(rt::open_method<NewtonThenBrent, double> && !rt::bracketing_method<NewtonThenBrent, double>);
     static_assert(rt::bracketing_method<Pegasus, double> && rt::bracketing_method<Pegasus, bin50>);
     static_assert(rt::bracketing_method<Section, double> && !std::default_initializable<Section>);
     static_assert(rt::bracketing_method<SafeNewton, double> && rt::values_of<SafeNewton> == 2);
@@ -389,6 +559,11 @@ namespace {
     static_assert(rt::bracketing_method<rt::Brent, bin50> && rt::bracketing_method<rt::Halley, dec50>
                   && rt::bracketing_method<rt::Toms748, float>);
     static_assert(!rt::bracketing_method<rt::Secant, double> && !rt::bracketing_method<rt::Steffensen, double>);
+    static_assert(rt::open_method<rt::Newton, double> && rt::open_method<rt::Halley, double>
+                  && rt::open_method<rt::Secant, double> && rt::open_method<rt::Steffensen, double>
+                  && rt::open_method<rt::Secant, bin50> && rt::open_method<rt::Halley, dec50>);
+    static_assert(!rt::open_method<rt::Brent, double> && !rt::open_method<rt::Bisection, double>
+                  && !rt::open_method<rt::Toms748, double> && !rt::open_method<int, double>);
     static_assert(!rt::bracketing_method<int, double>);
     struct Empty
     {
@@ -456,6 +631,51 @@ namespace {
         { return rt::Brent{}.advance(fn, s, t); }
     };
     static_assert(!rt::bracketing_method<NonConstAdvance, double>);
+
+    // The same clause in open_method: Secant's members around a state taken another way.
+    using SecantState = rt::open_state_t<rt::Secant, double>;
+    template<typename Pass>
+    struct ReshapedOpen
+    {
+        template<typename F>
+        constexpr std::expected<SecantState, rt::error>
+            start(F &fn, double const &guess, rt::Tolerance<double> const &t) const
+        { return rt::Secant{}.start(fn, guess, t); }
+
+        template<typename F>
+        constexpr std::expected<void, rt::error> advance(F &fn, Pass s, rt::Tolerance<double> const &t) const
+        {
+            auto copy = s;
+            return rt::Secant{}.advance(fn, copy, t);
+        }
+    };
+    static_assert(rt::open_method<ReshapedOpen<SecantState &>, double>);
+    static_assert(!rt::open_method<ReshapedOpen<SecantState>, double>);
+    static_assert(!rt::open_method<ReshapedOpen<SecantState const &>, double>);
+
+    // The user's open method and the observer from a guess, in constant evaluation too. Each root lies within
+    // abs_error plus its conditioning term (as in roots:protocol:guess) of the reference, abs_error within 2 tol.
+    constexpr auto wal_df = [](double x) { return 3.0 * x * x - 2.0; };
+    constexpr auto no_root = [](double x) { return std::array<double, 2>{ x * x + 1.0, 2.0 * x }; };
+    constexpr bool guess_methods_cases()
+    {
+        auto const near = [](std::expected<rt::Root<double>, rt::error> const &r, double ref, double c) {
+            return r.has_value() && nxx::math::abs(r->value - ref) <= r->abs_error + c
+                   && r->abs_error <= 2.0 * default_tol(r->value);
+        };
+        int reports = 0;
+        bool first_is_guess = false;
+        auto watch = [&](rt::Step<double> const &s) {
+            if (reports++ == 0) first_is_guess = s == rt::Step<double>{ 3.0, 7.0, 3.0, 7.0, 3.0 };
+        };
+        auto const observed = rt::solve<rt::Newton>(rt::observer(watch), g1d, 3.0);
+        return near(rt::solve<NewtonThenBrent>(wal_fn, wal_df, 2.0), wallis, 30.0 * deps / 11.2)
+               && near(rt::solve<NewtonThenBrent>(g1d, 1.0), sqrt2, deps)
+               && near(rt::solve(NewtonThenBrent{}, g1d, 10.0), sqrt2, deps)
+               && rt::solve<NewtonThenBrent>(no_root, 1.0).error() == rt::error::not_converged
+               && near(observed, sqrt2, deps) && first_is_guess && reports >= 2;
+    }
+    static_assert(guess_methods_cases());
 
     // Today's calls with a generic lambda as fn resolve, named, as a value and observed.
     constexpr auto generic = [](auto const &x) { return x * x - 2.0; };
@@ -573,6 +793,44 @@ TEST_CASE("roots:protocol:loop")
         CHECK(cases[i]);
     }
     CHECK(std::format("{}", rt::error::invalid_step) == "invalid_step");
+}
+
+TEST_CASE("roots:protocol:guess")
+{
+    // The constant-evaluation cases again at run time.
+    auto const cases = guess_cases();
+    for (std::size_t i = 0; i < cases.size(); ++i) {
+        INFO("guess case ", i);
+        CHECK(cases[i]);
+    }
+    CHECK(evaluations_to_cap<rt::Newton>(flat2, 0.0) == 1 + double_cap);
+    CHECK(evaluations_to_cap<rt::Halley>(flat3, 0.0) == 1 + double_cap);
+    CHECK(evaluations_to_cap<rt::Secant>(bump, 1.0) == 2 + double_cap);
+    CHECK(evaluations_to_cap<rt::Steffensen>(bowl, 1.0) == 1 + 2 * double_cap);
+    CHECK(same_everywhere_from<rt::Newton>(g1d, 1.0));
+    CHECK(same_everywhere_from<rt::Halley>(g2d, 1.0));
+    CHECK(same_everywhere_from<rt::Secant>(g, 1.0));
+    CHECK(same_everywhere_from<rt::Steffensen>(g, 1.0));
+
+    // The observer sees the iterates, then the bracket: Newton's start is the guess alone (Secant's holds its two
+    // first points), the last step the result's.
+    std::vector<rt::Step<double>> steps;
+    auto record = [&steps](rt::Step<double> const &s) { steps.push_back(s); };
+    auto const r = rt::solve<rt::Newton>(rt::observer(record), g1d, 3.0);
+    REQUIRE(r.has_value());
+    REQUIRE(steps.size() >= 2);
+    CHECK(steps.front() == rt::Step<double>{ 3.0, 7.0, 3.0, 7.0, 3.0 });
+    CHECK(steps.back().point == r->value);
+
+    // A user's open method with a Brent finisher, through the separate-derivative form from a guess and with fn
+    // returning both values, against Wallis's root (conditioning term as in methods-of-ones-own) and sqrt 2; and the
+    // constant-evaluation cases again.
+    CHECK(guess_methods_cases());
+    CHECK(brackets(rt::solve<NewtonThenBrent>(wal_fn, wal_df, 2.0), wallis, 30.0 * deps / 11.2));
+    CHECK(brackets(rt::solve<NewtonThenBrent>(g1d, 1.0), sqrt2, deps));
+    CHECK(brackets(rt::solve(NewtonThenBrent{}, g1d, 10.0), sqrt2, deps));
+    // Without a root: x^2 + 1 from 1 steps to 0, where f' = 0 ends it.
+    CHECK(rt::solve<NewtonThenBrent>(no_root, 1.0).error() == rt::error::not_converged);
 }
 
 TEST_CASE("roots:protocol:observing")

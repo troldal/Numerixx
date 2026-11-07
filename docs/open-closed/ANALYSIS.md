@@ -394,7 +394,9 @@ Decided by the user on 2026-11-02: D1 public, D4 quadrature first. The quadratur
 members `apply`, `start`/`advance`/`settle` and `estimate`, and the method value first, `integrate(m, fn, a, b)`.
 The roots protocol is `docs/roots/PHASE7_API.md`, approved on 2026-11-06 (Q1 to Q19): the members `start` and
 `advance` on a bracket or from a guess, `solve` checking each step's bracket and sign change, the method value first,
-`solve(m, fn, bracket)`; the one-call members of 6.2 deferred; the observer shared in `math.hpp`.
+`solve(m, fn, bracket)`; the one-call members of 6.2 deferred; the observer shared in `math.hpp`. It was built in
+three steps (2026-11-06 to 2026-11-07): the observer moved, then the bracket path, then the guess path and the guide
+page "A method of your own"; step 2 of section 10 is done, the battery bit for bit but for 7 of Bisection's results.
 
 - **D1. Open to users, or only internally?** Internal only (step 1 and 2 without promoting `Start` and `Tolerance`)
   already removes every edit to existing code when the library adds a method. Recommended: public, because

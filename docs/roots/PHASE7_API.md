@@ -280,7 +280,8 @@ As quadrature's (`PHASE3A_API.md` E), with the roots `Step`:
 - an lvalue observer kept by reference, an rvalue by value; called as a non-const callable; its exceptions pass
   through; it must return void (a `static_assert` says so), a result being reserved for a stopping observer
   (deferred);
-- from a guess it sees the iterates (lower and upper the last two, equal after the start; point the latest) and,
+- from a guess it sees the iterates (lower and upper the last two, equal after a start that evaluates only the guess,
+  Secant's two first points after its start; point the latest) and,
   after the hand-over, the bracket.
 
 ### F. The library's methods, and a fix to today's header
@@ -500,6 +501,42 @@ The review of step 1 (`numerics-reviewer`, on the uncommitted diff), each findin
 Found correct: every stepped method's arithmetic and order of evaluations against the loops of Phases 1 to 6, the
 loop's checks and stop test, the hand-over, F, `Observed`, the concept's clause and comment, the overload set, the
 rules for user types, and the tests' references.
+
+Step 2 as built (2026-11-07): the four open methods stepped (the spike's states, the hand-over in their state),
+`open_state_t`, `open_method` with its contract, the guess checked by `solve` (Q7), the cap in `detail::run`, which
+now takes an optional bracket, and the forms from a guess: named, as a value, both observed, and the
+separate-derivative forms on `open_method`. Today's open loops, `detail::open` and the dispatch are gone, so one
+mechanism remains. The evidence: the existing suite unchanged; the battery, against the header at 2dd3228, the same
+10,923 identical results and 7 of Bisection's as step 1, and no result different from step 1's;
+`tests/test_roots_protocol.cpp` with the guess's cases (cap - 1, cap and cap + 1 steps without a sign change, a sign
+change lost and found again, nesting, a single point, the guess checked), the maximum counts from the cap (Newton and
+Halley 1 + cap, Secant 2 + cap, Steffensen 1 + 2 cap), observed against unobserved for the open methods, and an open
+method of one's own with a Brent finisher through the public members only. The documentation: the header's comments,
+`docs/roots/design.md` ("The method protocol (Phase 7)"), the notes in `BRIEF.md` and `ANALYSIS.md`, the reference
+page's two concepts, and the guide page `docs/sphinx/roots/method-of-your-own.md` with its program. The page gives
+Pegasus and Chebyshev each a parameter passed as a value (`inside`, `min_step`), which also shows the two rules for
+convergence with measured numbers (10 evaluations against 33; 5 against 213), in place of the separate trisection the
+Documentation list names. Also: a test's file-scope `cap` was renamed, since MSVC (C4459) warns where it is hidden by
+the local `cap` of `detail::iteration_cap`, instantiated after it.
+
+The reviews of step 2, each finding reproduced before it was acted on:
+- `numerics-reviewer`: no defect in the arithmetic; the open methods' steps, cap and hand-over as in Phases 2 to 6.
+  1. No test covered `previous.reset()` after a step without a sign change (shown by deleting it: every test passed).
+     *Adopted: the same bracket found, lost and found again; the deletion now fails a `static_assert`.*
+  2. "Equal after the start" is wrong for Secant, whose start reports its first two points. *Adopted, in the header
+     and in E.*
+  3. Halley's observed-from-a-guess case had no run-time twin; the user's open method and the observer from a guess
+     ran only at run time; `open_method`'s state-by-reference clause had no negative test. *Adopted.*
+  4. Three internal `@return` lines (and three of the bracket's) omitted `not_converged`. *Adopted.*
+  5. G's "16 overloads" read as a contradiction of Q8; it describes the alternative Q8 rejected. *No change.*
+- `docs-reviewer`, on the guide page: the explanation of `inside = 0`'s 33 evaluations and of the observed crossing
+  were wrong (the far end does move; the lower end reaches the double below the root after nine evaluations and the
+  midpoint fallback halves the bracket 24 times; the crossing is the scaling's, the margin places only the last
+  point), shown by tracing both runs. *Adopted: the text corrected and each claim asserted in the program.* Also
+  adopted: a non-finite report is `non_finite`, not `invalid_step`; the ends lie inside the bracket `start` received,
+  which zero first may halve; one fn returning the values is needed with a method value or an observer; Newton and
+  Halley do not continue as Brent; tol(x) defined; observed against unobserved asserted; the page trimmed; editorial
+  fixes. The replacement of the trisection was judged acceptable for the page's job.
 
 Each step is built and tested on the five toolchains, locally and in CI, with the docs build clean, before the next.
 

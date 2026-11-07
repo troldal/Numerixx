@@ -133,7 +133,8 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
   - [x] Step 1: on a bracket: the public types, the concepts, the loop, the fix, the nine bracketing methods stepped,
     the new forms; `tests/test_roots_protocol.cpp` (five toolchains locally, docs clean, `numerics-reviewer`'s seven
     findings adopted)
-  - [ ] Step 2: from a guess: the four open methods stepped, the cap in the loop; the documentation and the guide page
+  - [x] Step 2: from a guess: the four open methods stepped, the cap in the loop; the documentation and the guide page
+    (five toolchains locally, docs clean, the battery as step 1, `numerics-reviewer` and `docs-reviewer` adopted)
   - [ ] CI passes on all five toolchains
   - [ ] The independent review (Codex) and its adopted findings
 

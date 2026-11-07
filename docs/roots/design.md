@@ -22,23 +22,28 @@ the phases in `docs/plan.md`, and each phase's specification and evidence in `PH
 
 - The entry point is `solve<M>(...)` (user decision, 2026-10-27; `root<M>(...)` in Phase 1 and the brief), so that it
   is not told apart from its result type `Root<T>` only by case.
-- One entry point, `solve<M>(fn, Bracket[, Criteria])`, for every bracketing method M (`Bisection`, `Brent`); a closed
-  set of empty tags, `detail::bracketing<M>`, as in `nxx::deriv`. The open methods (Phase 2) take a guess as their
-  start, by an overload; `BRIEF.md` 3.1.
+- One entry point, `solve<M>(fn, Bracket[, Criteria])`, for every bracketing method M; the open methods (Phase 2) take
+  a guess as their start, by an overload; `BRIEF.md` 3.1. Until Phase 7 the methods were a closed set of empty tags
+  (`detail::bracketing<M>`, `detail::open<M>`); since Phase 7 a method is any type with the members of
+  `bracketing_method` or `open_method`, named (`solve<M>(fn, start)`) or given as a value (`solve(m, fn, start)`):
+  "The method protocol (Phase 7)".
 - `Bracket<T>{lower, upper}`: the ends in either order (swapped, not an error: an interval is unambiguous).
 - `Root<T>{value, abs_error}`, its own type rather than `nxx::deriv::Estimate<T>`, without a conversion to T; read by
   member name, so that members can be added (`BRIEF.md` 3.5).
 - `Criteria<T>{abs_tol, rel_tol}`, taken as `Criteria<std::type_identity_t<T>>` so that T comes from the bracket and a
   braced list of doubles converts.
-- `error`: `non_finite`, `no_sign_change`, `not_converged` (Phase 2: an open method found no root from its guess);
-  extensible, formattable.
+- `error`: `non_finite`, `no_sign_change`, `not_converged` (Phase 2: an open method found no root from its guess;
+  Phase 7: any method that cannot go on), `invalid_step` (Phase 7: a method broke the protocol's contract; never the
+  library's); extensible, formattable.
 - fn is constrained by `nxx::detail::callable` (`math.hpp`), shared with `nxx::deriv`, or, where it gives
   derivatives, by `detail::gives<F, T, K>`: a `std::pair`, `std::tuple` or `std::array` returned by value, every
   element exactly T (a reference or an expression type could dangle), at least K of them. A tuple-like result is never
   read as a value; a bracketing method on a tuple fn uses its first element.
 - Six overloads (Phase 2): a bracket or a guess, each with fn alone, with fn and dfn (Newton), or with fn, dfn and d2fn
   (Halley). The separate callables are joined by `detail::Joined` into one fn returning an array, so each method has
-  one implementation, and each callable is evaluated once per point.
+  one implementation, and each callable is evaluated once per point. Phase 7 adds six: the method as a value, and an
+  observer, named or with a value, each on a bracket or from a guess; the separate-derivative forms are keyed on
+  `values_of<M>` (2 or 3) and take the method by name only.
 
 ## Behaviour
 
@@ -189,6 +194,38 @@ the phases in `docs/plan.md`, and each phase's specification and evidence in `PH
   and the root found (1000 (x^2 - 2) from 1: -sqrt 2).
 - The cost (`PHASE6_API.md`): on 27 of the paper's cases Brent 309, AndersonBjorck 327, Illinois 382, Ridders 416,
   RegulaFalsi 645; Ridders 86 on (x - 1)^3 against Brent's 156. Teaching examples; Brent stays the default.
+
+## The method protocol (Phase 7)
+
+`PHASE7_API.md` (approved 2026-11-06, Q1 to Q19); `docs/open-closed/ANALYSIS.md` records why.
+- **A method computes, `solve` decides.** A stepped method has two const members, `start(fn, start, tolerance)` (a
+  `Start<T, values_of<M>>` on a bracket, a finite guess from one) and `advance(fn, state, tolerance)`, each leaving a
+  `Step<T>` (two points, fn's values there, the method's point) in `state.step`. The state is taken by non-const
+  reference; the concepts reject one taken by value or by const reference, which would loop on a copy (Q17).
+- **The loop (`detail::run`)** checks each step: all five numbers finite (`non_finite`); lower <= point <= upper, inside
+  the caller's bracket on a bracket (`invalid_step`); fn exactly 0 at the point returns it with tol(point); a bracketed
+  step (fn nonzero, of opposite signs at lower < upper) must lie strictly inside the last bracketed step
+  (`invalid_step`), and returns the point once the bracket is at most 2 tol(point) wide or the point within tol(point)
+  of both ends, `abs_error` the larger distance to an end (Q3). On a bracket every step must be bracketed; from a
+  guess a step without a sign change counts against the cap, 4 times the bits of T, and may follow a bracketed one
+  (Q19).
+- **Every method ends:** strictly nested brackets of T's finite set of numbers are finitely many (Q18), and the cap
+  bounds the rest. A method that cannot go on returns `not_converged` from `advance`; no step without progress
+  returns a root.
+- **The stop test** is Criteria's documented rule for every method. For a method whose point is an end it is today's
+  test bit for bit; Bisection's midpoint stops one halving earlier where it rounds (7 of the battery's 10,930
+  results), within 2 tol.
+- **The tolerance stays in the method's steps** (Brent's minimum step, `place`'s 0.7 tol, the open methods' tol(x)),
+  but the stop test is `solve`'s alone.
+- **The library's methods** are stepped: one evaluation per step but Steffensen's (up to two), Toms748 and Ridders
+  state machines over their stages, the strategies internal enumerations (`Safeguard`, `Scaling`). The open methods
+  hold Brent's state after their first sign change and forward to it.
+- **The arithmetic assumed:** IEEE round-to-nearest with subnormals, or a type that flushes below min() as Boost's do;
+  not flush-to-zero modes. In the latter types `midpoint` falls back on (a + b) / 2 where a + (b - a) / 2 is not
+  strictly inside, and Brent's minimum step takes its direction from b < c (Q16): before, [min, 2.5 min] returned a
+  bound above 2 tol.
+- **Observing:** `observer(o)`, shared with quadrature in `math.hpp`, wraps the method (`detail::Observed`); an
+  observed run is the same computation.
 
 ## Evidence (Phase 1)
 

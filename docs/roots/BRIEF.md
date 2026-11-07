@@ -1,5 +1,9 @@
 # `nxx::roots`: architecture brief
 
+Note (2026-11-07): 3.1 and 3.8 are amended by Phase 7 (`PHASE7_API.md`): the methods are no longer a closed set of
+empty tags dispatched with `if constexpr`, but types with `start` and `advance` members that `solve` steps through one
+loop, which owns the stop test; a user's type is a method too, named or given as a value.
+
 Note (2026-10-27): the entry point `root<M>(...)` of this brief is now `solve<M>(...)` (`PHASE2_API.md`, user
 decision), and the open methods finish inside the first sign change their iterates cross, so every method's
 `abs_error` is a bound (it supersedes 3.5's "open: the last step, an estimate" and 3.7's stop test for them).

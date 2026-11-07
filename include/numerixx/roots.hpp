@@ -16,10 +16,11 @@
  * exactly T (the value, f', f''), or from separate callables passed after fn, which may return a std::expected:
  * nxx::deriv::derivative_of(fn) gives a numerical derivative as such a callable.
  *
- * On a bracket a method computes and solve() decides: the method reports its bracket and its point after each step
- * (a Step), and solve() checks the report, applies the stop test and forms the bound. So a method of one's own, a
- * type that is a bracketing_method, gets the same checks and the same guarantee as the library's: `solve<M>(fn,
- * bracket)`, or `solve(m, fn, bracket)` for a method with parameters. `observer(o)` before fn reports each step to o.
+ * A method computes and solve() decides: the method reports two points, fn's values there and its point after each
+ * step (a Step), and solve() checks the report, applies the stop test and forms the bound. So a method of one's own,
+ * a type that is a bracketing_method or an open_method, gets the same checks and the same guarantee as the
+ * library's: `solve<M>(fn, start)`, or `solve(m, fn, start)` for a method with parameters. `observer(o)` before fn
+ * reports each step to o.
  *
  * search(fn, x0) finds a bracket from a guess, by an outward search, for a bracketing method to finish:
  * `search(fn, x0).and_then([&](Bracket<double> b) { return solve<Brent>(fn, b); })`.
@@ -250,8 +251,10 @@ namespace nxx::roots {
      * On a bracket: lower < upper with fn's values nonzero and of opposite signs, inside the caller's bracket and
      * strictly inside the previous step's; or point an end at which fn is exactly 0. solve() returns point once the
      * bracket is at most 2 tol(point) wide or point is within tol(point) of both ends, with abs_error the larger
-     * distance from point to an end, and point with abs_error tol(point) where fn is exactly 0 there. A method that
-     * cannot go on returns error::not_converged from advance.
+     * distance from point to an end, and point with abs_error tol(point) where fn is exactly 0 there. From a guess,
+     * before a sign change: the last two iterates in order (one point after a start that evaluates only the guess;
+     * Secant's start holds its first two points), point the latest; such a step
+     * counts against the iteration cap. A method that cannot go on returns error::not_converged from advance.
      *
      * @tparam T The real type.
      */
@@ -1381,8 +1384,8 @@ namespace nxx::roots {
          * Implemented from the book, with three changes: the tolerance is the caller's tol(b) rather than
          * 2 macheps |b| + t; the stop test (in solve()) is distance_bound(c, b) <= 2 tol(b) rather than |c - b| / 2 <=
          * tol(b); and a step is a bisection step whenever |c - b|, |b - a| or |e| exceeds max / 16, so that no product
-         * of the interpolation overflows. A derivative step is accepted by Brent's test written for a step s: towards c,
-         * |s| < 3 |m| / 2 - tol / 2, and |s| < |e| / 2; one that cannot be formed is a bisection step.
+         * of the interpolation overflows. A derivative step is accepted by Brent's test written for a step s: towards
+         * c, |s| < 3 |m| / 2 - tol / 2, and |s| < |e| / 2; one that cannot be formed is a bisection step.
          *
          * @tparam G The step.
          * @param fn The function.
@@ -1429,7 +1432,8 @@ namespace nxx::roots {
                 s.e = s.d;
                 // Accept the interpolated point only if it falls well inside the bracket and the steps shrink. A NaN
                 // or q = 0 fails both tests, and falls back on bisection.
-                if (T(T(2) * p) < T(T(T(3) * m * q) - math::abs(T(tol * q))) && p < math::abs(T(before_last * q / T(2)))) {
+                if (T(T(2) * p) < T(T(T(3) * m * q) - math::abs(T(tol * q)))
+                    && p < math::abs(T(before_last * q / T(2)))) {
                     s.d = T(p / q);
                 } else {
                     s.d = m;
@@ -1459,8 +1463,10 @@ namespace nxx::roots {
             else
                 next = T(s.b - tol);
             // A point not strictly inside the bracket: no step can make progress. Not reached by the library's
-            // arithmetic where the stop test failed (PHASE7_API.md B); not_converged rather than a root outside the bound.
-            if (!((s.b < next && next < s.c) || (s.c < next && next < s.b))) return std::unexpected(error::not_converged);
+            // arithmetic where the stop test failed (PHASE7_API.md B); not_converged rather than a root outside the
+            // bound.
+            if (!((s.b < next && next < s.c) || (s.c < next && next < s.b)))
+                return std::unexpected(error::not_converged);
             s.a = s.b;
             s.va = s.vb;
             s.b = next;
@@ -1516,8 +1522,9 @@ namespace nxx::roots {
             Tolerance<T> const &tolerance)
         {
             T const c = detail::wide(s) ? detail::midpoint(s.a, s.b) : detail::place(s, proposed, tolerance);
-            // Not reached: a midpoint not strictly inside means adjacent ends, which met the stop test before (midpoint()
-            // falls back on (a + b) / 2 where a + (b - a) / 2 flushes, numerics review of draft 1, finding 1).
+            // Not reached: a midpoint not strictly inside means adjacent ends, which met the stop test before
+            // (midpoint() falls back on (a + b) / 2 where a + (b - a) / 2 flushes, numerics review of draft 1, finding
+            // 1).
             assert(s.a < c && c < s.b);
             if (!(s.a < c && c < s.b)) return Narrowed<T>{ s, c, s.fa, false, true };
             Enclosure<T> next = s;
@@ -1588,7 +1595,8 @@ namespace nxx::roots {
          * @param fn The function.
          * @param st The state.
          * @param tolerance The tolerances.
-         * @return Nothing, or error::non_finite.
+         * @return Nothing, error::non_finite where fn is not finite at a point, or error::not_converged where the
+         *         method cannot go on.
          */
         template<real T, typename F>
         constexpr std::expected<void, error> toms748_advance(F &fn, Toms748State<T> &st, Tolerance<T> const &tolerance)
@@ -1699,7 +1707,8 @@ namespace nxx::roots {
          * @param fn The function.
          * @param st The state.
          * @param tolerance The tolerances.
-         * @return Nothing, or error::non_finite.
+         * @return Nothing, error::non_finite where fn is not finite at a point, or error::not_converged where the
+         *         method cannot go on.
          */
         template<Scaling S, real T, typename F>
         constexpr std::expected<void, error>
@@ -1777,7 +1786,8 @@ namespace nxx::roots {
          * @param fn The function.
          * @param st The state.
          * @param tolerance The tolerances.
-         * @return Nothing, or error::non_finite.
+         * @return Nothing, error::non_finite where fn is not finite at a point, or error::not_converged where the
+         *         method cannot go on.
          */
         template<real T, typename F>
         constexpr std::expected<void, error> ridders_advance(F &fn, RiddersState<T> &st, Tolerance<T> const &tolerance)
@@ -1801,6 +1811,286 @@ namespace nxx::roots {
             return {};
         }
 
+        /**
+         * @brief Secant's second point: x0 (1 + eta), eta = eps^(1/4); eta at x0 = 0; x0 (1 - eta) where x0 (1 + eta)
+         * would overflow; x0 + tol(x0) where x0 (1 + eta) rounds back to x0 (among the subnormals). Relative, so no
+         * scale is assumed.
+         * @param x0 The guess, finite.
+         * @param tolerance The tolerances.
+         * @return The second point, distinct from x0.
+         */
+        template<real T>
+        constexpr T secant_second_point(T const &x0, Tolerance<T> const &tolerance)
+        {
+            T const eta = math::root_epsilon<4, T>();
+            if (x0 == T(0)) return eta;
+            if (math::abs(x0) > T(detail::largest<T>() / T(T(1) + eta))) return T(x0 * T(T(1) - eta));
+            T const second = T(x0 * T(T(1) + eta));
+            if (second == x0) return T(x0 + tolerance.at(x0)); // tiny x0: tol(x0) is about denorm_min
+            return second;
+        }
+
+        /**
+         * @brief The secant's step from x: dx (f / (fp - f)), dx = x - xp, through (x, f) and (xp, fp) of one sign, at
+         * least tol(x) long, its direction from the signs of f, fp - f and dx in case the step underflowed. Secant's and
+         * Steffensen's.
+         * @param x The latest point.
+         * @param f fn there.
+         * @param dx x - xp.
+         * @param difference fp - f, of one sign's values (it cannot overflow).
+         * @param tolerance The tolerances.
+         * @return The move from x, or nothing where it cannot be formed (fp = f, a quotient or product out of range, or
+         *         x + move overflowing).
+         */
+        template<real T>
+        constexpr std::optional<T>
+            secant_move(T const &x, T const &f, T const &dx, T const &difference, Tolerance<T> const &tolerance)
+        {
+            if (difference == T(0)) return std::nullopt;
+            std::optional<T> const ratio = detail::quotient(f, difference);
+            if (!ratio) return std::nullopt;
+            std::optional<T> const step = detail::product(dx, *ratio);
+            if (!step) return std::nullopt;
+            T const tol = tolerance.at(x);
+            bool const upward = ((dx > T(0)) == (f > T(0))) == (difference > T(0));
+            T const move = math::abs(*step) > tol ? *step : (upward ? tol : T(-tol));
+            if (!detail::sum_fits(x, move)) return std::nullopt;
+            return move;
+        }
+
+        /**
+         * @brief The step of two points x and y, y the latest and the point, in order: an open method's report before
+         * its sign change, or where fn is exactly 0 at y.
+         * @param x The earlier point.
+         * @param fx fn there.
+         * @param y The latest point.
+         * @param fy fn there.
+         * @return The step.
+         */
+        template<real T>
+        constexpr Step<T> pair_step(T const &x, T const &fx, T const &y, T const &fy)
+        {
+            if (x < y) return Step<T>{ x, fx, y, fy, y };
+            return Step<T>{ y, fy, x, fx, y };
+        }
+
+        // ---- The open methods ------------------------------------------------------------------------------------
+
+        /**
+         * @brief Brent's procedure on two iterates of an open method, whose values have opposite signs: the
+         * hand-over. No zero first: they are adjacent iterates, not the caller's bracket.
+         * @param x One iterate.
+         * @param vx fn's values there.
+         * @param y The other.
+         * @param vy fn's values there.
+         * @return The state, reported.
+         */
+        template<real T, std::size_t K>
+        constexpr SafeguardedState<T, K>
+            hand_over(T const &x, std::array<T, K> const &vx, T const &y, std::array<T, K> const &vy)
+        {
+            if (x < y) return detail::safeguarded_start(Start<T, K>{ x, vx, y, vy });
+            return detail::safeguarded_start(Start<T, K>{ y, vy, x, vx });
+        }
+
+        /**
+         * @brief Newton's or Halley's state from a guess: the latest iterate and, once two iterates have shown a sign
+         * change, Brent's procedure with the same step on them.
+         * @tparam T The real type.
+         * @tparam K The number of values: 2 or 3.
+         */
+        template<real T, std::size_t K>
+        struct OpenDerivativeState
+        {
+            /** @brief The latest iterate. */
+            T x;
+            /** @brief fn's values there. */
+            std::array<T, K> vx;
+            /** @brief The bracket loop after the hand-over. */
+            std::optional<SafeguardedState<T, K>> finish;
+            /** @brief The report. */
+            Step<T> step;
+        };
+
+        /**
+         * @brief One step of Newton or Halley from a guess: the method's step, at least tol(x) long, its direction from
+         * the signs of f and f'; at the first sign change, the hand-over; then the bracket loop.
+         * @tparam G Safeguard::newton or Safeguard::halley.
+         * @param fn The function.
+         * @param st The state.
+         * @param tolerance The tolerances.
+         * @return Nothing, error::non_finite where fn is not finite at a point, or error::not_converged where the
+         *         method cannot go on.
+         */
+        template<Safeguard G, real T, std::size_t K, typename F>
+        constexpr std::expected<void, error>
+            open_derivative_advance(F &fn, OpenDerivativeState<T, K> &st, Tolerance<T> const &tolerance)
+        {
+            if (st.finish) {
+                std::expected<void, error> const r = detail::safeguarded_advance<G>(fn, *st.finish, tolerance);
+                st.step = st.finish->step;
+                return r;
+            }
+            std::optional<T> const step = detail::derivative_step<G>(st.vx);
+            if (!step) return std::unexpected(error::not_converged);
+            T const tol = tolerance.at(st.x);
+            bool const upward = !detail::same_sign(st.vx[0], st.vx[1]); // Newton's direction, -f / f'
+            T const move = math::abs(*step) > tol ? *step : (upward ? tol : T(-tol));
+            if (!detail::sum_fits(st.x, move)) return std::unexpected(error::not_converged);
+            T const next = T(st.x + move);
+            std::array<T, K> const vn = detail::evaluate<K>(fn, next);
+            if (!math::isfinite(vn[0])) return std::unexpected(error::non_finite);
+            if (vn[0] != T(0) && !detail::same_sign(vn[0], st.vx[0])) {
+                st.finish = detail::hand_over(st.x, st.vx, next, vn);
+                st.step = st.finish->step;
+                return {};
+            }
+            st.step = detail::pair_step(st.x, st.vx[0], next, vn[0]);
+            st.x = next;
+            st.vx = vn;
+            return {};
+        }
+
+        /**
+         * @brief The secant method's state from a guess: the latest two iterates and the last move, then Brent.
+         * @tparam T The real type.
+         */
+        template<real T>
+        struct SecantState
+        {
+            /** @brief The previous iterate. */
+            T xp;
+            /** @brief fn there. */
+            T fp;
+            /** @brief The latest iterate. */
+            T x;
+            /** @brief fn there. */
+            T fx;
+            /** @brief x - xp. */
+            T dx;
+            /** @brief Brent's procedure after the hand-over. */
+            std::optional<SafeguardedState<T, 1>> finish;
+            /** @brief The report. */
+            Step<T> step;
+        };
+
+        /**
+         * @brief The secant method's report on a new iterate x after xp: the hand-over at a sign change, else the
+         * two iterates (the zero where fn is 0 at x).
+         * @param st The state, x just evaluated and finite.
+         */
+        template<real T>
+        constexpr void secant_report(SecantState<T> &st)
+        {
+            if (st.fx != T(0) && !detail::same_sign(st.fx, st.fp)) {
+                st.finish = detail::hand_over(st.xp, std::array<T, 1>{ st.fp }, st.x, std::array<T, 1>{ st.fx });
+                st.step = st.finish->step;
+                return;
+            }
+            st.step = detail::pair_step(st.xp, st.fp, st.x, st.fx);
+        }
+
+        /**
+         * @brief One step of the secant method from a guess: the step (x - xp) (f / (fp - f)) through the latest two
+         * iterates, at least tol(x) long; at the first sign change Brent on them.
+         * @param fn The function.
+         * @param st The state.
+         * @param tolerance The tolerances.
+         * @return Nothing, error::non_finite where fn is not finite at a point, or error::not_converged where the
+         *         method cannot go on.
+         */
+        template<real T, typename F>
+        constexpr std::expected<void, error> secant_advance(F &fn, SecantState<T> &st, Tolerance<T> const &tolerance)
+        {
+            if (st.finish) {
+                std::expected<void, error> const r =
+                    detail::safeguarded_advance<Safeguard::interpolation>(fn, *st.finish, tolerance);
+                st.step = st.finish->step;
+                return r;
+            }
+            std::optional<T> const move = detail::secant_move(st.x, st.fx, st.dx, T(st.fp - st.fx), tolerance);
+            if (!move) return std::unexpected(error::not_converged);
+            st.xp = st.x;
+            st.fp = st.fx;
+            st.x = T(st.x + *move);
+            st.dx = *move;
+            st.fx = detail::evaluate<1>(fn, st.x)[0];
+            if (!math::isfinite(st.fx)) return std::unexpected(error::non_finite);
+            detail::secant_report(st);
+            return {};
+        }
+
+        /**
+         * @brief Steffensen's state from a guess: the latest iterate, then Brent.
+         * @tparam T The real type.
+         */
+        template<real T>
+        struct SteffensenState
+        {
+            /** @brief The latest iterate. */
+            T x;
+            /** @brief fn there. */
+            T fx;
+            /** @brief Brent's procedure after the hand-over. */
+            std::optional<SafeguardedState<T, 1>> finish;
+            /** @brief The report. */
+            Step<T> step;
+        };
+
+        /**
+         * @brief One iteration of Steffensen's method from a guess: z = x + f(x), at least tol(x) away from x in f(x)'s
+         * direction; the secant's step through (x, f(x)) and (z, f(z)); Brent at the first sign change, between x and z
+         * or x and the next iterate. Up to two evaluations.
+         * @param fn The function.
+         * @param st The state.
+         * @param tolerance The tolerances.
+         * @return Nothing, error::non_finite where fn is not finite at a point, or error::not_converged where the
+         *         method cannot go on.
+         */
+        template<real T, typename F>
+        constexpr std::expected<void, error>
+            steffensen_advance(F &fn, SteffensenState<T> &st, Tolerance<T> const &tolerance)
+        {
+            if (st.finish) {
+                std::expected<void, error> const r =
+                    detail::safeguarded_advance<Safeguard::interpolation>(fn, *st.finish, tolerance);
+                st.step = st.finish->step;
+                return r;
+            }
+            T const x = st.x;
+            T const fx = st.fx;
+            T const tol = tolerance.at(x);
+            T const offset = math::abs(fx) > tol ? fx : (fx > T(0) ? tol : T(-tol));
+            if (!detail::sum_fits(x, offset)) return std::unexpected(error::not_converged);
+            T const z = T(x + offset);
+            T const fz = detail::evaluate<1>(fn, z)[0];
+            if (!math::isfinite(fz)) return std::unexpected(error::non_finite);
+            if (fz == T(0)) {
+                st.step = detail::pair_step(x, fx, z, fz);
+                return {};
+            }
+            if (!detail::same_sign(fz, fx)) {
+                st.finish = detail::hand_over(x, std::array<T, 1>{ fx }, z, std::array<T, 1>{ fz });
+                st.step = st.finish->step;
+                return {};
+            }
+            T const width = math::abs(offset) <= math::abs(x) ? T(z - x) : offset;
+            std::optional<T> const move = detail::secant_move(x, fx, T(-width), T(fz - fx), tolerance);
+            if (!move) return std::unexpected(error::not_converged);
+            T const next = T(x + *move);
+            T const fn_next = detail::evaluate<1>(fn, next)[0];
+            if (!math::isfinite(fn_next)) return std::unexpected(error::non_finite);
+            if (fn_next != T(0) && !detail::same_sign(fn_next, fx)) {
+                st.finish = detail::hand_over(x, std::array<T, 1>{ fx }, next, std::array<T, 1>{ fn_next });
+                st.step = st.finish->step;
+                return {};
+            }
+            st.step = detail::pair_step(x, fx, next, fn_next);
+            st.x = next;
+            st.fx = fn_next;
+            return {};
+        }
+
     } // namespace detail
     /** @endcond */
 
@@ -1820,7 +2110,8 @@ namespace nxx::roots {
          * @return The state.
          */
         template<real T, typename F>
-        constexpr std::expected<detail::BisectionState<T>, error> start(F &, Start<T> const &s, Tolerance<T> const &) const
+        constexpr std::expected<detail::BisectionState<T>, error>
+            start(F &, Start<T> const &s, Tolerance<T> const &) const
         {
             T const fa = s.at_lower[0];
             T const fb = s.at_upper[0];
@@ -1919,7 +2210,8 @@ namespace nxx::roots {
          * @return The state.
          */
         template<real T, typename F>
-        constexpr std::expected<detail::Toms748State<T>, error> start(F &, Start<T> const &s, Tolerance<T> const &) const
+        constexpr std::expected<detail::Toms748State<T>, error>
+            start(F &, Start<T> const &s, Tolerance<T> const &) const
         {
             T const fa = s.at_lower[0];
             T const fb = s.at_upper[0];
@@ -1962,7 +2254,8 @@ namespace nxx::roots {
              * @return The state.
              */
             template<real T, typename F>
-            constexpr std::expected<FalsePositionState<T>, error> start(F &, Start<T> const &s, Tolerance<T> const &) const
+            constexpr std::expected<FalsePositionState<T>, error>
+                start(F &, Start<T> const &s, Tolerance<T> const &) const
             {
                 T const fa = s.at_lower[0];
                 T const fb = s.at_upper[0];
@@ -1987,8 +2280,9 @@ namespace nxx::roots {
         };
 
         /**
-         * @brief A method with a derivative step (Newton's or Halley's) inside Brent's safeguard on a bracket, so that
-         * Newton and Halley share Brent's bookkeeping and differ only in the step.
+         * @brief A method with a derivative step (Newton's or Halley's): inside Brent's safeguard on a bracket, and
+         * from a guess until two iterates show a sign change, then inside it, so that Newton and Halley share Brent's
+         * bookkeeping and differ only in the step.
          * @tparam G The step.
          * @tparam K The values it needs: the value and K - 1 derivatives.
          */
@@ -2024,6 +2318,39 @@ namespace nxx::roots {
             template<real T, typename F>
             constexpr std::expected<void, error> advance(F &fn, SafeguardedState<T, K> &s, Tolerance<T> const &t) const
             { return detail::safeguarded_advance<G>(fn, s, t); }
+
+            /**
+             * @brief The state from a guess: fn's values there, the guess its point.
+             * @tparam T The real type.
+             * @tparam F fn's type.
+             * @param fn The function.
+             * @param guess The guess, finite.
+             * @return The state, or error::non_finite where fn is not finite at the guess.
+             */
+            template<real T, typename F>
+            constexpr std::expected<OpenDerivativeState<T, K>, error>
+                start(F &fn, T const &guess, Tolerance<T> const &) const
+            {
+                std::array<T, K> const v = detail::evaluate<K>(fn, guess);
+                if (!math::isfinite(v[0])) return std::unexpected(error::non_finite);
+                return OpenDerivativeState<T, K>{ guess, v, std::nullopt, Step<T>{ guess, v[0], guess, v[0], guess } };
+            }
+
+            /**
+             * @brief One iteration from a guess: the derivative step, at least tol(x) long, to the next iterate; at the
+             * first sign change between two iterates, Brent's procedure with the same step on them; then its steps.
+             * @tparam T The real type.
+             * @tparam F fn's type.
+             * @param fn The function.
+             * @param s The state.
+             * @param t The tolerances.
+             * @return Nothing, error::non_finite where fn is not finite at the iterate, or error::not_converged where
+             *         the step cannot be formed (f' = 0 or not finite, or x + step would overflow).
+             */
+            template<real T, typename F>
+            constexpr std::expected<void, error>
+                advance(F &fn, OpenDerivativeState<T, K> &s, Tolerance<T> const &t) const
+            { return detail::open_derivative_advance<G>(fn, s, t); }
         };
 
     } // namespace detail
@@ -2065,7 +2392,8 @@ namespace nxx::roots {
          * @return The state.
          */
         template<real T, typename F>
-        constexpr std::expected<detail::RiddersState<T>, error> start(F &, Start<T> const &s, Tolerance<T> const &) const
+        constexpr std::expected<detail::RiddersState<T>, error>
+            start(F &, Start<T> const &s, Tolerance<T> const &) const
         {
             T const fa = s.at_lower[0];
             T const fb = s.at_upper[0];
@@ -2144,6 +2472,45 @@ namespace nxx::roots {
      */
     struct Secant
     {
+        /**
+         * @brief The state from a guess: fn at the guess and at the second point.
+         * @tparam T The real type.
+         * @tparam F fn's type.
+         * @param fn The function.
+         * @param guess The guess, finite.
+         * @param tolerance The tolerances.
+         * @return The state, or error::non_finite where fn is not finite at either point.
+         */
+        template<real T, typename F>
+        constexpr std::expected<detail::SecantState<T>, error>
+            start(F &fn, T const &guess, Tolerance<T> const &tolerance) const
+        {
+            T const fp = detail::evaluate<1>(fn, guess)[0];
+            if (!math::isfinite(fp)) return std::unexpected(error::non_finite);
+            Step<T> const at_guess{ guess, fp, guess, fp, guess };
+            if (fp == T(0)) return detail::SecantState<T>{ guess, fp, guess, fp, T(0), std::nullopt, at_guess };
+            T const x = detail::secant_second_point(guess, tolerance);
+            T const fx = detail::evaluate<1>(fn, x)[0];
+            if (!math::isfinite(fx)) return std::unexpected(error::non_finite);
+            detail::SecantState<T> s{ guess, fp, x, fx, T(x - guess), std::nullopt, at_guess };
+            detail::secant_report(s);
+            return s;
+        }
+
+        /**
+         * @brief One iteration: the secant step through the latest two iterates, at least tol(x) long; at the first
+         * sign change, Brent's procedure on them; then its steps.
+         * @tparam T The real type.
+         * @tparam F fn's type.
+         * @param fn The function.
+         * @param s The state.
+         * @param t The tolerances.
+         * @return Nothing, error::non_finite where fn is not finite at the iterate, or error::not_converged where the
+         *         step cannot be formed (the two values equal, or a quotient, product or sum out of range).
+         */
+        template<real T, typename F>
+        constexpr std::expected<void, error> advance(F &fn, detail::SecantState<T> &s, Tolerance<T> const &t) const
+        { return detail::secant_advance(fn, s, t); }
     };
 
     /**
@@ -2157,6 +2524,37 @@ namespace nxx::roots {
      */
     struct Steffensen
     {
+        /**
+         * @brief The state from a guess: fn's value there.
+         * @tparam T The real type.
+         * @tparam F fn's type.
+         * @param fn The function.
+         * @param guess The guess, finite.
+         * @return The state, or error::non_finite where fn is not finite at the guess.
+         */
+        template<real T, typename F>
+        constexpr std::expected<detail::SteffensenState<T>, error>
+            start(F &fn, T const &guess, Tolerance<T> const &) const
+        {
+            T const fx = detail::evaluate<1>(fn, guess)[0];
+            if (!math::isfinite(fx)) return std::unexpected(error::non_finite);
+            return detail::SteffensenState<T>{ guess, fx, std::nullopt, Step<T>{ guess, fx, guess, fx, guess } };
+        }
+
+        /**
+         * @brief One iteration, up to two evaluations: z = x + f(x), at least tol(x) from x, then the secant step
+         * through x and z; at the first sign change, Brent's procedure on it; then its steps.
+         * @tparam T The real type.
+         * @tparam F fn's type.
+         * @param fn The function.
+         * @param s The state.
+         * @param t The tolerances.
+         * @return Nothing, error::non_finite where fn is not finite at a point, or error::not_converged where the
+         *         step cannot be formed.
+         */
+        template<real T, typename F>
+        constexpr std::expected<void, error> advance(F &fn, detail::SteffensenState<T> &s, Tolerance<T> const &t) const
+        { return detail::steffensen_advance(fn, s, t); }
     };
 
     /** @cond INTERNAL */
@@ -2177,7 +2575,7 @@ namespace nxx::roots {
          * @tparam M The method.
          * @tparam T The real type.
          * @tparam F fn's type.
-         * @tparam X The start: a Start.
+         * @tparam X The start: a Start, or T for a guess.
          */
         template<typename M, typename T, typename F, typename X>
         using start_result = decltype(std::declval<M const &>().start(
@@ -2276,6 +2674,59 @@ namespace nxx::roots {
         };
 
     /**
+     * @brief The state type of an open method M for fn of type F, for a method of one's own that holds a library
+     * method's state in its own: what `m.start(fn, guess, tolerance)` returns inside its std::expected.
+     * @tparam M The method.
+     * @tparam T The real type.
+     * @tparam F fn's type, reference removed; by default a plain function of T returning values_of<M> values.
+     */
+    template<typename M, typename T, typename F = detail::archetype<T, values_of<M>>>
+    using open_state_t = typename detail::start_result<M, T, F, T>::value_type;
+
+    /**
+     * @brief What a type must provide to work with solve() from a guess, one step at a time: the method iterates,
+     * solve() checks each report and returns once two of its points bracket a sign change that meets the request.
+     *
+     * Newton, Halley, Secant and Steffensen are open methods; a user's type can be another, given as a type,
+     * `solve<M>(fn, guess)`, or as a value, `solve(m, fn, guess)`. The members are those of bracketing_method, with
+     * `m.start(fn, guess, tolerance)` taking a finite guess of type T in place of a Start.
+     *
+     * The step reports two points and fn's values there. Before a sign change they are the last two iterates, in order
+     * (one point after a start that evaluates only the guess; Secant's holds its first two), and point the latest.
+     * solve() checks each step as for bracketing_method, without a
+     * caller's bracket: a step whose values have opposite signs at lower < upper is bracketed and is tested as on a
+     * bracket, and a bracketed step after a bracketed one must lie strictly inside it; fn exactly 0 at the point ends
+     * the solve. A step without a sign change counts against the iteration cap, 4 times the bits of T (212 in double):
+     * at the cap solve() returns error::not_converged. So every open method ends, and every success is a bracketed
+     * step that met the request, a verified sign change.
+     *
+     * The contract: as for bracketing_method, and
+     * - **Given:** a finite guess; fn may be evaluated anywhere.
+     * - **Allowed:** a sign change may be lost again (a plain iteration need not keep it); the steps without one keep
+     *   counting against the cap.
+     * - **For convergence, not checked:** steps of at least tol(x), or an iterate converging from one side never
+     *   brackets; and once a sign change is found, keep each point about tol inside it, as on a bracket. Holding a
+     *   bracketing method's state (`std::optional<bracketing_state_t<Brent, T, F>>`) and forwarding to it after the
+     *   first sign change is one way, which the library's open methods take.
+     *
+     * Check a method where it is defined: `static_assert(nxx::roots::open_method<MyMethod, double>)`.
+     *
+     * @tparam M The method.
+     * @tparam T The real type.
+     * @tparam F fn's type, reference removed; by default a plain function of T returning values_of<M> values.
+     */
+    template<typename M, typename T, typename F = detail::archetype<T, values_of<M>>>
+    concept open_method = requires(M const &m, F &fn, T const &guess, Tolerance<T> const &t) {
+        { m.start(fn, guess, t) } -> detail::state_result;
+    } && requires(M const &m, F &fn, open_state_t<M, T, F> &st, Tolerance<T> const &t) {
+        { m.advance(fn, st, t) } -> std::same_as<std::expected<void, error>>;
+        { std::as_const(st).step } -> std::same_as<Step<T> const &>;
+        // advance updates the state: one taken by value or by const reference would loop on a copy (PHASE7_API.md,
+        // Q17).
+        requires !requires { m.advance(fn, std::move(st), t); };
+    };
+
+    /**
      * @brief The observer's marker, nxx::Observer, shared with the other modules: solve() tells an observer from fn
      * by this type.
      */
@@ -2357,6 +2808,26 @@ namespace nxx::roots {
             }
 
             /**
+             * @brief The method's start from a guess, then a report of its first step.
+             * @tparam T The real type.
+             * @tparam F fn's type.
+             * @tparam Self The method, as a dependent type.
+             * @param fn The function.
+             * @param guess The guess.
+             * @param t The tolerances.
+             * @return The method's state, or its error.
+             */
+            template<real T, typename F, typename Self = M>
+            requires open_method<Self, T, F>
+            constexpr auto start(F &fn, T const &guess, Tolerance<T> const &t) const
+                -> decltype(std::declval<Self const &>().start(fn, guess, t))
+            {
+                auto started = method.start(fn, guess, t);
+                if (started) report(started->step);
+                return started;
+            }
+
+            /**
              * @brief The method's step, then a report of it.
              * @tparam F fn's type.
              * @tparam S The method's state.
@@ -2410,8 +2881,7 @@ namespace nxx::roots {
         { return Observed<M, O>{ m, std::move(o.callable) }; }
 
         /**
-         * @brief A bracket inside which every step must lie: the caller's after validation, or an open method's at its
-         * hand-over.
+         * @brief The caller's bracket after validation, inside which every step and result must lie.
          * @tparam T The real type.
          */
         template<real T>
@@ -2425,50 +2895,63 @@ namespace nxx::roots {
         };
 
         /**
-         * @brief The loop for a bracketing method: check each step, return a root once it meets the request, else
-         * advance (bracketing_method states the checks).
+         * @brief The loop for a stepped method: check each step, return a root once it meets the request, else
+         * advance (bracketing_method and open_method state the checks).
          *
          * The stop test is Criteria's rule, the bracket at most 2 tol(point) wide, or point within tol(point) of both
          * ends. For a method whose point is an end the two are one test; Bisection's midpoint can meet the second
          * where the unit distance_bound adds to a width that rounds fails the first (numerics review of Phase 7's
-         * draft 1, finding 2). Each bracket strictly inside the last: finitely many such brackets of T's numbers
-         * exist, so every method ends (the same review, finding 3).
+         * draft 1, finding 2). Each bracketed step after a bracketed step strictly inside it: finitely many such
+         * brackets of T's numbers exist (the same review, finding 3); from a guess the steps without a sign change
+         * count against the cap. So every method ends.
          *
          * @param m The method.
          * @param fn The function.
          * @param state The method's state, started.
          * @param tolerance The tolerances.
-         * @param within The bracket inside which every step must lie.
+         * @param within The caller's bracket, for a bracketing method; nothing from a guess.
          * @return The root, or an error.
          */
         template<typename M, real T, typename F, typename S>
         constexpr std::expected<Root<T>, error>
-            run(M const &m, F &fn, S &state, Tolerance<T> const &tolerance, Within<T> const &within)
+            run(M const &m, F &fn, S &state, Tolerance<T> const &tolerance, std::optional<Within<T>> const &within)
         {
-            std::optional<Within<T>> previous; // the last step's bracket
+            std::optional<Within<T>> previous; // the last step's bracket, where it was one
+            int unbracketed = 0;               // from a guess: the steps without a sign change so far
             while (true) {
                 Step<T> const &s = std::as_const(state).step;
                 if (!math::isfinite(s.lower) || !math::isfinite(s.upper) || !math::isfinite(s.point)
                     || !math::isfinite(s.f_lower) || !math::isfinite(s.f_upper))
                     return std::unexpected(error::non_finite);
                 if (!(s.lower <= s.point && s.point <= s.upper)) return std::unexpected(error::invalid_step);
-                if (s.lower < within.lower || within.upper < s.upper) return std::unexpected(error::invalid_step);
+                if (within && (s.lower < within->lower || within->upper < s.upper))
+                    return std::unexpected(error::invalid_step);
                 if ((s.point == s.lower && s.f_lower == T(0)) || (s.point == s.upper && s.f_upper == T(0)))
                     return Root<T>{ s.point, tolerance.at(s.point) };
                 bool const bracketed =
                     s.f_lower != T(0) && s.f_upper != T(0) && !detail::same_sign(s.f_lower, s.f_upper);
-                if (!bracketed || !(s.lower < s.upper)) return std::unexpected(error::invalid_step);
-                if (previous
-                    && (s.lower < previous->lower || previous->upper < s.upper
-                        || (s.lower == previous->lower && s.upper == previous->upper)))
-                    return std::unexpected(error::invalid_step);
-                previous = Within<T>{ s.lower, s.upper };
-                T const tol = tolerance.at(s.point);
-                T const below = detail::distance_bound(s.point, s.lower);
-                T const above = detail::distance_bound(s.upper, s.point);
-                T const larger = below < above ? above : below;
-                if (detail::distance_bound(s.lower, s.upper) <= detail::twice(tol) || larger <= tol)
-                    return Root<T>{ s.point, larger };
+                if (bracketed) {
+                    if (!(s.lower < s.upper)) return std::unexpected(error::invalid_step);
+                    if (previous
+                        && (s.lower < previous->lower || previous->upper < s.upper
+                            || (s.lower == previous->lower && s.upper == previous->upper)))
+                        return std::unexpected(error::invalid_step);
+                    previous = Within<T>{ s.lower, s.upper };
+                    T const tol = tolerance.at(s.point);
+                    T const below = detail::distance_bound(s.point, s.lower);
+                    T const above = detail::distance_bound(s.upper, s.point);
+                    T const larger = below < above ? above : below;
+                    if (detail::distance_bound(s.lower, s.upper) <= detail::twice(tol) || larger <= tol)
+                        return Root<T>{ s.point, larger };
+                } else {
+                    // On a bracket the sign change must be kept; from a guess a step without one counts against the
+                    // cap, so that a method that finds and loses sign changes still ends (simplicity review of
+                    // draft 1, finding 3).
+                    if (within) return std::unexpected(error::invalid_step);
+                    previous.reset();
+                    if (unbracketed == detail::iteration_cap<T>()) return std::unexpected(error::not_converged);
+                    ++unbracketed;
+                }
                 std::expected<void, error> const r = m.advance(fn, state, tolerance);
                 if (!r) return std::unexpected(r.error());
             }
@@ -2497,221 +2980,27 @@ namespace nxx::roots {
             Start<T, K> const &start = prepared->start;
             auto state = m.start(fn, start, *tolerance);
             if (!state) return std::unexpected(state.error());
-            return detail::run(m, fn, *state, *tolerance, Within<T>{ start.lower, start.upper });
+            std::optional<Within<T>> const within = Within<T>{ start.lower, start.upper };
+            return detail::run(m, fn, *state, *tolerance, within);
         }
 
         /**
-         * @brief The methods solve() accepts from a guess.
-         * @tparam M The method.
-         */
-        template<typename M>
-        concept open = std::same_as<M, Newton> || std::same_as<M, Halley> || std::same_as<M, Secant>
-                       || std::same_as<M, Steffensen>;
-
-        /**
-         * @brief The bracketing method M on two consecutive iterates of an open method, whose values have opposite
-         * signs: the hand-over. No zero first: they are adjacent iterates, not the caller's bracket.
-         * @tparam M The bracketing method: Brent (for Secant and Steffensen), Newton or Halley.
+         * @brief solve() from a guess: the tolerances and the guess validated, then the method's start and the loop.
+         * @param m The method.
          * @param fn The function.
-         * @param x One iterate.
-         * @param vx fn's values there.
-         * @param y The other iterate.
-         * @param vy fn's values there.
-         * @param tolerance The tolerances.
-         * @return The root, or error::non_finite.
-         */
-        template<typename M, std::size_t K, real T, typename F>
-        constexpr std::expected<Root<T>, error> hand_over(F &fn,
-            T const &x,
-            std::array<T, K> const &vx,
-            T const &y,
-            std::array<T, K> const &vy,
-            Tolerance<T> const &tolerance)
-        {
-            Start<T, K> const start = x < y ? Start<T, K>{ x, vx, y, vy } : Start<T, K>{ y, vy, x, vx };
-            M const m{};
-            auto state = m.start(fn, start, tolerance);
-            if (!state) return std::unexpected(state.error());
-            return detail::run(m, fn, *state, tolerance, Within<T>{ start.lower, start.upper });
-        }
-
-        /**
-         * @brief The derivative step of Newton or Halley, from the method's type.
-         * @tparam M Newton or Halley.
-         */
-        template<typename M>
-        inline constexpr Safeguard derivative_safeguard = std::same_as<M, Halley> ? Safeguard::halley : Safeguard::newton;
-
-        /**
-         * @brief Newton or Halley from a guess: the method's step, at least tol(x) long, until fn's values at two
-         * consecutive iterates have opposite signs; then the bracket loop on them (the hand-over).
-         *
-         * The minimum step takes its direction from the signs of f and f', not from a step that may have underflowed
-         * to 0. An x + step that would overflow, or a step that cannot be formed, is error::not_converged.
-         *
-         * @tparam M The method, Newton or Halley.
-         * @param fn The function, giving the values M needs.
-         * @param guess The starting point.
-         * @param tolerance The tolerances.
-         * @return The root, error::non_finite or error::not_converged.
+         * @param guess The caller's guess.
+         * @param criteria The caller's criteria.
+         * @return The root, or an error.
          */
         template<typename M, real T, typename F>
-        constexpr std::expected<Root<T>, error> open_derivative(F &fn, T const &guess, Tolerance<T> const &tolerance)
+        constexpr std::expected<Root<T>, error> on_guess(M const &m, F &fn, T const &guess, Criteria<T> const &criteria)
         {
-            constexpr std::size_t K = values_of<M>;
+            std::expected<Tolerance<T>, error> const tolerance = detail::checked_tolerance(criteria);
+            if (!tolerance) return std::unexpected(tolerance.error());
             if (!math::isfinite(guess)) return std::unexpected(error::non_finite);
-            T x = guess;
-            std::array<T, K> vx = detail::evaluate<K>(fn, x);
-            if (!math::isfinite(vx[0])) return std::unexpected(error::non_finite);
-            if (vx[0] == T(0)) return Root<T>{ x, tolerance.at(x) };
-            for (int i = 0; i < detail::iteration_cap<T>(); ++i) {
-                std::optional<T> const step = detail::derivative_step<detail::derivative_safeguard<M>>(vx);
-                if (!step) return std::unexpected(error::not_converged);
-                T const tol = tolerance.at(x);
-                bool const upward = !detail::same_sign(vx[0], vx[1]); // Newton's direction, -f / f'
-                T const move = math::abs(*step) > tol ? *step : (upward ? tol : T(-tol));
-                if (!detail::sum_fits(x, move)) return std::unexpected(error::not_converged);
-                T const next = T(x + move);
-                std::array<T, K> const vn = detail::evaluate<K>(fn, next);
-                if (!math::isfinite(vn[0])) return std::unexpected(error::non_finite);
-                if (vn[0] == T(0)) return Root<T>{ next, tolerance.at(next) };
-                if (!detail::same_sign(vn[0], vx[0])) return detail::hand_over<M>(fn, x, vx, next, vn, tolerance);
-                x = next;
-                vx = vn;
-            }
-            return std::unexpected(error::not_converged);
-        }
-
-        /**
-         * @brief Secant's second point: x0 (1 + eta), eta = eps^(1/4); eta at x0 = 0; x0 (1 - eta) where x0 (1 + eta)
-         * would overflow; x0 + tol(x0) where x0 (1 + eta) rounds back to x0 (among the subnormals). Relative, so no
-         * scale is assumed.
-         * @param x0 The guess, finite.
-         * @param tolerance The tolerances.
-         * @return The second point, distinct from x0.
-         */
-        template<real T>
-        constexpr T secant_second_point(T const &x0, Tolerance<T> const &tolerance)
-        {
-            T const eta = math::root_epsilon<4, T>();
-            if (x0 == T(0)) return eta;
-            if (math::abs(x0) > T(detail::largest<T>() / T(T(1) + eta))) return T(x0 * T(T(1) - eta));
-            T const second = T(x0 * T(T(1) + eta));
-            if (second == x0) return T(x0 + tolerance.at(x0)); // tiny x0: tol(x0) is about denorm_min
-            return second;
-        }
-
-        /**
-         * @brief The secant's step from x: dx (f / (fp - f)), dx = x - xp, through (x, f) and (xp, fp) of one sign, at
-         * least tol(x) long, its direction from the signs of f, fp - f and dx in case the step underflowed. Secant's and
-         * Steffensen's.
-         * @param x The latest point.
-         * @param f fn there.
-         * @param dx x - xp.
-         * @param difference fp - f, of one sign's values (it cannot overflow).
-         * @param tolerance The tolerances.
-         * @return The move from x, or nothing where it cannot be formed (fp = f, a quotient or product out of range, or
-         *         x + move overflowing).
-         */
-        template<real T>
-        constexpr std::optional<T>
-            secant_move(T const &x, T const &f, T const &dx, T const &difference, Tolerance<T> const &tolerance)
-        {
-            if (difference == T(0)) return std::nullopt;
-            std::optional<T> const ratio = detail::quotient(f, difference);
-            if (!ratio) return std::nullopt;
-            std::optional<T> const step = detail::product(dx, *ratio);
-            if (!step) return std::nullopt;
-            T const tol = tolerance.at(x);
-            bool const upward = ((dx > T(0)) == (f > T(0))) == (difference > T(0));
-            T const move = math::abs(*step) > tol ? *step : (upward ? tol : T(-tol));
-            if (!detail::sum_fits(x, move)) return std::nullopt;
-            return move;
-        }
-
-        /**
-         * @brief Secant from a guess: the step (x - xp) (f / (fp - f)) through the latest two iterates, at least tol(x)
-         * long, until fn's values at two consecutive iterates have opposite signs; then Brent on them.
-         *
-         * fp and f have one sign before the hand-over, so fp - f cannot overflow; the ratio first keeps a large f from
-         * overflowing the product (1e300 (x - 1) from 1e7). The minimum step takes its direction from the signs of f,
-         * fp - f and x - xp.
-         *
-         * @param fn The function.
-         * @param guess The starting point.
-         * @param tolerance The tolerances.
-         * @return The root, error::non_finite or error::not_converged.
-         */
-        template<real T, typename F>
-        constexpr std::expected<Root<T>, error> open_secant(F &fn, T const &guess, Tolerance<T> const &tolerance)
-        {
-            if (!math::isfinite(guess)) return std::unexpected(error::non_finite);
-            T xp = guess;
-            std::array<T, 1> vp = detail::evaluate<1>(fn, xp);
-            if (!math::isfinite(vp[0])) return std::unexpected(error::non_finite);
-            if (vp[0] == T(0)) return Root<T>{ xp, tolerance.at(xp) };
-            T x = detail::secant_second_point(xp, tolerance);
-            T dx = T(x - xp); // small: x0 eta, or eta
-            std::array<T, 1> vx = detail::evaluate<1>(fn, x);
-            for (int i = 0;; ++i) {
-                // The checks come first, so that the last point evaluated before the cap is checked too.
-                if (!math::isfinite(vx[0])) return std::unexpected(error::non_finite);
-                if (vx[0] == T(0)) return Root<T>{ x, tolerance.at(x) };
-                if (!detail::same_sign(vx[0], vp[0])) return detail::hand_over<Brent>(fn, xp, vp, x, vx, tolerance);
-                if (i == detail::iteration_cap<T>()) return std::unexpected(error::not_converged);
-                std::optional<T> const step = detail::secant_move(x, vx[0], dx, T(vp[0] - vx[0]), tolerance);
-                if (!step) return std::unexpected(error::not_converged);
-                T const move = *step;
-                xp = x;
-                vp = vx;
-                x = T(x + move);
-                dx = move;
-                vx = detail::evaluate<1>(fn, x);
-            }
-        }
-
-        /**
-         * @brief Steffensen from a guess: z = x + f(x), at least tol(x) away from x in f(x)'s direction; the secant's
-         * step through (x, f(x)) and (z, f(z)) (Steffensen's -f(x)^2 / (f(z) - f(x)) where z - x = f(x)); Brent at the
-         * first sign change, between x and z or x and the next iterate.
-         *
-         * z - x is taken as formed where it is exact (|z - x| <= |x|, by Sterbenz), else as the intended offset, where
-         * the difference could overflow.
-         *
-         * @param fn The function.
-         * @param guess The starting point.
-         * @param tolerance The tolerances.
-         * @return The root, error::non_finite or error::not_converged.
-         */
-        template<real T, typename F>
-        constexpr std::expected<Root<T>, error> open_steffensen(F &fn, T const &guess, Tolerance<T> const &tolerance)
-        {
-            if (!math::isfinite(guess)) return std::unexpected(error::non_finite);
-            T x = guess;
-            std::array<T, 1> vx = detail::evaluate<1>(fn, x);
-            if (!math::isfinite(vx[0])) return std::unexpected(error::non_finite);
-            if (vx[0] == T(0)) return Root<T>{ x, tolerance.at(x) };
-            for (int i = 0; i < detail::iteration_cap<T>(); ++i) {
-                T const tol = tolerance.at(x);
-                T const offset = math::abs(vx[0]) > tol ? vx[0] : (vx[0] > T(0) ? tol : T(-tol));
-                if (!detail::sum_fits(x, offset)) return std::unexpected(error::not_converged);
-                T const z = T(x + offset);
-                std::array<T, 1> const vz = detail::evaluate<1>(fn, z);
-                if (!math::isfinite(vz[0])) return std::unexpected(error::non_finite);
-                if (vz[0] == T(0)) return Root<T>{ z, tolerance.at(z) };
-                if (!detail::same_sign(vz[0], vx[0])) return detail::hand_over<Brent>(fn, x, vx, z, vz, tolerance);
-                T const width = math::abs(offset) <= math::abs(x) ? T(z - x) : offset;
-                std::optional<T> const move = detail::secant_move(x, vx[0], T(-width), T(vz[0] - vx[0]), tolerance);
-                if (!move) return std::unexpected(error::not_converged);
-                T const next = T(x + *move);
-                std::array<T, 1> const vn = detail::evaluate<1>(fn, next);
-                if (!math::isfinite(vn[0])) return std::unexpected(error::non_finite);
-                if (vn[0] == T(0)) return Root<T>{ next, tolerance.at(next) };
-                if (!detail::same_sign(vn[0], vx[0])) return detail::hand_over<Brent>(fn, x, vx, next, vn, tolerance);
-                x = next;
-                vx = vn;
-            }
-            return std::unexpected(error::not_converged);
+            auto state = m.start(fn, guess, *tolerance);
+            if (!state) return std::unexpected(state.error());
+            return detail::run(m, fn, *state, *tolerance, std::optional<Within<T>>());
         }
 
     } // namespace detail
@@ -2856,15 +3145,16 @@ namespace nxx::roots {
     { return detail::on_bracket(detail::observed(m, std::move(o)), fn, bracket, criteria); }
 
     /**
-     * @brief A root of @p fn from @p guess by the open method @p M: Newton, Halley, Secant or Steffensen.
+     * @brief A root of @p fn from @p guess by the open method @p M: Newton, Halley, Secant, Steffensen, or an
+     * open_method of one's own.
      *
      * The method iterates from the guess until fn's values at two consecutive iterates have opposite signs, then
-     * continues inside that bracket (Newton and Halley safeguarded, Secant as Brent), so the result is a verified sign
-     * change with a bound, as for the bracketing methods. It returns a root, the first sign change its iterates cross,
-     * not necessarily the one nearest the guess; from a guess already within tol of a root it takes one step past it (2
-     * evaluations). error::not_converged where it finds no sign change within its cap (4 times the bits of T: 212
-     * iterations in double) or cannot take a step: a cycle, a divergence, f' = 0, a multiple root at 0 with the default
-     * abs_tol. A bracket solves those.
+     * continues inside that bracket (Newton and Halley safeguarded, Secant and Steffensen as Brent), so the result is a
+     * verified sign change with a bound, as for the bracketing methods. It returns a root, the first sign change its
+     * iterates cross, not necessarily the one nearest the guess; from a guess already within tol of a root it takes one
+     * step past it (2 evaluations). error::not_converged where it finds no sign change within the cap (4 times the bits
+     * of T: 212 steps in double) or cannot take a step: a cycle, a divergence, f' = 0, a multiple root at 0 with the
+     * default abs_tol. A bracket solves those.
      *
      * @code
      * namespace rt = nxx::roots;
@@ -2873,7 +3163,8 @@ namespace nxx::roots {
      * auto const s = rt::solve<rt::Secant>([](double x) { return x * x - 2.0; }, 1.0); // 9
      * @endcode
      *
-     * @tparam M The method: `Newton`, `Halley`, `Secant` or `Steffensen`.
+     * @tparam M The method: `Newton`, `Halley`, `Secant`, `Steffensen`, or a default-constructible open_method (a
+     *           method with parameters is given as a value).
      * @tparam T The real type, deduced from @p guess.
      * @tparam F A callable taking T const &: for Secant and Steffensen returning T (for a class type T, T itself or a
      *           built-in arithmetic type, not an expression template; for a built-in T, anything convertible to T),
@@ -2885,22 +3176,81 @@ namespace nxx::roots {
      * @param criteria When to stop; it converts to T.
      * @return The root and a bound on its distance to a sign change of fn; error::non_finite if the guess, a tolerance
      *         or a value of fn is not finite or a tolerance is negative; error::not_converged if the method found no
-     *         root.
+     *         root; error::invalid_step if a method of one's own broke the contract of open_method. Any other error a
+     *         method of one's own returns passes through.
      */
     template<typename M, real T, typename F>
-    requires detail::open<M> && detail::gives<F, T, values_of<M>>
+    requires std::default_initializable<M> && open_method<M, T, std::remove_reference_t<F>>
+             && detail::gives<F, T, values_of<M>>
     [[nodiscard]] constexpr std::expected<Root<T>, error>
         solve(F &&fn, T const &guess, Criteria<std::type_identity_t<T>> const &criteria = {})
-    {
-        std::expected<Tolerance<T>, error> const tolerance = detail::checked_tolerance(criteria);
-        if (!tolerance) return std::unexpected(tolerance.error());
-        if constexpr (std::same_as<M, Secant>)
-            return detail::open_secant(fn, guess, *tolerance);
-        else if constexpr (std::same_as<M, Steffensen>)
-            return detail::open_steffensen(fn, guess, *tolerance);
-        else
-            return detail::open_derivative<M>(fn, guess, *tolerance);
-    }
+    { return detail::on_guess(M{}, fn, guess, criteria); }
+
+    /**
+     * @brief A root of @p fn from @p guess by the open method @p m, given as a value: for a method of one's own with
+     * parameters, as solve<M>(fn, guess) otherwise.
+     * @tparam M The method: an open_method.
+     * @tparam T The real type, deduced from @p guess.
+     * @tparam F As for solve<M>(fn, guess).
+     * @param m The method.
+     * @param fn The function.
+     * @param guess The starting point.
+     * @param criteria When to stop.
+     * @return As for solve<M>(fn, guess).
+     */
+    template<typename M, real T, typename F>
+    requires(!detail::is_observer<M>) && open_method<M, T, std::remove_reference_t<F>>
+            && detail::gives<F, T, values_of<M>>
+    [[nodiscard]] constexpr std::expected<Root<T>, error>
+        solve(M const &m, F &&fn, T const &guess, Criteria<std::type_identity_t<T>> const &criteria = {})
+    { return detail::on_guess(m, fn, guess, criteria); }
+
+    /**
+     * @brief As solve<M>(fn, guess), each step reported to an observer: `o(step)` with the Step<T> after the method's
+     * start and after each step.
+     *
+     * Before the first sign change the step holds the last two iterates, in order (one point after a start that
+     * evaluates only the guess; Secant's start holds its first two), its point
+     * the latest; after it, the bracket. The observed run computes exactly what an unobserved one does.
+     *
+     * @tparam M The method, as for solve<M>(fn, guess).
+     * @tparam O The observer's callable.
+     * @tparam T The real type, deduced from @p guess.
+     * @tparam F As for solve<M>(fn, guess).
+     * @param o The observer, made by observer().
+     * @param fn The function.
+     * @param guess The starting point.
+     * @param criteria When to stop.
+     * @return As for solve<M>(fn, guess).
+     */
+    template<typename M, typename O, real T, typename F>
+    requires std::default_initializable<M> && open_method<M, T, std::remove_reference_t<F>>
+             && detail::gives<F, T, values_of<M>>
+    [[nodiscard]] constexpr std::expected<Root<T>, error>
+        solve(Observer<O> o, F &&fn, T const &guess, Criteria<std::type_identity_t<T>> const &criteria = {})
+    { return detail::on_guess(detail::observed(M{}, std::move(o)), fn, guess, criteria); }
+
+    /**
+     * @brief As solve(m, fn, guess), each step reported to an observer, as for solve<M>(observer(o), fn, guess).
+     * @tparam M The method: an open_method.
+     * @tparam O The observer's callable.
+     * @tparam T The real type, deduced from @p guess.
+     * @tparam F As for solve<M>(fn, guess).
+     * @param m The method.
+     * @param o The observer, made by observer().
+     * @param fn The function.
+     * @param guess The starting point.
+     * @param criteria When to stop.
+     * @return As for solve<M>(fn, guess).
+     */
+    template<typename M, typename O, real T, typename F>
+    requires open_method<M, T, std::remove_reference_t<F>> && detail::gives<F, T, values_of<M>>
+    [[nodiscard]] constexpr std::expected<Root<T>, error> solve(M const &m,
+        Observer<O> o,
+        F &&fn,
+        T const &guess,
+        Criteria<std::type_identity_t<T>> const &criteria = {})
+    { return detail::on_guess(detail::observed(m, std::move(o)), fn, guess, criteria); }
 
     /**
      * @brief Newton on @p bracket with the derivative as a separate callable: the same as Newton on a fn returning
@@ -2940,7 +3290,7 @@ namespace nxx::roots {
      *
      * A misuse fails one of the constraints, named in the compiler's message: detail::value_valued (fn returns a
      * value, not a tuple or a std::expected), detail::derivative_valued (the derivatives), bracketing_method and
-     * detail::open (the method and the start).
+     * open_method (the method and the start).
      * @tparam M Newton, or a default-constructible bracketing_method with `values = 2`.
      * @tparam T The real type, deduced from @p bracket.
      * @tparam F A callable taking T const & and returning T (for a class type T, T itself or a built-in arithmetic
@@ -2965,8 +3315,9 @@ namespace nxx::roots {
     }
 
     /**
-     * @brief Newton from @p guess with the derivative as a separate callable.
-     * @tparam M Newton.
+     * @brief Newton from @p guess with the derivative as a separate callable. Also for an open method of one's own
+     * that declares `values = 2`.
+     * @tparam M Newton, or a default-constructible open_method with `values = 2`.
      * @tparam T The real type, deduced from @p guess.
      * @tparam F A callable taking T const & and returning T (for a class type T, T itself or a built-in arithmetic
      *           type, not an expression template; for a built-in T, anything convertible to T).
@@ -2978,7 +3329,9 @@ namespace nxx::roots {
      * @return As from a guess.
      */
     template<typename M, real T, typename F, typename D>
-    requires(values_of<M> == 2) && detail::open<M> && detail::value_valued<F, T> && detail::derivative_valued<D, T>
+    requires(values_of<M> == 2) && detail::value_valued<F, T> && detail::derivative_valued<D, T>
+            && std::default_initializable<M>
+            && open_method<M, T, detail::Joined<T, std::remove_reference_t<F>, std::remove_reference_t<D>> const>
     [[nodiscard]] constexpr std::expected<Root<T>, error>
         solve(F &&fn, D &&dfn, T const &guess, Criteria<std::type_identity_t<T>> const &criteria = {})
     {
@@ -3006,8 +3359,12 @@ namespace nxx::roots {
     template<typename M, real T, typename F, typename D, typename D2>
     requires(values_of<M> == 3) && detail::value_valued<F, T> && detail::derivative_valued<D, T>
             && detail::derivative_valued<D2, T> && std::default_initializable<M>
-            && bracketing_method<M, T,
-                detail::Joined<T, std::remove_reference_t<F>, std::remove_reference_t<D>, std::remove_reference_t<D2>> const>
+            && bracketing_method<M,
+                T,
+                detail::Joined<T,
+                    std::remove_reference_t<F>,
+                    std::remove_reference_t<D>,
+                    std::remove_reference_t<D2>> const>
     [[nodiscard]] constexpr std::expected<Root<T>, error> solve(F &&fn,
         D &&dfn,
         D2 &&d2fn,
@@ -3020,8 +3377,9 @@ namespace nxx::roots {
     }
 
     /**
-     * @brief Halley from @p guess with the first and second derivatives as separate callables.
-     * @tparam M Halley.
+     * @brief Halley from @p guess with the first and second derivatives as separate callables. Also for an open
+     * method of one's own that declares `values = 3`.
+     * @tparam M Halley, or a default-constructible open_method with `values = 3`.
      * @tparam T The real type, deduced from @p guess.
      * @tparam F A callable taking T const & and returning T (for a class type T, T itself or a built-in arithmetic
      *           type, not an expression template; for a built-in T, anything convertible to T).
@@ -3035,8 +3393,14 @@ namespace nxx::roots {
      * @return As from a guess.
      */
     template<typename M, real T, typename F, typename D, typename D2>
-    requires(values_of<M> == 3) && detail::open<M> && detail::value_valued<F, T> && detail::derivative_valued<D, T>
-            && detail::derivative_valued<D2, T>
+    requires(values_of<M> == 3) && detail::value_valued<F, T> && detail::derivative_valued<D, T>
+            && detail::derivative_valued<D2, T> && std::default_initializable<M>
+            && open_method<M,
+                T,
+                detail::Joined<T,
+                    std::remove_reference_t<F>,
+                    std::remove_reference_t<D>,
+                    std::remove_reference_t<D2>> const>
     [[nodiscard]] constexpr std::expected<Root<T>, error>
         solve(F &&fn, D &&dfn, D2 &&d2fn, T const &guess, Criteria<std::type_identity_t<T>> const &criteria = {})
     {
