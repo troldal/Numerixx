@@ -444,7 +444,13 @@ breaking the API, so none needs a hook now). For `nxx::quadrature` the open meth
 - An open method protocol, so that a user's method works in `derivative<M>`: method objects with a const member
   template, which also carry parameters. Until a library algorithm is generic in the method (gradients, Jacobians,
   `derivatives<M, N>`) and a user needs a method of their own in it. A spike compiled it in constant expressions on
-  GCC, Clang and MSVC.
+  GCC, Clang and MSVC. Reconsidered after roots' Phase 7 (2026-11-09) and kept deferred: unlike `solve` and
+  `integrate`, `derivative<M>` owns no loop, stop test or bound to give a user's method, and roots already takes any
+  derivative callable. The trigger is the first gradient or Jacobian routine, whichever module it lands in (the
+  nonlinear least squares in scope): design `derivative_method` (`docs/open-closed/ANALYSIS.md` 6.5) against it then,
+  so that it takes the library's stencils and Ridders, a complex step, or an adaptor around a user's automatic
+  differentiation. The internal half of 6.5 (stencils by nodes, one table builder, the `Central<2>` fast paths
+  tested on the table's nodes) changes no API and may come earlier, when deriv is touched anyway.
 - fn's noise level (fn accurate to eta rather than eps), attached to fn, e.g. `with_noise(fn, 1e-10)`, for every
   method: Ridders' floor and the stencils' default step. The only item with a numerical case: at relative noise 1e-8
   Ridders' estimate covered the error in 90.7% of the book's cases, against 100% on clean fn, and a caller cannot fix
