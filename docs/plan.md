@@ -139,6 +139,8 @@ Architecture approved: `docs/roots/BRIEF.md` (2026-10-25). Each phase gets its A
   - [x] The independent review (Codex) and its adopted findings: three, all reproduced and adopted (the bound at a
     point next to an end, the guide's Pegasus near max, `Tolerance::at`'s comment); 6aeb8a0, runs 42409857978 and
     42410127959. A further review by DeepSeek V4.1 Flash (Cline): three wording findings, adopted
+  - [x] A demo section: methods of your own, on a bracket and from a guess (`numerixx_roots_demo` 13 and 14; five
+    toolchains locally, run on each)
 
 ## Milestone 3: user documentation (Doxygen, Breathe, Sphinx)
 

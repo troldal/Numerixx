@@ -1,13 +1,15 @@
-// Numerixx demo: roots of a function of one variable in a bracket with nxx::roots.
+// Numerixx demo: roots of a function of one variable with nxx::roots, and methods of your own.
 
 #include <numerixx/deriv.hpp>
 #include <numerixx/roots.hpp>
 
+#include <array>
 #include <cmath>
 #include <expected>
 #include <format>
 #include <limits>
 #include <numbers>
+#include <optional>
 #include <print>
 #include <string_view>
 #include <tuple>
@@ -40,15 +42,29 @@ namespace {
         }
     };
 
+    void counted_result(std::string_view label, std::expected<rt::Root<double>, rt::error> const &r, int n)
+    {
+        if (r)
+            std::println("   {:<30} {:.17g} +- {:.1e}  ({} evaluations)", label, r->value, r->abs_error, n);
+        else
+            std::println("   {:<30} error: {}  ({} evaluations)", label, r.error(), n);
+    }
+
     template<typename M, typename F, typename S>
     void count_from(std::string_view label, F const &fn, S const &start, rt::Criteria<double> c)
     {
         int n = 0;
         auto const r = rt::solve<M>(Counted<F>{ fn, &n }, start, c);
-        if (r)
-            std::println("   {:<30} {:.17g} +- {:.1e}  ({} evaluations)", label, r->value, r->abs_error, n);
-        else
-            std::println("   {:<30} error: {}  ({} evaluations)", label, r.error(), n);
+        counted_result(label, r, n);
+    }
+
+    // The same with the method given as a value, for a method with parameters.
+    template<typename M, typename F, typename S>
+    void count_with(std::string_view label, M const &m, F const &fn, S const &start, rt::Criteria<double> c = {})
+    {
+        int n = 0;
+        auto const r = rt::solve(m, Counted<F>{ fn, &n }, start, c);
+        counted_result(label, r, n);
     }
 
     template<typename M, typename F>
@@ -317,6 +333,193 @@ namespace {
         show_bracket("x^2 = 2 from 100", rt::search([](double x) { return x * x - 2.0; }, 100.0));
     }
 
+    // A method of your own on a bracket: a type with two const members, start and advance, each leaving a Step (the
+    // bracket, fn's values at its ends and the method's point) in its state. solve() checks every Step, applies the
+    // stop test and forms the bound, so the method has neither; the manual's "A method of your own" has the rules.
+    // This one evaluates fn at the fraction `at` of the bracket from its lower end (0.5 is bisection) and keeps the
+    // part with the sign change; its point is the end with the smaller |f|.
+    struct Section
+    {
+        double at = 0.5;
+
+        struct State
+        {
+            double a, fa, b, fb; // the bracket and fn's values at its ends
+            rt::Step<double> step;
+        };
+
+        static constexpr rt::Step<double> report(State const &s)
+        { return rt::Step<double>{ s.a, s.fa, s.b, s.fb, nxx::math::abs(s.fa) < nxx::math::abs(s.fb) ? s.a : s.b }; }
+
+        template<typename F>
+        constexpr std::expected<State, rt::error>
+            start(F &, rt::Start<double> const &s, rt::Tolerance<double> const &) const
+        {
+            State state{ s.lower, s.at_lower[0], s.upper, s.at_upper[0], {} };
+            state.step = report(state);
+            return state;
+        }
+
+        template<typename F>
+        constexpr std::expected<void, rt::error> advance(F &fn, State &s, rt::Tolerance<double> const &tol) const
+        {
+            // A weighted average of the ends, which cannot overflow, kept tol inside them: a point that approached the
+            // root from one side only would never move the other end, and the bracket would not close.
+            double const margin = tol.at(s.step.point);
+            double x = (1.0 - at) * s.a + at * s.b;
+            if (x < s.a + margin) x = s.a + margin;
+            else if (s.b - margin < x) x = s.b - margin;
+            if (!(s.a < x && x < s.b)) x = s.a / 2 + s.b / 2;
+            if (!(s.a < x && x < s.b)) return std::unexpected(rt::error::not_converged);
+            double const fx = fn(x);
+            if (!nxx::math::isfinite(fx)) return std::unexpected(rt::error::non_finite);
+            if (fx == 0.0) {
+                s.step = rt::Step<double>{ s.a, s.fa, x, fx, x };
+                return {};
+            }
+            if ((fx < 0.0) == (s.fa < 0.0)) { // the sign test without a product, which could underflow
+                s.a = x;
+                s.fa = fx;
+            } else {
+                s.b = x;
+                s.fb = fx;
+            }
+            s.step = report(s);
+            return {};
+        }
+    };
+    static_assert(rt::bracketing_method<Section, double>); // names the member at fault, where solve() would not
+
+    // A method that breaks the contract: its advance leaves the bracket as it was.
+    struct Stuck
+    {
+        struct State
+        {
+            rt::Step<double> step;
+        };
+
+        template<typename F>
+        constexpr std::expected<State, rt::error>
+            start(F &, rt::Start<double> const &s, rt::Tolerance<double> const &) const
+        { return State{ rt::Step<double>{ s.lower, s.at_lower[0], s.upper, s.at_upper[0], s.lower } }; }
+
+        template<typename F>
+        constexpr std::expected<void, rt::error> advance(F &, State &, rt::Tolerance<double> const &) const
+        { return {}; }
+    };
+
+    void own_bracketing_method()
+    {
+        std::println("\n13. A method of your own on a bracket");
+        auto const f = [](double x) { return x * x - 2.0; };
+        count<rt::Bisection>("x^2 - 2: Bisection", f, { 1.0, 2.0 });
+        count<Section>("x^2 - 2: Section", f, { 1.0, 2.0 }); // named: Section{}, at = 0.5
+        count_with("x^2 - 2: Section, at = 0.1", Section{ .at = 0.1 }, f, rt::Bracket{ 1.0, 2.0 });
+        auto const dottie = [](double x) { return std::cos(x) - x; };
+        count_with("cos x = x: Section, at = 0.1", Section{ .at = 0.1 }, dottie, rt::Bracket{ 0.0, 1.0 });
+
+        // observer(o) before fn: o sees each Step, here at a loose tolerance, so that there are few.
+        std::println("   the steps of Section at rel_tol = 1e-2:");
+        auto const print = [](rt::Step<double> const &s) {
+            std::println("     [{:.6f}, {:.6f}] point {:.6f}", s.lower, s.upper, s.point);
+        };
+        (void)rt::solve<Section>(rt::observer(print), f, rt::Bracket{ 1.0, 2.0 }, { .rel_tol = 1e-2 });
+
+        // solve() checks each Step: a bracket that does not shrink ends the solve with invalid_step, so even a broken
+        // method cannot loop for ever.
+        show("x^2 - 2: Stuck", rt::solve<Stuck>(f, rt::Bracket{ 1.0, 2.0 }));
+
+        // A constexpr method runs at compile time, as the library's do.
+        constexpr auto r = rt::solve<Section>([](double x) { return x * x - 2.0; }, rt::Bracket{ 1.0, 2.0 });
+        static_assert(r.has_value() && nxx::math::abs(r->value - 1.4142135623730951) <= r->abs_error);
+    }
+
+    // A method of your own from a guess (values = 2, so fn gives f and f'): Newton's step, at least tol(x) long, until
+    // two iterates show a sign change; then Brent's method on them, whose state it holds. solve() counts the steps
+    // without a sign change against its cap, so this method ends even where Newton cycles or diverges.
+    struct NewtonThenBrent
+    {
+        static constexpr int values = 2;
+
+        struct State
+        {
+            double x;              // the latest iterate
+            std::array<double, 2> v; // f and f' there
+            std::optional<rt::bracketing_state_t<rt::Brent, double>> brent; // after the first sign change
+            rt::Step<double> step;
+        };
+
+        template<typename F>
+        static constexpr std::array<double, 2> values_at(F &fn, double x)
+        {
+            auto const r = fn(x);
+            return { std::get<0>(r), std::get<1>(r) };
+        }
+
+        template<typename F>
+        constexpr std::expected<State, rt::error> start(F &fn, double const &guess, rt::Tolerance<double> const &) const
+        {
+            std::array<double, 2> const v = values_at(fn, guess);
+            if (!nxx::math::isfinite(v[0])) return std::unexpected(rt::error::non_finite);
+            return State{ guess, v, std::nullopt, rt::Step<double>{ guess, v[0], guess, v[0], guess } };
+        }
+
+        template<typename F>
+        constexpr std::expected<void, rt::error> advance(F &fn, State &s, rt::Tolerance<double> const &tol) const
+        {
+            if (s.brent) { // Brent's step, and its report
+                std::expected<void, rt::error> const r = rt::Brent{}.advance(fn, *s.brent, tol);
+                s.step = s.brent->step;
+                return r;
+            }
+            if (s.v[1] == 0.0 || !nxx::math::isfinite(s.v[1])) return std::unexpected(rt::error::not_converged);
+            double step = -s.v[0] / s.v[1];
+            double const least = tol.at(s.x);
+            if (nxx::math::abs(step) < least) step = step < 0.0 ? -least : least;
+            double const next = s.x + step;
+            std::array<double, 2> const vn = values_at(fn, next);
+            if (!nxx::math::isfinite(vn[0])) return std::unexpected(rt::error::non_finite);
+            bool const up = s.x < next;
+            if (vn[0] != 0.0 && (vn[0] < 0.0) != (s.v[0] < 0.0)) { // a sign change: Brent from here
+                rt::Start<double> const ends = up ? rt::Start<double>{ s.x, { s.v[0] }, next, { vn[0] } }
+                                                  : rt::Start<double>{ next, { vn[0] }, s.x, { s.v[0] } };
+                auto started = rt::Brent{}.start(fn, ends, tol);
+                if (!started) return std::unexpected(started.error());
+                s.brent = *started;
+                s.step = s.brent->step;
+                return {};
+            }
+            // Before it: the last two iterates in order, the latest the point.
+            s.step = up ? rt::Step<double>{ s.x, s.v[0], next, vn[0], next }
+                        : rt::Step<double>{ next, vn[0], s.x, s.v[0], next };
+            s.x = next;
+            s.v = vn;
+            return {};
+        }
+    };
+    static_assert(rt::open_method<NewtonThenBrent, double>);
+
+    void own_open_method()
+    {
+        std::println("\n14. A method of your own from a guess");
+        // values = 2 gives the method the forms with f' as a separate callable, as for Newton.
+        auto const f = [](double x) { return std::exp(x) - 2.0; };
+        auto const df = [](double x) { return std::exp(x); };
+        show("e^x = 2: own, f and f'", rt::solve<NewtonThenBrent>(f, df, 0.0));
+        show("e^x = 2: Newton, f and f'", rt::solve<rt::Newton>(f, df, 0.0));
+        // As a value, or with an observer, fn gives both values. Brent's interpolation finishes in two evaluations
+        // more than the library's Newton, which keeps its own step inside the bracket.
+        auto const kepler = [](double big_e) {
+            return std::pair{ big_e - 0.9 * std::sin(big_e) - 1.0, 1.0 - 0.9 * std::cos(big_e) };
+        };
+        count_with("Kepler, M = 1: own from M", NewtonThenBrent{}, kepler, 1.0);
+        count<rt::Newton>("Kepler, M = 1: Newton from M", kepler, 1.0);
+        // No root: x^2 + 1 steps from 1 to 0, where f' = 0; from 0.5 it wanders until the cap.
+        auto const no_root = [](double x) { return std::pair{ x * x + 1.0, 2.0 * x }; };
+        count_with("x^2 + 1: own from 1", NewtonThenBrent{}, no_root, 1.0);
+        count_with("x^2 + 1: own from 0.5", NewtonThenBrent{}, no_root, 0.5);
+    }
+
 } // namespace
 
 int main()
@@ -333,4 +536,6 @@ int main()
     open_methods();
     numerical_derivatives();
     searching();
+    own_bracketing_method();
+    own_open_method();
 }
