@@ -240,7 +240,7 @@ the examples' tests pass on all five toolchains.
   the roots and quadrature chapters, each a phase of its own.
   - [x] The workflow: `docs/sphinx/CLAUDE.md`, the three agents, `CLAUDE.md` and `reviews/` excluded from the build;
     `numerixx_docs` builds clean
-  - [ ] Plan approved: `docs/sphinx/PHASE9_PLAN.md`
+  - [x] Plan approved: `docs/sphinx/PHASE9_PLAN.md` (2026-11-09; the critic's review in `docs/sphinx/reviews/`)
   - [ ] Evidence: the chapter's programs and figures pass with GCC; the user has seen the figures
   - [ ] Draft and edit: every page within its budget or with the editor's reason; docs build clean
   - [ ] Review round, decision letter and revision (`docs/sphinx/reviews/P9-*.md`)
