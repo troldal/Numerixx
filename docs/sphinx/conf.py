@@ -43,7 +43,7 @@ plot_include_source = False
 # A page names its script from this folder ("plots/<name>.py"): under MyST the directive does not resolve a path from
 # the page's own folder, and a leading / is the drive's root on Windows.
 plot_basedir = str(Path(__file__).parent)
-exclude_patterns = ["PHASE*.md", "examples", "_ext"]
+exclude_patterns = ["PHASE*.md", "CLAUDE.md", "reviews", "examples", "_ext"]
 
 # One source, two manuals (PHASE6_PLAN.md). The PDF build passes -t pdf: its root is manual.md, whose toctree makes
 # each page a chapter, with introduction.md (index.md's text without its toctrees) first. index.md cannot be the PDF's

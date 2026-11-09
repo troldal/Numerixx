@@ -43,9 +43,11 @@ A module may use another module's public API, never its `detail`.
   run as tests (`numerixx_docs_example_<name>`, a glob in `tests/CMakeLists.txt`), each checking its page's claims and
   comparing the output the page quotes, held in a raw string, with what it printed (`examples/printed.hpp`);
   figures drawn by matplotlib from `plots/*.py`, with data an example program checks (`docs/CLAUDE.md` says how);
-  `docs-reviewer` reviews the pages
+  its rules (brevity, budgets, figures), roles (the `docs-*` agents) and process are in `docs/sphinx/CLAUDE.md`
 - `docs/deriv-book/` the book on `nxx::deriv` (LaTeX): its own `CLAUDE.md` holds its rules, roles and process; its
-  examples build as tests (`NUMERIXX_BUILD_BOOK`), its PDF is the target `numerixx_book`
+  examples build as tests (`NUMERIXX_BUILD_BOOK`), its PDF is the target `numerixx_book`. It is to become the general
+  book *Numerical Methods with Numerixx*, a part per module (Milestone 5); what goes in the book and what in the
+  manual is in `docs/design.md`, Documentation
 
 ## Build and test
 

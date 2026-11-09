@@ -149,9 +149,10 @@ entity is documented; Sphinx with Breathe and MyST (Markdown) renders the site, 
 PDF, so they are worded for both. The manual is organised by module (the user's choice, 2026-10-29, replacing Diataxis
 at the top level chosen 2026-10-27), with Diataxis's four kinds of writing inside each module: an overview, a tutorial,
 guide pages, reference. The deriv book stays the long explanation of `nxx::deriv` and is offered as its PDF, not
-repeated. `numerixx_docs_all` builds the whole documentation: the site and the PDF manual, Doxygen's internal HTML and
-the book. Each phase gets its plan approved before it is written, and the pages get the reviews of a phase. A box is
-ticked when the docs build with no warning locally and in CI, and the examples' tests pass on all five toolchains.
+repeated (from 2026-11-09, the general book of Milestone 5). `numerixx_docs_all` builds the whole documentation: the
+site and the PDF manual, Doxygen's internal HTML and the book. Each phase gets its plan approved before it is written,
+and the pages get the reviews of a phase. A box is ticked when the docs build with no warning locally and in CI, and
+the examples' tests pass on all five toolchains.
 
 - Phase 1: spike. Render `roots.hpp`, `deriv.hpp` and `math.hpp` through Doxygen XML, Breathe and Sphinx in a scratch
   folder, and list what the C++ domain misrenders or rejects (concepts, `requires` clauses, constrained `auto`,
@@ -231,6 +232,19 @@ ticked when the docs build with no warning locally and in CI, and the examples' 
     41819573354)
   - [x] CI passes; the independent review (Fable in place of Codex): no defect, two wording findings adopted
     (`docs/sphinx/PHASE8_PLAN.md`)
+- Phase 9: the manual's workflow, and the `nxx::deriv` chapter rewritten through it as the pilot (the user's decision,
+  2026-11-09). The workflow is in `docs/sphinx/CLAUDE.md`: the theory cap of `docs/design.md`, budgets (about 800
+  words for an overview, 1,000 for a tutorial, 600 for a guide page), plain words, figures where they make a concept
+  or a method easier to see (as in the quadrature chapter), the agents `docs-editor`, `docs-author` and `docs-critic`
+  beside `docs-reviewer`, `numerics-reviewer` and `docs-reader`, and the reviews kept in `docs/sphinx/reviews/`. Then
+  the roots and quadrature chapters, each a phase of its own.
+  - [x] The workflow: `docs/sphinx/CLAUDE.md`, the three agents, `CLAUDE.md` and `reviews/` excluded from the build;
+    `numerixx_docs` builds clean
+  - [ ] Plan approved: `docs/sphinx/PHASE9_PLAN.md`
+  - [ ] Evidence: the chapter's programs and figures pass with GCC; the user has seen the figures
+  - [ ] Draft and edit: every page within its budget or with the editor's reason; docs build clean
+  - [ ] Review round, decision letter and revision (`docs/sphinx/reviews/P9-*.md`)
+  - [ ] Release: all five toolchains, site and PDF, CI; the Codex review and its adopted findings
 
 Open decisions: hosting (GitHub Pages from CI, or Read the Docs) and versioning (one site per release, or `dev` only),
 with `linkcheck` and the install section of getting-started;
@@ -416,6 +430,24 @@ approved before it is written (`docs/quadrature/PHASE<n>_API.md`), as in Milesto
     TanhSinh's slow-decay remedy and far-half-line cause as above; a bad node is avoided because the halves are
     sampled afresh, not because it becomes an end.
 - Milestone 4 is complete: the module, its chapter and the comments of its header.
+
+## Milestone 5: the book, *Numerical Methods with Numerixx*
+
+The deriv book becomes a general book on numerical methods, with a part per module, grown a little at a time
+(`docs/design.md`, Documentation; the user's decision, 2026-11-09). Each phase gets its plan approved before it is
+written, and follows the book's process (`docs/deriv-book/CLAUDE.md`: authors, editor, review rounds). A box is ticked
+when `numerixx_book` builds with no warning and the book's examples pass their tests on all five toolchains.
+
+- Phase 1: from the deriv book to the general book. The phase's plan brings these to the user: the title, and the
+  folder, target and file names (`docs/deriv-book/`, `numerixx_book`, `NUMERIXX_BUILD_BOOK`, `numerixx-deriv-book.pdf`);
+  the structure (where the shared fundamentals sit, deriv's chapters as its part); the book's rules (`CLAUDE.md`,
+  `PLAN.md`) rewritten for several modules; the API material taken out (chapter 8, and the library's mechanics in
+  chapter 7) with references to the manual instead; the manual's page on the book (`docs/sphinx/deriv/book.md`) moved
+  to where every module can link to it.
+  - [ ] Plan approved
+  - [ ] The book builds as the general book with deriv's part, and no API reference is left in it
+- Later phases: one per module's part (`nxx::roots`, `nxx::quadrature`, then the modules to come), each when the user
+  chooses it.
 
 ## Deferred
 

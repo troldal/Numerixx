@@ -24,4 +24,4 @@ prog.cpp -o prog.exe -lstdc++exp`. Do not edit anything in the repository.
 
 Report, for each task: whether the docs alone got you to correct, compiling code; every place you had to guess; every
 compile error or wrong result, and which page would have prevented it; anything on the pages that confused you or
-seemed wrong. Quote the page and line. End with the programs' outputs.
+seemed wrong; every sentence you had to read twice. Quote the page and line. End with the programs' outputs.

@@ -1,7 +1,9 @@
 # Documentation
 
 The root `CLAUDE.md` describes the documentation's layout and its build targets; the deriv book
-(`docs/deriv-book/`) has its own `CLAUDE.md`. This file holds how the user manual (`docs/sphinx/`) makes its figures.
+(`docs/deriv-book/`) has its own `CLAUDE.md`. How much theory a manual page holds, and what goes in the book instead,
+is in `docs/design.md`, Documentation; the manual's rules, roles and process are in `docs/sphinx/CLAUDE.md`. This file
+holds how the user manual (`docs/sphinx/`) makes its figures.
 
 ## Plots in the manual
 
@@ -79,7 +81,7 @@ Inside an `{eval-rst}` block, the path from `docs/sphinx/`:
 - The directive takes no `:name:`, so a figure cannot be cited by number: the text says "the figure", in the
   paragraph after it. The PDF keeps each figure where the text puts it (`figure_align` H in `conf.py`); the site's CSS
   (`_static/numerixx.css`) gives it the content column's full width.
-- Words for both media (voice rule 7 in `PHASE4_PLAN.md`): "the figure", never "below" for something not adjacent.
+- Words for both media (the language rules in `docs/sphinx/CLAUDE.md`): "the figure", never "below" for something not adjacent.
 
 ### 4. Checks before a commit
 

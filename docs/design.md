@@ -64,6 +64,31 @@ decisions are in `docs/<module>/design.md` (`docs/deriv/design.md`).
   scaling step multiplies by the radix one factor at a time and stops once the value passes 1, so radix^N, which
   overflows for large N (2^128 for float), is never formed.
 
+## Documentation
+
+The user's decisions, 2026-11-09.
+
+- Two documents, each for its own reader: the manual (`docs/sphinx/`, a site and a PDF) for a developer who wants a
+  result, and the book, *Numerical Methods with Numerixx* (LaTeX, in `docs/deriv-book/` until Milestone 5 renames
+  it), for a student or engineer who wants to understand the methods. Why not one: merging would load the manual with
+  derivations or cost the book its tutorial voice, and the book's form (sidebars, margin notes, numbered equations,
+  its layout) does not survive Sphinx's PDF; porting it to MyST would cost much for a worse result.
+- The manual stands alone: every module is documented in full there, whether or not the book has its part yet, and no
+  page requires the book. Its theory stops at what a user needs to choose a method, a step or a tolerance, and to read
+  the result and its error estimate; the overviews of `deriv` and `quadrature` are the model. Proofs, derivations,
+  convergence and error analysis, and history go in the book, and a page may link to the book's section for the why.
+- The book is one book with a part per module, grown one module at a time in the order the user chooses; `nxx::deriv`'s
+  is the first. Fundamentals every part uses (floating point, Taylor's theorem, rounding) are written once and shared,
+  not repeated per module. Why one book rather than one per module: the modules share these fundamentals, and later
+  parts build on earlier ones (roots and quadrature use derivatives, error estimates and rounding floors).
+- The API is documented in one place: the headers' Doxygen comments, rendered as the manual's reference. The book has
+  no API reference and does not teach the library's mechanics (`std::expected`, constant evaluation, user types); it
+  uses the library in worked examples of the methods and refers to the manual, at a named release, for the API. Its
+  tables of rules, accuracy, cost and guarantees stay: they are facts about the methods. Why: two references drift,
+  and every library change already means revising the book (`docs/deriv-book/PLAN.md` 12.8, deriv's Phase 5).
+- The book keeps its evidence rules (generated values, compiled examples, figures from generated data, verified
+  references) and its process: `docs/deriv-book/CLAUDE.md`.
+
 ## Tests
 
 - doctest, one executable (`numerixx_tests`); a module's test cases carry its prefixes (the table in `CLAUDE.md`).

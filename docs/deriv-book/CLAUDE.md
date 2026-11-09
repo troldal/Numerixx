@@ -5,6 +5,10 @@ to everything in `docs/deriv-book/` and override the repository's `CLAUDE.md` wh
 the library's rules). `BRIEF.md` holds the approved approach and the starting material; `PLAN.md` (written in stage 1)
 holds the outline, the targets and the ownership, and wins over `BRIEF.md` once approved.
 
+The book is to become *Numerical Methods with Numerixx*, a part per module, and to lose its API reference
+(`docs/design.md`, Documentation; `docs/plan.md`, Milestone 5). Until Milestone 5's Phase 1 rewrites these rules, they
+hold as written for the deriv book.
+
 ## Decisions by the author (fixed)
 
 - **Author:** Kenneth Troldal Balslev, the only listed author. The front matter states that the document was prepared

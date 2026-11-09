@@ -27,11 +27,12 @@ Check, at least:
   page with one main job within its module: an overview introduces the problem and the methods and may explain and
   show code, a tutorial teaches by doing, a guide page solves one task, the reference describes. Breathe directives
   only on the reference pages.
-- The voice rules of `docs/sphinx/PHASE4_PLAN.md`: problem first; code explained before and after; edge cases in a
+- The language rules of `docs/sphinx/CLAUDE.md`: problem first; code explained before and after; edge cases in a
   note unless they change a result; a term defined at its first use on each page; one name for one thing (f in
   mathematics, `fn` in code); second person, short sentences; overview and tutorial end with what to read next;
   wording that works on screen and in print ("this manual", "this chapter", "this section"; no "site", "page",
-  "click" or "scroll"), since the pages are also the PDF manual.
+  "click" or "scroll"), since the pages are also the PDF manual. Brevity and the budgets are `docs-critic`'s; report
+  them only where they hide something a reader needs.
 - Anything a user would get wrong because of how a page says it, and anything a user needs that no page says.
 
 Report findings most severe first, each with the page and line, severity (major: false, or would cause wrong code;
