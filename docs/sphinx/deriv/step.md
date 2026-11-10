@@ -1,10 +1,10 @@
 # Choose a step
 
-A stencil, a fixed formula such as the central difference, evaluates `fn` at points a step $h$ apart. Too large a step,
-and the truncation error, the error of the formula itself, dominates; too small, and rounding does. The default step
-balances the two under one assumption: that `fn` varies on the *scale* $\max(|x|, 1)$. For the central difference it is
-$\varepsilon^{1/3} \approx 6 \times 10^{-6}$ times that scale, where $\varepsilon$ is the type's machine epsilon. This
-section is about functions that break the assumption, and what to do then.
+A stencil, a fixed formula such as the central difference, evaluates `fn` at points a step $h$ from $x$. The default
+step balances truncation against rounding error ([Numerical derivatives](index.md#the-idea-and-its-catch)) under one
+assumption: that `fn` varies on the *scale* $\max(|x|, 1)$, the distance over which `fn` changes noticeably. For the
+central difference and a first derivative it is $\varepsilon^{1/3} \approx 6 \times 10^{-6}$ times that scale, where
+$\varepsilon$ is the type's machine epsilon. Some functions break the assumption.
 
 ## When the default step is too large
 
@@ -44,11 +44,11 @@ $\sqrt x$ at 2, against the step.
              :math:`x / (x^2 + a^2)`, :math:`a = 10^{-4}`, at :math:`2a`, each with its default step circled.
 ```
 
-The two curves have one shape, but the peak's lies about four decades to the left: the best step depends on the
-function's scale, not on $x$ alone. The default step sits at the bottom of the square root's curve. On the peak it is
-far too large, high on the side where truncation rules. For this function, use $\varepsilon^{1/3}$ times its own
-scale, $a$, as the step. {cpp:func}`nxx::math::root_epsilon` gives $\varepsilon^{1/3}$, and the third argument of
-`derivative` is the step:
+The two curves have one shape, but the peak's lies about four decades to the right, at smaller steps: the best step
+depends on the function's scale, not on $x$ alone. The default step sits at the bottom of the square root's curve. On
+the peak it is far too large, high on the side where truncation error dominates. For this function, use
+$\varepsilon^{1/3}$ times its own scale, $a$, as the step. {cpp:func}`nxx::math::root_epsilon` gives
+$\varepsilon^{1/3}$, and the third argument of `derivative` is the step:
 
 ```{literalinclude} ../examples/deriv_step.cpp
 :start-after: // <scaled>
@@ -63,7 +63,8 @@ scale, $a$, as the step. {cpp:func}`nxx::math::root_epsilon` gives $\varepsilon^
 ```
 
 Now the result keeps about 10 digits, at the bottom of the peak's curve. For another method or order,
-{cpp:func}`nxx::deriv::default_step` gives the default step, which you can scale the same way.
+{cpp:func}`nxx::deriv::default_step`, called as `default_step<Method, N>(1.0)` (in another real type, `T(1)`), gives the
+default step for a function of scale 1; multiply it by your function's scale.
 
 ## Or let Ridders' method find the step
 
@@ -99,8 +100,8 @@ evaluations:
 ```
 
 ```{note}
-A step so small that the method's points round to the same number gives the error `non_finite` (at 1,
-$h = 10^{-300}$ does); so does a step that is not positive and finite.
+A step too small for the points to differ, or not positive and finite, gives `non_finite` ([Handle
+failures](handle-failures.md)).
 ```
 
 The program needs:

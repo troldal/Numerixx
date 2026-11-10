@@ -36,6 +36,11 @@ int main(int, char **argv)
     }
     // </callable>
 
+    // <own-step>
+    double const h = 1.0 / 8.0; // a step of your own: here Ridders' initial step
+    auto const own_step = [fn, h](double x) { return dv::derivative<dv::Ridders>(fn, x, h); };
+    // </own-step>
+
     // <state>
     // A function object that counts its own calls. derivative_of keeps a copy, whose count is its own;
     // std::ref(counter) passes the original instead.
@@ -76,6 +81,12 @@ the original counted 2 calls
         if (!d || !d->abs_error || !(std::abs(d->value - 0.5 / std::sqrt(x)) <= *d->abs_error + 1.2e-16)) return 2;
         if (!(d == dv::derivative<dv::Ridders>(fn, x))) return 3;
     }
+    // The lambda with a step of your own: a derivative at 2 within its estimate of 1 / (2 sqrt 2), which sqrt(2) / 4
+    // holds to half an ulp (1.2e-16 allowed).
+    auto const at_two = own_step(2.0);
+    if (!at_two || !at_two->abs_error
+        || !(std::abs(at_two->value - std::sqrt(2.0) / 4.0) <= *at_two->abs_error + 1.2e-16))
+        return 6;
     // The copy: Central<2> calls fn twice for f', so the copy counted 2 and the original only the 2 calls made through
     // std::ref.
     if (!(counter.calls == 2)) return 4;

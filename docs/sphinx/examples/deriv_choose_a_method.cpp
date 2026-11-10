@@ -108,9 +108,10 @@ Ridders      14 calls   relative error 5.3e-14
     if (!d50 || !d50->abs_error || !(abs(bin50(d50->value - exact50)) <= *d50->abs_error) || !(*d50->abs_error < 1e-45))
         return 6;
     // "A stencil gains less ... about two thirds of its digits": the central difference in cpp_bin_float_50, with its
-    // default step eps^(1/3), within 1e-30 relative but not within 1e-40 (model: eps^(2/3), about 1e-33).
+    // default step eps^(1/3), within 1e-32 relative but not within 1e-40 (model: eps^(2/3) times the truncation and
+    // rounding constants, about 3e-34; measured 5.7e-35).
     auto const c50 = dv::derivative(root, bin50(2));
     bin50 const c50_error = c50 ? bin50(abs(bin50(c50->value - exact50))) : bin50(1);
-    if (!c50 || !(c50_error < 1e-30 * exact50 && c50_error > 1e-40 * exact50)) return 7;
+    if (!c50 || !(c50_error < 1e-32 * exact50 && c50_error > 1e-40 * exact50)) return 7;
     return 0;
 }

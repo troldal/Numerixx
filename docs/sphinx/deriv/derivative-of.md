@@ -22,12 +22,22 @@ at $x$, it gives exactly what `derivative<Method, N>(fn, x)` gives, with the def
 ```
 
 The exact values are $1/(2\sqrt x)$: 0.5, 0.353553390593274 and 0.25. Each call returns a `std::expected`, so a caller
-can test it. For a step of your own, write the lambda yourself: `[&](double x) { return derivative(fn, x, h); }`.
-[Give derivatives](../roots/derivatives.md#numerically) passes such a function to Newton's method.
+can test it. [Give derivatives](../roots/derivatives.md#numerically) passes `derivative_of(fn)` to Newton's method.
+
+For a step of your own, write the lambda yourself; it too returns a `std::expected`:
+
+```{literalinclude} ../examples/deriv_derivative_of.cpp
+:start-after: // <own-step>
+:end-before: // </own-step>
+:dedent:
+```
+
+For Ridders' method `h` is the initial step. The lambda holds copies of `fn` and `h`, so, like `derivative_of`, it can
+outlive them; with `[&]` it could not.
 
 ## Its copy of `fn`
 
-`derivative_of` stores a copy of `fn`, so the result outlives `fn`. Two cases need care. A function object that is
+`derivative_of` stores a copy of `fn`, so the result can outlive `fn`. Two cases need care. A function object that is
 expensive to copy, such as one that holds a large table, is copied too. A function object that changes its own state,
 such as a counter of its calls, changes only its copy. In both cases pass
 `std::ref(fn)`: the result then calls the original, which must outlive it.
@@ -45,9 +55,10 @@ such as a counter of its calls, changes only its copy. In both cases pass
 ```
 
 Each derivative called `fn` twice, the central difference's two points. The copy's calls went to the copy; only the
-calls through `std::ref` reached the original. A lambda that captures a counter by reference needs no `std::ref`: the
-copy shares the counter, as it shares anything else captured by reference, which must still be alive when the
-derivative is called.
+calls through `std::ref` reached the original. Call such a copy through a non-`const` variable, as `copied` is.
+
+A lambda that captures a counter by reference needs no `std::ref`: the copy shares the counter. Anything captured by
+reference must still be alive when the derivative is called.
 
 The program needs:
 

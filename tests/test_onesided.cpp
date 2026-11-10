@@ -297,6 +297,27 @@ TEST_CASE("onesided: domain edges")
     CHECK(flagged(std::integral_constant<int, 2>{}, log));
     CHECK(flagged(std::integral_constant<int, 3>{}, log));
     CHECK(flagged(std::integral_constant<int, 4>{}, log));
+
+    // Between the reach and that flag, sqrt at 1e-11 and 2^-39 (exact in double): the result is wrong without the flag,
+    // but within about twice its estimate (the header's "either ... or"). References: the closed form 1 / (2 sqrt x),
+    // exact to an ulp, and the prototype ridders5.py, run 2026-11-10: at 1e-11 the value 147296.58 (6.84% off) with an
+    // estimate of 16054.16 (10.2%); at 2^-39 the value 248370.85 (33.0% off) with an estimate of 55025.26 (14.8%, so
+    // the error is 2.22 times it); 33 evaluations each. Bounds: the error within 10% of the prototype's and the
+    // estimate within a factor 2 of it, room for a target that fuses a * b + c or a later change of the tableau; sqrt
+    // is correctly rounded, so libm does not move these.
+    auto const unflagged = [](double x, double proto_error, double proto_estimate) {
+        int calls = 0;
+        auto const r = derivative<ForwardRidders>(Counted{ [](double t) { return std::sqrt(t); }, &calls }, x);
+        if (!r) return false;
+        double const exact = 0.5 / std::sqrt(x);
+        double const error = std::abs(r->value - exact) / exact;
+        double const estimate = *r->abs_error / exact;
+        return std::abs(error - proto_error) <= 0.1 * proto_error && estimate >= proto_estimate / 2
+            && estimate <= 2 * proto_estimate && 4 * *r->abs_error < std::abs(r->value) && error <= 3 * estimate
+            && calls == 33;
+    };
+    CHECK(unflagged(1e-11, 0.0684, 0.102));
+    CHECK(unflagged(0x1p-39, 0.330, 0.148));
 }
 
 TEST_CASE("onesided: fn is evaluated on one side of x only, restarts included")

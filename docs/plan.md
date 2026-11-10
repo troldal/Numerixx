@@ -245,7 +245,8 @@ the examples' tests pass on all five toolchains.
     2026-11-10, with decimal steps in place of the plan's dyadic ones)
   - [x] Draft and edit: every page within its budget or with the editor's reason; docs build clean (8c39680 and
     the stage-4 commit)
-  - [ ] Review round, decision letter and revision (`docs/sphinx/reviews/P9-*.md`)
+  - [x] Review round, decision letter and revision (`docs/sphinx/reviews/P9-*.md`; with two header-comment
+    corrections and a test the user approved)
   - [ ] Release: all five toolchains, site and PDF, CI; the Codex review and its adopted findings
 
 Open decisions: hosting (GitHub Pages from CI, or Read the Docs) and versioning (one site per release, or `dev` only),

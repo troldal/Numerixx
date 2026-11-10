@@ -147,3 +147,43 @@ approved); `higher-derivatives.md` (C6, C13, D9, D10, task 2); `derivative-of.md
 its budget: the cuts (C5 to C10, C13) outweigh the additions (G5, G12, C4, U3). The editor corrects the plan's figure 2
 text (G1). The second, targeted round: `docs-reviewer` and `numerics-reviewer` on `one-sided.md` and its program,
 which carry most of the changes, and on the header comments if the user approves U1 and U2.
+
+## Second round
+
+`docs-editor`, 2026-11-10, on `P9-docs-reviewer-2.md` (D2) and `P9-numerics-2.md` (N2), both on the revised tree
+after 9a04d32. Neither found a major problem; every first-round decision is done. The pages' wording where they touch
+the header's new `ForwardRidders` sentence ("either flagged by an estimate of at least |value| / 4, or ... within
+about twice its estimate") needs no change: `handle-failures.md` already shows both outcomes (1e-11 covered and
+unflagged, 1e-12 flagged) and the one-sided note says "from their default step".
+
+**Settled before this section (the user, 2026-11-10; the main session makes the `include/` and `tests/` changes):**
+N2-1 and N2-2 with D2-11 (the `ForwardRidders` comment and `design.md` sharpened to the measured dichotomy, the test
+citing the prototype `.scratch/onesided/ridders5.py` with a second case at $2^{-39}$ and its justification
+corrected); N2-11 and D2-10 (the 134-column line reflowed); N2-3 (`design.md`'s "Ridders is better, also near a NaN
+edge" corrected); the `derivative_of` comment's capture-by-value note and its `@code` block qualified; N2-4 (the
+$f''''$ pole-ahead clause, after the main session reproduces it). N2-5 is answered by D2's probe: Ridders' method wins
+on $\sqrt{1 - x}$ at every distance from $10^{-1}$ to $10^{-10}$, so "is the more accurate one" stays. N2-6 is
+answered by D2-6: on the cancelling form `BackwardRidders`' estimate (1.63e-10) is the larger, so the sum rule keeps
+Ridders' result, the right one; no change.
+
+| Id | Finding | Decision | Author |
+|---|---|---|---|
+| D2-1 | `one-sided.md:9` dropped "(or an infinity)", narrower than the header and `handle-failures.md` | adopt | "if `fn` returns NaN (or an infinity) there" |
+| D2-2 | The kink section lost its advice sentence, which G11 did not ask to cut | adopt | Restore "So return NaN outside the domain, or use a one-sided method." after "and gets $-1$" |
+| D2-3 | The `<own-step>` block has no text after it, and its `[&]` lambda dangles if returned, right before "can outlive `fn`" | adopt | The program's lambda captures by value, `[fn, h]`, as the header's note now says (one name for one thing); after the block: "For Ridders' method `h` is the initial step. The lambda holds copies of `fn` and `h`, so, like `derivative_of`, it can outlive them; with `[&]` it could not." The assertion is unchanged |
+| D2-4 | "trust neither until you have checked at another step" gives no means | adopt | "...at another initial step, the third argument of `derivative` ([Choose a step](step.md))" |
+| D2-5 | "a few ulps" undefined on `tutorial.md` | adopt | "off from the root solve by a few units in its last digit, which adds at most about $3 \times 10^{-10}$" |
+| D2-6 | "cancels" undefined; "optimistic" against `handle-failures.md`'s "too small" | adopt | "cancels near an edge (subtracts nearly equal numbers and loses digits), as $1 - x^2$ does near 1 ... or its noise makes an estimate too small" |
+| D2-7 | `one-sided.md`'s first paragraph no longer states the job; "with an estimate" at first use; the table's "relative" clause dropped | adopt | End the paragraph with "One-sided methods evaluate `fn` on one side only."; "with an error estimate, `abs_error`"; "the relative error, the estimate relative to the derivative, and the evaluations" |
+| D2-8 | The note's polynomial vanishes at Ridders' points only because of the NaN restarts | adopt | "on a polynomial, NaN below 0, whose zeros lie at the points Ridders' method tries after its restarts" |
+| D2-9 | `Forward<2>` only, where an upper edge needs `Backward<2>` | adopt | "`Forward<2>` or `Backward<2>` is enough" |
+| D2-12 | `basics.md:163` "the Ridders methods" without the gloss the stencils have; line 233 "One more exception" two sentences from its claim | adopt, for the main session (shared page) | "the Ridders methods (`Ridders`, `ForwardRidders`, `BackwardRidders`)"; "A constant can also differ in one more way:" |
+| N2-7 | `default_step<Method, N>(1.0)` deduces `double`, silently wrong in another type | adopt | "`default_step<Method, N>(1.0)` (in another real type, `T(1)`)" on `step.md`; the assertion stands |
+| N2-8 | The note leaves out "from the default step" | adopt | "lose accuracy from their default step where `fn` changes on a scale below..." |
+| N2-9 | `deriv_one_sided.cpp:214`'s "70 eps" should be about 125 eps in $1 - x^2$, about 60 after the square root | adopt | The comment (no assertion changes) |
+| N2-10 | `deriv_kepler.cpp:72, 74` still say "far below 1e-9" | adopt | The comments say "below" |
+
+Fourteen items: 14 adopted, none adapted or rejected; D2-12 goes to the main session. The author's changes: `one-sided.md`
+(D2-1, D2-2, D2-4, D2-6 to D2-9, N2-8), `derivative-of.md` and `deriv_derivative_of.cpp` (D2-3), `tutorial.md` (D2-5),
+`step.md` (N2-7), the comments of `deriv_one_sided.cpp` (N2-9) and `deriv_kepler.cpp` (N2-10). Wording only, within
+every budget; no third round needed beyond `docs-reviewer`'s read of the diff at release.

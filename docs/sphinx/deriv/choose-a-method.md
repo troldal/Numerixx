@@ -1,14 +1,13 @@
 # Choose a method
 
 The default, the central difference `Central<2>`, costs two evaluations of `fn` and gives about 10 correct digits of a
-`double`. That holds for a function that varies on the *scale* $\max(|x|, 1)$, which the default step assumes. This
-section is for when that is not enough: you need more digits, an error estimate, a function defined on one side of $x$ only, or the fewest evaluations
-of an expensive `fn`.
+`double`. That holds where `fn` varies on the *scale* the default step assumes: the distance over which `fn` changes
+noticeably, taken to be about $\max(|x|, 1)$. When you need more digits, an error estimate, or a function defined on
+one side of $x$ only, choose another method.
 
 A *stencil* is a fixed formula: a few points around $x$, a weight for each, and a step $h$. Its *truncation error* is
 the error of the formula itself, apart from rounding. Its *accuracy order* $P$ says how fast that error falls with the
-step: as $h^P$. Every method is called the same way, `derivative<Method>(fn, x)`, so trying another is a one-word
-change.
+step: as $h^P$. Trying another method is a one-word change, `derivative<Method>(fn, x)`.
 
 ## From what you need to a method
 
@@ -16,13 +15,14 @@ change.
 |---|---|---|
 | A few correct digits, at the fewest evaluations | {cpp:struct}`nxx::deriv::Central`, `Central<2>` (the default) | 2 evaluations for $f'$; about 10 digits of a `double` |
 | More digits at a fixed cost, `fn` smooth on the scale $\max(\lvert x \rvert, 1)$ | `Central<4>` or `Central<6>` | 4 or 6 evaluations; one to three digits more |
-| The most digits, or an error estimate | {cpp:struct}`nxx::deriv::Ridders` | Typically 13 to 15 digits, with `abs_error`; typically 10 to 16 evaluations for $f'$ |
-| $x$ at the edge of `fn`'s domain, where it is defined | {cpp:struct}`nxx::deriv::ForwardRidders`, {cpp:struct}`nxx::deriv::BackwardRidders`; at a fixed cost {cpp:struct}`nxx::deriv::Forward`, {cpp:struct}`nxx::deriv::Backward` | Points on one side only ([Near the edge of a domain](one-sided.md)) |
-| $x$ near the edge | `Ridders` and the one-sided Ridders method | Try both, and compare ([Near the edge](one-sided.md#near-the-edge)) |
+| The most digits, or an error estimate | {cpp:struct}`nxx::deriv::Ridders` | Typically 13 to 15 digits ([Costs](costs.md)), with `abs_error`; typically 10 to 16 evaluations for $f'$ |
+| $x$ at the edge of `fn`'s domain | {cpp:struct}`nxx::deriv::ForwardRidders`, {cpp:struct}`nxx::deriv::BackwardRidders`; at a fixed cost {cpp:struct}`nxx::deriv::Forward`, {cpp:struct}`nxx::deriv::Backward` | Points on one side only ([Near the edge of a domain](one-sided.md)) |
+| $x$ near the edge | `Ridders`, and `ForwardRidders` or `BackwardRidders` for the side the domain lies on | Try both, and compare ([Near the edge](one-sided.md#near-the-edge)) |
 | `fn` varying faster than $\max(\lvert x \rvert, 1)$ | `Ridders`, or a stencil with a step of your own | [Choose a step](step.md) |
 
-A higher accuracy order is not always better. Its points spread wider and its default step is larger, so on a function
-that changes fast it can lose every digit ([Costs](costs.md) shows a case).
+A higher accuracy order is not always better. Its points spread wider and its default step is larger, so it can be less
+accurate even on a function that varies slowly (`Central<10>` on $1/x$, [Costs](costs.md)), and on one that changes
+fast it can lose every digit.
 
 ## Measure on your own function
 

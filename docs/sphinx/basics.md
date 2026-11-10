@@ -160,9 +160,9 @@ module's description of it.
   a point where `fn`, as computed, changes sign. [Roots of functions](roots/index.md#what-you-get-back) explains what it
   covers.
 - **A derivative** ({cpp:struct}`nxx::deriv::Estimate`): `abs_error` is an *estimate* of the error, not a guarantee, and
-  a `std::optional`: Ridders' methods fill it, the plain finite differences leave it empty, so test it before reading it
-  with `*`. An `Estimate` converts to its value, so it can be used where a number is expected. That has a trap: for a
-  result `d`, `if (*d)` compiles, and tests whether the derivative is 0. Test `d` itself.
+  a `std::optional`: the Ridders methods (`Ridders`, `ForwardRidders`, `BackwardRidders`) fill it, the stencils (fixed
+  formulas such as `Central<2>`) leave it empty, so test it before reading it with `*`. An `Estimate` converts to its value, so it can be used where a number is expected.
+  That has a trap: for a result `d`, `if (*d)` compiles, and tests whether the derivative is nonzero. Test `d` itself.
 
 - **An integral** ({cpp:struct}`nxx::quadrature::Integral`): `abs_error` is an *estimate* of the error, always present,
   not a guarantee: no method that samples `fn` at finitely many points can bound its error. A failure, a
@@ -228,12 +228,12 @@ the type must be a *literal type*, usable in constant expressions: the built-in 
 Boost.Multiprecision types in this manual, `cpp_bin_float_50` and `cpp_dec_float_50`, are not.
 
 A constant gives exactly what the same call gives at run time, as long as the compiler does not fuse a multiplication
-and an addition into one instruction (a fused multiply-add) at run time. One more exception: an overflow is not
-allowed in a constant expression, so `nxx::quadrature` refuses, with `non_finite`, a term or a sum beyond half the
-type's largest number in a constant that it would accept at run time. Compilers for x86-64 and WebAssembly do not by
+and an addition into one instruction (a fused multiply-add) at run time. Compilers for x86-64 and WebAssembly do not by
 default, but GCC and Clang do as soon as you target hardware that has the instruction (`-march=native`, `-mfma`);
 `-ffp-contract=off` turns that off. Fused arithmetic also changes the last digits of results, and the counts of
-evaluations, that this manual quotes.
+evaluations, that this manual quotes. A constant can also differ in one more way: an overflow is not allowed in a
+constant expression, so `nxx::quadrature` refuses, with `non_finite`, a term or a sum beyond half the type's largest
+number in a constant that it would accept at run time.
 
 ```{note}
 A compiler limits the work in one constant expression. If it reports that a solve exceeds the limit, raise it:

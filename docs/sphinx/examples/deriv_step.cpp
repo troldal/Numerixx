@@ -88,6 +88,10 @@ Ridders from a / 8: relative error 5.0e-14
     // |f| = 4000 and |f'| = 1.2e7, 1.9e-10 relative; the page says "about 10 digits".
     double const scaled_error = std::abs(scaled->value - exact) / -exact;
     if (!(scaled_error < 3e-10)) return 5;
+    // "default_step<Method, N>(1.0) gives the default step for a function of scale 1; multiply it by your function's
+    // scale": for the central difference and f', the same step as the page's root_epsilon<3, double>() * a (an API
+    // fact, eps^(1/3) times max(|1|, 1) = 1, not a numerical reference).
+    if (!(dv::default_step<dv::Central<2>>(1.0) * a == h)) return 11;
     // Ridders finds the scale itself: "13 to 15 digits", its estimate covering the actual error and below 1e-12
     // relative.
     if (!(std::abs(r->value - exact) <= *r->abs_error && *r->abs_error < 1e-12 * -exact)) return 6;

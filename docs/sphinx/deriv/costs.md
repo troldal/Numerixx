@@ -15,8 +15,10 @@ Each cell gives the evaluations, then the relative error:
 :end-before: )";
 ```
 
+On the peak the higher-order stencils lose every digit; Ridders' method keeps 13 at 36 evaluations.
+
 The table is printed by `docs/sphinx/examples/deriv_costs.cpp`, which checks that every estimate of the Ridders
-methods covers its error. It holds for builds that do not fuse a multiplication and an addition ([Working with
+methods covers its error. The numbers hold for builds that do not fuse a multiplication and an addition ([Working with
 Numerixx](../basics.md#compile-time)).
 
 The Ridders methods' typical and maximum evaluations for each derivative order are in the reference

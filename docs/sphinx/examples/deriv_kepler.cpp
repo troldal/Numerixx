@@ -69,11 +69,13 @@ int main()
     // both round to it.
     if (!(std::format("{:.10f}", slope->value) == "1.0373620219" && std::format("{:.10f}", exact) == "1.0373620219"))
         return 7;
-    // The central difference: "far below 1e-9" relative. eccentric's values are E to within about 1.6e-15
+    // The central difference: "below 1e-9" relative. eccentric's values are E to within about 1.6e-15
     // (above), so the rounding part is at most 2 * 1.6e-15 / 2h with h = eps^(1/3) = 6.06e-6: 2.64e-10 absolute; the
-    // truncation part is h^2 / 6 |E'''|, below 1.3e-11 (|E'''| = 0.855). The page says the error is far below 1e-9.
+    // truncation part is h^2 / 6 |E'''|, below 1.3e-11 (|E'''| = 0.855). The page says the error is below 1e-9.
     if (!(std::abs(slope->value - exact) <= 2.64e-10 + 1.3e-11 && std::abs(slope->value - exact) / exact < 1e-9))
         return 2;
+    // "Its default step is about 6e-6 here": eps^(1/3) max(|M|, 1) with M = 1, 6.06e-6.
+    if (!(dv::default_step<dv::Central<2>>(M) > 6e-6 && dv::default_step<dv::Central<2>>(M) < 6.1e-6)) return 8;
     // Ridders: the estimate covers the actual error, and both are far smaller than the central difference's bound.
     if (!(std::abs(r->value - exact) <= *r->abs_error && *r->abs_error < 1e-11)) return 3;
     // "More than ten times smaller than the central difference's, for about a dozen evaluations" (measured: 12; the

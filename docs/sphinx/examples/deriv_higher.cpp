@@ -116,6 +116,9 @@ N = 4   Central<2> 2.9e-05   Ridders 1.8e-09
         if (n > 0 && !(central[n] > central[n - 1] && ridders[n] > ridders[n - 1])) return 5;
     }
     if (!(std::abs(fourth->value - 0.75) <= *fourth->abs_error)) return 6;
+    // "Ridders' method starts from max(|x|, 1) / 4 for these orders instead of / 32": at 2, 0.5 for f''.
+    if (!(dv::default_step<dv::Ridders, 2>(2.0) == 0.5 && dv::default_step<dv::Ridders, 1>(2.0) == 2.0 / 32.0))
+        return 10;
     // float: f'' is good to only about 3 or 4 digits, as the warning says. Model: eps_f^(1/2) = 3.5e-4 for Central<2>.
     if (!(std::abs(in_float->value - 0.25f) / 0.25f < 1e-3f)) return 7;
     return 0;

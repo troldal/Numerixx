@@ -69,9 +69,11 @@ int main(int, char **argv)
     struct Row {
         double distance;
         char const *method;
+        double value;
         double error;
         double estimate;
         int evaluations;
+        int nans; // the evaluations at which fn returned NaN: points past the edge
     };
     std::vector<Row> rows;
     for (double const d : {1e-2, 1e-6, 1e-10}) {
@@ -81,14 +83,17 @@ int main(int, char **argv)
         double const exact = -1.0 / ((1.0 + d) * (1.0 + d));
         auto const add = [&]<typename M>(char const *name) {
             int calls = 0;
+            int nans = 0;
             auto const counted = [&](double t) {
                 ++calls;
-                return fn(t);
+                double const y = fn(t);
+                if (std::isnan(y)) ++nans;
+                return y;
             };
             auto const r = dv::derivative<M>(counted, d);
             if (r && r->abs_error)
-                rows.push_back({.distance = d, .method = name, .error = relative_error(r, exact),
-                                .estimate = *r->abs_error / std::abs(exact), .evaluations = calls});
+                rows.push_back({.distance = d, .method = name, .value = r->value, .error = relative_error(r, exact),
+                                .estimate = *r->abs_error / std::abs(exact), .evaluations = calls, .nans = nans});
         };
         add.operator()<dv::Ridders>("Ridders");
         add.operator()<dv::ForwardRidders>("ForwardRidders");
@@ -134,16 +139,17 @@ distance  method           error  estimate  evaluations
         return 6;
     // At 1e-6, the central difference's default step, 6.06e-6, still reaches below 0.
     if (!(dv::derivative(fn, 1e-6) == std::unexpected(dv::error::non_finite))) return 8;
-    // "On sqrt(1 - x) near 1, Ridders' method can be the more accurate one", and a one-sided stencil with its default
-    // step fails there: g(x) = sqrt(1 - x) + x, defined up to 1, g'(x) = 1 - 1 / (2 sqrt(1 - x)). At 0.999 Ridders
-    // beats BackwardRidders; at 1 - 1e-7, Backward<2>'s step, 6e-6, spans sixty times the distance to the edge, and
-    // its result is more than 10% off, with no estimate.
+    // "On a function that changes fast near its edge, such as sqrt(1 - x) near 1, Ridders' method is the more accurate
+    // one", and a one-sided stencil with its default step fails there: g(x) = sqrt(1 - x), defined up to 1,
+    // g'(x) = -1 / (2 sqrt(1 - x)). At 0.999 Ridders beats BackwardRidders; at 1 - 1e-7, Backward<2>'s step, 6e-6,
+    // spans sixty times the distance to the edge, and its result is more than 10% off, with no estimate. 1 - x is
+    // exact (Sterbenz), so each reference is within about 2 ulps, far below the errors compared.
     auto const g = [](double x) {
         if (x > 1.0) return std::numeric_limits<double>::quiet_NaN();
-        return std::sqrt(1.0 - x) + x;
+        return std::sqrt(1.0 - x);
     };
     double const at = 0.999;
-    double const g_exact = 1.0 - 0.5 / std::sqrt(1.0 - at);
+    double const g_exact = -0.5 / std::sqrt(1.0 - at);
     auto const g_central = dv::derivative<dv::Ridders>(g, at);
     auto const g_backward = dv::derivative<dv::BackwardRidders>(g, at);
     if (!g_central || !g_backward
@@ -151,7 +157,7 @@ distance  method           error  estimate  evaluations
         return 13;
     double const close = 1.0 - 1e-7;
     auto const g_stencil = dv::derivative<dv::Backward<2>>(g, close);
-    double const g_close = 1.0 - 0.5 / std::sqrt(1.0 - close);
+    double const g_close = -0.5 / std::sqrt(1.0 - close);
     if (!g_stencil || !(std::abs(g_stencil->value - g_close) > 0.1 * std::abs(g_close))) return 14;
     // "On a function whose values happen to vanish at the points a method tries, [the estimate] can even be 0 for a
     // wrong result" (Codex's case): u (1 - (64 u)^2) (1 - (128 u)^2), u = t - 1/64, NaN below 0, at 1/64, where the
@@ -192,5 +198,41 @@ distance  method           error  estimate  evaluations
     // accurate.
     if (!(rows[4].evaluations == 64 && rows[4].estimate > 3e-6 && rows[4].estimate < 3e-5)) return 21;
     if (!(rows[5].error < rows[4].error)) return 22;
+    // The page's numbers at 1e-10: Ridders' error between 1e-10 and 1e-9; the one-sided method's below 1e-12, at 10
+    // evaluations.
+    if (!(rows[4].error > 1e-10 && rows[4].error < 1e-9 && rows[5].error < 1e-12 && rows[5].evaluations == 10))
+        return 23;
+    // "It restarts below every step that reaches past the edge, and the closer x is, the more often": at every distance
+    // Ridders' method met NaN, and more often the closer it was.
+    if (!(rows[0].nans > 0 && rows[2].nans > rows[0].nans && rows[4].nans > rows[2].nans)) return 24;
+    // The rule: "keep the one with the smaller estimate if the two differ by less than the sum of their estimates". At
+    // 1e-10 they do (estimates relative to |f'| = 1 within 2e-10, so compared as absolute values), the smaller
+    // estimate is ForwardRidders', and its error is the smaller.
+    if (!(std::abs(rows[4].value - rows[5].value) < rows[4].estimate + rows[5].estimate
+          && rows[5].estimate < rows[4].estimate && rows[5].error < rows[4].error))
+        return 25;
+    // A formula that cancels (the user's decision U3): sqrt(1 - x^2) at 0.999, NaN above 1, loses up to about 125 eps
+    // relative in 1 - x^2 (about 60 eps after the square root), and BackwardRidders' estimate falls below its error
+    // (Ridders' happens to cover it, hence the page's "makes an estimate too small", not both); written as
+    // sqrt((1 - x)(1 + x)), both Ridders' and BackwardRidders' estimates cover their errors. The reference,
+    // -x / sqrt((1 - x)(1 + x)), has 1 - x exact and a few roundings, about 1e-15 relative, far below the errors
+    // compared.
+    auto const cancelling = [](double x) {
+        if (x > 1.0) return std::numeric_limits<double>::quiet_NaN();
+        return std::sqrt(1.0 - x * x);
+    };
+    auto const factored = [](double x) {
+        if (x > 1.0) return std::numeric_limits<double>::quiet_NaN();
+        return std::sqrt((1.0 - x) * (1.0 + x));
+    };
+    double const c_exact = -at / std::sqrt((1.0 - at) * (1.0 + at));
+    auto const missed = dv::derivative<dv::BackwardRidders>(cancelling, at);
+    if (!missed || !missed->abs_error || !(std::abs(missed->value - c_exact) > *missed->abs_error)) return 26;
+    auto const cured_central = dv::derivative<dv::Ridders>(factored, at);
+    auto const cured_one_sided = dv::derivative<dv::BackwardRidders>(factored, at);
+    if (!cured_central || !cured_central->abs_error || !cured_one_sided || !cured_one_sided->abs_error
+        || !(std::abs(cured_central->value - c_exact) <= *cured_central->abs_error)
+        || !(std::abs(cured_one_sided->value - c_exact) <= *cured_one_sided->abs_error))
+        return 27;
     return 0;
 }

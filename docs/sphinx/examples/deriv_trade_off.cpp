@@ -162,12 +162,13 @@ default_step,default_error,ridders_error,ridders_estimate
     if (!(best->error < 1e-10 && best->error > 1e-13)) return 14;
     // Then rounding takes over: below 1e-7 every error is within the rounding bound rho / h (with the truncation, at
     // most 3.2e-16 there, and 1.1e-16 for exact), and every error below 1e-9 is more than a thousand times the
-    // smallest; at 1e-13 fewer than four digits are left.
+    // smallest.
     for (Point const &p : curve) {
         if (p.h < 1e-7 && !(p.error <= rho / p.h + p.h * p.h / 32.0 + 1.1e-16 + 1.1e-16)) return 9;
         if (p.h < 1e-9 && !(p.error > 1000.0 * best->error)) return 10;
     }
-    if (!(curve.back().error > 1e-4)) return 11;
+    // "Two or three digits are left" at 1e-13: an error between 1e-3 and 1e-2.
+    if (!(curve.back().error > 1e-3 && curve.back().error < 1e-2)) return 11;
     // Ridders' method: its estimate covers its error, which is 50 to 500 times below the curve's smallest error; the
     // estimate is 1 to 10 times the error.
     if (!(ridders_error <= ridders_estimate && ridders_estimate <= 10.0 * ridders_error)) return 12;

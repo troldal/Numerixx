@@ -188,10 +188,18 @@ The one-sided methods:
 - The initial step is `max(|x|, 1) / 32` for every N (`detail::one_sided_divisor`): the rules reach N h, and s/32 was
   the more accurate of the two starts without gross errors for f' to f''', and the best for f''''.
 - Their reach from the default step: fn must vary on a scale of at least about `2^-30 max(|x|, 1)` (sqrt or log at
-  1e-9 from 0). Closer, the levels run out and the result is wrong, but flagged by an estimate of at least |value| / 4.
+  1e-9 from 0). Closer, the levels run out and the result is wrong: either flagged by an estimate of at least
+  |value| / 4, or, as measured for f' of sqrt, log and cbrt near 0, within about twice its estimate (sqrt at 1e-11
+  from 0: 7% off, estimate 11%; at 2^-39: 33% off, estimate 15%; log at 2^-37: error 0.224, estimate 0.193; 215
+  unflagged results of 828, at worst 2.2 times). Corrected 2026-11-10 (the manual's Phase 9 review, the book's U-17):
+  the old text said every such result was flagged.
+- Inside the reach, a pole just ahead of x, within the span the rule samples, can make f'''' wrong without the flag:
+  on 1/(t - a) at 0, a from 1e-9 to 1e-1, 9 of 4000 results about 60 times the derivative, the error 4.3 to 4.9 times
+  the estimate (a resonance of the nodes with the pole; the book's R3-numerics-01, reproduced 2026-11-10). f' to f'''
+  and poles behind x had none. Documented in the header, not fixed.
 - They are less accurate than `Ridders` (medians 2e-13, 1e-10, 4e-8 and 2e-6 for f' to f'''' in double, against 1e-14
-  to 7e-10), and for fn defined on one side only: where both sides exist, `Ridders` is better, also near a NaN edge,
-  whose NaN guides its restarts.
+  to 7e-10), and for fn defined on one side only: where both sides exist, `Ridders` is usually better; close to a NaN
+  edge either can be (the manual's near-edge table: `ForwardRidders` 1e-13 against `Ridders`' 2e-10 at 1e-10).
 
 ## Tests
 

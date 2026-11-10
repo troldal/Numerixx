@@ -1,21 +1,17 @@
 # The slope of a computed function
 
-Numerical derivatives are for functions that have no formula you can differentiate. This tutorial takes one such
-function, the position of a planet in its orbit, which is itself computed by solving Kepler's equation. You will
-differentiate it with the default method, check the result against a closed form, get a more accurate result with an
-error estimate, and take the second derivative. The [roots tutorial](../roots/tutorial.md) solves the same equation;
-you do not need to have read it.
+Numerical derivatives are for functions that have no formula you can differentiate. This tutorial differentiates one
+such function, the position of a planet in its orbit, which is itself computed by solving Kepler's equation.
 
 ## The function
 
-A planet's *mean anomaly* $M$ grows uniformly with time; its *eccentric anomaly* $E$ gives its position on the ellipse.
-For an orbit of eccentricity $e$ they are related by Kepler's equation,
+The *mean anomaly* $M$ measures time along the orbit, and the *eccentric anomaly* $E$ the planet's position; for an
+orbit of eccentricity $e$, Kepler's equation relates them ([the roots tutorial](../roots/tutorial.md) says more):
 
 $$E - e \sin E = M$$
 
-which has no solution in closed form. For each $M$, $E(M)$ is the root of $E - e \sin E - M$, which lies in
-$[M - e, M + e]$. So you can evaluate $E(M)$, by a root solve, but not write it down. How fast does the eccentric
-anomaly advance with time? That is the derivative $dE/dM$.
+For each $M$, $E(M)$ is the root of $E - e \sin E - M$, which lies in $[M - e, M + e]$. You can evaluate it, but not
+write it down. Its derivative $dE/dM$ says how fast the position advances with time.
 
 In code, $E(M)$ is a lambda that solves Kepler's equation with `nxx::roots`. The examples write `rt` for `nxx::roots`
 and `dv` for `nxx::deriv`:
@@ -64,9 +60,9 @@ Compare:
 :dedent:
 ```
 
-The relative error is far below $10^{-9}$. Each value of $E(M)$ comes from a root solve, but its rounding adds at most
-about $3 \times 10^{-10}$. The digits depend on the platform's `std::sin`, so the program checks that bound rather than
-printed output.
+The relative error is below $10^{-9}$. Each $E(M)$ is off from the root solve by a few units in its last digit, which
+adds at most about $3 \times 10^{-10}$. The digits depend on the platform's `std::sin`, so the program checks that bound
+rather than printed output.
 
 ## A better result, with an error estimate
 
@@ -79,9 +75,9 @@ from a sequence of shrinking steps to a step of zero, and estimates its error on
 :dedent:
 ```
 
-The result now has an `abs_error`, the method's estimate of its error, a `std::optional` that Ridders' method always
-fills. The estimate is below $10^{-11}$, and covers the actual error. That error is more than ten times smaller than the
-central difference's, for about a dozen evaluations of $E(M)$ instead of two.
+The result now has an `abs_error`, the method's estimate of its error. The estimate is below $10^{-11}$, and covers the
+actual error. That error is more than ten times smaller than the central difference's, for about a dozen evaluations of
+$E(M)$ instead of two.
 
 The estimate assumes that each value of $E(M)$ is accurate to about the type's epsilon. A root solve gives a few times
 that, and the estimate still covers the error here. For a function computed less accurately, check the digits as

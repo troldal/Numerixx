@@ -303,10 +303,14 @@ namespace nxx::deriv {
      *
      * The tableau, its stopping rules and restarts are those of `Ridders`, with the initial step max(|x|, 1) / 32 for
      * every order; the error estimate also covers the rounding that the tableau amplifies. From the default step the
-     * method needs fn to vary on a scale of at least about 2^-30 max(|x|, 1) (sqrt or log at 1e-9 from 0); closer, its
-     * result is wrong but flagged by an estimate of at least |value| / 4: pass a step on fn's own scale. It costs fn(x)
-     * once and N evaluations per level: typically 10 for f' and 17, 22 and 29 for f'' to f'''' in double, at most 33,
-     * 65, 97 and 129.
+     * method needs fn to vary on a scale of at least about 2^-30 max(|x|, 1) (sqrt or log at 1e-9 from 0); closer, the
+     * levels run out and the result is wrong: either flagged by an estimate of at least |value| / 4, or, as measured
+     * for f' of sqrt, log and cbrt near 0, within about twice its estimate (sqrt at 1e-11 from 0: 7% off, estimate 11%;
+     * at 2^-39: 33% off, estimate 15%). Pass a step on fn's own scale. Inside that reach, a pole just ahead of x,
+     * within the span the rule samples, can make f'''' wrong without the flag (measured on 1/(t - a) at 0, a from 1e-9
+     * to 1e-1: 9 of 4000 results about 60 times the derivative, the error 4 to 5 times the estimate); near a known
+     * singularity, check f'''' at a second initial step. It costs fn(x) once and N evaluations per level: typically 10
+     * for f' and 17, 22 and 29 for f'' to f'''' in double, at most 33, 65, 97 and 129.
      *
      * @code
      * // log is NaN below 0.5 here, and x is the edge: Ridders returns non_finite, ForwardRidders the derivative.
@@ -1890,14 +1894,15 @@ namespace nxx::deriv {
      * from fn.
      *
      * The step is derivative()'s default, which assumes that fn varies on the scale max(|x|, 1); for another step,
-     * write the lambda `[&](double x) { return derivative<M, N>(fn, x, h); }`. Unlike a direct call of derivative(), a
-     * call of the callable does not warn for a derivative above the first in a coarse type such as float, where it
-     * keeps few correct digits: the type is known only where an algorithm calls it, inside a header, where the warning
-     * could not be silenced at the caller's line.
+     * write the lambda `[&](double x) { return nxx::deriv::derivative<M, N>(fn, x, h); }`, which refers to fn and h:
+     * unlike the callable, it must not outlive them (capture by value, `[fn, h]`, to keep copies). Unlike a direct call
+     * of derivative(), a call of the callable does not warn for a derivative above the first in a coarse type such as
+     * float, where it keeps few correct digits: the type is known only where an algorithm calls it, inside a header,
+     * where the warning could not be silenced at the caller's line.
      *
      * @code
-     * auto const d = derivative_of(fn);                          // f' by Central<2>
-     * auto const d2 = derivative_of<Ridders, order::second>(fn); // f'' by Ridders
+     * auto const d = nxx::deriv::derivative_of(fn); // f' by Central<2>
+     * auto const d2 = nxx::deriv::derivative_of<nxx::deriv::Ridders, nxx::deriv::order::second>(fn); // f'' by Ridders
      * if (auto const r = d(1.0)) use(r->value);
      * @endcode
      *
