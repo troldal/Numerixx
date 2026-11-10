@@ -39,7 +39,8 @@ Ridders' method on $1/x$ at 2 show the fall:
 ```
 
 Ridders' method keeps far more digits at every order, with an error estimate, for more evaluations
-([Costs](costs.md)). Above the first derivative, it is the method to use unless evaluations are expensive.
+({cpp:struct}`nxx::deriv::Ridders` gives the counts per order). Above the first derivative, it is the method to use
+unless evaluations are expensive.
 
 ## Not in `float`
 

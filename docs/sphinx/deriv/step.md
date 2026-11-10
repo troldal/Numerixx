@@ -17,20 +17,7 @@ Take a peak of width $a = 10^{-4}$, and its derivative at $2 \times 10^{-4}$:
 :dedent:
 ```
 
-```{eval-rst}
-.. plot:: plots/deriv_scale.py
-   :alt: Two V-shaped curves of one shape on logarithmic axes, smaller steps to the right. For the square root at 2 the
-         lowest error, 4.1e-12, is at a step of 5e-6, and the default step, 1.2e-5, is at the bottom of the V. The
-         peak's error stays at 1 or above down to a step of 2e-4, then falls to its lowest, 1.2e-11, at 1e-9, about four
-         decades further right. The peak's default step, 6.1e-6, is circled on its falling side, at an error of 3.4e-4.
-   :caption: The relative error of the central difference against its step on :math:`\sqrt{x}` at 2 and on the peak
-             :math:`x / (x^2 + a^2)`, :math:`a = 10^{-4}`, at :math:`2a`, each with its default step circled.
-```
-
-The figure shows the central difference's error on this peak and on $\sqrt x$ at 2. The two curves have one shape, but
-the peak's lies about four decades to the left: the best step depends on the function's scale, not on $x$ alone. The
-default step sits at the bottom of the square root's curve. On the peak it is far too large, high on the side where
-truncation rules:
+With the default step:
 
 ```{literalinclude} ../examples/deriv_step.cpp
 :start-after: // <default>
@@ -44,8 +31,24 @@ truncation rules:
 :end-before: )";
 ```
 
-The result keeps only three or four digits. For this function, use $\varepsilon^{1/3}$ times its own scale, $a$, as the
-step. {cpp:func}`nxx::math::root_epsilon` gives $\varepsilon^{1/3}$, and the third argument of `derivative` is the step:
+The result keeps only three or four digits. The figure shows why: the central difference's error on this peak and on
+$\sqrt x$ at 2, against the step.
+
+```{eval-rst}
+.. plot:: plots/deriv_scale.py
+   :alt: Two V-shaped curves of one shape on logarithmic axes, smaller steps to the right. For the square root at 2 the
+         lowest error, 4.1e-12, is at a step of 5e-6, and the default step, 1.2e-5, is at the bottom of the V. The
+         peak's error stays at 1 or above down to a step of 2e-4, then falls to its lowest, 1.2e-11, at 1e-9, about four
+         decades further right. The peak's default step, 6.1e-6, is circled on its falling side, at an error of 3.4e-4.
+   :caption: The relative error of the central difference against its step on :math:`\sqrt{x}` at 2 and on the peak
+             :math:`x / (x^2 + a^2)`, :math:`a = 10^{-4}`, at :math:`2a`, each with its default step circled.
+```
+
+The two curves have one shape, but the peak's lies about four decades to the left: the best step depends on the
+function's scale, not on $x$ alone. The default step sits at the bottom of the square root's curve. On the peak it is
+far too large, high on the side where truncation rules. For this function, use $\varepsilon^{1/3}$ times its own
+scale, $a$, as the step. {cpp:func}`nxx::math::root_epsilon` gives $\varepsilon^{1/3}$, and the third argument of
+`derivative` is the step:
 
 ```{literalinclude} ../examples/deriv_step.cpp
 :start-after: // <scaled>

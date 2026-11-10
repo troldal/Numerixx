@@ -1,8 +1,8 @@
 # Near the edge of a domain
 
 Many functions are defined only on part of the line, such as $\sqrt x$ or a model valid above some limit. The part where
-a function is defined is its *domain*. A central method evaluates `fn` on both sides of $x$, so at the *edge* of the
-domain one of its points falls outside. One-sided methods avoid that.
+a function is defined is its *domain*. The central difference and Ridders' method evaluate `fn` on both sides of $x$,
+so at the *edge* of the domain one of their points falls outside. One-sided methods avoid that.
 
 ## Return NaN outside the domain
 
@@ -28,9 +28,9 @@ about 13, with an error estimate.
 
 ## Near the edge
 
-A little inside the domain, the central methods work, but are harder to trust. The program also compares Ridders'
-method and `ForwardRidders` at three distances from the edge: the relative error, the relative estimate, and the
-evaluations of `fn`:
+A little inside the domain, Ridders' method works, at a price; the central difference, whose default step is about
+$6 \times 10^{-6}$, still fails at $10^{-6}$. The program compares Ridders' method and `ForwardRidders` at three
+distances from the edge: the relative error, the estimate relative to the derivative, and the evaluations of `fn`:
 
 ```{literalinclude} ../examples/deriv_one_sided.cpp
 :language: text
@@ -40,15 +40,15 @@ evaluations of `fn`:
 
 Far from the edge, Ridders' method is the more accurate. Closer, it restarts below each step that met NaN; its estimate
 grows, and at $10^{-10}$ it makes all the 64 evaluations it may. `ForwardRidders` keeps its accuracy and its 10
-evaluations. On a function that changes fast near its edge, such as $\sqrt{1 - x}$ near 1, Ridders' method is the more
-accurate one.
+evaluations. Yet on a function that changes fast near its edge, such as $\sqrt{1 - x}$ near 1, Ridders' method can be
+the more accurate one.
 
 So near an edge, try both. Keep the one with the smaller estimate only if the two agree within their estimates. An
 estimate is not a proof: on a function whose values happen to vanish at the points a method tries, it can even be 0
 for a wrong result.
 
-Avoid the one-sided stencils there: their step does not shrink near the edge, and they have no estimate to warn you. A
-root solve meets the same problem ([A numerical derivative near the
+Avoid the one-sided stencils there: their step does not shrink near the edge, and they have no estimate to warn you.
+Newton's method with a numerical derivative meets the same problem ([A numerical derivative near the
 edge](../roots/restricted-domain.md#a-numerical-derivative-near-the-edge)).
 
 ## A formula that goes on

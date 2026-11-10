@@ -211,6 +211,23 @@ Every program moves its `dv` alias into its includes block. Eleven programs: nin
 2. `basics.md`'s "the plain finite differences" for what the headers and the chapter call stencils: left for the
    shared pages' phase (the user, 2026-11-09).
 
+## Stage 4: the edit
+
+The author's three departures from the plan, checked: (1) the costs table shows `Central<10>` less accurate than
+`Central<2>` on $1/x$ at 2, so the overview says that `Central<4>` and `Central<6>` are the more accurate ones on a
+smooth function, not "`Central<4>` and higher"; (2) the Ridders methods' typical and maximum evaluation counts per
+order are the header's documented properties, which no program of the manual computes, so `costs.md` now points to
+the reference for them instead of repeating them, and the overview's "10 to 16" links to `nxx::deriv::Ridders`;
+(3) the near-edge sentences (64 evaluations, the one-sided method's 10) are asserted by `deriv_one_sided.cpp`. Edits
+for wording: `step.md`'s figure moved after the default step's output, which it explains (and which left most of a
+PDF page blank before it); `one-sided.md` names the methods instead of "a central method", says what fails at
+$10^{-6}$ (the central difference, asserted), and "can be the more accurate one" for $\sqrt{1 - x}$, as asserted at
+0.999; the page's roots link is about Newton's method, not a root solve in general; `choose-a-method.md` defines
+"scale" and "domain" at first use; `handle-failures.md` introduces the one error value in a full sentence. Prose
+words by the editor's count (inline code and formulas as one word each): index 622, tutorial 573, choose-a-method 486,
+step 358, one-sided 442, higher-derivatives 352, derivative-of 261, handle-failures 397, costs 135, book 27, all
+within budget.
+
 ## Steps
 
 As `docs/sphinx/CLAUDE.md`: the user's approval; evidence (the two figure programs and scripts, the changed programs,

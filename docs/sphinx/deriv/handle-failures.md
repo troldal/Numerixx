@@ -8,7 +8,7 @@ case, and what to try next.
 
 A failed call returns a `std::expected` holding an {cpp:enum}`nxx::deriv::error` instead of an
 {cpp:struct}`nxx::deriv::Estimate`. [Working with Numerixx](../basics.md#results) shows how to test the result, and why
-to test for success rather than for a particular error. There is one,
+to test for success rather than for a particular error. The enumeration has one value today,
 {cpp:enumerator}`nxx::deriv::error::non_finite`: no finite estimate exists. Its causes:
 
 - `fn` returned NaN or an infinity where the method needed a value. A stencil fails as soon as one of its points gives

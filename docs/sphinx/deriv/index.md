@@ -6,8 +6,7 @@ function, as any callable, and the point; you get back the derivative and, from 
 
 ## The idea, and its catch
 
-The *central difference* evaluates $f$ one *step* $h$ to each side
-of $x$:
+The *central difference* evaluates $f$ one *step* $h$ to each side of $x$:
 
 $$f'(x) \approx \frac{f(x + h) - f(x - h)}{2h}$$
 
@@ -53,13 +52,13 @@ step](step.md)).
 
 A *stencil* is a fixed formula of this kind: a few points around $x$, a weight for each, and a step. The central
 difference is `Central<2>`, the default. `Central<4>` to `Central<10>` use more points; on a smooth function
-`Central<4>` and `Central<6>` are more accurate. `Forward<P>` and `Backward<P>` use points on one side of $x$ only. A
-stencil costs a fixed number of evaluations, but cannot tell you how accurate it is.
+`Central<4>` and `Central<6>` are more accurate. `Forward<P>` and `Backward<P>` use points on one side of $x$ only, for
+a function defined only there. A stencil costs a fixed number of evaluations, but cannot tell you how accurate it is.
 
 *Ridders' method* computes the central difference at a sequence of shrinking steps, and extrapolates the results to a
-step of zero. It finds a good step by itself and estimates its error, typically for 10 to 16 evaluations of `fn`.
-`ForwardRidders` and `BackwardRidders` do the same from one side of $x$; with `Ridders`, they are *the Ridders
-methods*:
+step of zero. It finds a good step by itself and estimates its error, typically for 10 to 16 evaluations of `fn`
+({cpp:struct}`nxx::deriv::Ridders`). `ForwardRidders` and `BackwardRidders` do the same from one side of $x$; with
+`Ridders`, they are *the Ridders methods*:
 
 ```{literalinclude} ../examples/deriv_overview.cpp
 :start-after: // <ridders>

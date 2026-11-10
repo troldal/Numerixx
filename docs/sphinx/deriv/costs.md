@@ -15,10 +15,9 @@ Each cell gives the evaluations, then the relative error:
 :end-before: )";
 ```
 
-`docs/sphinx/examples/deriv_costs.cpp` prints this table, and checks that every estimate of the Ridders methods covers
-its error. It holds for builds that do not fuse a multiplication and an addition.
+The table is printed by `docs/sphinx/examples/deriv_costs.cpp`, which checks that every estimate of the Ridders
+methods covers its error. It holds for builds that do not fuse a multiplication and an addition ([Working with
+Numerixx](../basics.md#compile-time)).
 
-Ridders' method typically makes 10 to 16 evaluations for $f'$ (at most 64), 13 to 23 for $f''$ (at most 65), and 25
-to 45 for $f'''$ and $f''''$ (at most 128 and 129). The one-sided Ridders methods typically make 10, 17, 22 and 29 for
-$f'$ to $f''''$, at most 33, 65, 97 and 129 ({cpp:struct}`nxx::deriv::Ridders`,
-{cpp:struct}`nxx::deriv::ForwardRidders`).
+The Ridders methods' typical and maximum evaluations for each derivative order are in the reference
+({cpp:struct}`nxx::deriv::Ridders`, {cpp:struct}`nxx::deriv::ForwardRidders`).
