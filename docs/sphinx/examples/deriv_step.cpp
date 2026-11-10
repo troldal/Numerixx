@@ -18,6 +18,8 @@ namespace dv = nxx::deriv;
 
 #include "printed.hpp"
 
+#include <string>
+
 int main(int, char **argv)
 {
     if (!docs::capture(argv[0])) return 100;
@@ -32,7 +34,7 @@ int main(int, char **argv)
     // </scale>
 
     // <default>
-    auto const coarse = dv::derivative(fn, x); // h = 6e-6, about a sixteenth of the peak's width
+    auto const coarse = dv::derivative(fn, x); // h = 6e-6, for the scale max(|x|, 1) = 1
     if (coarse) std::println("default step:   relative error {:.1e}", std::abs(coarse->value - exact) / -exact);
     // </default>
 
@@ -56,13 +58,22 @@ int main(int, char **argv)
     // </ridders-step>
     // clang-format on
 
-    constexpr std::string_view output = R"(
+    constexpr std::string_view default_output = R"(
 default step:   relative error 3.4e-04
+)";
+    constexpr std::string_view scaled_output = R"(
 h = 6.1e-10:     relative error 4.6e-11
+)";
+    constexpr std::string_view ridders_output = R"(
 Ridders:        relative error 3.3e-14, abs_error 1.9e-13
+)";
+    constexpr std::string_view ridders_step_output = R"(
 Ridders from a / 8: relative error 5.0e-14
 )";
-    if (!(docs::printed() == docs::quoted(output))) return 1;
+    std::string const expected = std::string(docs::quoted(default_output)) + std::string(docs::quoted(scaled_output))
+                                 + std::string(docs::quoted(ridders_output))
+                                 + std::string(docs::quoted(ridders_step_output));
+    if (!(docs::printed() == expected)) return 1;
 
     // Each check states what must hold, so that a NaN fails it. exact is computed in a few roundings, about 4 eps
     // relative, far below every error checked.

@@ -70,11 +70,8 @@ For Halley's method, give $f''$ as `nxx::deriv::derivative_of<nxx::deriv::Centra
 costs 6 calls of `fn`: the value, 2 for $f'$, and 3 for $f''$, which evaluates `fn` at the point again. That makes 30
 from the guess 2 here.
 
-```{note}
-`derivative_of` keeps its own copy of `fn`. A counter that `fn` captures by reference, as in [Choose a
-method](choose-a-method.md#measure-the-cost-on-your-own-function), is shared by the copy and counts every call. State
-held inside a `mutable` lambda is not: pass `std::ref(fn)` to share it.
-```
+`derivative_of` keeps its own copy of `fn`; [Its copy of `fn`](../deriv/derivative-of.md#its-copy-of-fn) says when
+to pass `std::ref(fn)` instead.
 
 Whichever way you give the derivatives, the bound on the result does not depend on them: `abs_error` bounds the distance
 to a sign change of `fn`, which the method verifies with `fn`'s values alone. A poor derivative can cost evaluations, or

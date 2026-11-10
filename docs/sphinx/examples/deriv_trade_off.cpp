@@ -157,6 +157,9 @@ default_step,default_error,ridders_error,ridders_estimate
     if (!(best->h < 8.0 * step && best->h > step / 8.0)) return 6;
     if (!(central_error <= 10.0 * best->error)) return 7;
     if (!(step > 1.2e-5 && step < 1.22e-5)) return 8;
+    // "About two thirds of the type's digits": the smallest error keeps 10 to 13 of a double's 16 (the model,
+    // eps^(2/3), is 3.7e-11).
+    if (!(best->error < 1e-10 && best->error > 1e-13)) return 14;
     // Then rounding takes over: below 1e-7 every error is within the rounding bound rho / h (with the truncation, at
     // most 3.2e-16 there, and 1.1e-16 for exact), and every error below 1e-9 is more than a thousand times the
     // smallest; at 1e-13 fewer than four digits are left.

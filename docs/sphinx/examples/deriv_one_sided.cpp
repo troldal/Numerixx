@@ -52,12 +52,6 @@ int main(int, char **argv)
                                       *forward_ridders->abs_error);
     // </edge>
 
-    // <near>
-    // Near the edge, not at it: Ridders' steps cross 0, and it restarts with smaller ones.
-    auto const near = dv::derivative<dv::Ridders>(fn, 1e-6);
-    if (near) std::println("Ridders at 1e-6: {:.15f}, abs_error {:.1e}", near->value, *near->abs_error);
-    // </near>
-
     // <kink>
     // A formula that goes on below 0 with another slope: no NaN tells the methods where the edge is.
     auto const kink = [](double x) { return x >= 0.0 ? 1.0 / (1.0 + x) : 1.0 - 3.0 * x; };
@@ -109,9 +103,6 @@ Central<2>:     non_finite
 Forward<2>:     -0.999999999886047
 ForwardRidders: -0.999999999999835, abs_error 4.8e-12
 )";
-    constexpr std::string_view near_output = R"(
-Ridders at 1e-6: -0.999997999984771, abs_error 9.3e-10
-)";
     constexpr std::string_view kink_output = R"(
 Ridders:        -1.999999991, abs_error 1.2e-08
 ForwardRidders: -1.000000000, abs_error 4.8e-12
@@ -125,12 +116,12 @@ distance  method           error  estimate  evaluations
 1e-10     Ridders          2e-10     8e-06           64
 1e-10     ForwardRidders   1e-13     5e-12           10
 )";
-    std::string const expected = std::string(docs::quoted(edge_output)) + std::string(docs::quoted(near_output))
-                                 + std::string(docs::quoted(kink_output)) + std::string(docs::quoted(distances_output));
+    std::string const expected = std::string(docs::quoted(edge_output)) + std::string(docs::quoted(kink_output))
+                                 + std::string(docs::quoted(distances_output));
     if (!(docs::printed() == expected)) return 1;
 
     // Each check states what must hold, so that a NaN fails it.
-    if (!forward || !forward_ridders || !forward_ridders->abs_error || !near || !near->abs_error) return 2;
+    if (!forward || !forward_ridders || !forward_ridders->abs_error) return 2;
     // At the edge, the central methods fail: their points reach below 0, where fn is NaN.
     if (!(central == std::unexpected(dv::error::non_finite))) return 3;
     if (!(dv::derivative<dv::Ridders>(fn, 0.0) == std::unexpected(dv::error::non_finite))) return 4;
@@ -143,12 +134,6 @@ distance  method           error  estimate  evaluations
         return 6;
     // At 1e-6, the central difference's default step, 6.06e-6, still reaches below 0.
     if (!(dv::derivative(fn, 1e-6) == std::unexpected(dv::error::non_finite))) return 8;
-    // Near the edge: Ridders' estimate covers its error. -1 / (1 + 1e-6)^2 is held to within 2 ulps.
-    double const exact_near = -1.0 / ((1.0 + 1e-6) * (1.0 + 1e-6));
-    if (!(std::abs(near->value - exact_near) <= *near->abs_error + 4.5e-16 && *near->abs_error < 1e-8)) return 7;
-    // "On this function ForwardRidders is more accurate at 1e-6" than Ridders.
-    auto const forward_near = dv::derivative<dv::ForwardRidders>(fn, 1e-6);
-    if (!forward_near || !(std::abs(forward_near->value - exact_near) < std::abs(near->value - exact_near))) return 12;
     // "On sqrt(1 - x) near 1, Ridders' method can be the more accurate one", and a one-sided stencil with its default
     // step fails there: g(x) = sqrt(1 - x) + x, defined up to 1, g'(x) = 1 - 1 / (2 sqrt(1 - x)). At 0.999 Ridders
     // beats BackwardRidders; at 1 - 1e-7, Backward<2>'s step, 6e-6, spans sixty times the distance to the edge, and

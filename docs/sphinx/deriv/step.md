@@ -1,16 +1,15 @@
 # Choose a step
 
-A stencil evaluates `fn` at points a step $h$ apart. Too large a step, and the formula's truncation error, the error of
-the formula itself, dominates; too small, and rounding does ([Numerical derivatives](index.md#the-idea-and-its-catch)
-shows the trade-off). The default step balances the two under one assumption: that `fn` varies on the scale
-$\max(|x|, 1)$. Near $x = 0$ that scale is 1; for a large $|x|$ it is $|x|$. For the central difference and a first
-derivative the default is $\varepsilon^{1/3} \approx 6 \times 10^{-6}$ times that scale. This section is about the
-functions that break the assumption, and what to do then. The examples write `dv` for `nxx::deriv`.
+A stencil, a fixed formula such as the central difference, evaluates `fn` at points a step $h$ apart. Too large a step,
+and the truncation error, the error of the formula itself, dominates; too small, and rounding does. The default step
+balances the two under one assumption: that `fn` varies on the *scale* $\max(|x|, 1)$. For the central difference it is
+$\varepsilon^{1/3} \approx 6 \times 10^{-6}$ times that scale, where $\varepsilon$ is the type's machine epsilon. This
+section is about functions that break the assumption, and what to do then.
 
 ## When the default step is too large
 
-A function that changes much faster than $\max(|x|, 1)$, such as a narrow peak, a steep front, or $\exp(100 x)$, needs a
-smaller step. Take a peak of width $a = 10^{-4}$, and its derivative at $2 \times 10^{-4}$:
+A function that changes much faster than $\max(|x|, 1)$, such as a narrow peak or a steep front, needs a smaller step.
+Take a peak of width $a = 10^{-4}$, and its derivative at $2 \times 10^{-4}$:
 
 ```{literalinclude} ../examples/deriv_step.cpp
 :start-after: // <scale>
@@ -18,7 +17,20 @@ smaller step. Take a peak of width $a = 10^{-4}$, and its derivative at $2 \time
 :dedent:
 ```
 
-With the default step:
+```{eval-rst}
+.. plot:: plots/deriv_scale.py
+   :alt: Two V-shaped curves of one shape on logarithmic axes, smaller steps to the right. For the square root at 2 the
+         lowest error, 4.1e-12, is at a step of 5e-6, and the default step, 1.2e-5, is at the bottom of the V. The
+         peak's error stays at 1 or above down to a step of 2e-4, then falls to its lowest, 1.2e-11, at 1e-9, about four
+         decades further right. The peak's default step, 6.1e-6, is circled on its falling side, at an error of 3.4e-4.
+   :caption: The relative error of the central difference against its step on :math:`\sqrt{x}` at 2 and on the peak
+             :math:`x / (x^2 + a^2)`, :math:`a = 10^{-4}`, at :math:`2a`, each with its default step circled.
+```
+
+The figure shows the central difference's error on this peak and on $\sqrt x$ at 2. The two curves have one shape, but
+the peak's lies about four decades to the left: the best step depends on the function's scale, not on $x$ alone. The
+default step sits at the bottom of the square root's curve. On the peak it is far too large, high on the side where
+truncation rules:
 
 ```{literalinclude} ../examples/deriv_step.cpp
 :start-after: // <default>
@@ -26,10 +38,14 @@ With the default step:
 :dedent:
 ```
 
-The step, $6 \times 10^{-6}$, is about a sixteenth of the peak's width, so the truncation error is large: the result
-keeps only three or four digits (the output follows the last example, in [Or let Ridders' method find the
-step](#or-let-ridders-method-find-the-step)). The default step is $\varepsilon^{1/3}$ times the assumed scale; for this function, use $\varepsilon^{1/3}$ times its own scale, $a$.
-{cpp:func}`nxx::math::root_epsilon` gives $\varepsilon^{1/3}$:
+```{literalinclude} ../examples/deriv_step.cpp
+:language: text
+:start-after: default_output = R"(
+:end-before: )";
+```
+
+The result keeps only three or four digits. For this function, use $\varepsilon^{1/3}$ times its own scale, $a$, as the
+step. {cpp:func}`nxx::math::root_epsilon` gives $\varepsilon^{1/3}$, and the third argument of `derivative` is the step:
 
 ```{literalinclude} ../examples/deriv_step.cpp
 :start-after: // <scaled>
@@ -37,15 +53,19 @@ step](#or-let-ridders-method-find-the-step)). The default step is $\varepsilon^{
 :dedent:
 ```
 
-The third argument of `derivative` is the step. With it the result keeps about 10 digits, as the central difference does
-on a function that suits its default. For a stencil of order $P$ the balanced step is $\varepsilon^{1/(P+1)}$ times the
-scale ($\varepsilon^{1/5}$ for `Central<4>`), and for the $N$-th derivative $\varepsilon^{1/(P+N)}$ times it;
-{cpp:func}`nxx::deriv::default_step` gives the default for any method and order.
+```{literalinclude} ../examples/deriv_step.cpp
+:language: text
+:start-after: scaled_output = R"(
+:end-before: )";
+```
+
+Now the result keeps about 10 digits, at the bottom of the peak's curve. For another method or order,
+{cpp:func}`nxx::deriv::default_step` gives the default step, which you can scale the same way.
 
 ## Or let Ridders' method find the step
 
 You may not know the scale of `fn`. Ridders' method starts from a large step, $\max(|x|, 1)/32$ for a first derivative,
-and halves it until rounding stops the improvement, so it finds a suitable step by itself:
+and halves it until rounding stops the improvement:
 
 ```{literalinclude} ../examples/deriv_step.cpp
 :start-after: // <ridders>
@@ -53,9 +73,15 @@ and halves it until rounding stops the improvement, so it finds a suitable step 
 :dedent:
 ```
 
-Here it keeps 13 digits, with an estimate that covers its error, at the cost of 36 evaluations: more than its usual 10
-to 16, because it had to come down from a step of $1/32$ to the peak's scale. If you know the scale, give Ridders'
-method a step: it starts from that step instead, and needs fewer evaluations, 14 here:
+```{literalinclude} ../examples/deriv_step.cpp
+:language: text
+:start-after: ridders_output = R"(
+:end-before: )";
+```
+
+It keeps 13 digits, with an estimate that covers its error, at the cost of 36 evaluations: it had to come down from
+$1/32$ to the peak's scale. If you know the scale, pass a step, and the method starts from it instead, here with 14
+evaluations:
 
 ```{literalinclude} ../examples/deriv_step.cpp
 :start-after: // <ridders-step>
@@ -63,18 +89,15 @@ method a step: it starts from that step instead, and needs fewer evaluations, 14
 :dedent:
 ```
 
-The results:
-
 ```{literalinclude} ../examples/deriv_step.cpp
 :language: text
-:start-after: output = R"(
+:start-after: ridders_step_output = R"(
 :end-before: )";
 ```
 
 ```{note}
-A step that is too small for $x$, so that the method's points round to the same number (at 1, $h = 10^{-300}$ does),
-gives the error `non_finite`; so does a step that is
-not positive and finite. Below the balanced step, rounding grows as $1/h$ long before that.
+A step so small that the method's points round to the same number gives the error `non_finite` (at 1,
+$h = 10^{-300}$ does); so does a step that is not positive and finite.
 ```
 
 The program needs:

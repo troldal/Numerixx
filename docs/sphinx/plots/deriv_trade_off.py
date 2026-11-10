@@ -51,4 +51,5 @@ ax.grid(True, which="major", color=grey, alpha=0.2, linewidth=0.5)
 ax.minorticks_off()
 for side in ("top", "right"):
     ax.spines[side].set_visible(False)
-ax.legend(loc="upper center", frameon=False)
+# Right of the default step's line, above the rounding branch, so that the line does not cross the legend.
+ax.legend(loc="upper left", bbox_to_anchor=(0.43, 1.0), frameon=False)

@@ -1,4 +1,4 @@
-// The program of docs/sphinx/deriv/accuracy.md: evaluations and relative errors of every method for f', with the
+// The program of docs/sphinx/deriv/costs.md: evaluations and relative errors of every method for f', with the
 // default step, on three functions with closed-form derivatives: 1/x at 2 (-1/4), sqrt x at 2 (1 / (2 sqrt 2)) and the
 // peak x / (x^2 + a^2), a = 1e-4, at 2e-4 ((a^2 - x^2) / (x^2 + a^2)^2). The page shows the output in the raw string;
 // main returns non-zero unless the program prints it and the Ridders methods' estimates cover their errors. The
@@ -15,9 +15,9 @@
 #include <print>
 #include <string>
 
-namespace {
+namespace dv = nxx::deriv;
 
-    namespace dv = nxx::deriv;
+namespace {
 
     constexpr double width = 1e-4; // the peak's, a in the page
     constexpr double peak_x = 2e-4;

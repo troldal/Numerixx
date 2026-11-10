@@ -171,5 +171,9 @@ peak,6.06e-06,0.000343
     if (!scaled) return 7;
     double const scaled_error = std::abs(scaled->value - peak_exact) / std::abs(peak_exact);
     if (!(scaled_error <= 10.0 * fast.errors[best(fast)])) return 8;
+    // The peak's flat top: for the steps 2e-4 and above, which span the peak, the error is 1 or more (to the 0.995 the
+    // table's three digits show as 1): no correct digit.
+    for (std::size_t i = 0; i < hs.size(); ++i)
+        if (hs[i] >= 2e-4 && !(fast.errors[i] >= 0.995)) return 9;
     return 0;
 }
