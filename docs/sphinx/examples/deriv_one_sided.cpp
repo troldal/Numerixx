@@ -18,7 +18,10 @@ namespace dv = nxx::deriv;
 
 #include "printed.hpp"
 
+#include <numerixx/roots.hpp>
+
 #include <cstddef>
+#include <format>
 #include <initializer_list>
 #include <string>
 #include <vector>
@@ -234,5 +237,30 @@ distance  method           error  estimate  evaluations
         || !(std::abs(cured_central->value - c_exact) <= *cured_central->abs_error)
         || !(std::abs(cured_one_sided->value - c_exact) <= *cured_one_sided->abs_error))
         return 27;
+    // Newton's method with a one-sided stencil (Codex's finding 1): sqrt(x) - 1e-6, NaN below 0, root 1e-12. At the
+    // guess 2e-12, Forward<2>'s default step, 6.06e-6, spans three million times x, and its slope is 525 against the
+    // exact 1 / (2 sqrt(2e-12)) = 353553 (both printed to whole numbers, as the page quotes them); Newton's first step,
+    // 2e-12 - f / 525, lands below 0, and the solve from the guess fails with non_finite. In the bracket [0, 1e-11]
+    // (f(0) = -1e-6 < 0 < f(1e-11) = 2.2e-6), a step outside the bracket falls back to bisection, and the solve
+    // converges.
+    namespace rt = nxx::roots;
+    auto const steep = [](double x) {
+        if (x < 0.0) return std::numeric_limits<double>::quiet_NaN();
+        return std::sqrt(x) - 1e-6;
+    };
+    auto const slope = dv::derivative<dv::Forward<2>>(steep, 2e-12);
+    if (!slope || !(std::format("{:.0f}", slope->value) == "525")
+        || !(std::format("{:.0f}", 0.5 / std::sqrt(2e-12)) == "353553"))
+        return 28;
+    if (!(2e-12 - steep(2e-12) / slope->value < 0.0)) return 29;
+    auto const from_guess = rt::solve<rt::Newton>(steep, dv::derivative_of<dv::Forward<2>>(steep), 2e-12);
+    if (!(from_guess == std::unexpected(rt::error::non_finite))) return 30;
+    // The bracket's result within abs_error plus c: fn changes sign, as computed, where fl(sqrt(x)) passes the double
+    // d nearest 1e-6 (the subtraction is exact there, by Sterbenz), that is at x = d^2 to within the width of the
+    // inputs that round to d, 2 sqrt(x) ulp(d) = 4.2e-28; d is within half an ulp, 1.1e-22, of 1e-6, which moves d^2
+    // by 2.1e-28; and the double 1e-12 is within half an ulp, 1e-28, of 1e-12: c = 8e-28.
+    auto const in_bracket =
+        rt::solve<rt::Newton>(steep, dv::derivative_of<dv::Forward<2>>(steep), rt::Bracket{0.0, 1e-11});
+    if (!in_bracket || !(std::abs(in_bracket->value - 1e-12) <= in_bracket->abs_error + 8e-28)) return 31;
     return 0;
 }

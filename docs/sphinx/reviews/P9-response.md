@@ -121,3 +121,17 @@ On the "Second round" section of `P9-decision.md` (`P9-docs-reviewer-2.md`, `P9-
 
 Budgets, by the editor's count (notes not counted; with them in parentheses), for the pages that changed: one-sided 500
 of 500 (564), derivative-of 297 of 300, tutorial 510 of 700, step 358 of 450 (376).
+
+## Codex
+
+On `P9-codex.md` (e70ed13), the user's decisions of 2026-11-10: all three findings and the roots sentence adopted.
+
+| Item | Done |
+|---|---|
+| 1 (major) | `one-sided.md`: the sentence that `Forward<2>` or `Backward<2>` "is enough" for Newton's method is replaced by "That holds for Newton's method too: on $\sqrt x - 10^{-6}$ from $2 \times 10^{-12}$, `Forward<2>` gives 525 for 353553, and Newton leaves the domain. Start it in a bracket, where a bad step falls back to bisection (the roots chapter)", following the sentence on one-sided stencils where `fn` changes fast near its edge. `deriv_one_sided.cpp` asserts: the slope at $2 \times 10^{-12}$ prints as 525 and the exact one as 353553 (28); Newton's first step lands below 0 (29); `solve<Newton>` with `derivative_of<Forward<2>>` from the guess returns `non_finite` (30); in the bracket $[0, 10^{-11}]$ it converges to $10^{-12}$ within `abs_error` plus $8 \times 10^{-28}$, justified in the comment (31). To stay within 500 words, the domain's example, the central difference's step and the roots link's text were shortened |
+| 2 (minor) | `choose-a-method.md`: "A stencil gains less, since its default step scales with the type too: the central difference keeps about two thirds of the type's digits" (the program's check 7 is on `Central<2>`) |
+| 3 (minor) | `deriv_kepler.cpp` checks against $E'(1) = 1.0373620218936458704990245805$ and $E''(1) = -0.556713032668587779463634931485$ (mpmath at 60 digits, as the comment says), each allowing half an ulp of its rounding to a double; the central difference's bound, Ridders' coverage, the gain and $f''$'s coverage are now against these. The page's closed forms stay, and a check (9) confirms that they agree with the constants within $10^{-14}$, justified by the solve's bound on $E$ |
+| roots sentence | `roots/restricted-domain.md`: "From a guess, a one-sided difference can avoid the problem", and after the `Backward<2>` sentence: "It is not a cure. Its step does not shrink near the edge, so where `fn` changes fast there its slope can be far off, and Newton's step can leave the domain: on $\sqrt x - 10^{-6}$ from $2 \times 10^{-12}$ the solve fails with `non_finite`. A bracket safeguards Newton's method: a step that leaves it is replaced by bisection, and the same solve in $[0, 10^{-11}]$ converges." `roots_restricted_domain.cpp` asserts both (20, 21). Not "where `fn` varies slowly near the edge, as in its $\ln(x / 10^{-12})$ example": $\ln$ is steep at 0 too, and the forward slope there is also far off; Newton survives because its overshoot points away from the edge. So the page says what is true of both cases instead |
+
+Words (headings and notes counted; inline code and formulas one word each): `one-sided.md` 500 of 500,
+`choose-a-method.md` 481 of 550; `roots/restricted-domain.md`, outside this phase's budgets, 708 before and 771 after.

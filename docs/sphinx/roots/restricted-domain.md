@@ -95,8 +95,8 @@ Here the root is $10^{-12}$ and the numerical derivative's step, about $6 \times
 :end-before: )";
 ```
 
-From a guess, a one-sided difference avoids the problem. `nxx::deriv::Forward<2>` evaluates `fn` only at $x$ and above
-it, so near a domain that starts at 0 its points stay inside:
+From a guess, a one-sided difference can avoid the problem. `nxx::deriv::Forward<2>` evaluates `fn` only at $x$ and
+above it, so near a domain that starts at 0 its points stay inside:
 
 ```{literalinclude} ../examples/roots_restricted_domain.cpp
 :start-after: // <one-sided>
@@ -111,6 +111,11 @@ it, so near a domain that starts at 0 its points stay inside:
 ```
 
 For a domain that ends at an upper edge, `nxx::deriv::Backward<2>` evaluates `fn` only at $x$ and below it.
+
+It is not a cure. Its step does not shrink near the edge, so where `fn` changes fast there its slope can be far off,
+and Newton's step can leave the domain: on $\sqrt x - 10^{-6}$ from $2 \times 10^{-12}$ the solve fails with
+`non_finite`. A bracket safeguards Newton's method: a step that leaves it is replaced by bisection, and the same solve
+in $[0, 10^{-11}]$ converges.
 
 The program needs:
 

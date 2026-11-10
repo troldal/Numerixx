@@ -72,8 +72,8 @@ Numerixx](../basics.md#multiprecision-types) gives the rules for `fn` in such a 
 :end-before: )";
 ```
 
-The estimate is near $10^{-46}$, and all 40 printed digits are correct. A stencil gains less: its default step scales
-with the type too, and keeps about two thirds of the type's digits.
+The estimate is near $10^{-46}$, and all 40 printed digits are correct. A stencil gains less, since its default step
+scales with the type too: the central difference keeps about two thirds of the type's digits.
 
 The program needs:
 

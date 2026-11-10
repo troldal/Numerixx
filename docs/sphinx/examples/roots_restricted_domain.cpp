@@ -139,6 +139,19 @@ Newton, forward difference, from 1e-13: 1.000000e-12
     if (!(step > 6e-6 && step < 6.1e-6 && 1e-13 - step < 0.0)) return 11;
     // The forward difference from the guess: the root 1e-12 within abs_error + 2e-28, as in the bracket.
     if (!forward || !(std::abs(forward->value - 1e-12) <= forward->abs_error + 2e-28)) return 12;
+    // "It is not a cure": sqrt(x) - 1e-6, NaN below 0, root 1e-12. From 2e-12 Forward<2>'s slope is 525 against the
+    // exact 353553 (its step, 6.06e-6, spans three million times x), Newton's step lands below 0, and the solve fails
+    // with non_finite; in [0, 1e-11] it converges to 1e-12 within abs_error + 8e-28: fn changes sign, as computed,
+    // where fl(sqrt(x)) passes the double d nearest 1e-6, at d^2 within 4.2e-28 (the inputs that round to d), d^2
+    // within 2.1e-28 of 1e-12, and the double 1e-12 within 1e-28 of it (as in deriv_one_sided.cpp).
+    auto const steep = [](double x) {
+        if (x < 0.0) return std::numeric_limits<double>::quiet_NaN();
+        return std::sqrt(x) - 1e-6;
+    };
+    auto const steep_slope = nxx::deriv::derivative_of<nxx::deriv::Forward<2>>(steep);
+    if (!(rt::solve<rt::Newton>(steep, steep_slope, 2e-12) == std::unexpected(rt::error::non_finite))) return 20;
+    auto const steep_bracket = rt::solve<rt::Newton>(steep, steep_slope, rt::Bracket{0.0, 1e-11});
+    if (!steep_bracket || !(std::abs(steep_bracket->value - 1e-12) <= steep_bracket->abs_error + 8e-28)) return 21;
 
     // Van der Waals' critical temperature T_c = 8a / (27 R b) = 303.8 K: below it the equation can have three roots
     // for v. At 280 K and 4 MPa it has one: the cubic p v^3 - (p b + R T) v^2 + a v - a b has a negative

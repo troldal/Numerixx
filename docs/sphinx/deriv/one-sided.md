@@ -1,7 +1,7 @@
 # Near the edge of a domain
 
-Many functions are defined only on part of the line, their *domain*: $\sqrt x$, or a model valid above a limit. At
-its *edge*, a method that evaluates `fn` on both sides of $x$ reaches outside. One-sided methods do not.
+Many functions are defined only on part of the line, their *domain*. At its *edge*, a method that evaluates `fn` on both
+sides of $x$ reaches outside. One-sided methods do not.
 
 ## Return NaN outside the domain
 
@@ -27,9 +27,8 @@ digits here, `ForwardRidders` about 13, with an error estimate, `abs_error`.
 
 ## Near the edge
 
-A little inside, Ridders' method works, at a price (the central difference, with its default step of about
-$6 \times 10^{-6}$, still fails $10^{-6}$ from the edge). The program compares it with `ForwardRidders` at three
-distances, with the relative error, estimate and evaluations:
+A little inside, Ridders' method works, at a price (the central difference still fails at $10^{-6}$). The program
+compares it with `ForwardRidders` at three distances, with the relative error, estimate and evaluations:
 
 ```{literalinclude} ../examples/deriv_one_sided.cpp
 :language: text
@@ -48,8 +47,9 @@ often cancels near an edge (subtracts nearly equal numbers and loses digits), as
 $(1 - x)(1 + x)$, or its noise makes an estimate too small.
 
 Where `fn` changes fast near its edge, avoid the one-sided stencils: their step does not follow `fn`'s scale, which
-shrinks with the distance to the edge, and nothing warns you. Where the derivative only steers Newton's method,
-`Forward<2>` or `Backward<2>` is enough (the [roots
+shrinks with the distance to the edge, and nothing warns you. That holds for Newton's method
+too: on $\sqrt x - 10^{-6}$ from $2 \times 10^{-12}$, `Forward<2>` gives 525 for 353553, and Newton leaves the
+domain. Start it in a bracket, where a bad step falls back to bisection (the [roots
 chapter](../roots/restricted-domain.md#a-numerical-derivative-near-the-edge)).
 
 ```{note}
