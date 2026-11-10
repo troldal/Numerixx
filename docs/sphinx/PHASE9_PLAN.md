@@ -107,22 +107,25 @@ for one thing across the modules:
 
 Each as `docs/CLAUDE.md` describes: a program (`examples/<name>.cpp`, a test) that holds the table in a raw string and
 asserts what the page, caption and alt text say; a script (`plots/<name>.py`) that draws only that table. The data are
-computed with `+ - * /` and `std::sqrt` at dyadic steps $h = 2^{-k}$, exact and the same on every toolchain. Smaller
+computed with `+ - * /` and `std::sqrt` at decimal steps $h = 1, 0.5, 0.2, 0.1, \ldots$, each the correctly rounded
+quotient of two integers, so the same on every toolchain (stage 2, approved by the user 2026-11-10: dyadic steps
+$2^{-k}$ make $2 \pm h$ exact, and the rounded differences repeat or vanish, drawing a flat bottom in figure 1 and
+false dips to $3 \times 10^{-16}$ in figure 2; `deriv_trade_off.cpp` records why). Smaller
 steps to the right, so that the story reads left to right. Colours: blue `#3987e5`, orange `#d95926`, references in
 the text grey. The numbers below come from a probe; the programs confirm or correct them.
 
 1. **Error against step** (`index.md`, "The idea, and its catch"): `deriv_trade_off`. The relative error of the
-   central difference of $\sqrt x$ at 2 for $h = 1, 1/2, \ldots, 2^{-44}$, on logarithmic axes; the default step as a
+   central difference of $\sqrt x$ at 2 for $h$ from 1 to $10^{-13}$, on logarithmic axes; the default step as a
    vertical line; Ridders' method's error as a horizontal line. The reader sees a V: the error falls fourfold with
-   every halving down to about $10^{-5}$ (truncation), then rises raggedly, about as $1/h$ (rounding); the default
-   step, $1.2 \times 10^{-5}$, stands at the bottom; Ridders' line lies about a hundred times below it. The one fact:
-   the best step is a balance, and the default step finds it. `main` asserts the fourfold fall on the truncation
-   branch, the minimum within a factor 8 of the default step with the default step's error within ten times it, the
-   rise below $2^{-30}$, and Ridders' error within its estimate and 50 to 500 times below the curve's minimum.
+   every halving down to about $5 \times 10^{-6}$ (truncation), then rises raggedly, about as $1/h$ (rounding); the
+   default step, $1.2 \times 10^{-5}$, stands at the bottom; Ridders' line lies about a hundred times below it. The
+   one fact: the best step is a balance, and the default step finds it. `main` asserts the fourfold fall on the
+   truncation branch, the minimum within a factor 8 of the default step with the default step's error within ten times
+   it, the rise below $10^{-7}$, and Ridders' error within its estimate and 50 to 500 times below the curve's minimum.
    Reference: $1 / (2\sqrt 2)$.
 2. **The valley moves with the function's scale** (`step.md`, "When the default step is too large"): `deriv_scale`.
    The same curve for $\sqrt x$ at 2 (scale 1) and for the peak $x / (x^2 + a^2)$, $a = 10^{-4}$, at
-   $2 \times 10^{-4}$ (scale $10^{-4}$), $h$ from 1 to $2^{-48}$, the default step marked. The reader sees two V's of
+   $2 \times 10^{-4}$ (scale $10^{-4}$), $h$ from 1 to $10^{-14}$, the default step marked. The reader sees two V's of
    one shape, the peak's about four decades to the left; the default step sits at the bottom of one and high on the
    truncation slope of the other. The one fact: the right step depends on the function's scale, not on $x$ alone.
    `main` asserts that the minima's steps differ by a factor between $2^{10}$ and $2^{16}$, that the peak's error at

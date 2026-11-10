@@ -11,15 +11,15 @@
 #include <cmath>
 #include <limits>
 #include <print>
+
+namespace dv = nxx::deriv;
+namespace rt = nxx::roots;
 // </includes>
 // clang-format on
 
 #include <format>
 int main()
 {
-    namespace dv = nxx::deriv;
-    namespace rt = nxx::roots;
-
     // clang-format off
     // <function>
     double const e = 0.5; // the orbit's eccentricity

@@ -12,6 +12,8 @@
 
 #include <cmath>
 #include <print>
+
+namespace dv = nxx::deriv;
 // </includes>
 
 // <count>
@@ -24,7 +26,7 @@ void compare(char const *name, F const &fn, double x, double exact)
         ++calls;
         return fn(t);
     };
-    auto const d = nxx::deriv::derivative<M>(counted, x);
+    auto const d = dv::derivative<M>(counted, x);
     if (d) std::println("{:<12} {:>2} calls   relative error {:.1e}", name, calls,
                         std::abs(d->value - exact) / std::abs(exact));
 }
@@ -42,7 +44,7 @@ namespace {
     template<typename M, typename F>
     double relative_error(F const &fn, double x, double exact)
     {
-        auto const d = nxx::deriv::derivative<M>(fn, x);
+        auto const d = dv::derivative<M>(fn, x);
         return d ? std::abs(d->value - exact) / std::abs(exact) : std::numeric_limits<double>::quiet_NaN();
     }
 
@@ -54,7 +56,6 @@ int main(int, char **argv)
 
     // clang-format off
     // <compare>
-    namespace dv = nxx::deriv;
     auto const fn = [](double x) { return 1.0 / (1.0 + x * x); };
     double const exact = 0.64; // f'(0.5) = -0.64
     compare<dv::Central<2>>("Central<2>", fn, 0.5, -exact);

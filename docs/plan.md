@@ -241,7 +241,8 @@ the examples' tests pass on all five toolchains.
   - [x] The workflow: `docs/sphinx/CLAUDE.md`, the three agents, `CLAUDE.md` and `reviews/` excluded from the build;
     `numerixx_docs` builds clean
   - [x] Plan approved: `docs/sphinx/PHASE9_PLAN.md` (2026-11-09; the critic's review in `docs/sphinx/reviews/`)
-  - [ ] Evidence: the chapter's programs and figures pass with GCC; the user has seen the figures
+  - [x] Evidence: the chapter's programs and figures pass with GCC; the user has seen the figures (approved
+    2026-11-10, with decimal steps in place of the plan's dyadic ones)
   - [ ] Draft and edit: every page within its budget or with the editor's reason; docs build clean
   - [ ] Review round, decision letter and revision (`docs/sphinx/reviews/P9-*.md`)
   - [ ] Release: all five toolchains, site and PDF, CI; the Codex review and its adopted findings

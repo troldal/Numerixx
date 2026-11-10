@@ -11,13 +11,17 @@
 #include <cmath>
 #include <initializer_list>
 #include <print>
+
+namespace dv = nxx::deriv;
 // </includes>
 // clang-format on
 
 #include "printed.hpp"
 
+#include <algorithm>
 #include <limits>
 #include <string>
+#include <vector>
 
 int main(int, char **argv)
 {
@@ -25,7 +29,6 @@ int main(int, char **argv)
 
     // clang-format off
     // <steps>
-    namespace dv = nxx::deriv;
     auto const fn = [](double x) { return std::sqrt(x); };
     double const exact = std::sqrt(2.0) / 4.0; // f'(2) = 1 / (2 sqrt 2)
     for (double const h : {1e-1, 1e-3, 1e-5, 1e-7, 1e-9, 1e-11}) {
@@ -86,9 +89,20 @@ value 0.35355339059329444, abs_error 8.0e-14, actual error 2.1e-14
         double const model = h * h / 6.0 * 0.375 * std::pow(2.0, -2.5);
         if (!(err > 0.85 * model && err < 1.15 * model)) return 5;
     }
-    // The default step, eps^(1/3) max(|x|, 1) = 1.2e-5 at x = 2, gives about the best error of the table: within
-    // ten times the best measured (5.1e-12 relative at 1e-5).
-    if (!(std::abs(d->value - exact) / exact <= 5.1e-11)) return 6;
+    // The default step, eps^(1/3) max(|x|, 1) = 1.2e-5 at x = 2, gives about the best error of the figure's curve
+    // (deriv_trade_off.cpp): within ten times the smallest error of the central difference at the steps 1, 0.5, 0.2,
+    // 0.1, ... down to 1e-13, each the double nearest its decimal value.
+    std::vector<double> hs;
+    double p = 1.0; // 10^j, exact
+    for (int j = 0; j < 13; ++j, p *= 10.0) hs.insert(hs.end(), {1.0 / p, 5.0 / (10.0 * p), 2.0 / (10.0 * p)});
+    hs.push_back(1.0 / p);
+    double best = std::numeric_limits<double>::infinity();
+    for (double const h : hs) {
+        auto const s = dv::derivative(fn, 2.0, h);
+        if (!s) return 9;
+        best = std::min(best, std::abs(s->value - exact) / exact);
+    }
+    if (!(std::abs(d->value - exact) / exact <= 10.0 * best)) return 6;
     // Ridders: its estimate covers the actual error, about 1e-13 relative or better.
     if (!(std::abs(r->value - exact) <= *r->abs_error && std::abs(r->value - exact) <= 1e-13 * exact)) return 7;
     // "About a hundred times smaller than the central difference's" error, and an estimate "a few times larger" than

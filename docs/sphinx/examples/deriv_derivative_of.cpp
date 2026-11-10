@@ -12,6 +12,8 @@
 #include <functional>
 #include <initializer_list>
 #include <print>
+
+namespace dv = nxx::deriv;
 // </includes>
 // clang-format on
 
@@ -23,7 +25,6 @@
 int main(int, char **argv)
 {
     if (!docs::capture(argv[0])) return 100;
-    namespace dv = nxx::deriv;
 
     // clang-format off
     // <callable>

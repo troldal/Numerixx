@@ -1,8 +1,8 @@
 // The program of docs/sphinx/deriv/one-sided.md: a function defined for x >= 0 only, 1 / (1 + x) with NaN below 0,
-// whose derivative is -1 / (1 + x)^2: at the edge 0 and at 1e-6 from it. The page shows the parts between the markers
-// and the output in the raw strings; main returns non-zero unless the program prints that output and what the page
-// says holds. fn uses only + - * /, so the output is the same on every target that does not contract a * b + c into a
-// fused multiply-add (x86-64 without -mfma, WebAssembly).
+// whose derivative is -1 / (1 + x)^2: at the edge 0, and at 1e-2, 1e-6 and 1e-10 from it (the near-edge table). The
+// page shows the parts between the markers and the output in the raw strings; main returns non-zero unless the
+// program prints that output and what the page says holds. fn uses only + - * /, so the output is the same on every
+// target that does not contract a * b + c into a fused multiply-add (x86-64 without -mfma, WebAssembly).
 
 // clang-format off
 // <includes>
@@ -11,16 +11,19 @@
 #include <cmath>
 #include <limits>
 #include <print>
+
+namespace dv = nxx::deriv;
 // </includes>
 // clang-format on
 
 #include "printed.hpp"
 
+#include <cstddef>
+#include <initializer_list>
 #include <string>
+#include <vector>
 
 namespace {
-
-    namespace dv = nxx::deriv;
 
     // The relative error of a result, or -1 for a failure.
     template<typename R>
@@ -67,6 +70,40 @@ int main(int, char **argv)
     // </kink>
     // clang-format on
 
+    // The near-edge table: Ridders' method and ForwardRidders at 1e-2, 1e-6 and 1e-10 from the edge, each with its
+    // relative error, its estimate relative to |f'|, and the evaluations of fn it made.
+    struct Row {
+        double distance;
+        char const *method;
+        double error;
+        double estimate;
+        int evaluations;
+    };
+    std::vector<Row> rows;
+    for (double const d : {1e-2, 1e-6, 1e-10}) {
+        // -1 / (1 + d)^2 in three roundings, within 1.5 ulps: a relative 3.3e-16, a hundred times below the smallest
+        // error in the table, 4e-14, so it cannot change the printed digit by more than a unit in rare ties, and the
+        // checks below allow for it.
+        double const exact = -1.0 / ((1.0 + d) * (1.0 + d));
+        auto const add = [&]<typename M>(char const *name) {
+            int calls = 0;
+            auto const counted = [&](double t) {
+                ++calls;
+                return fn(t);
+            };
+            auto const r = dv::derivative<M>(counted, d);
+            if (r && r->abs_error)
+                rows.push_back({.distance = d, .method = name, .error = relative_error(r, exact),
+                                .estimate = *r->abs_error / std::abs(exact), .evaluations = calls});
+        };
+        add.operator()<dv::Ridders>("Ridders");
+        add.operator()<dv::ForwardRidders>("ForwardRidders");
+    }
+    std::println("distance  method           error  estimate  evaluations");
+    for (Row const &r : rows)
+        std::println("{:<8.0e}  {:<15} {:>6.0e}  {:>8.0e}  {:>11}", r.distance, r.method, r.error, r.estimate,
+                     r.evaluations);
+
     constexpr std::string_view edge_output = R"(
 Central<2>:     non_finite
 Forward<2>:     -0.999999999886047
@@ -79,8 +116,17 @@ Ridders at 1e-6: -0.999997999984771, abs_error 9.3e-10
 Ridders:        -1.999999991, abs_error 1.2e-08
 ForwardRidders: -1.000000000, abs_error 4.8e-12
 )";
+    constexpr std::string_view distances_output = R"(
+distance  method           error  estimate  evaluations
+1e-02     Ridders          4e-14     2e-13           16
+1e-02     ForwardRidders   5e-13     5e-12           10
+1e-06     Ridders          2e-11     9e-10           36
+1e-06     ForwardRidders   3e-13     5e-12           10
+1e-10     Ridders          2e-10     8e-06           64
+1e-10     ForwardRidders   1e-13     5e-12           10
+)";
     std::string const expected = std::string(docs::quoted(edge_output)) + std::string(docs::quoted(near_output))
-                                 + std::string(docs::quoted(kink_output));
+                                 + std::string(docs::quoted(kink_output)) + std::string(docs::quoted(distances_output));
     if (!(docs::printed() == expected)) return 1;
 
     // Each check states what must hold, so that a NaN fails it.
@@ -140,5 +186,26 @@ ForwardRidders: -1.000000000, abs_error 4.8e-12
     if (!both_sides || !both_sides->abs_error || !one_side || !one_side->abs_error) return 9;
     if (!(std::abs(both_sides->value + 2.0) < 1e-6 && *both_sides->abs_error < 1e-6)) return 10;
     if (!(std::abs(one_side->value + 1.0) <= *one_side->abs_error)) return 11;
+
+    // The near-edge table: six rows, Ridders' method then ForwardRidders at each distance.
+    if (!(rows.size() == 6)) return 17;
+    for (std::size_t i = 0; i < rows.size(); i += 2) {
+        Row const &central_row = rows[i];
+        Row const &one_sided_row = rows[i + 1];
+        // Both estimates cover their errors, allowing 3.3e-16 for the reference's rounding.
+        if (!(central_row.error <= central_row.estimate + 3.3e-16
+              && one_sided_row.error <= one_sided_row.estimate + 3.3e-16))
+            return 18;
+        // ForwardRidders stays below 1e-12 in error and 1e-11 in estimate, at 10 evaluations or fewer.
+        if (!(one_sided_row.error < 1e-12 && one_sided_row.estimate < 1e-11 && one_sided_row.evaluations <= 10))
+            return 19;
+    }
+    // Far from the edge, at 1e-2, both work, and Ridders' method is the more accurate.
+    if (!(rows[0].error < 1e-12 && rows[0].error < rows[1].error)) return 20;
+    // Near it, at 1e-10, Ridders' method restarts below each step that met NaN until it has made 64 evaluations, the
+    // most it may make for f' (deriv.hpp, Ridders), with an estimate of about 1e-5; ForwardRidders is the more
+    // accurate.
+    if (!(rows[4].evaluations == 64 && rows[4].estimate > 3e-6 && rows[4].estimate < 3e-5)) return 21;
+    if (!(rows[5].error < rows[4].error)) return 22;
     return 0;
 }

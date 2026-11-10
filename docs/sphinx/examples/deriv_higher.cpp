@@ -16,6 +16,8 @@
 
 #include <cmath>
 #include <print>
+
+namespace dv = nxx::deriv;
 // </includes>
 // clang-format on
 
@@ -25,8 +27,6 @@
 #include <string>
 
 namespace {
-
-    namespace dv = nxx::deriv;
 
     // The relative error of derivative<M, N> of 1/x at 2.
     template<typename M, int N>
