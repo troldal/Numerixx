@@ -1,7 +1,8 @@
 # Milestone 3, Phase 9: the `nxx::deriv` chapter through the manual's workflow
 
-Status: approved by the user (2026-11-09), after the critic's review of the plan (`reviews/P9-plan-critic.md`) and
-the user's decisions on it.
+Status: complete (2026-11-10, 3c2bc95). Approved by the user 2026-11-09, after the critic's review of the plan
+(`reviews/P9-plan-critic.md`) and the user's decisions on it; the reviews, decisions and responses of every stage are
+in `reviews/P9-*.md`.
 
 The pilot of the workflow in `docs/sphinx/CLAUDE.md`: the chapter is rewritten to the theory cap and the budgets, with
 figures where they make a concept easier to see, and reviewed in the new round. Roots and quadrature follow in phases

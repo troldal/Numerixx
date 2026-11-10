@@ -247,7 +247,8 @@ the examples' tests pass on all five toolchains.
     the stage-4 commit)
   - [x] Review round, decision letter and revision (`docs/sphinx/reviews/P9-*.md`; with two header-comment
     corrections and a test the user approved)
-  - [ ] Release: all five toolchains, site and PDF, CI; the Codex review and its adopted findings
+  - [x] Release: all five toolchains, site and PDF, CI; the Codex review and its adopted findings (3c2bc95: run
+    42894113815; Codex: three findings, all reproduced and adopted, `docs/sphinx/reviews/P9-codex.md`)
 
 Open decisions: hosting (GitHub Pages from CI, or Read the Docs) and versioning (one site per release, or `dev` only),
 with `linkcheck` and the install section of getting-started;
