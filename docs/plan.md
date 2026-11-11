@@ -250,6 +250,15 @@ the examples' tests pass on all five toolchains.
   - [x] Release: all five toolchains, site and PDF, CI; the Codex review and its adopted findings (3c2bc95: run
     42894113815; Codex: three findings, all reproduced and adopted, `docs/sphinx/reviews/P9-codex.md`)
 
+- Phase 10: the `nxx::roots` chapter through the same workflow (the user's decision, 2026-11-11). Plan approved:
+  `docs/sphinx/PHASE10_PLAN.md` (budgets about 5,400 words as targets, two figures on the overview, the overview
+  headings' sentences dropped on all three chapters, `docs/sphinx/count_words.py` as the one word counter).
+  - [x] Plan approved, after the critic's review (`docs/sphinx/reviews/P10-plan-critic.md`)
+  - [ ] Evidence: the figures and the changed programs pass with GCC; the user has seen the figures
+  - [ ] Draft and edit: every page within its budget or with the editor's reason; docs build clean
+  - [ ] Review round, decision letter and revision (`docs/sphinx/reviews/P10-*.md`)
+  - [ ] Release: all five toolchains, site and PDF, CI; the Codex review and its adopted findings
+
 Open decisions: hosting (GitHub Pages from CI, or Read the Docs) and versioning (one site per release, or `dev` only),
 with `linkcheck` and the install section of getting-started;
 whether the headers' `@code` blocks move to `@snippet` from tests (a change to `include/`); whether to offer the

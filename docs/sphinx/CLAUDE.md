@@ -50,7 +50,7 @@ Easy to understand, and brief.
 - **Budgets.** About 800 words for an overview, 1,000 for a tutorial, 600 for a guide page; the plan sets each page's.
   An overrun needs the editor's reason in the plan. Code blocks, output, captions and alt text do not count; notes
   and headings do, and an inline code span or formula counts as one word (Phase 9: three counting methods gave
-  budgets three meanings).
+  budgets three meanings). Count with `python docs/sphinx/count_words.py <pages or folders>`, and with nothing else.
 - **Cut what the reader would not miss.** No sentence repeats another page; link to it instead. No preamble, no
   summary of what was just said.
 - **Plain words.** One idea per sentence, at most about 25 words; active voice; second person. A term of numerical
