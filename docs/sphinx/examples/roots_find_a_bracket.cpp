@@ -9,6 +9,8 @@
 #include <numerixx/roots.hpp>
 
 #include <print>
+
+namespace rt = nxx::roots;
 // </includes>
 // clang-format on
 
@@ -34,7 +36,6 @@ int main(int, char **argv)
     if (!docs::capture(argv[0])) return 100;
     // clang-format off
     // <search>
-    namespace rt = nxx::roots;
     auto const wallis = [](double x) { return (x * x - 2.0) * x - 5.0; };
     auto const bracket = rt::search(wallis, 0.0);
     if (bracket) std::println("[{}, {}]", bracket->lower, bracket->upper);

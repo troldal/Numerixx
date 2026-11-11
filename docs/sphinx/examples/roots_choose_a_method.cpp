@@ -8,19 +8,21 @@
 #include <numerixx/roots.hpp>
 
 #include <print>
+
+namespace rt = nxx::roots;
 // </includes>
 
 // <count>
 // The number of calls of fn that solve<M> makes on bracket, or -1 where it finds no root.
 template<typename M, typename F>
-int evaluations(F const &fn, nxx::roots::Bracket<double> const &bracket)
+int evaluations(F const &fn, rt::Bracket<double> const &bracket)
 {
     int calls = 0;
     auto const counted = [&](double x) {
         ++calls;
         return fn(x);
     };
-    return nxx::roots::solve<M>(counted, bracket) ? calls : -1;
+    return rt::solve<M>(counted, bracket) ? calls : -1;
 }
 // </count>
 // clang-format on
@@ -33,7 +35,6 @@ int main(int, char **argv)
 
     // clang-format off
     // <compare>
-    namespace rt = nxx::roots;
     auto const wallis = [](double x) { return (x * x - 2.0) * x - 5.0; };
     rt::Bracket const bracket{2.0, 3.0};
     int const bisection = evaluations<rt::Bisection>(wallis, bracket);

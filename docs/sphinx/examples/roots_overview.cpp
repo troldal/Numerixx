@@ -8,6 +8,8 @@
 #include <numerixx/roots.hpp>
 
 #include <print>
+
+namespace rt = nxx::roots;
 // </includes>
 // clang-format on
 
@@ -24,7 +26,6 @@ int main(int, char **argv)
 
     // clang-format off
     // <brent>
-    namespace rt = nxx::roots;
     auto const r = rt::solve<rt::Brent>([](double x) { return x * x - 2.0; }, rt::Bracket{1.0, 2.0});
     if (r) std::println("root {:.17g}, abs_error {:.1e}", r->value, r->abs_error);
     else std::println("no root: {}", r.error());

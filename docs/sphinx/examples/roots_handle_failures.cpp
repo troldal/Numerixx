@@ -1,6 +1,6 @@
-// The program of docs/sphinx/roots/handle-failures.md: reacting to a failed solve. The page shows the parts
-// between the markers and the output in the raw strings; main returns non-zero unless the program prints that output
-// and what the page says holds, against closed forms and mpmath, and the independent prototypes' outcomes
+// The program of docs/sphinx/roots/handle-failures.md: reacting to a failed solve, and watching one. The page shows
+// the parts between the markers and the output in the raw strings; main returns non-zero unless the program prints that
+// output and what the page says holds, against closed forms and mpmath, and the independent prototypes' outcomes
 // (docs/roots/design.md, Evidence, Phases 2 and 6).
 
 // clang-format off
@@ -11,6 +11,8 @@
 #include <limits>
 #include <print>
 #include <utility>
+
+namespace rt = nxx::roots;
 // </includes>
 // clang-format on
 
@@ -23,7 +25,7 @@
 // Whether a result is more likely a pole than a root: |fn| falls away from a pole and grows away from a root.
 // Compares |fn| at the result with |fn| a little to each side, 1024 times abs_error away.
 template<typename F>
-bool looks_like_a_pole(F const &fn, nxx::roots::Root<double> const &r)
+bool looks_like_a_pole(F const &fn, rt::Root<double> const &r)
 {
     double const away = 1024 * r.abs_error;
     double const here = std::abs(fn(r.value));
@@ -35,7 +37,6 @@ bool looks_like_a_pole(F const &fn, nxx::roots::Root<double> const &r)
 int main(int, char **argv)
 {
     if (!docs::capture(argv[0])) return 100;
-    namespace rt = nxx::roots;
 
     // clang-format off
     // <recover>
@@ -64,6 +65,15 @@ int main(int, char **argv)
     std::println("x = {:.17g}", x);
     // </react>
 
+    // <observe>
+    int steps = 0;
+    auto const watch = [&steps](rt::Step<double> const &s) {
+        if (++steps <= 6) std::println("step {}: x = {}", steps, s.point);
+    };
+    auto const n = rt::solve<rt::Newton>(rt::observer(watch), fdf, 0.0);
+    if (!n) std::println("{} after {} steps", n.error(), steps);
+    // </observe>
+
     // <pole>
     // 1/(x - 1/3) changes sign at its pole, and Brent returns the pole as a root.
     auto const g = [](double t) { return 1.0 / (t - 1.0 / 3.0); };
@@ -75,14 +85,43 @@ int main(int, char **argv)
     constexpr std::string_view react_output = R"(
 x = -1.7692923542386314
 )";
+    constexpr std::string_view observe_output = R"(
+step 1: x = 0
+step 2: x = 1
+step 3: x = 0
+step 4: x = 1
+step 5: x = 0
+step 6: x = 1
+not_converged after 213 steps
+)";
     constexpr std::string_view pole_output = R"(
 0.33333333333333309 is a pole, not a root
 )";
-    if (!(docs::printed() == std::string(docs::quoted(react_output)) + std::string(docs::quoted(pole_output))))
+    if (!(docs::printed() == std::string(docs::quoted(react_output)) + std::string(docs::quoted(observe_output))
+                                 + std::string(docs::quoted(pole_output))))
         return 8;
 
     // Newton alone from 0 gives not_converged (Phase 2's prototype: 213 evaluations, its cap).
     if (!(rt::solve<rt::Newton>(fdf, 0.0) == std::unexpected(rt::error::not_converged))) return 1;
+    // "Its steps go from 0 to 1 and back to 0, for ever": f(0) = 2 and f'(0) = -2, so the step from 0 is to exactly 1;
+    // f(1) = 1 and f'(1) = 1, so the step from 1 is to exactly 0, every value exact in a double. So the reported points
+    // alternate 0, 1, 0, ..., and fn is positive at both iterates of every step: no sign change. The run ends
+    // not_converged at the cap, 4 times the 53 bits of a double, 212 steps without a sign change after the start, one
+    // evaluation of fn each: 213 reports and 213 evaluations. The observed run returns what the unobserved one does.
+    int calls = 0;
+    int reports = 0;
+    bool cycle = true;
+    auto const counted = [&calls, &fdf](double t) {
+        ++calls;
+        return fdf(t);
+    };
+    auto const check = [&](rt::Step<double> const &s) {
+        cycle = cycle && s.point == (reports % 2 == 0 ? 0.0 : 1.0) && s.f_lower > 0.0 && s.f_upper > 0.0;
+        ++reports;
+    };
+    if (!(rt::solve<rt::Newton>(rt::observer(check), counted, 0.0) == std::unexpected(rt::error::not_converged)
+          && cycle && reports == 213 && calls == 213 && steps == 213 && n == rt::solve<rt::Newton>(fdf, 0.0)))
+        return 12;
     // The recovered root -1.769292354238631415 (mpmath) within abs_error + c: fn's rounding near the root (x * x,
     // * x; - 2 and + 2 exact) about 8e-16 over |f'| = 7.4, 1.1e-16, plus half an ulp of the root, 1.1e-16.
     if (!r || !(std::abs(r->value + 1.769292354238631415) <= r->abs_error + 2.5e-16)) return 2;

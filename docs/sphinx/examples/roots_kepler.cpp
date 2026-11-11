@@ -9,6 +9,8 @@
 #include <cmath>
 #include <print>
 #include <utility>
+
+namespace rt = nxx::roots;
 // </includes>
 // clang-format on
 
@@ -47,7 +49,6 @@ int main()
     // </function>
 
     // <bracket>
-    namespace rt = nxx::roots;
     auto const r = rt::solve<rt::Brent>(kepler, rt::Bracket{M - e, M + e});
     if (r) {
         std::println("E         = {:.17g}", r->value);

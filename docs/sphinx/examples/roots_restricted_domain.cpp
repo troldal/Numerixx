@@ -13,6 +13,8 @@
 #include <limits>
 #include <print>
 #include <utility>
+
+namespace rt = nxx::roots;
 // </includes>
 // clang-format on
 
@@ -25,7 +27,6 @@
 int main(int, char **argv)
 {
     if (!docs::capture(argv[0])) return 100;
-    namespace rt = nxx::roots;
     double const eps = std::numeric_limits<double>::epsilon();
 
     // clang-format off

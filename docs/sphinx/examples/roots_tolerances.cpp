@@ -10,6 +10,8 @@
 #include <numerixx/roots.hpp>
 
 #include <print>
+
+namespace rt = nxx::roots;
 // </includes>
 // clang-format on
 
@@ -24,8 +26,6 @@
 #include <utility>
 
 namespace {
-
-    namespace rt = nxx::roots;
 
     // The number of calls of fn that solve<M> makes, and its result.
     template<typename M, typename F>

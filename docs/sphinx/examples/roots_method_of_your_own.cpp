@@ -1,9 +1,11 @@
-// The program of docs/sphinx/roots/method-of-your-own.md: Pegasus on a bracket and Chebyshev's method from a guess,
-// written as stepped methods against the public protocol only, checked against their concepts where they are defined,
-// and called through solve() on Wallis's cubic x^3 - 2x - 5. The page shows the parts between the markers and the
-// output in the raw strings; main returns non-zero unless the program prints that output and what the page says holds.
-// The methods and the function use only + - * /, which IEEE 754 rounds correctly, so the output is the same on every
-// target that does not contract a * b + c into a fused multiply-add (x86-64 without -mfma, WebAssembly).
+// The program of docs/sphinx/roots/method-of-your-own.md: the Pegasus method (Dowell and Jarratt 1972) on a bracket
+// and Chebyshev's method from a guess, written as stepped methods against the public protocol only, checked against
+// their concepts where they are defined, and called through solve() on Wallis's cubic x^3 - 2x - 5. The page names the
+// Pegasus method without its source, which the manual's citation rule does not admit (PHASE10_PLAN.md, Q6). The page
+// shows the parts between the markers and the output in the raw strings; main returns non-zero unless the program
+// prints that output and what the page says holds. The methods and the function use only + - * /, which IEEE 754
+// rounds correctly, so the output is the same on every target that does not contract a * b + c into a fused
+// multiply-add (x86-64 without -mfma, WebAssembly).
 
 // clang-format off
 // <includes>
@@ -16,6 +18,8 @@
 #include <optional>
 #include <print>
 #include <tuple>
+
+namespace rt = nxx::roots;
 // </includes>
 // clang-format on
 
@@ -29,10 +33,8 @@
 
 // clang-format off
 // <pegasus>
-namespace rt = nxx::roots;
-
-// Pegasus (Dowell and Jarratt 1972): false position whose retained end's value is scaled by f1 / (f1 + fx)
-// whenever that end is retained again; each new point kept `inside` times tol(point) away from the ends
+// The Pegasus method: false position whose retained end's value is scaled by f1 / (f1 + fx) whenever that end is
+// retained again; each new point kept `inside` times tol(point) away from the ends
 struct Pegasus
 {
     double inside = 1.0;

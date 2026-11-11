@@ -254,7 +254,7 @@ the examples' tests pass on all five toolchains.
   `docs/sphinx/PHASE10_PLAN.md` (budgets about 5,400 words as targets, two figures on the overview, the overview
   headings' sentences dropped on all three chapters, `docs/sphinx/count_words.py` as the one word counter).
   - [x] Plan approved, after the critic's review (`docs/sphinx/reviews/P10-plan-critic.md`)
-  - [ ] Evidence: the figures and the changed programs pass with GCC; the user has seen the figures
+  - [x] Evidence: the figures and the changed programs pass with GCC; the user has seen the figures (2026-11-11)
   - [ ] Draft and edit: every page within its budget or with the editor's reason; docs build clean
   - [ ] Review round, decision letter and revision (`docs/sphinx/reviews/P10-*.md`)
   - [ ] Release: all five toolchains, site and PDF, CI; the Codex review and its adopted findings

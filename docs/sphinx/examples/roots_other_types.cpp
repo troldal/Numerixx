@@ -12,6 +12,8 @@
 #include <limits>
 #include <print>
 #include <utility>
+
+namespace rt = nxx::roots;
 // </includes>
 // clang-format on
 
@@ -21,8 +23,6 @@
 #include <expected>
 
 namespace {
-
-    namespace rt = nxx::roots;
 
     constexpr char const *sqrt2_70 = "1.414213562373095048801688724209698078569671875376948073176679737990732";
 

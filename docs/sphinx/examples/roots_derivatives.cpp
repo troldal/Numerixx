@@ -11,6 +11,8 @@
 #include <print>
 #include <tuple>
 #include <utility>
+
+namespace rt = nxx::roots;
 // </includes>
 // clang-format on
 
@@ -20,8 +22,6 @@
 #include <type_traits>
 
 namespace {
-
-    namespace rt = nxx::roots;
 
     // fn wrapped to count its calls; it returns what fn returns.
     template<typename F>
@@ -44,6 +44,14 @@ namespace {
         return r && std::abs(r->value - 2.0945514815423265915) <= r->abs_error + 2e-16 + 2.3e-16
                && r->abs_error <= 2 * (std::numeric_limits<double>::denorm_min() + 2 * eps * r->value);
     }
+
+    // "Every element must be exactly the real type": a pair whose second element is the int 1 fails solve's
+    // constraint, so the call does not compile; with 1.0 it does.
+    template<typename F>
+    constexpr bool solvable = requires(F const &fn) { rt::solve<rt::Newton>(fn, 2.0); };
+    constexpr auto int_slope = [](double x) { return std::pair{x - 1.0, 1}; };
+    constexpr auto double_slope = [](double x) { return std::pair{x - 1.0, 1.0}; };
+    static_assert(!solvable<decltype(int_slope)> && solvable<decltype(double_slope)>);
 
 } // namespace
 
@@ -73,13 +81,14 @@ int main()
 
     // <numerical>
     auto const numerical = rt::solve<rt::Newton>(f, nxx::deriv::derivative_of(f), rt::Bracket{2.0, 3.0});
+    auto const numerical_guess = rt::solve<rt::Newton>(f, nxx::deriv::derivative_of(f), 2.0);
     // </numerical>
     // clang-format on
 
     if (newton) std::println("Newton {:.17g}, Halley {:.17g}", newton->value, halley ? halley->value : 0.0);
 
     if (!accurate(newton) || !accurate(newton_guess) || !accurate(halley) || !accurate(separate)) return 1;
-    if (!accurate(numerical)) return 2;
+    if (!accurate(numerical) || !accurate(numerical_guess)) return 2;
     // The separate callables are the pair, joined: the same result.
     if (!(separate == newton)) return 3;
 
